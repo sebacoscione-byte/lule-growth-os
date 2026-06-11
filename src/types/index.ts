@@ -1,0 +1,179 @@
+export type LeadStatus =
+  | "nuevo"
+  | "interesado"
+  | "calificado"
+  | "derivado_cimel"
+  | "derivado_swiss"
+  | "seguimiento_pendiente"
+  | "confirmo_que_pidio_turno"
+  | "no_pudo_pedir_turno"
+  | "requiere_humano"
+  | "urgencia_derivada"
+  | "descartado"
+  | "spam"
+
+export type OriginChannel =
+  | "google_maps"
+  | "google_search"
+  | "instagram"
+  | "whatsapp"
+  | "manual"
+  | "referral"
+  | "landing_page"
+
+export type RequestedService =
+  | "consulta_cardiologia"
+  | "ecocardiograma"
+  | "no_definido"
+
+export type PreferredLocation =
+  | "cimel_lanus"
+  | "swiss_lomas"
+  | "sin_definir"
+
+export type LeadIntent =
+  | "turno"
+  | "consulta_cardiologia"
+  | "ecocardiograma"
+  | "cobertura"
+  | "lugar_atencion"
+  | "consulta_medica"
+  | "urgencia"
+  | "spam"
+  | "otro"
+
+export type NextAction =
+  | "responder"
+  | "pedir_preferencia"
+  | "derivar_cimel"
+  | "derivar_swiss"
+  | "escalar"
+  | "descartar"
+
+export interface Lead {
+  id: string
+  name: string | null
+  phone: string | null
+  instagram_username: string | null
+  origin_channel: OriginChannel
+  origin_campaign: string | null
+  searched_keyword: string | null
+  requested_service: RequestedService
+  preferred_location: PreferredLocation
+  preferred_day: "martes" | "viernes" | "sin_definir"
+  insurance: string | null
+  general_reason: string | null
+  consent_to_contact: boolean
+  status: LeadStatus
+  priority_score: number
+  possible_emergency: boolean
+  requires_human: boolean
+  ai_summary: string | null
+  last_message: string | null
+  created_at: string
+  updated_at: string
+  referred_at: string | null
+  followup_due_at: string | null
+  confirmed_booked: boolean
+}
+
+export interface Message {
+  id: string
+  lead_id: string
+  role: "user" | "assistant"
+  content: string
+  created_at: string
+}
+
+export interface GrowthExperiment {
+  id: string
+  name: string
+  channel: "google_maps" | "seo" | "instagram" | "google_ads" | "whatsapp" | "referrals"
+  hypothesis: string
+  content_or_action: string
+  start_date: string
+  end_date: string | null
+  metric_to_improve: string
+  result: string | null
+  winner: boolean | null
+  created_at: string
+}
+
+export interface ClassifyResult {
+  intent: LeadIntent
+  requested_service: RequestedService
+  suggested_location: PreferredLocation | "preguntar"
+  suggested_day: "martes" | "viernes" | "preguntar"
+  priority_score: number
+  requires_human: boolean
+  possible_emergency: boolean
+  reply_suggestion: string
+  next_action: NextAction
+}
+
+export interface DashboardMetrics {
+  total_leads: number
+  leads_by_channel: Record<OriginChannel, number>
+  leads_by_service: Record<RequestedService, number>
+  leads_by_location: Record<PreferredLocation, number>
+  derivados_cimel: number
+  derivados_swiss: number
+  confirmed_booked: number
+  no_pudo_pedir: number
+  requires_human: number
+  possible_emergencies: number
+  weekly_leads: { date: string; count: number }[]
+}
+
+export const STATUS_LABELS: Record<LeadStatus, string> = {
+  nuevo: "Nuevo",
+  interesado: "Interesado",
+  calificado: "Calificado",
+  derivado_cimel: "Derivado CIMEL",
+  derivado_swiss: "Derivado Swiss",
+  seguimiento_pendiente: "Seguimiento pendiente",
+  confirmo_que_pidio_turno: "Confirmó turno",
+  no_pudo_pedir_turno: "No pudo pedir",
+  requiere_humano: "Requiere humano",
+  urgencia_derivada: "Urgencia derivada",
+  descartado: "Descartado",
+  spam: "Spam",
+}
+
+export const STATUS_COLORS: Record<LeadStatus, string> = {
+  nuevo: "bg-blue-100 text-blue-800",
+  interesado: "bg-yellow-100 text-yellow-800",
+  calificado: "bg-purple-100 text-purple-800",
+  derivado_cimel: "bg-indigo-100 text-indigo-800",
+  derivado_swiss: "bg-teal-100 text-teal-800",
+  seguimiento_pendiente: "bg-orange-100 text-orange-800",
+  confirmo_que_pidio_turno: "bg-green-100 text-green-800",
+  no_pudo_pedir_turno: "bg-red-100 text-red-800",
+  requiere_humano: "bg-pink-100 text-pink-800",
+  urgencia_derivada: "bg-red-200 text-red-900",
+  descartado: "bg-gray-100 text-gray-600",
+  spam: "bg-gray-100 text-gray-400",
+}
+
+export const CHANNEL_LABELS: Record<OriginChannel, string> = {
+  google_maps: "Google Maps",
+  google_search: "Google Search",
+  instagram: "Instagram",
+  whatsapp: "WhatsApp",
+  manual: "Manual",
+  referral: "Referido",
+  landing_page: "Landing Page",
+}
+
+export const SERVICE_LABELS: Record<RequestedService, string> = {
+  consulta_cardiologia: "Consulta cardiológica",
+  ecocardiograma: "Ecocardiograma",
+  no_definido: "Sin definir",
+}
+
+export const LOCATION_LABELS: Record<string, string> = {
+  cimel_lanus: "CIMEL Lanús",
+  swiss_lomas: "Swiss Medical Lomas",
+  sin_definir: "Sin definir",
+  preguntar: "Por definir",
+}
