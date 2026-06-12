@@ -13,7 +13,7 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
-import type { ContentItem, ContentSource, ContentStatus } from "@/types"
+import type { ContentItem, ContentSlide, ContentSource, ContentStatus } from "@/types"
 
 const IS_MANUAL_MODE = process.env.NEXT_PUBLIC_AI_MODE !== "gemini_api"
 
@@ -63,6 +63,53 @@ function VisualCard({ item, compact = false }: { item: ContentItem; compact?: bo
         <p className="mt-3 text-sm text-white/80">{item.visual_subtitle}</p>
       </div>
       <p className="text-xs text-white/70">Martes en Lanus · Viernes en Lomas</p>
+    </div>
+  )
+}
+
+function SlideCard({ slide, index, style, compact = false }: { slide: ContentSlide; index: number; style: ContentItem["visual_style"]; compact?: boolean }) {
+  return (
+    <div className={`${compact ? "w-28 flex-shrink-0" : "w-full"} aspect-square rounded-xl bg-gradient-to-br ${STYLE_CLASSES[style]} p-3 text-white flex flex-col justify-between shadow-sm`}>
+      <span className="text-[10px] font-bold text-white/50 uppercase tracking-widest">{index + 1}</span>
+      <div>
+        <p className={`${compact ? "text-xs" : "text-base"} font-bold leading-tight`}>{slide.headline}</p>
+        <p className={`${compact ? "text-[10px]" : "text-sm"} text-white/80 mt-1 line-clamp-3`}>{slide.text}</p>
+      </div>
+    </div>
+  )
+}
+
+function CarouselPreview({ item, compact = false }: { item: ContentItem; compact?: boolean }) {
+  const slides = item.slides
+  if (!slides || slides.length === 0) return <VisualCard item={item} compact={compact} />
+  if (compact) {
+    return (
+      <div className="space-y-2">
+        <VisualCard item={item} compact />
+        <div className="flex gap-1.5 overflow-x-auto pb-1">
+          {slides.map((slide, i) => (
+            <SlideCard key={i} slide={slide} index={i} style={item.visual_style} compact />
+          ))}
+        </div>
+        <p className="text-xs text-gray-400 text-center">{slides.length + 1} slides · Portada + {slides.length} contenido</p>
+      </div>
+    )
+  }
+  return (
+    <div className="space-y-3">
+      <div>
+        <p className="text-xs font-medium text-gray-500 mb-1.5 uppercase tracking-wide">Portada</p>
+        <VisualCard item={item} />
+      </div>
+      <div>
+        <p className="text-xs font-medium text-gray-500 mb-1.5 uppercase tracking-wide">Slides de contenido ({slides.length})</p>
+        <div className="grid grid-cols-2 gap-2">
+          {slides.map((slide, i) => (
+            <SlideCard key={i} slide={slide} index={i} style={item.visual_style} />
+          ))}
+        </div>
+      </div>
+      <p className="text-xs text-gray-400 text-center">Total: {slides.length + 1} slides. Usá estos contenidos en Canva o Instagram para armar las placas.</p>
     </div>
   )
 }
@@ -538,6 +585,13 @@ export default function ContentStudioPage() {
 
   async function saveGeneratedItem(generated: Record<string, unknown>) {
     const now = new Date().toISOString()
+    const rawSlides = generated.slides
+    const slides = Array.isArray(rawSlides)
+      ? (rawSlides as Array<Record<string, unknown>>)
+          .filter(s => typeof s.headline === "string" && typeof s.text === "string")
+          .map(s => ({ headline: (s.headline as string).slice(0, 60), text: (s.text as string).slice(0, 300) }))
+      : undefined
+
     const item: ContentItem = {
       id: crypto.randomUUID(),
       topic: topic || category,
@@ -559,6 +613,7 @@ export default function ContentStudioPage() {
       visual_style: (["rose", "blue", "teal"].includes(generated.visual_style as string)
         ? generated.visual_style
         : "blue") as "rose" | "blue" | "teal",
+      slides: slides && slides.length > 0 ? slides : undefined,
     }
 
     const saved = await fetch("/api/content/items", {
@@ -787,7 +842,7 @@ export default function ContentStudioPage() {
               {items.filter(item => item.status !== "archived").map(item => (
                 <Card key={item.id} className="overflow-hidden">
                   <CardContent className="p-4 space-y-3">
-                    <VisualCard item={item} compact />
+                    <CarouselPreview item={item} compact />
                     <div className="flex items-center justify-between gap-2">
                       <div><p className="font-medium text-gray-900">{item.topic}</p><p className="text-xs text-gray-500">{item.format} · {new Date(item.created_at).toLocaleDateString("es-AR")}</p></div>
                       <Badge variant="outline">{STATUS_LABELS[item.status]}</Badge>
@@ -826,13 +881,16 @@ function Editor({ item, working, copied, onChange, onSave, onCopy, onDownload, o
   onPublishGoogle: () => void
 }) {
   const busy = working === item.id
+  const isCarousel = item.format === "carrusel" && item.slides && item.slides.length > 0
   return (
     <div className="grid gap-5 lg:grid-cols-2">
       <div className="space-y-3">
-        <VisualCard item={item} />
+        <CarouselPreview item={item} />
         <div className="flex gap-2">
-          <Button variant="outline" onClick={onDownload} className="flex-1 gap-2"><Download className="h-4 w-4" /> Descargar placa</Button>
-          <Button variant="outline" onClick={onCopy} className="flex-1 gap-2">{copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />} Copiar Instagram</Button>
+          {!isCarousel && (
+            <Button variant="outline" onClick={onDownload} className="flex-1 gap-2"><Download className="h-4 w-4" /> Descargar placa</Button>
+          )}
+          <Button variant="outline" onClick={onCopy} className={`gap-2 ${isCarousel ? "w-full" : "flex-1"}`}>{copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />} Copiar Instagram</Button>
         </div>
         {item.source && (
           <a href={item.source.url} target="_blank" rel="noreferrer" className="block rounded-lg border border-blue-100 bg-blue-50 p-3 text-xs text-blue-800">

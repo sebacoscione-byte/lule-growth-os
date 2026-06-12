@@ -188,7 +188,25 @@ El caption debe cerrar invitando al lector a usar ese link para pedir turno. NO 
 ${sourceSection}
 RESPUESTA ESPERADA:
 Devolvé ÚNICAMENTE el JSON válido, sin markdown, sin bloques de código, sin explicaciones.
+${input.format === "carrusel" ? `Formato CARRUSEL: incluí un array "slides" con 4-5 slides de contenido (además de la portada).
+Cada slide tiene "headline" (máx. 40 caracteres) y "text" (1-2 oraciones del contenido de esa slide).
 Usá exactamente estas claves:
+
+{
+  "hook": "frase gancho para la portada del carrusel",
+  "caption": "caption completo (150-300 palabras). Estructurá con introducción + puntos clave de cada slide.",
+  "google_text": "texto para Google Business, máximo 1500 caracteres",
+  "hashtags": "#hashtag1 #hashtag2 (10-15 hashtags)",
+  "visual_headline": "título de la portada, máximo 40 caracteres",
+  "visual_subtitle": "subtítulo de la portada, máximo 60 caracteres",
+  "visual_style": "rose",
+  "slides": [
+    {"headline": "Slide 1 — título", "text": "Contenido de esta slide en 1-2 oraciones."},
+    {"headline": "Slide 2 — título", "text": "Contenido de esta slide."},
+    {"headline": "Slide 3 — título", "text": "Contenido de esta slide."},
+    {"headline": "Slide 4 — título", "text": "Contenido de esta slide."}
+  ]
+}` : `Usá exactamente estas claves:
 
 {
   "hook": "frase gancho de 1-2 líneas para captar atención en Instagram",
@@ -198,7 +216,7 @@ Usá exactamente estas claves:
   "visual_headline": "titular para la placa visual, máximo 60 caracteres",
   "visual_subtitle": "subtítulo para la placa visual, máximo 80 caracteres",
   "visual_style": "rose"
-}`
+}`}`
 }
 
 export function buildReplyPrompt(message: string, leadContext: string): string {
@@ -477,6 +495,7 @@ export async function generateContentPlan(input: {
   visual_headline: string
   visual_subtitle: string
   visual_style: "rose" | "blue" | "teal"
+  slides?: Array<{ headline: string; text: string }>
 }> {
   const sourceContext = input.source
     ? `Fuente para contextualizar:
@@ -488,6 +507,16 @@ Resumen disponible: ${input.source.summary || "No disponible"}
 No inventes resultados que no esten en el resumen. Menciona la fuente de forma general, sin presentar el post como consejo medico.`
     : "No hay fuente reciente seleccionada. Trata el tema como contenido evergreen y no menciones novedades ni estudios recientes."
 
+  const slidesSchema = input.format === "carrusel"
+    ? `,
+  "slides": [
+    {"headline": "Slide 1 — titulo, max 40 chars", "text": "1-2 oraciones del contenido."},
+    {"headline": "Slide 2", "text": "..."},
+    {"headline": "Slide 3", "text": "..."},
+    {"headline": "Slide 4", "text": "..."}
+  ]`
+    : ""
+
   const userContent = `Tema: ${input.topic}
 Categoria: ${input.category}
 Formato Instagram: ${input.format}
@@ -495,15 +524,14 @@ CTA: ${input.cta}
 
 ${sourceContext}
 
-Devolve:
+${input.format === "carrusel" ? "Es un CARRUSEL: generá 4-5 slides con headline y texto corto para cada slide, ademas de la portada.\n\n" : ""}Devolve:
 {
   "hook": "...",
   "caption": "...",
   "google_text": "...",
   "hashtags": "...",
   "visual_headline": "...",
-  "visual_subtitle": "...",
-  "visual_style": "rose | blue | teal"
+  "visual_subtitle": "..."${slidesSchema}
 }`
 
   const text = await generateText({
@@ -530,6 +558,14 @@ Reglas:
   const parsed = parseJson<Record<string, unknown>>(text)
   const required = ["hook", "caption", "google_text", "hashtags", "visual_headline", "visual_subtitle"]
   if (required.some(key => typeof parsed[key] !== "string")) throw new Error("Plan de contenido incompleto.")
+
+  const rawSlides = parsed.slides
+  const slides = Array.isArray(rawSlides)
+    ? (rawSlides as Array<Record<string, unknown>>)
+        .filter(s => typeof s.headline === "string" && typeof s.text === "string")
+        .map(s => ({ headline: (s.headline as string).slice(0, 60), text: (s.text as string).slice(0, 300) }))
+    : undefined
+
   return {
     hook: parsed.hook as string,
     caption: parsed.caption as string,
@@ -540,6 +576,7 @@ Reglas:
     visual_style: ["rose", "blue", "teal"].includes(parsed.visual_style as string)
       ? parsed.visual_style as "rose" | "blue" | "teal"
       : "blue",
+    slides: slides && slides.length > 0 ? slides : undefined,
   }
 }
 

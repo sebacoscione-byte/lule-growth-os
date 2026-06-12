@@ -119,6 +119,11 @@ export interface ContentSource {
   summary: string
 }
 
+export interface ContentSlide {
+  headline: string
+  text: string
+}
+
 export interface ContentItem {
   id: string
   topic: string
@@ -134,6 +139,7 @@ export interface ContentItem {
   visual_headline: string
   visual_subtitle: string
   visual_style: "rose" | "blue" | "teal"
+  slides?: ContentSlide[]
   source: ContentSource | null
   created_at: string
   updated_at: string
