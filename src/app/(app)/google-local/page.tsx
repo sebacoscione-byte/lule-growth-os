@@ -16,10 +16,19 @@ import { Badge } from "@/components/ui/badge"
 
 interface StatusData {
   connected: boolean
+  needsLocationPick?: boolean
   accountId?: string
   locationId?: string
   locationName?: string
   profile?: { title?: string }
+}
+
+interface LocationOption {
+  accountName: string
+  accountId: string
+  locationName: string
+  locationId: string
+  title: string
 }
 
 interface Post {
@@ -53,6 +62,72 @@ function Stars({ rating }: { rating: string }) {
         <Star key={i} className={`h-4 w-4 ${i <= n ? "fill-yellow-400 text-yellow-400" : "text-gray-200"}`} />
       ))}
     </span>
+  )
+}
+
+// ─── Location picker ─────────────────────────────────────────────────────────
+
+function LocationPickerView({ onPicked }: { onPicked: () => void }) {
+  const [locations, setLocations] = useState<LocationOption[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [selecting, setSelecting] = useState<string | null>(null)
+
+  useEffect(() => {
+    fetch("/api/google-business/locations")
+      .then(r => r.json())
+      .then(data => {
+        if (data.error) setError(data.error)
+        else setLocations(data.locations ?? [])
+      })
+      .catch(e => setError(String(e)))
+      .finally(() => setLoading(false))
+  }, [])
+
+  async function selectLocation(loc: LocationOption) {
+    setSelecting(loc.locationId)
+    await fetch("/api/google-business/select-location", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(loc),
+    })
+    setSelecting(null)
+    onPicked()
+  }
+
+  return (
+    <div className="flex flex-col items-center justify-center py-12 gap-6">
+      <div>
+        <h2 className="text-xl font-semibold text-gray-900 text-center">Elegí el negocio a administrar</h2>
+        <p className="text-sm text-gray-500 mt-1 text-center">Tu cuenta tiene varios negocios. Seleccioná el de la Dra. Lucía Chahin.</p>
+      </div>
+      {loading ? (
+        <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
+      ) : error ? (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-sm text-red-700 max-w-md w-full">
+          <span className="font-medium">Error:</span> {error}
+        </div>
+      ) : (
+        <div className="w-full max-w-md space-y-2">
+          {locations.map(loc => (
+            <button
+              key={loc.locationId}
+              onClick={() => selectLocation(loc)}
+              disabled={selecting === loc.locationId}
+              className="w-full flex items-center justify-between p-4 rounded-lg border border-gray-200 hover:border-blue-400 hover:bg-blue-50 text-left transition-colors"
+            >
+              <div>
+                <p className="font-medium text-gray-900">{loc.title}</p>
+                <p className="text-xs text-gray-400">{loc.locationId}</p>
+              </div>
+              {selecting === loc.locationId
+                ? <Loader2 className="h-4 w-4 animate-spin text-blue-500" />
+                : <MapPin className="h-4 w-4 text-gray-300" />}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
   )
 }
 
@@ -712,6 +787,8 @@ export default function GoogleLocalPage() {
 
       {!status?.connected ? (
         <ConnectView />
+      ) : status?.needsLocationPick ? (
+        <LocationPickerView onPicked={fetchStatus} />
       ) : (
         <Tabs defaultValue="posts">
           <TabsList>
