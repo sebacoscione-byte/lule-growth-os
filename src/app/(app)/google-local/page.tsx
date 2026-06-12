@@ -567,8 +567,12 @@ function PostsTab() {
           <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
         </div>
       ) : apiError ? (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-sm text-red-700">
-          <span className="font-medium">Error al cargar publicaciones:</span> {apiError}
+        <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 text-sm text-amber-800">
+          <p className="font-medium mb-1">Publicaciones no disponibles via API</p>
+          <p className="text-xs mb-3">Google eliminó el acceso público a esta función. Para publicar en Google, usá el panel oficial:</p>
+          <a href="https://business.google.com/" target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-xs font-medium text-blue-600 underline">
+            Ir a Google Business <ExternalLink className="h-3 w-3" />
+          </a>
         </div>
       ) : posts.length === 0 ? (
         <p className="text-center text-sm text-gray-400 py-8">No hay publicaciones aún</p>
@@ -676,8 +680,12 @@ function ReviewsTab() {
           <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
         </div>
       ) : apiError ? (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-sm text-red-700">
-          <span className="font-medium">Error al cargar reseñas:</span> {apiError}
+        <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 text-sm text-amber-800">
+          <p className="font-medium mb-1">Reseñas no disponibles via API</p>
+          <p className="text-xs mb-3">Google eliminó el acceso público a esta función. Para responder reseñas, usá el panel oficial:</p>
+          <a href="https://business.google.com/" target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-xs font-medium text-blue-600 underline">
+            Ir a Google Business <ExternalLink className="h-3 w-3" />
+          </a>
         </div>
       ) : reviews.length === 0 ? (
         <p className="text-center text-sm text-gray-400 py-8">No hay reseñas todavía</p>
