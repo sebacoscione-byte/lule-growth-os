@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import {
   Archive, BookOpen, Check, Copy, Download, ExternalLink, Loader2,
   RefreshCw, Search, Send, Sparkles,
@@ -14,6 +14,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
 import type { ContentItem, ContentSource, ContentStatus } from "@/types"
+
+const IS_MANUAL_MODE = process.env.NEXT_PUBLIC_AI_MODE !== "gemini_api"
 
 const CATEGORIES = [
   "Consulta cardiologica", "Ecocardiograma", "Presion arterial", "Colesterol",
@@ -106,6 +108,132 @@ function downloadVisual(item: ContentItem) {
   URL.revokeObjectURL(link.href)
 }
 
+// ---------------------------------------------------------------------------
+// Manual prompt panel
+// ---------------------------------------------------------------------------
+
+function ManualPanel({
+  prompt,
+  onProcess,
+  onDismiss,
+}: {
+  prompt: string
+  onProcess: (response: string) => Promise<void>
+  onDismiss: () => void
+}) {
+  const [copied, setCopied] = useState(false)
+  const [pasted, setPasted] = useState("")
+  const [processing, setProcessing] = useState(false)
+  const [parseError, setParseError] = useState<string | null>(null)
+
+  async function handleProcess() {
+    setParseError(null)
+    setProcessing(true)
+    try {
+      await onProcess(pasted)
+    } catch (e) {
+      setParseError(e instanceof Error ? e.message : "Error al procesar la respuesta")
+    }
+    setProcessing(false)
+  }
+
+  function copyPrompt() {
+    navigator.clipboard.writeText(prompt).catch(() => {
+      const el = document.createElement("textarea")
+      el.value = prompt
+      document.body.appendChild(el)
+      el.select()
+      document.execCommand("copy")
+      document.body.removeChild(el)
+    })
+    setCopied(true)
+    setTimeout(() => setCopied(false), 1800)
+  }
+
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-base flex items-center gap-2">
+            <Sparkles className="h-4 w-4 text-blue-600" />
+            Prompt listo — copialo y pegalo en la IA
+          </CardTitle>
+          <button onClick={onDismiss} className="text-xs text-gray-400 hover:text-gray-600">✕ cerrar</button>
+        </div>
+        <p className="text-xs text-gray-500">
+          Modo manual activo. Usá tu cuenta de ChatGPT, Gemini o Claude gratis.
+        </p>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {/* Prompt text */}
+        <Textarea
+          rows={11}
+          value={prompt}
+          readOnly
+          className="font-mono text-xs bg-gray-50 resize-none"
+        />
+
+        {/* Action buttons */}
+        <div className="flex flex-wrap gap-2">
+          <Button onClick={copyPrompt} className="gap-2">
+            {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+            {copied ? "Copiado!" : "Copiar prompt"}
+          </Button>
+          <Button variant="outline" onClick={() => window.open("https://chatgpt.com/", "_blank")} className="gap-2">
+            <ExternalLink className="h-4 w-4" />
+            Abrir ChatGPT
+          </Button>
+          <Button variant="outline" onClick={() => window.open("https://gemini.google.com/", "_blank")} className="gap-2">
+            <ExternalLink className="h-4 w-4" />
+            Abrir Gemini
+          </Button>
+          <Button variant="outline" onClick={() => window.open("https://claude.ai/", "_blank")} className="gap-2">
+            <ExternalLink className="h-4 w-4" />
+            Abrir Claude
+          </Button>
+        </div>
+
+        {/* Instructions */}
+        <ol className="text-xs text-gray-500 space-y-1 list-decimal list-inside bg-blue-50 rounded-lg p-3">
+          <li>Copiá el prompt de arriba</li>
+          <li>Abrí ChatGPT, Gemini o Claude con tu cuenta</li>
+          <li>Pegá el prompt y envialo</li>
+          <li>Copiá la respuesta completa (el JSON)</li>
+          <li>Pegala abajo y hacé clic en <strong>Procesar</strong></li>
+        </ol>
+
+        {/* Paste area */}
+        <div className="border-t pt-4 space-y-2">
+          <Label>Pegá la respuesta de la IA acá</Label>
+          <Textarea
+            rows={8}
+            placeholder='Pegá aquí la respuesta completa. Ejemplo: { "hook": "...", "caption": "...", ... }'
+            value={pasted}
+            onChange={e => { setPasted(e.target.value); setParseError(null) }}
+          />
+          {parseError && (
+            <p className="text-xs text-red-600 bg-red-50 rounded p-2">{parseError}</p>
+          )}
+          <Button
+            onClick={handleProcess}
+            disabled={!pasted.trim() || processing}
+            className="w-full gap-2"
+          >
+            {processing
+              ? <Loader2 className="h-4 w-4 animate-spin" />
+              : <Sparkles className="h-4 w-4" />}
+            Procesar y guardar como borrador
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Main page
+// ---------------------------------------------------------------------------
+
 export default function ContentStudioPage() {
   const [category, setCategory] = useState(CATEGORIES[0])
   const [topic, setTopic] = useState("")
@@ -122,6 +250,9 @@ export default function ContentStudioPage() {
   const [error, setError] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
   const [tab, setTab] = useState("crear")
+  const [manualPrompt, setManualPrompt] = useState<string | null>(null)
+
+  const lastGenRef = useRef(0)
 
   const loadItems = useCallback(async () => {
     const response = await fetch("/api/content/items")
@@ -132,8 +263,6 @@ export default function ContentStudioPage() {
   }, [])
 
   useEffect(() => {
-    // Initial remote state hydration.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadItems()
   }, [loadItems])
 
@@ -155,8 +284,15 @@ export default function ContentStudioPage() {
   }
 
   async function generate() {
+    // Debounce: ignore if clicked within 2s of previous attempt
+    const now = Date.now()
+    if (now - lastGenRef.current < 2000) return
+    lastGenRef.current = now
+
     setGenerating(true)
     setError(null)
+    setManualPrompt(null)
+
     const response = await fetch("/api/content", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -170,11 +306,30 @@ export default function ContentStudioPage() {
       }),
     })
     const generated = await response.json()
+    setGenerating(false)
+
+    // Rate limit fallback: show manual panel with the prompt
+    if (response.status === 429 && generated.prompt) {
+      setError(generated.error)
+      setManualPrompt(generated.prompt)
+      return
+    }
+
     if (!response.ok || generated.error) {
-      setGenerating(false)
       return setError(generated.error ?? "No se pudo generar el contenido")
     }
 
+    // Manual mode: show prompt panel
+    if (generated.mode === "manual") {
+      setManualPrompt(generated.prompt)
+      return
+    }
+
+    // API mode: create content item directly
+    await saveGeneratedItem(generated)
+  }
+
+  async function saveGeneratedItem(generated: Record<string, unknown>) {
     const now = new Date().toISOString()
     const item: ContentItem = {
       id: crypto.randomUUID(),
@@ -188,17 +343,49 @@ export default function ContentStudioPage() {
       created_at: now,
       updated_at: now,
       approved_at: null,
-      ...generated,
+      hook: generated.hook as string,
+      caption: generated.caption as string,
+      google_text: (generated.google_text as string).slice(0, 1500),
+      hashtags: generated.hashtags as string,
+      visual_headline: (generated.visual_headline as string).slice(0, 90),
+      visual_subtitle: (generated.visual_subtitle as string).slice(0, 90),
+      visual_style: (["rose", "blue", "teal"].includes(generated.visual_style as string)
+        ? generated.visual_style
+        : "blue") as "rose" | "blue" | "teal",
     }
+
     const saved = await fetch("/api/content/items", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(item),
     })
-    setGenerating(false)
-    if (!saved.ok) return setError("Se genero el contenido, pero no se pudo guardar")
+    if (!saved.ok) {
+      setError("Se genero el contenido pero no se pudo guardar")
+      return
+    }
     setItems(previous => [item, ...previous])
     setActive(item)
+    setManualPrompt(null)
+  }
+
+  async function processManualResponse(pasted: string) {
+    const jsonMatch = pasted.match(/\{[\s\S]*\}/)
+    if (!jsonMatch) throw new Error("No se encontró JSON válido. Asegurate de copiar la respuesta completa de la IA.")
+
+    let parsed: Record<string, unknown>
+    try {
+      parsed = JSON.parse(jsonMatch[0])
+    } catch {
+      throw new Error("El JSON pegado tiene un error de formato. Intentá copiar la respuesta nuevamente.")
+    }
+
+    const required = ["hook", "caption", "google_text", "hashtags", "visual_headline", "visual_subtitle"]
+    const missing = required.filter(k => typeof parsed[k] !== "string")
+    if (missing.length > 0) {
+      throw new Error(`Faltan campos en la respuesta: ${missing.join(", ")}. Pedile a la IA que devuelva el JSON completo.`)
+    }
+
+    await saveGeneratedItem(parsed)
   }
 
   async function updateItem(item: ContentItem, changes: Partial<ContentItem>) {
@@ -239,24 +426,38 @@ export default function ContentStudioPage() {
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Estudio de contenido</h1>
-          <p className="text-sm text-gray-500">Investiga, genera, revisa y aprueba contenido para Instagram y Google.</p>
+          <p className="text-sm text-gray-500">
+            {IS_MANUAL_MODE
+              ? "Generá prompts listos para ChatGPT, Gemini o Claude. Sin costo."
+              : "Investigá, generá, revisá y aprobá contenido para Instagram y Google."}
+          </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex items-center gap-2">
+          {IS_MANUAL_MODE && (
+            <Badge variant="outline" className="border-amber-300 text-amber-700 bg-amber-50">
+              Modo manual
+            </Badge>
+          )}
           <Badge variant="outline">{counts.draft} borradores</Badge>
           <Badge variant="outline" className="border-green-300 text-green-700">{counts.approved} aprobados</Badge>
         </div>
       </div>
 
-      {error && <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</div>}
+      {error && (
+        <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+          {error}
+        </div>
+      )}
 
       <Tabs value={tab} onValueChange={setTab}>
         <TabsList>
-          <TabsTrigger value="crear">Crear con IA</TabsTrigger>
+          <TabsTrigger value="crear">{IS_MANUAL_MODE ? "Preparar prompt" : "Crear con IA"}</TabsTrigger>
           <TabsTrigger value="biblioteca">Biblioteca</TabsTrigger>
         </TabsList>
 
         <TabsContent value="crear" className="mt-4">
           <div className="grid gap-6 xl:grid-cols-[380px_1fr]">
+            {/* Left: brief form */}
             <Card>
               <CardHeader><CardTitle className="text-base">Brief editorial</CardTitle></CardHeader>
               <CardContent className="space-y-4">
@@ -287,7 +488,7 @@ export default function ContentStudioPage() {
                     </Select>
                   </div>
                 </div>
-                <Button variant="outline" onClick={research} disabled={researching} className="w-full">
+                <Button variant="outline" onClick={research} disabled={researching} className="w-full gap-2">
                   {researching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
                   Buscar informacion reciente
                 </Button>
@@ -303,21 +504,46 @@ export default function ContentStudioPage() {
                     ))}
                   </div>
                 )}
-                <Button onClick={generate} disabled={generating} className="w-full">
+                <Button onClick={generate} disabled={generating} className="w-full gap-2">
                   {generating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-                  Generar propuesta completa
+                  {IS_MANUAL_MODE ? "Preparar prompt para copiar" : "Generar propuesta completa"}
                 </Button>
-                <p className="text-xs text-gray-500">La IA crea texto para ambos canales y una placa visual descargable. Todo queda como borrador hasta tu aprobacion.</p>
+                <p className="text-xs text-gray-500">
+                  {IS_MANUAL_MODE
+                    ? "Se genera el prompt listo para pegar en ChatGPT, Gemini o Claude. Vos pegás la respuesta y la app la guarda."
+                    : "La IA crea texto para ambos canales y una placa visual descargable. Todo queda como borrador hasta tu aprobacion."}
+                </p>
               </CardContent>
             </Card>
 
-            {active ? <Editor item={active} working={working} copied={copied} onChange={setActive}
-              onSave={changes => updateItem(active, changes)} onCopy={() => copyInstagram(active)}
-              onDownload={() => downloadVisual(active)} onPublishGoogle={() => publishGoogle(active)} />
-              : <Card className="flex min-h-[420px] items-center justify-center"><CardContent className="text-center text-sm text-gray-500">
-                <Sparkles className="mx-auto mb-3 h-7 w-7 text-gray-300" />
-                Genera una propuesta o abri un borrador de la biblioteca.
-              </CardContent></Card>}
+            {/* Right: manual panel, editor, or empty state */}
+            {manualPrompt ? (
+              <ManualPanel
+                prompt={manualPrompt}
+                onProcess={processManualResponse}
+                onDismiss={() => setManualPrompt(null)}
+              />
+            ) : active ? (
+              <Editor
+                item={active}
+                working={working}
+                copied={copied}
+                onChange={setActive}
+                onSave={changes => updateItem(active, changes)}
+                onCopy={() => copyInstagram(active)}
+                onDownload={() => downloadVisual(active)}
+                onPublishGoogle={() => publishGoogle(active)}
+              />
+            ) : (
+              <Card className="flex min-h-[420px] items-center justify-center">
+                <CardContent className="text-center text-sm text-gray-500">
+                  <Sparkles className="mx-auto mb-3 h-7 w-7 text-gray-300" />
+                  {IS_MANUAL_MODE
+                    ? "Completá el brief y hacé clic en \"Preparar prompt\"."
+                    : "Genera una propuesta o abri un borrador de la biblioteca."}
+                </CardContent>
+              </Card>
+            )}
           </div>
         </TabsContent>
 
@@ -333,8 +559,12 @@ export default function ContentStudioPage() {
                       <Badge variant="outline">{STATUS_LABELS[item.status]}</Badge>
                     </div>
                     <div className="flex gap-2">
-                      <Button variant="outline" size="sm" className="flex-1" onClick={() => { setActive(item); setTab("crear") }}><BookOpen className="h-4 w-4" /> Abrir</Button>
-                      <Button variant="ghost" size="icon" onClick={() => updateItem(item, { status: "archived" })}><Archive className="h-4 w-4" /></Button>
+                      <Button variant="outline" size="sm" className="flex-1" onClick={() => { setActive(item); setManualPrompt(null); setTab("crear") }}>
+                        <BookOpen className="h-4 w-4" /> Abrir
+                      </Button>
+                      <Button variant="ghost" size="icon" onClick={() => updateItem(item, { status: "archived" })}>
+                        <Archive className="h-4 w-4" />
+                      </Button>
                     </div>
                   </CardContent>
                 </Card>
@@ -346,6 +576,10 @@ export default function ContentStudioPage() {
     </div>
   )
 }
+
+// ---------------------------------------------------------------------------
+// Editor component
+// ---------------------------------------------------------------------------
 
 function Editor({ item, working, copied, onChange, onSave, onCopy, onDownload, onPublishGoogle }: {
   item: ContentItem
@@ -363,12 +597,14 @@ function Editor({ item, working, copied, onChange, onSave, onCopy, onDownload, o
       <div className="space-y-3">
         <VisualCard item={item} />
         <div className="flex gap-2">
-          <Button variant="outline" onClick={onDownload} className="flex-1"><Download className="h-4 w-4" /> Descargar placa</Button>
-          <Button variant="outline" onClick={onCopy} className="flex-1">{copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />} Copiar Instagram</Button>
+          <Button variant="outline" onClick={onDownload} className="flex-1 gap-2"><Download className="h-4 w-4" /> Descargar placa</Button>
+          <Button variant="outline" onClick={onCopy} className="flex-1 gap-2">{copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />} Copiar Instagram</Button>
         </div>
-        {item.source && <a href={item.source.url} target="_blank" rel="noreferrer" className="block rounded-lg border border-blue-100 bg-blue-50 p-3 text-xs text-blue-800">
-          <span className="font-medium">Fuente revisada:</span> {item.source.title} <ExternalLink className="inline h-3 w-3" />
-        </a>}
+        {item.source && (
+          <a href={item.source.url} target="_blank" rel="noreferrer" className="block rounded-lg border border-blue-100 bg-blue-50 p-3 text-xs text-blue-800">
+            <span className="font-medium">Fuente revisada:</span> {item.source.title} <ExternalLink className="inline h-3 w-3" />
+          </a>
+        )}
       </div>
       <Card>
         <CardHeader className="flex-row items-center justify-between">
@@ -379,11 +615,19 @@ function Editor({ item, working, copied, onChange, onSave, onCopy, onDownload, o
           <div className="space-y-1.5"><Label>Instagram</Label><Textarea rows={9} value={item.caption} onChange={event => onChange({ ...item, caption: event.target.value })} /></div>
           <div className="space-y-1.5"><Label>Google Business</Label><Textarea rows={6} value={item.google_text} onChange={event => onChange({ ...item, google_text: event.target.value })} /></div>
           <div className="flex flex-wrap gap-2">
-            <Button variant="outline" onClick={() => onSave({ caption: item.caption, google_text: item.google_text })} disabled={busy}>
+            <Button variant="outline" onClick={() => onSave({ caption: item.caption, google_text: item.google_text })} disabled={busy} className="gap-2">
               {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />} Guardar cambios
             </Button>
-            {item.status !== "approved" && <Button onClick={() => onSave({ status: "approved", caption: item.caption, google_text: item.google_text })} disabled={busy}><Check className="h-4 w-4" /> Aprobar</Button>}
-            {item.status === "approved" && <Button onClick={onPublishGoogle} disabled={busy}><Send className="h-4 w-4" /> Publicar en Google</Button>}
+            {item.status !== "approved" && (
+              <Button onClick={() => onSave({ status: "approved", caption: item.caption, google_text: item.google_text })} disabled={busy} className="gap-2">
+                <Check className="h-4 w-4" /> Aprobar
+              </Button>
+            )}
+            {item.status === "approved" && (
+              <Button onClick={onPublishGoogle} disabled={busy} className="gap-2">
+                <Send className="h-4 w-4" /> Publicar en Google
+              </Button>
+            )}
           </div>
           <p className="text-xs text-gray-500">Instagram requiere copiar/publicar manualmente hasta conectar Instagram Graph API. Google publica solo despues de aprobar y si la API de la cuenta lo permite.</p>
         </CardContent>

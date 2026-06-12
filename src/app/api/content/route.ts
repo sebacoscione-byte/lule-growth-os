@@ -1,5 +1,13 @@
 import { NextResponse } from "next/server"
-import { generateContentPlan, generateInstagramContent, generateGooglePost, generateReviewReply, getPublicAiError } from "@/lib/ai"
+import {
+  generateContentPlan,
+  buildContentPlanPrompt,
+  generateInstagramContent,
+  generateGooglePost,
+  generateReviewReply,
+  getPublicAiError,
+  getAiMode,
+} from "@/lib/ai"
 import { createClient } from "@/lib/supabase/server"
 
 export async function POST(request: Request) {
@@ -9,19 +17,57 @@ export async function POST(request: Request) {
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
     const { type, category, content_type, cta, topic, source } = await request.json()
+    const mode = getAiMode()
 
+    // -------------------------------------------------------------------------
+    // content_plan — supports both manual and gemini_api modes
+    // -------------------------------------------------------------------------
     if (type === "content_plan") {
       if (!topic || !category || !content_type) {
         return NextResponse.json({ error: "topic, category and content_type required" }, { status: 400 })
       }
-      const result = await generateContentPlan({
+
+      const input = {
         topic,
         category,
-        format: content_type,
+        format: content_type as "reel" | "historia" | "carrusel" | "post",
         cta: cta ?? "Escribi TURNO y te paso como pedir turno",
-        source,
-      })
-      return NextResponse.json(result)
+        source: source ?? null,
+      }
+
+      if (mode === "manual") {
+        const prompt = buildContentPlanPrompt(input)
+        return NextResponse.json({ mode: "manual", prompt })
+      }
+
+      // gemini_api mode — try API, fall back to manual on rate limit
+      try {
+        const result = await generateContentPlan(input)
+        return NextResponse.json({ mode: "api", ...result })
+      } catch (e) {
+        const publicError = getPublicAiError(e)
+        const isRateLimit =
+          publicError.startsWith("RATE_LIMIT:") ||
+          publicError.includes("límite diario")
+        if (isRateLimit) {
+          const prompt = buildContentPlanPrompt(input)
+          return NextResponse.json(
+            { error: publicError.replace("RATE_LIMIT: ", ""), mode: "manual", prompt },
+            { status: 429 }
+          )
+        }
+        return NextResponse.json({ error: publicError }, { status: 500 })
+      }
+    }
+
+    // -------------------------------------------------------------------------
+    // instagram / google_post / review_reply — API mode only
+    // -------------------------------------------------------------------------
+    if (mode === "manual") {
+      return NextResponse.json(
+        { error: "Esta función requiere AI_MODE=gemini_api. Usá Generar propuesta completa para el modo manual." },
+        { status: 400 }
+      )
     }
 
     if (type === "instagram") {
@@ -33,17 +79,13 @@ export async function POST(request: Request) {
     }
 
     if (type === "google_post") {
-      if (!topic) {
-        return NextResponse.json({ error: "topic required" }, { status: 400 })
-      }
+      if (!topic) return NextResponse.json({ error: "topic required" }, { status: 400 })
       const text = await generateGooglePost(topic)
       return NextResponse.json({ text })
     }
 
     if (type === "review_reply") {
-      if (!topic) {
-        return NextResponse.json({ error: "topic required" }, { status: 400 })
-      }
+      if (!topic) return NextResponse.json({ error: "topic required" }, { status: 400 })
       const [starLine, ...rest] = topic.split(". ")
       const starRating = starLine.replace(" stars", "").trim().toUpperCase()
       const comment = rest.join(". ")
