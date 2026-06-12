@@ -46,11 +46,13 @@ export async function GET(req: NextRequest) {
 
       if (target) {
         const locationId = target.name.split("/").pop()!
+        // Business Information API needs "locations/{locationId}" format
+        const infoApiLocationName = `locations/${locationId}`
         await Promise.all([
           supabase.from("app_config").upsert({ key: "google_account_id", value: accountId }, { onConflict: "key" }),
           supabase.from("app_config").upsert({ key: "google_location_id", value: locationId }, { onConflict: "key" }),
           supabase.from("app_config").upsert({ key: "google_account_name", value: account.name }, { onConflict: "key" }),
-          supabase.from("app_config").upsert({ key: "google_location_name", value: target.name }, { onConflict: "key" }),
+          supabase.from("app_config").upsert({ key: "google_location_name", value: infoApiLocationName }, { onConflict: "key" }),
         ])
         break // found the right location
       }

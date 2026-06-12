@@ -12,11 +12,15 @@ export async function POST(req: NextRequest) {
   const info = await getConnectionInfo(supabase)
   if (!info) return NextResponse.json({ error: "Not connected" }, { status: 401 })
 
+  // locationName from v4 API is "accounts/{accountId}/locations/{locationId}"
+  // Business Information API needs "locations/{locationId}"
+  const infoApiLocationName = `locations/${locationId}`
+
   await Promise.all([
     supabase.from("app_config").upsert({ key: "google_account_id", value: accountId }, { onConflict: "key" }),
     supabase.from("app_config").upsert({ key: "google_location_id", value: locationId }, { onConflict: "key" }),
     supabase.from("app_config").upsert({ key: "google_account_name", value: accountName }, { onConflict: "key" }),
-    supabase.from("app_config").upsert({ key: "google_location_name", value: locationName }, { onConflict: "key" }),
+    supabase.from("app_config").upsert({ key: "google_location_name", value: infoApiLocationName }, { onConflict: "key" }),
   ])
 
   return NextResponse.json({ ok: true })
