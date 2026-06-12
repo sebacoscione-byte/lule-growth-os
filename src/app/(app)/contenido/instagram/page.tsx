@@ -24,6 +24,7 @@ const CATEGORIES = [
 ]
 
 const CTA_OPTIONS = [
+  "",
   "Escribi CARDIO y te paso como pedir turno",
   "Escribi ECO si necesitas un ecocardiograma",
   "Escribi TURNO y te paso las opciones de atencion",
@@ -239,7 +240,7 @@ export default function ContentStudioPage() {
   const [category, setCategory] = useState(CATEGORIES[0])
   const [topic, setTopic] = useState("")
   const [format, setFormat] = useState<ContentItem["format"]>("reel")
-  const [cta, setCta] = useState(CTA_OPTIONS[0])
+  const [cta, setCta] = useState("")
   const [sources, setSources] = useState<ContentSource[]>([])
   const [selectedSource, setSelectedSource] = useState<ContentSource | null>(null)
   const [items, setItems] = useState<ContentItem[]>([])
@@ -488,10 +489,15 @@ export default function ContentStudioPage() {
                     </Select>
                   </div>
                   <div className="space-y-1.5">
-                    <Label className="text-gray-900">CTA</Label>
+                    <Label className="text-gray-900">CTA <span className="text-gray-400 font-normal">(opcional)</span></Label>
                     <Select value={cta} onValueChange={setCta}>
-                      <SelectTrigger className="text-gray-900"><SelectValue /></SelectTrigger>
-                      <SelectContent>{CTA_OPTIONS.map(value => <SelectItem key={value} value={value}>{value}</SelectItem>)}</SelectContent>
+                      <SelectTrigger className="text-gray-900">
+                        <SelectValue placeholder="Sin llamado a acción" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="">Sin llamado a acción</SelectItem>
+                        {CTA_OPTIONS.filter(v => v).map(value => <SelectItem key={value} value={value}>{value}</SelectItem>)}
+                      </SelectContent>
                     </Select>
                   </div>
                 </div>
