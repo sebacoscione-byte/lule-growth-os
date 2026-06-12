@@ -70,17 +70,28 @@ function Stars({ rating }: { rating: string }) {
 function LocationPickerView({ onPicked }: { onPicked: () => void }) {
   const [locations, setLocations] = useState<LocationOption[]>([])
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const [quotaError, setQuotaError] = useState(false)
   const [selecting, setSelecting] = useState<string | null>(null)
+
+  // Manual entry state
+  const [accountId, setAccountId] = useState("")
+  const [locationId, setLocationId] = useState("")
+  const [saving, setSaving] = useState(false)
+  const [manualError, setManualError] = useState<string | null>(null)
 
   useEffect(() => {
     fetch("/api/google-business/locations")
       .then(r => r.json())
       .then(data => {
-        if (data.error) setError(data.error)
-        else setLocations(data.locations ?? [])
+        if (data.error) {
+          if (data.error.includes("429") || data.error.includes("RATE_LIMIT") || data.error.includes("Quota")) {
+            setQuotaError(true)
+          }
+        } else {
+          setLocations(data.locations ?? [])
+        }
       })
-      .catch(e => setError(String(e)))
+      .catch(() => setQuotaError(true))
       .finally(() => setLoading(false))
   }, [])
 
@@ -95,17 +106,71 @@ function LocationPickerView({ onPicked }: { onPicked: () => void }) {
     onPicked()
   }
 
+  async function saveManual() {
+    const aid = accountId.trim()
+    const lid = locationId.trim()
+    if (!aid || !lid) { setManualError("Completá los dos campos"); return }
+    setSaving(true)
+    setManualError(null)
+    const res = await fetch("/api/google-business/select-location", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        accountId: aid,
+        accountName: `accounts/${aid}`,
+        locationId: lid,
+        locationName: `accounts/${aid}/locations/${lid}`,
+      }),
+    })
+    setSaving(false)
+    if (res.ok) onPicked()
+    else setManualError("Error al guardar. Verificá los IDs.")
+  }
+
   return (
     <div className="flex flex-col items-center justify-center py-12 gap-6">
       <div>
         <h2 className="text-xl font-semibold text-gray-900 text-center">Elegí el negocio a administrar</h2>
         <p className="text-sm text-gray-500 mt-1 text-center">Tu cuenta tiene varios negocios. Seleccioná el de la Dra. Lucía Chahin.</p>
       </div>
+
       {loading ? (
         <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
-      ) : error ? (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-sm text-red-700 max-w-md w-full">
-          <span className="font-medium">Error:</span> {error}
+      ) : quotaError ? (
+        <div className="w-full max-w-md space-y-4">
+          <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 text-sm text-amber-800">
+            <p className="font-medium mb-1">Google no permite listar negocios automáticamente (cuota = 0)</p>
+            <p className="text-xs">Ingresá los IDs manualmente. Los encontrás en la URL de tu perfil de Google Business.</p>
+          </div>
+          <div className="space-y-3">
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">Account ID</label>
+              <Input
+                value={accountId}
+                onChange={e => setAccountId(e.target.value)}
+                placeholder="Ej: 123456789012345678"
+              />
+              <p className="text-xs text-gray-400 mt-1">
+                Desde business.google.com → URL al abrir tu negocio → el número largo después de <code>/accounts/</code>
+              </p>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">Location ID</label>
+              <Input
+                value={locationId}
+                onChange={e => setLocationId(e.target.value)}
+                placeholder="Ej: 987654321098765432"
+              />
+              <p className="text-xs text-gray-400 mt-1">
+                El número después de <code>/locations/</code> en la misma URL
+              </p>
+            </div>
+            {manualError && <p className="text-xs text-red-600">{manualError}</p>}
+            <Button onClick={saveManual} disabled={saving} className="w-full">
+              {saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+              Guardar
+            </Button>
+          </div>
         </div>
       ) : (
         <div className="w-full max-w-md space-y-2">
