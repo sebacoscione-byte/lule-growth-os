@@ -456,10 +456,14 @@ export default function ContentStudioPage() {
   const lastGenRef = useRef(0)
 
   const loadItems = useCallback(async () => {
-    const response = await fetch("/api/content/items")
-    const data = await response.json()
-    if (data.error) setError(data.error)
-    else setItems(data.items ?? [])
+    try {
+      const response = await fetch("/api/content/items")
+      const data = await response.json()
+      if (data.error) setError(data.error)
+      else setItems(data.items ?? [])
+    } catch {
+      setError("No se pudo cargar el contenido. Recargá la página.")
+    }
     setLoadingItems(false)
   }, [])
 
