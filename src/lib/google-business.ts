@@ -78,31 +78,28 @@ export async function clearTokens(supabase: SupabaseClient) {
   await supabase.from("app_config").delete().in("key", keys)
 }
 
-// ─── Account & Location discovery (uses v4 API — higher quota than Account Management API) ───
+// ─── Account & Location discovery ────────────────────────────────────────────
 
 export async function listAccounts(token: string) {
-  const res = await fetch(`${LEGACY_API}/accounts`, {
+  const res = await fetch(`${ACCOUNTS_API}/accounts`, {
     headers: { Authorization: `Bearer ${token}` },
   })
   if (!res.ok) throw new Error(await res.text())
-  // v4 response: { accounts: [{ name, accountName, type }] }
   const data = await res.json() as { accounts?: Array<{ name: string; accountName: string; type: string }> }
   return data
 }
 
 export async function listLocations(token: string, accountName: string) {
-  // v4 API — field is "locationName" not "title"
-  const url = `${LEGACY_API}/${accountName}/locations`
+  const url = `${INFO_API}/${accountName}/locations?readMask=name,title`
   const res = await fetch(url, {
     headers: { Authorization: `Bearer ${token}` },
   })
   if (!res.ok) throw new Error(await res.text())
-  const data = await res.json() as { locations?: Array<{ name: string; locationName?: string; title?: string }> }
-  // Normalize: expose title from either field
+  const data = await res.json() as { locations?: Array<{ name: string; title?: string }> }
   return {
     locations: (data.locations ?? []).map(l => ({
       name: l.name,
-      title: l.title ?? l.locationName ?? l.name,
+      title: l.title ?? l.name,
     }))
   }
 }
