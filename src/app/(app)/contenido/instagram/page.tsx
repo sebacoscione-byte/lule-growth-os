@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import {
-  Archive, BookOpen, Check, Copy, Download, ExternalLink, Loader2,
+  Archive, BookOpen, Check, ChevronDown, ChevronUp, Copy, Download, ExternalLink, Loader2,
   RefreshCw, Search, Send, Sparkles, Pin,
 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
@@ -499,6 +499,12 @@ export default function ContentStudioPage() {
   const [copied, setCopied] = useState(false)
   const [tab, setTab] = useState("crear")
   const [manualPrompt, setManualPrompt] = useState<string | null>(null)
+  const [showDirectEntry, setShowDirectEntry] = useState(false)
+  const [directCaption, setDirectCaption] = useState("")
+  const [directHeadline, setDirectHeadline] = useState("")
+  const [directSubtitle, setDirectSubtitle] = useState("")
+  const [directGoogleText, setDirectGoogleText] = useState("")
+  const [directSaving, setDirectSaving] = useState(false)
 
   const lastGenRef = useRef(0)
 
@@ -628,6 +634,46 @@ export default function ContentStudioPage() {
     setItems(previous => [item, ...previous])
     setActive(item)
     setManualPrompt(null)
+  }
+
+  async function saveDirect() {
+    if (!directCaption.trim() && !directHeadline.trim()) return
+    setDirectSaving(true)
+    const now = new Date().toISOString()
+    const item: ContentItem = {
+      id: crypto.randomUUID(),
+      topic: topic || category,
+      category,
+      format,
+      goal: "Captar consultas y explicar como pedir turno",
+      status: "draft",
+      channels: ["instagram", "google_business"],
+      source: null,
+      created_at: now,
+      updated_at: now,
+      approved_at: null,
+      hook: "",
+      caption: directCaption.trim(),
+      google_text: directGoogleText.trim().slice(0, 1500),
+      hashtags: "",
+      visual_headline: directHeadline.trim().slice(0, 90),
+      visual_subtitle: directSubtitle.trim().slice(0, 90),
+      visual_style: "blue",
+    }
+    const saved = await fetch("/api/content/items", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(item),
+    })
+    setDirectSaving(false)
+    if (!saved.ok) { setError("No se pudo guardar el borrador"); return }
+    setItems(previous => [item, ...previous])
+    setActive(item)
+    setShowDirectEntry(false)
+    setDirectCaption("")
+    setDirectHeadline("")
+    setDirectSubtitle("")
+    setDirectGoogleText("")
   }
 
   async function processManualResponse(pasted: string) {
@@ -798,6 +844,72 @@ export default function ContentStudioPage() {
                     ? "Se genera el prompt listo para pegar en ChatGPT, Gemini o Claude. Vos pegás la respuesta y la app la guarda."
                     : "La IA crea texto para ambos canales y una placa visual descargable. Todo queda como borrador hasta tu aprobacion."}
                 </p>
+
+                {/* Direct entry */}
+                <div className="border-t pt-3">
+                  <button
+                    type="button"
+                    onClick={() => setShowDirectEntry(v => !v)}
+                    className="flex items-center justify-between w-full text-sm text-gray-500 hover:text-gray-800 transition-colors"
+                  >
+                    <span>Ingresar contenido directamente</span>
+                    {showDirectEntry ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                  </button>
+
+                  {showDirectEntry && (
+                    <div className="mt-3 space-y-3">
+                      <div className="space-y-1.5">
+                        <Label className="text-gray-900">Caption Instagram</Label>
+                        <Textarea
+                          rows={5}
+                          value={directCaption}
+                          onChange={e => setDirectCaption(e.target.value)}
+                          placeholder="Pegá o escribí el texto para Instagram..."
+                          className="text-gray-900 placeholder:text-gray-400 resize-none"
+                        />
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div className="space-y-1.5">
+                          <Label className="text-gray-900 text-xs">Título placa visual</Label>
+                          <Input
+                            value={directHeadline}
+                            onChange={e => setDirectHeadline(e.target.value)}
+                            placeholder="Ej: ¿Cuándo ir al cardiólogo?"
+                            className="text-gray-900 placeholder:text-gray-400 text-sm"
+                          />
+                        </div>
+                        <div className="space-y-1.5">
+                          <Label className="text-gray-900 text-xs">Subtítulo placa</Label>
+                          <Input
+                            value={directSubtitle}
+                            onChange={e => setDirectSubtitle(e.target.value)}
+                            placeholder="Una línea corta"
+                            className="text-gray-900 placeholder:text-gray-400 text-sm"
+                          />
+                        </div>
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label className="text-gray-900">Texto Google Business <span className="text-gray-400 font-normal text-xs">(opcional)</span></Label>
+                        <Textarea
+                          rows={3}
+                          value={directGoogleText}
+                          onChange={e => setDirectGoogleText(e.target.value)}
+                          placeholder="Texto para publicar en Google Business Profile..."
+                          className="text-gray-900 placeholder:text-gray-400 resize-none"
+                        />
+                      </div>
+                      <Button
+                        onClick={saveDirect}
+                        disabled={directSaving || (!directCaption.trim() && !directHeadline.trim())}
+                        className="w-full gap-2"
+                        variant="outline"
+                      >
+                        {directSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+                        Guardar como borrador
+                      </Button>
+                    </div>
+                  )}
+                </div>
               </CardContent>
             </Card>
 
