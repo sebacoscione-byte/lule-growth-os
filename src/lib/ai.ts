@@ -143,14 +143,14 @@ export function buildContentPlanPrompt(input: {
   source?: ContentSource | null
 }): string {
   const sourceSection = input.source
-    ? `FUENTE DE REFERENCIA:
+    ? `FUENTE ADICIONAL DE REFERENCIA (usala como contexto, no como única fuente):
 Título: ${input.source.title}
 Publicación: ${input.source.publication}
 Fecha: ${input.source.published_at}
 Resumen: ${input.source.summary || "No disponible"}
 
-Mencioná la fuente de forma general. No inventes resultados que no estén en el resumen.`
-    : "No hay fuente reciente seleccionada. Tratá el tema como contenido evergreen."
+Podés mencionar esta fuente de forma general si es relevante, pero el contenido debe basarse principalmente en conocimiento médico actualizado sobre el tema.`
+    : ""
 
   return `Sos responsable de contenido de la Dra. Lucía Chahin, cardióloga.
 Creás propuestas editoriales para Instagram y Google Business.
@@ -158,23 +158,29 @@ Creás propuestas editoriales para Instagram y Google Business.
 CONTEXTO:
 - Lucía atiende martes en CIMEL Lanús (Tucumán 1314) y viernes en Swiss Medical Lomas
 - La app NO reserva turnos ni da diagnósticos
-- Objetivo: educar e invitar a pedir turno por los canales oficiales
+- Objetivo: educar, generar conciencia cardiovascular e invitar a pedir turno
 
 REGLAS OBLIGATORIAS:
 - Todo en español rioplatense
-- No diagnósticos ni tratamientos
-- No afirmaciones médicas personalizadas
-- No lenguaje alarmista ni promesas de resultados
+- Basate en conocimiento médico actualizado y evidencia general sobre el tema
+- Podés incorporar datos recientes, estadísticas o avances que conozcas sobre el tema
+- No diagnósticos ni tratamientos personalizados
+- No afirmaciones médicas personalizadas ni promesas de resultados
+- No lenguaje alarmista ni que asuma condiciones del lector
 - Ante síntomas de alarma → siempre derivar a guardia
+
+ENFOQUE DEL CONTENIDO:
+El contenido debe captar pacientes potenciales educándolos. Usá datos relevantes,
+desmitificá creencias comunes, explicá conceptos de forma accesible, o destacá la
+importancia del chequeo cardiovascular preventivo. El objetivo es que el lector
+sienta que aprendió algo valioso y quiera pedir turno.
 
 PEDIDO:
 Tema: ${input.topic}
 Categoría: ${input.category}
 Formato Instagram: ${input.format}
 CTA sugerido: ${input.cta}
-
 ${sourceSection}
-
 RESPUESTA ESPERADA:
 Devolvé ÚNICAMENTE el JSON válido, sin markdown, sin bloques de código, sin explicaciones.
 Usá exactamente estas claves:
