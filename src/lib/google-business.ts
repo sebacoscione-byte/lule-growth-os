@@ -89,7 +89,7 @@ export async function listAccounts(token: string) {
 }
 
 export async function listLocations(token: string, accountName: string) {
-  const url = `${INFO_API}/${accountName}/locations?readMask=name,title,storefrontAddress,regularHours,phoneNumbers,websiteUri,profile`
+  const url = `${INFO_API}/${accountName}/locations?readMask=name,title`
   const res = await fetch(url, {
     headers: { Authorization: `Bearer ${token}` },
   })
@@ -114,6 +114,54 @@ export async function updateDescription(token: string, locationName: string, des
     method: "PATCH",
     headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
     body: JSON.stringify({ profile: { description } }),
+  })
+  if (!res.ok) throw new Error(await res.text())
+  return res.json()
+}
+
+export async function updateWebsite(token: string, locationName: string, websiteUri: string) {
+  const url = `${INFO_API}/${locationName}?updateMask=websiteUri`
+  const res = await fetch(url, {
+    method: "PATCH",
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ websiteUri }),
+  })
+  if (!res.ok) throw new Error(await res.text())
+  return res.json()
+}
+
+export async function updatePhone(token: string, locationName: string, primaryPhone: string) {
+  const url = `${INFO_API}/${locationName}?updateMask=phoneNumbers`
+  const res = await fetch(url, {
+    method: "PATCH",
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ phoneNumbers: { primaryPhone } }),
+  })
+  if (!res.ok) throw new Error(await res.text())
+  return res.json()
+}
+
+export interface HourPeriod {
+  openDay: string
+  openTime: string  // "HH:MM"
+  closeTime: string // "HH:MM"
+}
+
+export async function updateHours(token: string, locationName: string, periods: HourPeriod[]) {
+  const url = `${INFO_API}/${locationName}?updateMask=regularHours`
+  const body = {
+    regularHours: {
+      periods: periods.map(p => ({
+        openDay: p.openDay,
+        openTime: { hours: parseInt(p.openTime.split(":")[0]), minutes: parseInt(p.openTime.split(":")[1]) },
+        closeTime: { hours: parseInt(p.closeTime.split(":")[0]), minutes: parseInt(p.closeTime.split(":")[1]) },
+      })),
+    },
+  }
+  const res = await fetch(url, {
+    method: "PATCH",
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    body: JSON.stringify(body),
   })
   if (!res.ok) throw new Error(await res.text())
   return res.json()

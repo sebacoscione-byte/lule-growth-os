@@ -35,19 +35,24 @@ export async function GET(req: NextRequest) {
   // Discover and save account + location IDs
   try {
     const accounts = await listAccounts(tokens.access_token)
-    const firstAccount = accounts.accounts?.[0]
-    if (firstAccount) {
-      const accountId = firstAccount.name.split("/").pop()!
-      const locations = await listLocations(tokens.access_token, firstAccount.name)
-      const firstLocation = locations.locations?.[0]
-      if (firstLocation) {
-        const locationId = firstLocation.name.split("/").pop()!
+    for (const account of accounts.accounts ?? []) {
+      const accountId = account.name.split("/").pop()!
+      const locations = await listLocations(tokens.access_token, account.name)
+      // Prefer location whose title matches "Lucía Chahin" or "Lucia Chahin"
+      const target = (locations.locations ?? []).find(
+        l => "title" in l && typeof l.title === "string" &&
+          l.title.toLowerCase().includes("chahin")
+      ) ?? (locations.locations ?? [])[0]
+
+      if (target) {
+        const locationId = target.name.split("/").pop()!
         await Promise.all([
           supabase.from("app_config").upsert({ key: "google_account_id", value: accountId }, { onConflict: "key" }),
           supabase.from("app_config").upsert({ key: "google_location_id", value: locationId }, { onConflict: "key" }),
-          supabase.from("app_config").upsert({ key: "google_account_name", value: firstAccount.name }, { onConflict: "key" }),
-          supabase.from("app_config").upsert({ key: "google_location_name", value: firstLocation.name }, { onConflict: "key" }),
+          supabase.from("app_config").upsert({ key: "google_account_name", value: account.name }, { onConflict: "key" }),
+          supabase.from("app_config").upsert({ key: "google_location_name", value: target.name }, { onConflict: "key" }),
         ])
+        break // found the right location
       }
     }
   } catch {

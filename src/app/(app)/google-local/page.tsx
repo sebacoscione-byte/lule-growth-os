@@ -3,8 +3,7 @@
 import { useEffect, useState, useCallback } from "react"
 import {
   Loader2, Sparkles, Star, Trash2, Send, RefreshCw,
-  CheckCircle2, AlertCircle, ExternalLink, LogOut, ChevronDown, ChevronUp,
-  MapPin, Clock, Globe
+  CheckCircle2, ExternalLink, LogOut, MapPin
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
@@ -20,13 +19,7 @@ interface StatusData {
   accountId?: string
   locationId?: string
   locationName?: string
-  profile?: {
-    title?: string
-    profile?: { description?: string }
-    storefrontAddress?: { addressLines?: string[]; locality?: string }
-    regularHours?: { periods?: Array<{ openDay: string; openTime: string; closeTime: string }> }
-    websiteUri?: string
-  }
+  profile?: { title?: string }
 }
 
 interface Post {
@@ -97,22 +90,99 @@ function ConnectView() {
 
 // ─── Profile tab ──────────────────────────────────────────────────────────────
 
+const DAYS_ES: Record<string, string> = {
+  MONDAY: "Lunes", TUESDAY: "Martes", WEDNESDAY: "Miércoles",
+  THURSDAY: "Jueves", FRIDAY: "Viernes", SATURDAY: "Sábado", SUNDAY: "Domingo",
+}
+const ALL_DAYS = ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY", "SUNDAY"]
+
+interface ProfileData {
+  title?: string
+  profile?: { description?: string }
+  storefrontAddress?: { addressLines?: string[]; locality?: string; administrativeArea?: string }
+  regularHours?: { periods?: Array<{ openDay: string; openTime: { hours?: number; minutes?: number } | string; closeTime: { hours?: number; minutes?: number } | string }> }
+  phoneNumbers?: { primaryPhone?: string }
+  websiteUri?: string
+}
+
+function formatTime(t: { hours?: number; minutes?: number } | string): string {
+  if (typeof t === "string") return t
+  const h = String(t.hours ?? 0).padStart(2, "0")
+  const m = String(t.minutes ?? 0).padStart(2, "0")
+  return `${h}:${m}`
+}
+
+function SaveButton({ saving, saved, disabled, onClick }: {
+  saving: boolean; saved: boolean; disabled?: boolean; onClick: () => void
+}) {
+  return (
+    <div className="flex items-center gap-2 justify-end">
+      {saved && (
+        <span className="flex items-center gap-1 text-xs text-green-600">
+          <CheckCircle2 className="h-3.5 w-3.5" /> Guardado
+        </span>
+      )}
+      <Button onClick={onClick} disabled={saving || disabled} size="sm">
+        {saving && <Loader2 className="h-4 w-4 animate-spin mr-1" />}
+        Guardar en Google
+      </Button>
+    </div>
+  )
+}
+
 function ProfileTab({ status, onRefresh }: { status: StatusData; onRefresh: () => void }) {
-  const profile = status.profile
-  const [desc, setDesc] = useState(profile?.profile?.description ?? "")
-  const [saving, setSaving] = useState(false)
-  const [saved, setSaved] = useState(false)
+  const [profileData, setProfileData] = useState<ProfileData | null>(null)
+  const [loadingProfile, setLoadingProfile] = useState(true)
+  const [profileError, setProfileError] = useState<string | null>(null)
+
+  // Description
+  const [desc, setDesc] = useState("")
+  const [savingDesc, setSavingDesc] = useState(false)
+  const [savedDesc, setSavedDesc] = useState(false)
+
+  // Website
+  const [website, setWebsite] = useState("")
+  const [savingWeb, setSavingWeb] = useState(false)
+  const [savedWeb, setSavedWeb] = useState(false)
+
+  // Phone
+  const [phone, setPhone] = useState("")
+  const [savingPhone, setSavingPhone] = useState(false)
+  const [savedPhone, setSavedPhone] = useState(false)
+
+  // Hours
+  const [hours, setHours] = useState<Record<string, { enabled: boolean; open: string; close: string }>>({})
+  const [savingHours, setSavingHours] = useState(false)
+  const [savedHours, setSavedHours] = useState(false)
 
   useEffect(() => {
-    setDesc(profile?.profile?.description ?? "")
-  }, [profile?.profile?.description])
+    setLoadingProfile(true)
+    fetch("/api/google-business/profile")
+      .then(r => r.json())
+      .then((data: ProfileData & { error?: string }) => {
+        if (data.error) { setProfileError(data.error); return }
+        setProfileData(data)
+        setDesc(data.profile?.description ?? "")
+        setWebsite(data.websiteUri ?? "")
+        setPhone(data.phoneNumbers?.primaryPhone ?? "")
+        // Build hours map
+        const h: Record<string, { enabled: boolean; open: string; close: string }> = {}
+        ALL_DAYS.forEach(d => { h[d] = { enabled: false, open: "09:00", close: "18:00" } })
+        data.regularHours?.periods?.forEach(p => {
+          h[p.openDay] = { enabled: true, open: formatTime(p.openTime), close: formatTime(p.closeTime) }
+        })
+        setHours(h)
+      })
+      .catch(e => setProfileError(String(e)))
+      .finally(() => setLoadingProfile(false))
+  }, [])
 
-  async function saveDescription() {
+  async function save(field: string, body: Record<string, unknown>, setSaving: (v: boolean) => void, setSaved: (v: boolean) => void) {
     setSaving(true)
     const res = await fetch("/api/google-business/profile", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ description: desc }),
+      body: JSON.stringify(body),
     })
     setSaving(false)
     if (res.ok) {
@@ -122,70 +192,117 @@ function ProfileTab({ status, onRefresh }: { status: StatusData; onRefresh: () =
     }
   }
 
+  function saveDesc() {
+    save("description", { description: desc }, setSavingDesc, setSavedDesc)
+  }
+  function saveWebsite() {
+    save("websiteUri", { websiteUri: website }, setSavingWeb, setSavedWeb)
+  }
+  function savePhone() {
+    save("phone", { primaryPhone: phone }, setSavingPhone, setSavedPhone)
+  }
+  function saveHours() {
+    const periods = ALL_DAYS
+      .filter(d => hours[d]?.enabled)
+      .map(d => ({ openDay: d, openTime: hours[d].open, closeTime: hours[d].close }))
+    save("hours", { hours: periods }, setSavingHours, setSavedHours)
+  }
+
+  if (loadingProfile) {
+    return <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-gray-400" /></div>
+  }
+
+  if (profileError) {
+    return (
+      <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-sm text-red-700">
+        <span className="font-medium">Error al cargar perfil:</span> {profileError}
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-4">
-      {profile && (
+      {/* Read-only info */}
+      {profileData && (
         <Card>
-          <CardHeader>
-            <CardTitle className="text-base text-gray-700">Estado del perfil</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="flex items-center gap-2 text-sm">
-              <MapPin className="h-4 w-4 text-gray-400 shrink-0" />
-              <span className="text-gray-600">
-                {profile.storefrontAddress?.addressLines?.join(", ")}, {profile.storefrontAddress?.locality}
-              </span>
-            </div>
-            {profile.websiteUri && (
-              <div className="flex items-center gap-2 text-sm">
-                <Globe className="h-4 w-4 text-gray-400 shrink-0" />
-                <a href={profile.websiteUri} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline truncate">
-                  {profile.websiteUri}
-                </a>
-              </div>
-            )}
-            {profile.regularHours?.periods && (
-              <div className="flex items-start gap-2 text-sm">
-                <Clock className="h-4 w-4 text-gray-400 shrink-0 mt-0.5" />
-                <div className="space-y-0.5">
-                  {profile.regularHours.periods.map((p, i) => (
-                    <p key={i} className="text-gray-600 capitalize">
-                      {p.openDay.toLowerCase()}: {p.openTime} – {p.closeTime}
-                    </p>
-                  ))}
-                </div>
+          <CardContent className="pt-4 space-y-2">
+            <p className="text-sm font-medium text-gray-900">{profileData.title}</p>
+            {profileData.storefrontAddress && (
+              <div className="flex items-center gap-2 text-sm text-gray-600">
+                <MapPin className="h-4 w-4 text-gray-400 shrink-0" />
+                {[...(profileData.storefrontAddress.addressLines ?? []), profileData.storefrontAddress.locality].filter(Boolean).join(", ")}
               </div>
             )}
           </CardContent>
         </Card>
       )}
 
+      {/* Description */}
       <Card>
-        <CardHeader>
-          <CardTitle className="text-base text-gray-700">Descripción del perfil</CardTitle>
-        </CardHeader>
+        <CardHeader><CardTitle className="text-sm font-medium text-gray-700">Descripción</CardTitle></CardHeader>
         <CardContent className="space-y-3">
-          <Textarea
-            value={desc}
-            onChange={e => setDesc(e.target.value)}
-            rows={6}
-            placeholder="Descripción que aparece en Google..."
-            className="resize-none"
-          />
+          <Textarea value={desc} onChange={e => setDesc(e.target.value)} rows={5} placeholder="Descripción que aparece en Google..." className="resize-none" />
           <div className="flex items-center justify-between">
-            <span className="text-xs text-gray-400">{desc.length}/750 caracteres</span>
-            <div className="flex items-center gap-2">
-              {saved && (
-                <span className="flex items-center gap-1 text-xs text-green-600">
-                  <CheckCircle2 className="h-3.5 w-3.5" /> Guardado en Google
-                </span>
-              )}
-              <Button onClick={saveDescription} disabled={saving || !desc.trim()} size="sm">
-                {saving ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : null}
-                Guardar en Google
-              </Button>
-            </div>
+            <span className="text-xs text-gray-400">{desc.length}/750</span>
+            <SaveButton saving={savingDesc} saved={savedDesc} disabled={!desc.trim()} onClick={saveDesc} />
           </div>
+        </CardContent>
+      </Card>
+
+      {/* Website */}
+      <Card>
+        <CardHeader><CardTitle className="text-sm font-medium text-gray-700">Sitio web</CardTitle></CardHeader>
+        <CardContent className="space-y-3">
+          <Input value={website} onChange={e => setWebsite(e.target.value)} placeholder="https://..." />
+          <SaveButton saving={savingWeb} saved={savedWeb} onClick={saveWebsite} />
+        </CardContent>
+      </Card>
+
+      {/* Phone */}
+      <Card>
+        <CardHeader><CardTitle className="text-sm font-medium text-gray-700">Teléfono</CardTitle></CardHeader>
+        <CardContent className="space-y-3">
+          <Input value={phone} onChange={e => setPhone(e.target.value)} placeholder="+54 11 ..." />
+          <SaveButton saving={savingPhone} saved={savedPhone} onClick={savePhone} />
+        </CardContent>
+      </Card>
+
+      {/* Hours */}
+      <Card>
+        <CardHeader><CardTitle className="text-sm font-medium text-gray-700">Horarios de atención</CardTitle></CardHeader>
+        <CardContent className="space-y-3">
+          <div className="space-y-2">
+            {ALL_DAYS.map(day => (
+              <div key={day} className="flex items-center gap-3">
+                <button
+                  onClick={() => setHours(h => ({ ...h, [day]: { ...h[day], enabled: !h[day]?.enabled } }))}
+                  className={`w-24 text-sm text-left font-medium ${hours[day]?.enabled ? "text-gray-900" : "text-gray-300"}`}
+                >
+                  {DAYS_ES[day]}
+                </button>
+                {hours[day]?.enabled ? (
+                  <div className="flex items-center gap-2">
+                    <Input
+                      type="time"
+                      value={hours[day].open}
+                      onChange={e => setHours(h => ({ ...h, [day]: { ...h[day], open: e.target.value } }))}
+                      className="w-32 text-sm"
+                    />
+                    <span className="text-gray-400 text-sm">–</span>
+                    <Input
+                      type="time"
+                      value={hours[day].close}
+                      onChange={e => setHours(h => ({ ...h, [day]: { ...h[day], close: e.target.value } }))}
+                      className="w-32 text-sm"
+                    />
+                  </div>
+                ) : (
+                  <span className="text-sm text-gray-300">Cerrado</span>
+                )}
+              </div>
+            ))}
+          </div>
+          <SaveButton saving={savingHours} saved={savedHours} onClick={saveHours} />
         </CardContent>
       </Card>
     </div>
