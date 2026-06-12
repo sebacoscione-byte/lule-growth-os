@@ -154,13 +154,13 @@ function ManualPanel({
     <Card>
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
-          <CardTitle className="text-base flex items-center gap-2">
+          <CardTitle className="text-sm font-semibold text-gray-900 flex items-center gap-2">
             <Sparkles className="h-4 w-4 text-blue-600" />
             Prompt listo — copialo y pegalo en la IA
           </CardTitle>
-          <button onClick={onDismiss} className="text-xs text-gray-400 hover:text-gray-600">✕ cerrar</button>
+          <button onClick={onDismiss} className="text-xs text-gray-500 hover:text-gray-900">✕ cerrar</button>
         </div>
-        <p className="text-xs text-gray-500">
+        <p className="text-xs text-gray-600">
           Modo manual activo. Usá tu cuenta de ChatGPT, Gemini o Claude gratis.
         </p>
       </CardHeader>
@@ -170,7 +170,7 @@ function ManualPanel({
           rows={11}
           value={prompt}
           readOnly
-          className="font-mono text-xs bg-gray-50 resize-none"
+          className="font-mono text-xs bg-white text-gray-900 border-gray-300 resize-none"
         />
 
         {/* Action buttons */}
@@ -194,7 +194,7 @@ function ManualPanel({
         </div>
 
         {/* Instructions */}
-        <ol className="text-xs text-gray-500 space-y-1 list-decimal list-inside bg-blue-50 rounded-lg p-3">
+        <ol className="text-xs text-gray-700 space-y-1 list-decimal list-inside bg-blue-50 rounded-lg p-3">
           <li>Copiá el prompt de arriba</li>
           <li>Abrí ChatGPT, Gemini o Claude con tu cuenta</li>
           <li>Pegá el prompt y envialo</li>
@@ -204,12 +204,13 @@ function ManualPanel({
 
         {/* Paste area */}
         <div className="border-t pt-4 space-y-2">
-          <Label>Pegá la respuesta de la IA acá</Label>
+          <Label className="text-gray-900">Pegá la respuesta de la IA acá</Label>
           <Textarea
             rows={8}
             placeholder='Pegá aquí la respuesta completa. Ejemplo: { "hook": "...", "caption": "...", ... }'
             value={pasted}
             onChange={e => { setPasted(e.target.value); setParseError(null) }}
+            className="text-gray-900 placeholder:text-gray-400"
           />
           {parseError && (
             <p className="text-xs text-red-600 bg-red-50 rounded p-2">{parseError}</p>
@@ -462,28 +463,34 @@ export default function ContentStudioPage() {
               <CardHeader><CardTitle className="text-base">Brief editorial</CardTitle></CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-1.5">
-                  <Label>Categoria</Label>
-                  <Select value={category} onValueChange={setCategory}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>{CATEGORIES.map(value => <SelectItem key={value} value={value}>{value}</SelectItem>)}</SelectContent>
-                  </Select>
+                  <Label className="text-gray-900">Categoria</Label>
+                  <Input
+                    value={category}
+                    onChange={e => setCategory(e.target.value)}
+                    list="categories-list"
+                    placeholder="Seleccioná o escribí una categoría"
+                    className="text-gray-900 placeholder:text-gray-400"
+                  />
+                  <datalist id="categories-list">
+                    {CATEGORIES.map(value => <option key={value} value={value} />)}
+                  </datalist>
                 </div>
                 <div className="space-y-1.5">
-                  <Label>Tema o enfoque</Label>
-                  <Input value={topic} onChange={event => setTopic(event.target.value)} placeholder="Ej: novedades sobre control de presion" />
+                  <Label className="text-gray-900">Tema o enfoque</Label>
+                  <Input value={topic} onChange={event => setTopic(event.target.value)} placeholder="Ej: novedades sobre control de presion" className="text-gray-900 placeholder:text-gray-400" />
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1.5">
-                    <Label>Formato</Label>
+                    <Label className="text-gray-900">Formato</Label>
                     <Select value={format} onValueChange={value => setFormat(value as ContentItem["format"])}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectTrigger className="text-gray-900"><SelectValue /></SelectTrigger>
                       <SelectContent>{FORMATS.map(item => <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>)}</SelectContent>
                     </Select>
                   </div>
                   <div className="space-y-1.5">
-                    <Label>CTA</Label>
+                    <Label className="text-gray-900">CTA</Label>
                     <Select value={cta} onValueChange={setCta}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectTrigger className="text-gray-900"><SelectValue /></SelectTrigger>
                       <SelectContent>{CTA_OPTIONS.map(value => <SelectItem key={value} value={value}>{value}</SelectItem>)}</SelectContent>
                     </Select>
                   </div>
@@ -612,8 +619,8 @@ function Editor({ item, working, copied, onChange, onSave, onCopy, onDownload, o
           <Badge variant="outline">{STATUS_LABELS[item.status]}</Badge>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="space-y-1.5"><Label>Instagram</Label><Textarea rows={9} value={item.caption} onChange={event => onChange({ ...item, caption: event.target.value })} /></div>
-          <div className="space-y-1.5"><Label>Google Business</Label><Textarea rows={6} value={item.google_text} onChange={event => onChange({ ...item, google_text: event.target.value })} /></div>
+          <div className="space-y-1.5"><Label className="text-gray-900">Instagram</Label><Textarea rows={9} value={item.caption} onChange={event => onChange({ ...item, caption: event.target.value })} className="text-gray-900" /></div>
+          <div className="space-y-1.5"><Label className="text-gray-900">Google Business</Label><Textarea rows={6} value={item.google_text} onChange={event => onChange({ ...item, google_text: event.target.value })} className="text-gray-900" /></div>
           <div className="flex flex-wrap gap-2">
             <Button variant="outline" onClick={() => onSave({ caption: item.caption, google_text: item.google_text })} disabled={busy} className="gap-2">
               {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />} Guardar cambios
