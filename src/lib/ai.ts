@@ -140,6 +140,7 @@ export function buildContentPlanPrompt(input: {
   category: string
   format: string
   cta: string
+  appointment_link?: string | null
   source?: ContentSource | null
 }): string {
   const sourceSection = input.source
@@ -179,7 +180,11 @@ PEDIDO:
 Tema: ${input.topic}
 Categoría: ${input.category}
 Formato Instagram: ${input.format}
-CTA sugerido: ${input.cta}
+${input.cta ? `Estilo de cierre sugerido: ${input.cta}` : ""}
+${input.appointment_link
+  ? `Link de turnos: ${input.appointment_link}
+El caption debe cerrar invitando al lector a usar ese link para pedir turno. NO invitar a escribir mensajes directos ni a responder al post.`
+  : `No hay link disponible aún. Si incluís un cierre, usá "link en la bio" como referencia al link de turnos. NO invitar a escribir mensajes directos.`}
 ${sourceSection}
 RESPUESTA ESPERADA:
 Devolvé ÚNICAMENTE el JSON válido, sin markdown, sin bloques de código, sin explicaciones.
@@ -462,6 +467,7 @@ export async function generateContentPlan(input: {
   category: string
   format: "reel" | "historia" | "carrusel" | "post"
   cta: string
+  appointment_link?: string | null
   source?: ContentSource | null
 }): Promise<{
   hook: string

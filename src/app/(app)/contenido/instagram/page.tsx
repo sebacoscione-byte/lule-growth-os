@@ -25,10 +25,10 @@ const CATEGORIES = [
 
 const CTA_OPTIONS = [
   "",
-  "Escribi CARDIO y te paso como pedir turno",
-  "Escribi ECO si necesitas un ecocardiograma",
-  "Escribi TURNO y te paso las opciones de atencion",
-  "Atiende martes en Lanus y viernes en Lomas",
+  "Link en la bio para pedir turno",
+  "Link en la bio → turnos en CIMEL Lanús (martes)",
+  "Link en la bio → turnos en Swiss Medical Lomas (viernes)",
+  "Link en la bio para consulta o ecocardiograma",
 ]
 
 const FORMATS = [
@@ -241,6 +241,7 @@ export default function ContentStudioPage() {
   const [topic, setTopic] = useState("")
   const [format, setFormat] = useState<ContentItem["format"]>("reel")
   const [cta, setCta] = useState("")
+  const [appointmentLink, setAppointmentLink] = useState("")
   const [sources, setSources] = useState<ContentSource[]>([])
   const [selectedSource, setSelectedSource] = useState<ContentSource | null>(null)
   const [items, setItems] = useState<ContentItem[]>([])
@@ -304,6 +305,7 @@ export default function ContentStudioPage() {
         category,
         content_type: format,
         cta,
+        appointment_link: appointmentLink.trim() || null,
         source: selectedSource,
       }),
     })
@@ -500,6 +502,17 @@ export default function ContentStudioPage() {
                       </SelectContent>
                     </Select>
                   </div>
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-gray-900">Link de turnos <span className="text-gray-400 font-normal">(opcional)</span></Label>
+                  <Input
+                    value={appointmentLink}
+                    onChange={e => setAppointmentLink(e.target.value)}
+                    placeholder="https://... (landing, Calendly, WhatsApp, etc.)"
+                    className="text-gray-900 placeholder:text-gray-400"
+                    type="url"
+                  />
+                  <p className="text-xs text-gray-400">Si no tenés link todavía, dejalo vacío y el prompt usará "link en la bio".</p>
                 </div>
                 <Button variant="outline" onClick={research} disabled={researching} className="w-full gap-2">
                   {researching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
