@@ -58,19 +58,27 @@ export default function InstagramPage() {
   const [cta, setCta] = useState(CTA_OPTIONS[0])
   const [generating, setGenerating] = useState(false)
   const [result, setResult] = useState<GeneratedContent | null>(null)
+  const [generateError, setGenerateError] = useState<string | null>(null)
   const [copied, setCopied] = useState<string | null>(null)
 
   async function generate() {
     if (!category) return
     setGenerating(true)
-    const res = await fetch("/api/content", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ type: "instagram", category, content_type: contentType, cta }),
-    })
-    const data = await res.json()
-    setResult(data)
-    setGenerating(false)
+    setGenerateError(null)
+    try {
+      const res = await fetch("/api/content", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type: "instagram", category, content_type: contentType, cta }),
+      })
+      const data = await res.json()
+      if (data.error) setGenerateError(data.error)
+      else setResult(data)
+    } catch (e) {
+      setGenerateError(String(e))
+    } finally {
+      setGenerating(false)
+    }
   }
 
   function copy(text: string, key: string) {
@@ -140,6 +148,13 @@ export default function InstagramPage() {
                     : <><Sparkles className="h-4 w-4" /> Generar contenido</>
                   }
                 </Button>
+                {generateError && (
+                  <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-700">
+                    {generateError.includes("auth") || generateError.includes("API")
+                      ? "Error de configuración: verificá que ANTHROPIC_API_KEY esté seteada en Vercel."
+                      : generateError}
+                  </div>
+                )}
               </CardContent>
             </Card>
 

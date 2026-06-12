@@ -353,9 +353,20 @@ function ProfileTab({ status, onRefresh }: { status: StatusData; onRefresh: () =
   }
 
   if (profileError) {
+    const isQuota = profileError.includes("429") || profileError.includes("RATE_LIMIT") || profileError.includes("Quota")
     return (
-      <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-sm text-red-700">
-        <span className="font-medium">Error al cargar perfil:</span> {profileError}
+      <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 text-sm text-amber-800">
+        <p className="font-medium mb-1">{isQuota ? "Perfil no disponible (cuota API = 0)" : "Error al cargar perfil"}</p>
+        <p className="text-xs mb-3">
+          {isQuota
+            ? "Google requiere solicitar acceso a la Business Profile API. Editá el perfil directamente en:"
+            : profileError}
+        </p>
+        {isQuota && (
+          <a href="https://business.google.com/" target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-xs font-medium text-blue-600 underline">
+            Ir a Google Business <ExternalLink className="h-3 w-3" />
+          </a>
+        )}
       </div>
     )
   }
