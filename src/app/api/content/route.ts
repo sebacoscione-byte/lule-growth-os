@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { generateInstagramContent, generateGooglePost } from "@/lib/claude"
+import { generateInstagramContent, generateGooglePost, generateReviewReply } from "@/lib/claude"
 
 export async function POST(request: Request) {
   const { type, category, content_type, cta, topic } = await request.json()
@@ -20,5 +20,17 @@ export async function POST(request: Request) {
     return NextResponse.json({ text })
   }
 
-  return NextResponse.json({ error: "type must be instagram or google_post" }, { status: 400 })
+  if (type === "review_reply") {
+    if (!topic) {
+      return NextResponse.json({ error: "topic required" }, { status: 400 })
+    }
+    // topic format: "{starRating} stars. {comment}"
+    const [starLine, ...rest] = topic.split(". ")
+    const starRating = starLine.replace(" stars", "").trim().toUpperCase()
+    const comment = rest.join(". ")
+    const text = await generateReviewReply(starRating, comment)
+    return NextResponse.json({ text })
+  }
+
+  return NextResponse.json({ error: "type must be instagram, google_post, or review_reply" }, { status: 400 })
 }

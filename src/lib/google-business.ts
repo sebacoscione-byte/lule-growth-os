@@ -1,0 +1,193 @@
+import type { SupabaseClient } from "@supabase/supabase-js"
+
+const ACCOUNTS_API = "https://mybusinessaccountmanagement.googleapis.com/v1"
+const INFO_API = "https://mybusinessbusinessinformation.googleapis.com/v1"
+const LEGACY_API = "https://mybusiness.googleapis.com/v4"
+const TOKEN_URL = "https://oauth2.googleapis.com/token"
+
+// ─── Token management ────────────────────────────────────────────────────────
+
+async function refreshAccessToken(refreshToken: string) {
+  const res = await fetch(TOKEN_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      client_id: process.env.GOOGLE_CLIENT_ID!,
+      client_secret: process.env.GOOGLE_CLIENT_SECRET!,
+      refresh_token: refreshToken,
+      grant_type: "refresh_token",
+    }),
+  })
+  if (!res.ok) throw new Error(`Token refresh failed: ${await res.text()}`)
+  return res.json() as Promise<{ access_token: string; expires_in: number }>
+}
+
+export async function getValidToken(supabase: SupabaseClient): Promise<string | null> {
+  const keys = ["google_access_token", "google_refresh_token", "google_token_expires_at"]
+  const { data } = await supabase.from("app_config").select("key, value").in("key", keys)
+  if (!data?.length) return null
+
+  const map: Record<string, string> = {}
+  data.forEach((r: { key: string; value: unknown }) => { map[r.key] = r.value as string })
+
+  if (!map.google_refresh_token) return null
+
+  const expiresAt = new Date(map.google_token_expires_at)
+  const isExpired = !map.google_access_token || Date.now() > expiresAt.getTime() - 60_000
+
+  if (!isExpired) return map.google_access_token
+
+  const fresh = await refreshAccessToken(map.google_refresh_token)
+  const newExpiry = new Date(Date.now() + fresh.expires_in * 1000).toISOString()
+
+  await Promise.all([
+    supabase.from("app_config").upsert({ key: "google_access_token", value: fresh.access_token }, { onConflict: "key" }),
+    supabase.from("app_config").upsert({ key: "google_token_expires_at", value: newExpiry }, { onConflict: "key" }),
+  ])
+
+  return fresh.access_token
+}
+
+export async function getConnectionInfo(supabase: SupabaseClient) {
+  const keys = ["google_refresh_token", "google_account_id", "google_location_id", "google_location_name", "google_account_name"]
+  const { data } = await supabase.from("app_config").select("key, value").in("key", keys)
+  if (!data?.length) return null
+
+  const map: Record<string, string> = {}
+  data.forEach((r: { key: string; value: unknown }) => { map[r.key] = r.value as string })
+
+  if (!map.google_refresh_token) return null
+  return map
+}
+
+export async function saveTokens(supabase: SupabaseClient, tokens: {
+  access_token: string
+  refresh_token: string
+  expires_in: number
+}) {
+  const expiry = new Date(Date.now() + tokens.expires_in * 1000).toISOString()
+  await Promise.all([
+    supabase.from("app_config").upsert({ key: "google_access_token", value: tokens.access_token }, { onConflict: "key" }),
+    supabase.from("app_config").upsert({ key: "google_refresh_token", value: tokens.refresh_token }, { onConflict: "key" }),
+    supabase.from("app_config").upsert({ key: "google_token_expires_at", value: expiry }, { onConflict: "key" }),
+  ])
+}
+
+export async function clearTokens(supabase: SupabaseClient) {
+  const keys = ["google_access_token", "google_refresh_token", "google_token_expires_at", "google_account_id", "google_location_id", "google_account_name", "google_location_name"]
+  await supabase.from("app_config").delete().in("key", keys)
+}
+
+// ─── Account & Location discovery ────────────────────────────────────────────
+
+export async function listAccounts(token: string) {
+  const res = await fetch(`${ACCOUNTS_API}/accounts`, {
+    headers: { Authorization: `Bearer ${token}` },
+  })
+  if (!res.ok) throw new Error(await res.text())
+  return res.json() as Promise<{ accounts?: Array<{ name: string; accountName: string; type: string }> }>
+}
+
+export async function listLocations(token: string, accountName: string) {
+  const url = `${INFO_API}/${accountName}/locations?readMask=name,title,storefrontAddress,regularHours,phoneNumbers,websiteUri,profile`
+  const res = await fetch(url, {
+    headers: { Authorization: `Bearer ${token}` },
+  })
+  if (!res.ok) throw new Error(await res.text())
+  return res.json() as Promise<{ locations?: Array<{ name: string; title: string }> }>
+}
+
+// ─── Profile ─────────────────────────────────────────────────────────────────
+
+export async function getLocation(token: string, locationName: string) {
+  const url = `${INFO_API}/${locationName}?readMask=name,title,storefrontAddress,regularHours,phoneNumbers,websiteUri,profile`
+  const res = await fetch(url, {
+    headers: { Authorization: `Bearer ${token}` },
+  })
+  if (!res.ok) throw new Error(await res.text())
+  return res.json()
+}
+
+export async function updateDescription(token: string, locationName: string, description: string) {
+  const url = `${INFO_API}/${locationName}?updateMask=profile.description`
+  const res = await fetch(url, {
+    method: "PATCH",
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ profile: { description } }),
+  })
+  if (!res.ok) throw new Error(await res.text())
+  return res.json()
+}
+
+// ─── Posts (legacy v4 API) ────────────────────────────────────────────────────
+
+export async function listPosts(token: string, accountId: string, locationId: string) {
+  const url = `${LEGACY_API}/accounts/${accountId}/locations/${locationId}/localPosts`
+  const res = await fetch(url, {
+    headers: { Authorization: `Bearer ${token}` },
+  })
+  if (!res.ok) throw new Error(await res.text())
+  return res.json() as Promise<{
+    localPosts?: Array<{
+      name: string
+      summary: string
+      state: string
+      createTime: string
+      updateTime: string
+    }>
+  }>
+}
+
+export async function createPost(token: string, accountId: string, locationId: string, summary: string) {
+  const url = `${LEGACY_API}/accounts/${accountId}/locations/${locationId}/localPosts`
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ languageCode: "es", summary, topicType: "STANDARD" }),
+  })
+  if (!res.ok) throw new Error(await res.text())
+  return res.json()
+}
+
+export async function deletePost(token: string, accountId: string, locationId: string, postId: string) {
+  const url = `${LEGACY_API}/accounts/${accountId}/locations/${locationId}/localPosts/${postId}`
+  const res = await fetch(url, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${token}` },
+  })
+  if (!res.ok) throw new Error(await res.text())
+  return res.json()
+}
+
+// ─── Reviews (legacy v4 API) ──────────────────────────────────────────────────
+
+export async function listReviews(token: string, accountId: string, locationId: string) {
+  const url = `${LEGACY_API}/accounts/${accountId}/locations/${locationId}/reviews?orderBy=updateTime desc&pageSize=20`
+  const res = await fetch(url, {
+    headers: { Authorization: `Bearer ${token}` },
+  })
+  if (!res.ok) throw new Error(await res.text())
+  return res.json() as Promise<{
+    reviews?: Array<{
+      name: string
+      reviewId: string
+      reviewer: { profilePhotoUrl: string; displayName: string; isAnonymous: boolean }
+      starRating: string
+      comment?: string
+      createTime: string
+      updateTime: string
+      reviewReply?: { comment: string; updateTime: string }
+    }>
+  }>
+}
+
+export async function replyToReview(token: string, accountId: string, locationId: string, reviewId: string, comment: string) {
+  const url = `${LEGACY_API}/accounts/${accountId}/locations/${locationId}/reviews/${reviewId}/reply`
+  const res = await fetch(url, {
+    method: "PUT",
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ comment }),
+  })
+  if (!res.ok) throw new Error(await res.text())
+  return res.json()
+}

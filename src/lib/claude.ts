@@ -126,6 +126,25 @@ Solo devolvé el texto de la publicación.`,
   return response.content[0].type === "text" ? response.content[0].text : ""
 }
 
+export async function generateReviewReply(starRating: string, comment: string): Promise<string> {
+  const stars = { ONE: 1, TWO: 2, THREE: 3, FOUR: 4, FIVE: 5 }[starRating] ?? 3
+  const sentiment = stars >= 4 ? "positiva" : stars === 3 ? "neutral" : "negativa"
+  const response = await anthropic.messages.create({
+    model: "claude-sonnet-4-6",
+    max_tokens: 256,
+    system: `Sos la Dra. Lucía Chahin y respondés reseñas de Google en primera persona.
+Tono cálido, profesional y breve (máximo 3 oraciones). Nunca hagas promesas médicas.
+Solo devolvé el texto de la respuesta, sin comillas ni formato extra.`,
+    messages: [
+      {
+        role: "user",
+        content: `Reseña ${sentiment} (${stars} estrellas): "${comment || "Sin comentario"}"\nGenerá una respuesta apropiada.`,
+      },
+    ],
+  })
+  return response.content[0].type === "text" ? response.content[0].text : ""
+}
+
 export async function generateFollowupMessage(
   leadName: string | null,
   location: string
