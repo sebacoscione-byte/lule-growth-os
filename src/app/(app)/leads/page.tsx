@@ -16,7 +16,7 @@ export default async function LeadsPage({
   const sp = await searchParams
   const supabase = await createClient()
 
-  let query = supabase.from("leads").select("*").order("created_at", { ascending: false })
+  let query = supabase.from("leads").select("*").order("created_at", { ascending: false }).limit(300)
 
   if (sp.status) query = query.eq("status", sp.status)
   if (sp.channel) query = query.eq("origin_channel", sp.channel)

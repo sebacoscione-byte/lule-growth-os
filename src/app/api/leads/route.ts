@@ -3,6 +3,9 @@ import { NextResponse } from "next/server"
 
 export async function GET(request: Request) {
   const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+
   const { searchParams } = new URL(request.url)
   const status = searchParams.get("status")
   const channel = searchParams.get("channel")
@@ -13,6 +16,7 @@ export async function GET(request: Request) {
     .from("leads")
     .select("*")
     .order("created_at", { ascending: false })
+    .limit(300)
 
   if (status) query = query.eq("status", status)
   if (channel) query = query.eq("origin_channel", channel)
@@ -27,6 +31,9 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+
   const body = await request.json()
 
   const { data, error } = await supabase

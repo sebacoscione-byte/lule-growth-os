@@ -321,16 +321,24 @@ function ProfileTab({ onRefresh }: { status: StatusData; onRefresh: () => void }
 
   async function save(field: string, body: Record<string, unknown>, setSaving: (v: boolean) => void, setSaved: (v: boolean) => void) {
     setSaving(true)
-    const res = await fetch("/api/google-business/profile", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    })
-    setSaving(false)
-    if (res.ok) {
-      setSaved(true)
-      setTimeout(() => setSaved(false), 3000)
-      onRefresh()
+    try {
+      const res = await fetch("/api/google-business/profile", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      })
+      if (res.ok) {
+        setSaved(true)
+        setTimeout(() => setSaved(false), 3000)
+        onRefresh()
+      } else {
+        const data = await res.json().catch(() => ({}))
+        setProfileError(data.error ?? `Error al guardar ${field}`)
+      }
+    } catch {
+      setProfileError(`Error de red al guardar ${field}`)
+    } finally {
+      setSaving(false)
     }
   }
 

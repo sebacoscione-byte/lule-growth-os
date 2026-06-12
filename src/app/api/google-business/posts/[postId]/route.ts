@@ -1,13 +1,16 @@
 import { NextRequest, NextResponse } from "next/server"
-import { createServiceClient } from "@/lib/supabase/server"
+import { createClient, createServiceClient } from "@/lib/supabase/server"
 import { getValidToken, getConnectionInfo, deletePost } from "@/lib/google-business"
 
 export async function DELETE(
   _req: NextRequest,
   { params }: { params: Promise<{ postId: string }> }
 ) {
-  const { postId } = await params
+  const userClient = await createClient()
+  const { data: { user } } = await userClient.auth.getUser()
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
+  const { postId } = await params
   const supabase = await createServiceClient()
   const info = await getConnectionInfo(supabase)
   if (!info?.google_account_id || !info?.google_location_id) {

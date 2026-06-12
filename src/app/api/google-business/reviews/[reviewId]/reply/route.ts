@@ -1,11 +1,15 @@
 import { NextRequest, NextResponse } from "next/server"
-import { createServiceClient } from "@/lib/supabase/server"
+import { createClient, createServiceClient } from "@/lib/supabase/server"
 import { getValidToken, getConnectionInfo, replyToReview } from "@/lib/google-business"
 
 export async function PUT(
   req: NextRequest,
   { params }: { params: Promise<{ reviewId: string }> }
 ) {
+  const userClient = await createClient()
+  const { data: { user } } = await userClient.auth.getUser()
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+
   const { reviewId } = await params
   const { comment } = await req.json() as { comment: string }
   if (!comment?.trim()) return NextResponse.json({ error: "comment required" }, { status: 400 })

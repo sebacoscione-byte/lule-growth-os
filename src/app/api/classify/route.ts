@@ -3,6 +3,10 @@ import { classifyMessage } from "@/lib/claude"
 import { createClient } from "@/lib/supabase/server"
 
 export async function POST(request: Request) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+
   const { message, lead_id } = await request.json()
 
   if (!message) {
@@ -13,7 +17,6 @@ export async function POST(request: Request) {
     const result = await classifyMessage(message)
 
     if (lead_id) {
-      const supabase = await createClient()
       await supabase.from("leads").update({
         requested_service: result.requested_service,
         preferred_location: result.suggested_location === "preguntar" ? "sin_definir" : result.suggested_location,

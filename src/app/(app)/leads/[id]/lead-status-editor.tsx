@@ -3,8 +3,9 @@
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Button } from "@/components/ui/button"
 import { STATUS_LABELS, STATUS_COLORS, type LeadStatus } from "@/types"
-import { Loader2 } from "lucide-react"
+import { Clock, Loader2 } from "lucide-react"
 
 const ALL_STATUSES: LeadStatus[] = [
   "nuevo", "interesado", "calificado", "derivado_cimel", "derivado_swiss",
@@ -12,29 +13,55 @@ const ALL_STATUSES: LeadStatus[] = [
   "requiere_humano", "urgencia_derivada", "descartado", "spam",
 ]
 
-export function LeadStatusEditor({ leadId, currentStatus }: { leadId: string; currentStatus: LeadStatus }) {
+export function LeadStatusEditor({
+  leadId,
+  currentStatus,
+  followupDueAt,
+}: {
+  leadId: string
+  currentStatus: LeadStatus
+  followupDueAt?: string | null
+}) {
   const router = useRouter()
   const [status, setStatus] = useState<LeadStatus>(currentStatus)
   const [saving, setSaving] = useState(false)
+  const [pendingStatus, setPendingStatus] = useState<LeadStatus | null>(null)
 
-  async function save(newStatus: LeadStatus) {
+  async function save(newStatus: LeadStatus, followupHours?: number) {
     setSaving(true)
+    setPendingStatus(null)
+    const body: Record<string, unknown> = { status: newStatus }
+    if (followupHours) {
+      body.followup_due_at = new Date(Date.now() + followupHours * 60 * 60 * 1000).toISOString()
+    }
     await fetch(`/api/leads/${leadId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status: newStatus }),
+      body: JSON.stringify(body),
     })
     setStatus(newStatus)
     setSaving(false)
     router.refresh()
   }
 
+  function handleStatusChange(newStatus: LeadStatus) {
+    if (newStatus === "seguimiento_pendiente") {
+      setPendingStatus(newStatus)
+    } else {
+      save(newStatus)
+    }
+  }
+
+  const followupDate = followupDueAt ? new Date(followupDueAt) : null
+  const isOverdue = followupDate && followupDate < new Date()
+
   return (
-    <div className="space-y-2">
+    <div className="space-y-3">
       <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${STATUS_COLORS[status]}`}>
         {STATUS_LABELS[status]}
       </span>
-      <Select value={status} onValueChange={(v) => save(v as LeadStatus)}>
+
+      <Select value={status} onValueChange={(v) => handleStatusChange(v as LeadStatus)}>
         <SelectTrigger className="w-full">
           <SelectValue />
         </SelectTrigger>
@@ -44,6 +71,34 @@ export function LeadStatusEditor({ leadId, currentStatus }: { leadId: string; cu
           ))}
         </SelectContent>
       </Select>
+
+      {pendingStatus === "seguimiento_pendiente" && (
+        <div className="rounded-lg border border-orange-200 bg-orange-50 p-3 space-y-2">
+          <p className="text-xs font-medium text-orange-800 flex items-center gap-1">
+            <Clock className="h-3.5 w-3.5" /> ¿Cuándo hacer seguimiento?
+          </p>
+          <div className="flex gap-2">
+            <Button size="sm" variant="outline" className="flex-1 text-xs" onClick={() => save("seguimiento_pendiente", 24)}>
+              24 horas
+            </Button>
+            <Button size="sm" variant="outline" className="flex-1 text-xs" onClick={() => save("seguimiento_pendiente", 48)}>
+              48 horas
+            </Button>
+          </div>
+          <Button size="sm" variant="ghost" className="w-full text-xs text-gray-500" onClick={() => { setPendingStatus(null); save("seguimiento_pendiente") }}>
+            Sin fecha
+          </Button>
+        </div>
+      )}
+
+      {followupDate && status === "seguimiento_pendiente" && (
+        <div className={`flex items-center gap-2 rounded-lg px-3 py-2 text-xs ${isOverdue ? "bg-red-50 text-red-700 border border-red-200" : "bg-orange-50 text-orange-700 border border-orange-200"}`}>
+          <Clock className="h-3.5 w-3.5 shrink-0" />
+          {isOverdue ? "Vencido: " : "Seguimiento: "}
+          {followupDate.toLocaleDateString("es-AR", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
+        </div>
+      )}
+
       {saving && <Loader2 className="h-4 w-4 animate-spin text-blue-500" />}
     </div>
   )

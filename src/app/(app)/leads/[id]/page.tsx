@@ -45,7 +45,7 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
           <Card>
             <CardHeader><CardTitle className="text-base">Estado</CardTitle></CardHeader>
             <CardContent>
-              <LeadStatusEditor leadId={l.id} currentStatus={l.status} />
+              <LeadStatusEditor leadId={l.id} currentStatus={l.status} followupDueAt={l.followup_due_at} />
             </CardContent>
           </Card>
 
