@@ -464,6 +464,7 @@ export default function ContentStudioPage() {
   }, [])
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadItems()
   }, [loadItems])
 
@@ -711,7 +712,7 @@ export default function ContentStudioPage() {
                     className="text-gray-900 placeholder:text-gray-400"
                     type="url"
                   />
-                  <p className="text-xs text-gray-400">Si no tenés link todavía, dejalo vacío y el prompt usará "link en la bio".</p>
+                  <p className="text-xs text-gray-400">Si no tenés link todavía, dejalo vacío y el prompt usará &ldquo;link en la bio&rdquo;.</p>
                 </div>
                 <Button variant="outline" onClick={research} disabled={researching} className="w-full gap-2">
                   {researching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}

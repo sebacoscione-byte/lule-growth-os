@@ -305,7 +305,6 @@ function ChecklistTab() {
 
   useEffect(() => {
     // Initial remote state hydration.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetch("/api/checklist")
       .then(r => r.json())
       .then(data => { if (Array.isArray(data)) setItems(data) })

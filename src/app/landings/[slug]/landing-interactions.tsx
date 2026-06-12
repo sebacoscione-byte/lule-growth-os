@@ -22,6 +22,7 @@ function useUtmParams() {
       const val = sp.get(key)
       if (val) result[key] = val
     }
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setUtms(result)
   }, [])
   return utms
