@@ -197,17 +197,21 @@ function ProfileTab({ status, onRefresh }: { status: StatusData; onRefresh: () =
 function PostsTab() {
   const [posts, setPosts] = useState<Post[]>([])
   const [loading, setLoading] = useState(true)
+  const [apiError, setApiError] = useState<string | null>(null)
   const [topic, setTopic] = useState("")
   const [draftText, setDraftText] = useState("")
   const [generating, setGenerating] = useState(false)
   const [publishing, setPublishing] = useState(false)
+  const [publishError, setPublishError] = useState<string | null>(null)
   const [deleting, setDeleting] = useState<string | null>(null)
 
   const fetchPosts = useCallback(async () => {
     setLoading(true)
+    setApiError(null)
     const res = await fetch("/api/google-business/posts")
     const data = await res.json()
-    setPosts(data.localPosts ?? [])
+    if (data.error) setApiError(data.error)
+    else setPosts(data.localPosts ?? [])
     setLoading(false)
   }, [])
 
@@ -229,16 +233,20 @@ function PostsTab() {
   async function publishPost() {
     if (!draftText.trim()) return
     setPublishing(true)
+    setPublishError(null)
     const res = await fetch("/api/google-business/posts", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ summary: draftText }),
     })
+    const data = await res.json()
     setPublishing(false)
-    if (res.ok) {
+    if (res.ok && !data.error) {
       setDraftText("")
       setTopic("")
       fetchPosts()
+    } else {
+      setPublishError(data.error ?? "Error al publicar")
     }
   }
 
@@ -290,10 +298,20 @@ function PostsTab() {
         </CardContent>
       </Card>
 
+      {publishError && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-700">
+          <span className="font-medium">Error al publicar:</span> {publishError}
+        </div>
+      )}
+
       {/* Existing posts */}
       {loading ? (
         <div className="flex justify-center py-8">
           <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
+        </div>
+      ) : apiError ? (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-sm text-red-700">
+          <span className="font-medium">Error al cargar publicaciones:</span> {apiError}
         </div>
       ) : posts.length === 0 ? (
         <p className="text-center text-sm text-gray-400 py-8">No hay publicaciones aún</p>
@@ -333,6 +351,7 @@ function PostsTab() {
 function ReviewsTab() {
   const [reviews, setReviews] = useState<Review[]>([])
   const [loading, setLoading] = useState(true)
+  const [apiError, setApiError] = useState<string | null>(null)
   const [replyDrafts, setReplyDrafts] = useState<Record<string, string>>({})
   const [generating, setGenerating] = useState<string | null>(null)
   const [publishing, setPublishing] = useState<string | null>(null)
@@ -340,9 +359,11 @@ function ReviewsTab() {
 
   const fetchReviews = useCallback(async () => {
     setLoading(true)
+    setApiError(null)
     const res = await fetch("/api/google-business/reviews")
     const data = await res.json()
-    setReviews(data.reviews ?? [])
+    if (data.error) setApiError(data.error)
+    else setReviews(data.reviews ?? [])
     setLoading(false)
   }, [])
 
@@ -396,6 +417,10 @@ function ReviewsTab() {
       {loading ? (
         <div className="flex justify-center py-8">
           <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
+        </div>
+      ) : apiError ? (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-sm text-red-700">
+          <span className="font-medium">Error al cargar reseñas:</span> {apiError}
         </div>
       ) : reviews.length === 0 ? (
         <p className="text-center text-sm text-gray-400 py-8">No hay reseñas todavía</p>
@@ -547,7 +572,7 @@ export default function GoogleLocalPage() {
         {status?.connected && (
           <div className="flex items-center gap-3">
             <a
-              href={`https://business.google.com/dashboard/l/${status.locationId}`}
+              href="https://business.google.com/"
               target="_blank"
               rel="noreferrer"
             >
