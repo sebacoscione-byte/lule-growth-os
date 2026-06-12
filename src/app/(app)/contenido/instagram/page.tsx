@@ -500,11 +500,9 @@ export default function ContentStudioPage() {
   const [tab, setTab] = useState("crear")
   const [manualPrompt, setManualPrompt] = useState<string | null>(null)
   const [showDirectEntry, setShowDirectEntry] = useState(false)
-  const [directCaption, setDirectCaption] = useState("")
-  const [directHeadline, setDirectHeadline] = useState("")
-  const [directSubtitle, setDirectSubtitle] = useState("")
-  const [directGoogleText, setDirectGoogleText] = useState("")
+  const [directPaste, setDirectPaste] = useState("")
   const [directSaving, setDirectSaving] = useState(false)
+  const [directError, setDirectError] = useState<string | null>(null)
 
   const lastGenRef = useRef(0)
 
@@ -637,43 +635,17 @@ export default function ContentStudioPage() {
   }
 
   async function saveDirect() {
-    if (!directCaption.trim() && !directHeadline.trim()) return
+    if (!directPaste.trim()) return
     setDirectSaving(true)
-    const now = new Date().toISOString()
-    const item: ContentItem = {
-      id: crypto.randomUUID(),
-      topic: topic || category,
-      category,
-      format,
-      goal: "Captar consultas y explicar como pedir turno",
-      status: "draft",
-      channels: ["instagram", "google_business"],
-      source: null,
-      created_at: now,
-      updated_at: now,
-      approved_at: null,
-      hook: "",
-      caption: directCaption.trim(),
-      google_text: directGoogleText.trim().slice(0, 1500),
-      hashtags: "",
-      visual_headline: directHeadline.trim().slice(0, 90),
-      visual_subtitle: directSubtitle.trim().slice(0, 90),
-      visual_style: "blue",
+    setDirectError(null)
+    try {
+      await processManualResponse(directPaste)
+      setDirectPaste("")
+      setShowDirectEntry(false)
+    } catch (e) {
+      setDirectError(e instanceof Error ? e.message : "Error al procesar la respuesta")
     }
-    const saved = await fetch("/api/content/items", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(item),
-    })
     setDirectSaving(false)
-    if (!saved.ok) { setError("No se pudo guardar el borrador"); return }
-    setItems(previous => [item, ...previous])
-    setActive(item)
-    setShowDirectEntry(false)
-    setDirectCaption("")
-    setDirectHeadline("")
-    setDirectSubtitle("")
-    setDirectGoogleText("")
   }
 
   async function processManualResponse(pasted: string) {
@@ -858,54 +830,24 @@ export default function ContentStudioPage() {
 
                   {showDirectEntry && (
                     <div className="mt-3 space-y-3">
-                      <div className="space-y-1.5">
-                        <Label className="text-gray-900">Caption Instagram</Label>
-                        <Textarea
-                          rows={5}
-                          value={directCaption}
-                          onChange={e => setDirectCaption(e.target.value)}
-                          placeholder="Pegá o escribí el texto para Instagram..."
-                          className="text-gray-900 placeholder:text-gray-400 resize-none"
-                        />
-                      </div>
-                      <div className="grid grid-cols-2 gap-2">
-                        <div className="space-y-1.5">
-                          <Label className="text-gray-900 text-xs">Título placa visual</Label>
-                          <Input
-                            value={directHeadline}
-                            onChange={e => setDirectHeadline(e.target.value)}
-                            placeholder="Ej: ¿Cuándo ir al cardiólogo?"
-                            className="text-gray-900 placeholder:text-gray-400 text-sm"
-                          />
-                        </div>
-                        <div className="space-y-1.5">
-                          <Label className="text-gray-900 text-xs">Subtítulo placa</Label>
-                          <Input
-                            value={directSubtitle}
-                            onChange={e => setDirectSubtitle(e.target.value)}
-                            placeholder="Una línea corta"
-                            className="text-gray-900 placeholder:text-gray-400 text-sm"
-                          />
-                        </div>
-                      </div>
-                      <div className="space-y-1.5">
-                        <Label className="text-gray-900">Texto Google Business <span className="text-gray-400 font-normal text-xs">(opcional)</span></Label>
-                        <Textarea
-                          rows={3}
-                          value={directGoogleText}
-                          onChange={e => setDirectGoogleText(e.target.value)}
-                          placeholder="Texto para publicar en Google Business Profile..."
-                          className="text-gray-900 placeholder:text-gray-400 resize-none"
-                        />
-                      </div>
+                      <Textarea
+                        rows={8}
+                        value={directPaste}
+                        onChange={e => { setDirectPaste(e.target.value); setDirectError(null) }}
+                        placeholder={`Pegá acá la respuesta JSON de Gemini, Claude o ChatGPT.\n\nEj: {"hook":"...","caption":"...","google_text":"...","hashtags":"...","visual_headline":"...","visual_subtitle":"...","visual_style":"rose"}`}
+                        className="font-mono text-xs text-gray-900 placeholder:text-gray-400 resize-none"
+                      />
+                      {directError && (
+                        <p className="text-xs text-red-600 bg-red-50 rounded p-2">{directError}</p>
+                      )}
                       <Button
                         onClick={saveDirect}
-                        disabled={directSaving || (!directCaption.trim() && !directHeadline.trim())}
+                        disabled={directSaving || !directPaste.trim()}
                         className="w-full gap-2"
                         variant="outline"
                       >
                         {directSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
-                        Guardar como borrador
+                        Procesar y guardar como borrador
                       </Button>
                     </div>
                   )}
