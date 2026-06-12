@@ -438,7 +438,7 @@ export default function ContentStudioPage() {
   const [category, setCategory] = useState(CATEGORIES[0])
   const [topic, setTopic] = useState("")
   const [format, setFormat] = useState<ContentItem["format"]>("reel")
-  const [cta, setCta] = useState("")
+  const [cta, setCta] = useState("none")
   const [appointmentLink, setAppointmentLink] = useState("")
   const [sources, setSources] = useState<ContentSource[]>([])
   const [selectedSource, setSelectedSource] = useState<ContentSource | null>(null)
@@ -507,7 +507,7 @@ export default function ContentStudioPage() {
         topic: topic || category,
         category,
         content_type: format,
-        cta,
+        cta: cta === "none" ? "" : cta,
         appointment_link: appointmentLink.trim() || null,
         source: selectedSource,
       }),
@@ -701,7 +701,7 @@ export default function ContentStudioPage() {
                         <SelectValue placeholder="Sin llamado a acción" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">Sin llamado a acción</SelectItem>
+                        <SelectItem value="none">Sin llamado a acción</SelectItem>
                         {CTA_OPTIONS.filter(v => v).map(value => <SelectItem key={value} value={value}>{value}</SelectItem>)}
                       </SelectContent>
                     </Select>
