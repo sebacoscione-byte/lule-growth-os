@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
-import { generateFollowupMessage } from "@/lib/claude"
+import { generateFollowupMessage } from "@/lib/ai"
 import { LOCATION_LABELS } from "@/types"
 
 export async function GET() {

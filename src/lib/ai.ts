@@ -1,0 +1,334 @@
+import Anthropic from "@anthropic-ai/sdk"
+import type { ClassifyResult, ContentSource } from "@/types"
+
+type AiProvider = "anthropic" | "gemini"
+type AiMessage = { role: "user" | "assistant"; content: string }
+
+type GenerateOptions = {
+  system: string
+  messages: AiMessage[]
+  maxTokens: number
+  json?: boolean
+}
+
+const SPANISH_INSTRUCTION = `Responde siempre en espanol rioplatense claro, natural y profesional.
+No respondas en ingles, salvo nombres propios, marcas o terminos tecnicos inevitables.`
+
+let anthropic: Anthropic | null = null
+
+function getRequestedProvider(): AiProvider | "auto" {
+  const provider = process.env.AI_PROVIDER?.toLowerCase()
+  return provider === "anthropic" || provider === "gemini" ? provider : "auto"
+}
+
+function getProviderOrder(): AiProvider[] {
+  const requested = getRequestedProvider()
+  if (requested !== "auto") return [requested]
+  return process.env.GEMINI_API_KEY
+    ? ["gemini", "anthropic"]
+    : ["anthropic", "gemini"]
+}
+
+export function getAiConfiguration() {
+  const requested = getRequestedProvider()
+  const available = {
+    gemini: Boolean(process.env.GEMINI_API_KEY),
+    anthropic: Boolean(process.env.ANTHROPIC_API_KEY),
+  }
+  const active = requested === "auto"
+    ? available.gemini ? "gemini" : available.anthropic ? "anthropic" : null
+    : requested
+  return { requested, active, available }
+}
+
+function getAnthropic() {
+  if (!process.env.ANTHROPIC_API_KEY) {
+    throw new Error("ANTHROPIC_API_KEY no esta configurada.")
+  }
+  if (!anthropic) anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+  return anthropic
+}
+
+async function generateWithAnthropic(options: GenerateOptions) {
+  const response = await getAnthropic().messages.create({
+    model: process.env.ANTHROPIC_MODEL || "claude-sonnet-4-6",
+    max_tokens: options.maxTokens,
+    system: `${SPANISH_INSTRUCTION}\n\n${options.system}`,
+    messages: options.messages,
+  })
+  return response.content
+    .filter(block => block.type === "text")
+    .map(block => block.text)
+    .join("")
+}
+
+async function generateWithGemini(options: GenerateOptions) {
+  const apiKey = process.env.GEMINI_API_KEY
+  if (!apiKey) throw new Error("GEMINI_API_KEY no esta configurada.")
+
+  const model = process.env.GEMINI_MODEL || "gemini-3.5-flash"
+  const response = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-goog-api-key": apiKey,
+      },
+      body: JSON.stringify({
+        systemInstruction: {
+          parts: [{ text: `${SPANISH_INSTRUCTION}\n\n${options.system}` }],
+        },
+        contents: options.messages.map(message => ({
+          role: message.role === "assistant" ? "model" : "user",
+          parts: [{ text: message.content }],
+        })),
+        generationConfig: {
+          maxOutputTokens: options.maxTokens,
+          ...(options.json ? { responseMimeType: "application/json" } : {}),
+        },
+      }),
+    }
+  )
+
+  const data = await response.json() as {
+    candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>
+    error?: { message?: string; status?: string }
+  }
+  if (!response.ok) {
+    throw new Error(data.error?.message || `Gemini respondio con estado ${response.status}.`)
+  }
+  const text = data.candidates?.[0]?.content?.parts?.map(part => part.text || "").join("") || ""
+  if (!text) throw new Error("Gemini no devolvio contenido.")
+  return text
+}
+
+async function generateText(options: GenerateOptions) {
+  const errors: unknown[] = []
+  for (const provider of getProviderOrder()) {
+    try {
+      return provider === "gemini"
+        ? await generateWithGemini(options)
+        : await generateWithAnthropic(options)
+    } catch (error) {
+      errors.push(error)
+      if (getRequestedProvider() !== "auto") break
+    }
+  }
+  throw errors[0] || new Error("No hay un proveedor de IA disponible.")
+}
+
+export function getPublicAiError(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error)
+  const normalized = message.toLowerCase()
+
+  if (normalized.includes("credit balance") || normalized.includes("billing") || normalized.includes("insufficient")) {
+    return "El proveedor de IA no tiene saldo disponible. Configura GEMINI_API_KEY para usar Gemini o revisa la facturacion del proveedor actual."
+  }
+  if (normalized.includes("quota") || normalized.includes("resource_exhausted") || normalized.includes("rate limit")) {
+    return "El proveedor de IA alcanzo su limite temporal. Intenta nuevamente en unos minutos o cambia AI_PROVIDER."
+  }
+  if (normalized.includes("api_key") || normalized.includes("api key") || normalized.includes("authentication")) {
+    return "Falta configurar una clave de IA valida. Agrega GEMINI_API_KEY o ANTHROPIC_API_KEY en las variables de entorno."
+  }
+  if (normalized.includes("not found") && normalized.includes("model")) {
+    return "El modelo de IA configurado no esta disponible. Revisa GEMINI_MODEL o ANTHROPIC_MODEL."
+  }
+  return "No se pudo generar la respuesta con IA. Revisa la configuracion del proveedor e intenta nuevamente."
+}
+
+function parseJson<T>(text: string): T {
+  const jsonMatch = text.match(/\{[\s\S]*\}/)
+  if (!jsonMatch) throw new Error("La IA no devolvio JSON valido.")
+  return JSON.parse(jsonMatch[0]) as T
+}
+
+const SYSTEM_PROMPT = `Sos el asistente administrativo digital de la Dra. Lucia Chahin.
+Tu objetivo es captar interesados y guiarlos para pedir turno.
+
+REGLAS OBLIGATORIAS:
+- No das diagnostico
+- No indicas tratamiento
+- No interpretas estudios
+- No das consejos medicos personalizados
+- No confirmas disponibilidad
+- No reservas turnos
+- No hablas en nombre de CIMEL ni de Swiss Medical
+- No prometes atencion ni resultados
+- No pedis DNI, estudios, imagenes, ECG ni historia clinica
+- Solo pedis datos minimos para seguimiento
+- Usas tono claro, calido, profesional y argentino (voseo)
+- Haces una pregunta por vez
+
+INFORMACION DE ATENCION:
+- Dra. Lucia Chahin atiende:
+  - Martes en CIMEL Lanus (Tucuman 1314, Lanus): consulta cardiologica y ecocardiograma
+  - Viernes en Swiss Medical Lomas: consulta cardiologica y ecocardiograma
+- Para pedir turno: comunicarse con la institucion y solicitar turno con la Dra. Lucia Chahin
+- La app NO reserva turnos ni confirma horarios
+
+DETECCION DE URGENCIAS:
+Si el usuario menciona dolor de pecho actual, falta de aire, desmayo, perdida de fuerza,
+dificultad para hablar, dolor irradiado a brazo o mandibula, palpitaciones con mareo intenso,
+presion muy alta con sintomas, o cualquier sintoma de alarma:
+Responder: "Por lo que contas, esto no deberia resolverse por este canal. Te recomiendo buscar atencion medica inmediata o concurrir a una guardia. Este canal solo sirve para orientar como pedir turno, no para urgencias."`
+
+export async function classifyMessage(message: string): Promise<ClassifyResult> {
+  const text = await generateText({
+    maxTokens: 1024,
+    json: true,
+    system: `${SYSTEM_PROMPT}
+
+Analiza el mensaje del usuario y devolve SOLO un JSON valido con esta estructura exacta:
+{
+  "intent": "turno | consulta_cardiologia | ecocardiograma | cobertura | lugar_atencion | consulta_medica | urgencia | spam | otro",
+  "requested_service": "consulta_cardiologia | ecocardiograma | no_definido",
+  "suggested_location": "cimel_lanus | swiss_lomas | preguntar",
+  "suggested_day": "martes | viernes | preguntar",
+  "priority_score": 1,
+  "requires_human": false,
+  "possible_emergency": false,
+  "reply_suggestion": "texto de respuesta en espanol",
+  "next_action": "responder | pedir_preferencia | derivar_cimel | derivar_swiss | escalar | descartar"
+}`,
+    messages: [{ role: "user", content: message }],
+  })
+  return parseJson<ClassifyResult>(text)
+}
+
+export async function generateReply(message: string, leadContext: string, conversationHistory: AiMessage[]) {
+  return generateText({
+    maxTokens: 512,
+    system: `${SYSTEM_PROMPT}
+
+Contexto del lead: ${leadContext}
+Genera una respuesta apropiada. Solo el texto de la respuesta, sin JSON ni formato extra.`,
+    messages: [...conversationHistory, { role: "user", content: message }],
+  })
+}
+
+export async function generateInstagramContent(
+  category: string,
+  type: "reel" | "historia" | "carrusel" | "post",
+  cta: string
+): Promise<{ caption: string; hook: string; hashtags: string }> {
+  const text = await generateText({
+    maxTokens: 1024,
+    json: true,
+    system: `Sos especialista en marketing medico para la Dra. Lucia Chahin, cardiologa.
+Generas contenido para Instagram en tono profesional, calido y argentino.
+NUNCA prometes resultados medicos, nunca das diagnosticos, nunca asumis condiciones del lector.
+El objetivo es informar y captar personas que quieran pedir turno.
+Devolve SOLO un JSON con: { "caption": "...", "hook": "...", "hashtags": "..." }`,
+    messages: [{ role: "user", content: `Genera un ${type} sobre: ${category}. CTA sugerido: ${cta}` }],
+  })
+  return parseJson(text)
+}
+
+export async function generateContentPlan(input: {
+  topic: string
+  category: string
+  format: "reel" | "historia" | "carrusel" | "post"
+  cta: string
+  source?: ContentSource | null
+}): Promise<{
+  hook: string
+  caption: string
+  google_text: string
+  hashtags: string
+  visual_headline: string
+  visual_subtitle: string
+  visual_style: "rose" | "blue" | "teal"
+}> {
+  const sourceContext = input.source
+    ? `Fuente para contextualizar:
+Titulo: ${input.source.title}
+Publicacion: ${input.source.publication}
+Fecha: ${input.source.published_at}
+Resumen disponible: ${input.source.summary || "No disponible"}
+
+No inventes resultados que no esten en el resumen. Menciona la fuente de forma general, sin presentar el post como consejo medico.`
+    : "No hay fuente reciente seleccionada. Trata el tema como contenido evergreen y no menciones novedades ni estudios recientes."
+
+  const text = await generateText({
+    maxTokens: 1600,
+    json: true,
+    system: `Sos responsable de contenido de la Dra. Lucia Chahin, cardiologa.
+Creas una propuesta editorial lista para revision humana, adaptada a Instagram y Google Business.
+
+Reglas:
+- Escribi todo el contenido final en espanol.
+- No diagnostiques, no indiques tratamientos y no interpretes estudios.
+- No hagas afirmaciones medicas personalizadas ni promesas.
+- No uses mensajes alarmistas ni asumas que el lector tiene una condicion.
+- Ante sintomas de alarma, indica guardia o atencion medica inmediata.
+- El objetivo es educar y explicar como pedir turno por canales oficiales.
+- Lucia atiende martes en CIMEL Lanus y viernes en Swiss Medical Lomas.
+- La placa visual debe funcionar sin fotos: titular breve, subtitulo y estilo de marca.
+- El texto de Google debe tener maximo 1500 caracteres.
+- Devolve SOLO JSON valido.`,
+    messages: [{
+      role: "user",
+      content: `Tema: ${input.topic}
+Categoria: ${input.category}
+Formato Instagram: ${input.format}
+CTA: ${input.cta}
+
+${sourceContext}
+
+Devolve:
+{
+  "hook": "...",
+  "caption": "...",
+  "google_text": "...",
+  "hashtags": "...",
+  "visual_headline": "...",
+  "visual_subtitle": "...",
+  "visual_style": "rose | blue | teal"
+}`,
+    }],
+  })
+
+  const parsed = parseJson<Record<string, unknown>>(text)
+  const required = ["hook", "caption", "google_text", "hashtags", "visual_headline", "visual_subtitle"]
+  if (required.some(key => typeof parsed[key] !== "string")) throw new Error("Plan de contenido incompleto.")
+  return {
+    hook: parsed.hook as string,
+    caption: parsed.caption as string,
+    google_text: (parsed.google_text as string).slice(0, 1500),
+    hashtags: parsed.hashtags as string,
+    visual_headline: (parsed.visual_headline as string).slice(0, 90),
+    visual_subtitle: (parsed.visual_subtitle as string).slice(0, 90),
+    visual_style: ["rose", "blue", "teal"].includes(parsed.visual_style as string)
+      ? parsed.visual_style as "rose" | "blue" | "teal"
+      : "blue",
+  }
+}
+
+export async function generateGooglePost(topic: string) {
+  return generateText({
+    maxTokens: 512,
+    system: `Generas publicaciones para Google Business Profile de la Dra. Lucia Chahin, cardiologa.
+Tono profesional y claro. Maximo 1500 caracteres. Sin promesas medicas.
+Siempre inclui donde atiende (CIMEL Lanus los martes, Swiss Medical Lomas los viernes).
+Solo devolve el texto de la publicacion.`,
+    messages: [{ role: "user", content: `Publicacion sobre: ${topic}` }],
+  })
+}
+
+export async function generateReviewReply(starRating: string, comment: string) {
+  const stars = { ONE: 1, TWO: 2, THREE: 3, FOUR: 4, FIVE: 5 }[starRating] ?? 3
+  const sentiment = stars >= 4 ? "positiva" : stars === 3 ? "neutral" : "negativa"
+  return generateText({
+    maxTokens: 256,
+    system: `Sos la Dra. Lucia Chahin y respondes resenas de Google en primera persona.
+Tono calido, profesional y breve (maximo 3 oraciones). Nunca hagas promesas medicas.
+Solo devolve el texto de la respuesta, sin comillas ni formato extra.`,
+    messages: [{ role: "user", content: `Resena ${sentiment} (${stars} estrellas): "${comment || "Sin comentario"}"\nGenera una respuesta apropiada.` }],
+  })
+}
+
+export async function generateFollowupMessage(leadName: string | null, location: string) {
+  const name = leadName ? `, ${leadName}` : ""
+  return `Hola${name}, te escribo para saber si pudiste pedir turno con la Dra. Lucia Chahin en ${location}. Si tuviste algun problema para ubicarla, avisame y te paso nuevamente las indicaciones.\n\nPudiste pedir turno?\n1. Ya pedi turno\n2. No pude pedir\n3. Necesito los datos de nuevo\n4. Ya no me interesa`
+}

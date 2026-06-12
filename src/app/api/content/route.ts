@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { generateContentPlan, generateInstagramContent, generateGooglePost, generateReviewReply } from "@/lib/claude"
+import { generateContentPlan, generateInstagramContent, generateGooglePost, generateReviewReply, getPublicAiError } from "@/lib/ai"
 import { createClient } from "@/lib/supabase/server"
 
 export async function POST(request: Request) {
@@ -53,7 +53,6 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ error: "invalid content type" }, { status: 400 })
   } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e)
-    return NextResponse.json({ error: msg }, { status: 500 })
+    return NextResponse.json({ error: getPublicAiError(e) }, { status: 500 })
   }
 }

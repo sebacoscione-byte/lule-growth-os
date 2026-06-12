@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import {
   MapPin, Heart, Settings, Pencil, Check, X, Plus, Trash2,
-  Loader2, Clock, Link2, Phone, Stethoscope, Shield,
+  Loader2, Clock, Link2, Phone, Stethoscope, Shield, Bot,
 } from "lucide-react"
 
 type Doctor = {
@@ -29,6 +29,11 @@ type Location = {
   notes: string
 }
 
+type AiStatus = {
+  requested: "auto" | "gemini" | "anthropic"
+  active: "gemini" | "anthropic" | null
+}
+
 const DEFAULT_LOCATION: Omit<Location, "id" | "name"> = {
   address: "",
   google_maps_link: "",
@@ -46,6 +51,7 @@ export default function ConfiguracionPage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState<string | null>(null)
+  const [aiStatus, setAiStatus] = useState<AiStatus | null>(null)
 
   const [editingDoctor, setEditingDoctor] = useState(false)
   const [doctorDraft, setDoctorDraft] = useState<Doctor | null>(null)
@@ -60,6 +66,14 @@ export default function ConfiguracionPage() {
         setDoctor(data.doctor ?? null)
         setLocations(data.locations ?? [])
         setLoading(false)
+      })
+  }, [])
+
+  useEffect(() => {
+    fetch("/api/ai/status")
+      .then(r => r.json())
+      .then(data => {
+        if (!data.error) setAiStatus(data)
       })
   }, [])
 
@@ -145,6 +159,22 @@ export default function ConfiguracionPage() {
           <p className="text-sm text-gray-500">Datos usados para publicaciones e información a pacientes</p>
         </div>
       </div>
+
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base flex items-center gap-2">
+            <Bot className="h-4 w-4 text-blue-500" /> Proveedor de IA
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3 text-sm">
+          <Row label="Proveedor activo" value={aiStatus?.active === "gemini" ? "Google Gemini" : aiStatus?.active === "anthropic" ? "Anthropic Claude" : "Sin configurar"} />
+          <Row label="Modo" value={aiStatus?.requested ?? "auto"} />
+          <p className="text-xs text-gray-500">
+            Configura <code>AI_PROVIDER=gemini</code> y <code>GEMINI_API_KEY</code> en Vercel o en <code>.env.local</code>.
+            Con <code>AI_PROVIDER=auto</code>, Gemini tiene prioridad cuando su clave esta disponible.
+          </p>
+        </CardContent>
+      </Card>
 
       {/* ── Datos de la doctora ─────────────────────────────── */}
       <Card>

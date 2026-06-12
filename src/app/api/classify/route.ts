@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { classifyMessage } from "@/lib/claude"
+import { classifyMessage, getPublicAiError } from "@/lib/ai"
 import { createClient } from "@/lib/supabase/server"
 
 export async function POST(request: Request) {
@@ -31,7 +31,6 @@ export async function POST(request: Request) {
 
     return NextResponse.json(result)
   } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e)
-    return NextResponse.json({ error: msg }, { status: 500 })
+    return NextResponse.json({ error: getPublicAiError(e) }, { status: 500 })
   }
 }

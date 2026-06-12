@@ -13,7 +13,7 @@ y hacer seguimiento hasta que el paciente confirme que pidió turno.
 - Next.js 14.2 (App Router) — usar `next.config.mjs`, NO `.ts`
 - TypeScript + Tailwind CSS + shadcn/ui (instalado manualmente, sin CLI)
 - Supabase (Auth + PostgreSQL) — NO usar generic `createBrowserClient<Database>`
-- Claude API (claude-sonnet-4-6) para clasificación y generación de contenido
+- Google Gemini o Claude mediante `src/lib/ai.ts` para clasificación, respuestas y generación de contenido
 - Vercel (deploy automático desde `main`)
 
 ## Node.js en Windows
@@ -43,7 +43,7 @@ src/
 │   └── landings/        # landing pages públicas SEO
 ├── lib/
 │   ├── supabase/
-│   └── claude.ts
+│   └── ai.ts
 ├── types/
 │   └── index.ts
 └── components/
@@ -55,7 +55,11 @@ src/
 NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_ANON_KEY=
 SUPABASE_SERVICE_ROLE_KEY=
+AI_PROVIDER=auto
+GEMINI_API_KEY=
+GEMINI_MODEL=gemini-3.5-flash
 ANTHROPIC_API_KEY=
+ANTHROPIC_MODEL=claude-sonnet-4-6
 # Google Business Profile API (OAuth 2.0)
 GOOGLE_CLIENT_ID=
 GOOGLE_CLIENT_SECRET=

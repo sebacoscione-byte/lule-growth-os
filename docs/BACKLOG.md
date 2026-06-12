@@ -3,7 +3,7 @@
 ## Fase 1 — MVP (en desarrollo)
 - [ ] CRM de leads completo
 - [ ] Carga manual de leads
-- [ ] Clasificador Claude
+- [x] Clasificador y generacion con proveedor IA configurable (Gemini/Claude)
 - [ ] Generador de respuestas
 - [ ] Seguimiento de leads (24/48hs)
 - [ ] Dashboard con métricas

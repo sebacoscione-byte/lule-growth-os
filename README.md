@@ -5,7 +5,7 @@ Sistema de adquisición de pacientes para la **Dra. Lucía Chahin**, cardióloga
 ## Qué hace
 
 - Captura leads desde Google Maps, Instagram, WhatsApp, landings y entrada manual
-- Clasifica la intención del paciente con Claude (consulta cardiológica o ecocardiograma)
+- Clasifica la intención del paciente con Gemini o Claude (consulta cardiológica o ecocardiograma)
 - Deriva al canal correcto: CIMEL Lanús (martes) o Swiss Medical Lomas (viernes)
 - Hace seguimiento hasta que el paciente confirme que pidió turno
 - Investiga fuentes recientes y genera contenido coordinado para Instagram y Google Business Profile
@@ -19,7 +19,7 @@ Sistema de adquisición de pacientes para la **Dra. Lucía Chahin**, cardióloga
 - Next.js (App Router) + TypeScript
 - Tailwind CSS + shadcn/ui (componentes manuales)
 - Supabase (Auth + PostgreSQL + RLS)
-- Claude API (claude-sonnet-4-6) — clasificación y generación
+- Google Gemini o Claude — clasificación, respuestas y generación en español
 - Vercel (deploy automático desde `main`)
 
 ## Setup
@@ -28,7 +28,7 @@ Sistema de adquisición de pacientes para la **Dra. Lucía Chahin**, cardióloga
 
 ```bash
 cp .env.example .env.local
-# Completar con tus keys de Supabase y Anthropic
+# Completar con tus keys de Supabase y al menos un proveedor de IA
 ```
 
 ### 2. Base de datos Supabase
@@ -67,7 +67,7 @@ src/
 │   ├── (auth)/login/
 │   ├── api/
 │   └── landings/[slug]/    # Landing pages SEO públicas
-├── lib/supabase/ · lib/claude.ts · lib/utils.ts
+├── lib/supabase/ · lib/ai.ts · lib/utils.ts
 ├── types/index.ts
 └── components/ui/
 ```
@@ -86,6 +86,24 @@ src/
 
 La app nunca da diagnósticos, indica tratamientos ni reserva turnos.
 Ante síntomas de alarma → deriva a guardia inmediatamente.
+
+## Proveedor de IA
+
+La misma capa de IA se usa para contenido, clasificación de leads, respuestas del inbox y Google Business.
+
+- `AI_PROVIDER=gemini`: usa solamente Google Gemini.
+- `AI_PROVIDER=anthropic`: usa solamente Anthropic Claude.
+- `AI_PROVIDER=auto`: prioriza Gemini si existe `GEMINI_API_KEY` y usa el otro proveedor como fallback.
+
+Para usar Gemini, crear una API key en Google AI Studio y configurar:
+
+```bash
+AI_PROVIDER=gemini
+GEMINI_API_KEY=...
+GEMINI_MODEL=gemini-3.5-flash
+```
+
+En Vercel, agregar las mismas variables de entorno y volver a desplegar. La pantalla `Configuración` muestra el proveedor activo sin exponer las claves.
 
 ---
 

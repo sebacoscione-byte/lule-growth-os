@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
-import { generateReply } from "@/lib/claude"
+import { generateReply, getPublicAiError } from "@/lib/ai"
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url)
@@ -45,7 +45,12 @@ export async function POST(request: Request) {
   const leadContext = `Lead: ${lead?.name ?? "anónimo"}. Canal: ${lead?.origin_channel}. Servicio: ${lead?.requested_service}. Ubicación preferida: ${lead?.preferred_location}.`
   const conversationHistory = (history ?? []).slice(0, -1) as { role: "user" | "assistant"; content: string }[]
 
-  const replyText = await generateReply(content, leadContext, conversationHistory)
+  let replyText: string
+  try {
+    replyText = await generateReply(content, leadContext, conversationHistory)
+  } catch (error) {
+    return NextResponse.json({ error: getPublicAiError(error), user_message: userMessage }, { status: 500 })
+  }
 
   const { data: assistantMessage } = await supabase
     .from("messages")
