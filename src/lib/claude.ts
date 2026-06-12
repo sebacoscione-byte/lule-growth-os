@@ -1,5 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk"
-import type { ClassifyResult } from "@/types"
+import type { ClassifyResult, ContentSource } from "@/types"
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
@@ -110,6 +110,90 @@ Devolvé SOLO un JSON con: { "caption": "...", "hook": "...", "hashtags": "..." 
   const jsonMatch = text.match(/\{[\s\S]*\}/)
   if (!jsonMatch) throw new Error("No JSON in response")
   return JSON.parse(jsonMatch[0])
+}
+
+export async function generateContentPlan(input: {
+  topic: string
+  category: string
+  format: "reel" | "historia" | "carrusel" | "post"
+  cta: string
+  source?: ContentSource | null
+}): Promise<{
+  hook: string
+  caption: string
+  google_text: string
+  hashtags: string
+  visual_headline: string
+  visual_subtitle: string
+  visual_style: "rose" | "blue" | "teal"
+}> {
+  const sourceContext = input.source
+    ? `Fuente para contextualizar:
+Titulo: ${input.source.title}
+Publicacion: ${input.source.publication}
+Fecha: ${input.source.published_at}
+Resumen disponible: ${input.source.summary || "No disponible"}
+
+No inventes resultados que no esten en el resumen. Menciona la fuente de forma general, sin presentar el post como consejo medico.`
+    : "No hay fuente reciente seleccionada. Trata el tema como contenido evergreen y no menciones novedades ni estudios recientes."
+
+  const response = await anthropic.messages.create({
+    model: "claude-sonnet-4-6",
+    max_tokens: 1600,
+    system: `Sos responsable de contenido de la Dra. Lucia Chahin, cardiologa.
+Creas una propuesta editorial lista para revision humana, adaptada a Instagram y Google Business.
+
+Reglas:
+- No diagnostiques, no indiques tratamientos y no interpretes estudios.
+- No hagas afirmaciones medicas personalizadas ni promesas.
+- No uses mensajes alarmistas ni asumas que el lector tiene una condicion.
+- Ante sintomas de alarma, indica guardia o atencion medica inmediata.
+- El objetivo es educar y explicar como pedir turno por canales oficiales.
+- Lucia atiende martes en CIMEL Lanus y viernes en Swiss Medical Lomas.
+- La placa visual debe funcionar sin fotos: titular breve, subtitulo y estilo de marca.
+- El texto de Google debe tener maximo 1500 caracteres.
+- Devolve SOLO JSON valido.`,
+    messages: [{
+      role: "user",
+      content: `Tema: ${input.topic}
+Categoria: ${input.category}
+Formato Instagram: ${input.format}
+CTA: ${input.cta}
+
+${sourceContext}
+
+Devolve:
+{
+  "hook": "...",
+  "caption": "...",
+  "google_text": "...",
+  "hashtags": "...",
+  "visual_headline": "...",
+  "visual_subtitle": "...",
+  "visual_style": "rose | blue | teal"
+}`,
+    }],
+  })
+
+  const text = response.content[0].type === "text" ? response.content[0].text : ""
+  const jsonMatch = text.match(/\{[\s\S]*\}/)
+  if (!jsonMatch) throw new Error("No JSON in response")
+  const parsed = JSON.parse(jsonMatch[0]) as Record<string, unknown>
+  const required = ["hook", "caption", "google_text", "hashtags", "visual_headline", "visual_subtitle"]
+  if (required.some(key => typeof parsed[key] !== "string")) {
+    throw new Error("Incomplete content plan")
+  }
+  return {
+    hook: parsed.hook as string,
+    caption: parsed.caption as string,
+    google_text: (parsed.google_text as string).slice(0, 1500),
+    hashtags: parsed.hashtags as string,
+    visual_headline: (parsed.visual_headline as string).slice(0, 90),
+    visual_subtitle: (parsed.visual_subtitle as string).slice(0, 90),
+    visual_style: ["rose", "blue", "teal"].includes(parsed.visual_style as string)
+      ? parsed.visual_style as "rose" | "blue" | "teal"
+      : "blue",
+  }
 }
 
 export async function generateGooglePost(topic: string): Promise<string> {

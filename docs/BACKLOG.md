@@ -9,17 +9,17 @@
 - [ ] Dashboard con métricas
 - [ ] Google Local checklist
 - [ ] Landing pages básicas
-- [ ] Generador de contenido Instagram
+- [x] Estudio de contenido con IA, fuentes, placas visuales y aprobacion
 
 ## Fase 2 — Automatización
 - [ ] Integración WhatsApp Business API
-- [ ] Integración Instagram Graph API
+- [ ] Integracion Instagram Graph API para publicar contenido aprobado
 - [ ] Reportes automáticos
 - [ ] Automatización de seguimientos con n8n
 - [ ] Métricas por campaña
 
 ## Fase 3 — Escalamiento
-- [ ] Google Business Profile API
+- [x] Google Business Profile API (sujeta a disponibilidad y cuotas de Google)
 - [ ] Google Search Console
 - [ ] Google Analytics
 - [ ] Google Ads

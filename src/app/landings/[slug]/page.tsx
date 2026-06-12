@@ -1,6 +1,6 @@
 import type { Metadata } from "next"
 import { notFound } from "next/navigation"
-import { Heart, MapPin, Clock, Phone, AlertTriangle } from "lucide-react"
+import { Heart, MapPin, Clock, AlertTriangle } from "lucide-react"
 
 const LANDING_DATA: Record<string, {
   title: string

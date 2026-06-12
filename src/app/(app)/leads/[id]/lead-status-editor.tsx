@@ -3,7 +3,6 @@
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Button } from "@/components/ui/button"
 import { STATUS_LABELS, STATUS_COLORS, type LeadStatus } from "@/types"
 import { Loader2 } from "lucide-react"
 

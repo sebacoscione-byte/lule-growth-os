@@ -270,7 +270,7 @@ function SaveButton({ saving, saved, disabled, onClick }: {
   )
 }
 
-function ProfileTab({ status, onRefresh }: { status: StatusData; onRefresh: () => void }) {
+function ProfileTab({ onRefresh }: { status: StatusData; onRefresh: () => void }) {
   const [profileData, setProfileData] = useState<ProfileData | null>(null)
   const [loadingProfile, setLoadingProfile] = useState(true)
   const [profileError, setProfileError] = useState<string | null>(null)
@@ -296,6 +296,8 @@ function ProfileTab({ status, onRefresh }: { status: StatusData; onRefresh: () =
   const [savedHours, setSavedHours] = useState(false)
 
   useEffect(() => {
+    // Initial remote state hydration.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoadingProfile(true)
     fetch("/api/google-business/profile")
       .then(r => r.json())
@@ -483,7 +485,11 @@ function PostsTab() {
     setLoading(false)
   }, [])
 
-  useEffect(() => { fetchPosts() }, [fetchPosts])
+  useEffect(() => {
+    // Initial remote state hydration.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    fetchPosts()
+  }, [fetchPosts])
 
   async function generateDraft() {
     if (!topic.trim()) return
@@ -639,7 +645,11 @@ function ReviewsTab() {
     setLoading(false)
   }, [])
 
-  useEffect(() => { fetchReviews() }, [fetchReviews])
+  useEffect(() => {
+    // Initial remote state hydration.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    fetchReviews()
+  }, [fetchReviews])
 
   async function generateReply(review: Review) {
     setGenerating(review.reviewId)
@@ -816,7 +826,11 @@ export default function GoogleLocalPage() {
     setLoadingStatus(false)
   }, [])
 
-  useEffect(() => { fetchStatus() }, [fetchStatus])
+  useEffect(() => {
+    // Initial remote state hydration.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    fetchStatus()
+  }, [fetchStatus])
 
   async function disconnect() {
     if (!confirm("¿Desconectar la app de Google Business?")) return

@@ -8,14 +8,15 @@ Sistema de adquisición de pacientes para la **Dra. Lucía Chahin**, cardióloga
 - Clasifica la intención del paciente con Claude (consulta cardiológica o ecocardiograma)
 - Deriva al canal correcto: CIMEL Lanús (martes) o Swiss Medical Lomas (viernes)
 - Hace seguimiento hasta que el paciente confirme que pidió turno
-- Genera contenido para Instagram y Google Business Profile
+- Investiga fuentes recientes y genera contenido coordinado para Instagram y Google Business Profile
+- Crea placas visuales descargables, guarda borradores y exige aprobacion humana
 - Administra experimentos de crecimiento
 
 **La app NO da turnos, NO reserva horarios, NO confirma disponibilidad.**
 
 ## Stack
 
-- Next.js 15 (App Router) + TypeScript
+- Next.js (App Router) + TypeScript
 - Tailwind CSS + shadcn/ui (componentes manuales)
 - Supabase (Auth + PostgreSQL + RLS)
 - Claude API (claude-sonnet-4-6) — clasificación y generación
@@ -59,7 +60,7 @@ src/
 │   │   ├── leads/          # CRM + detalle + nuevo lead
 │   │   ├── inbox/          # Conversaciones por lead
 │   │   ├── google-local/   # Checklist y generadores Google
-│   │   ├── contenido/instagram/  # Generador de contenido
+│   │   ├── contenido/instagram/  # Estudio editorial y aprobaciones
 │   │   ├── landings/       # Panel de landing pages
 │   │   ├── experimentos/   # Growth experiments
 │   │   └── configuracion/  # Datos de la doctora

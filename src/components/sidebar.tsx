@@ -20,7 +20,7 @@ const NAV_ITEMS = [
   { href: "/leads", label: "Leads", icon: Users },
   { href: "/inbox", label: "Inbox", icon: MessageSquare },
   { href: "/google-local", label: "Google Local", icon: MapPin },
-  { href: "/contenido/instagram", label: "Instagram", icon: Camera },
+  { href: "/contenido/instagram", label: "Contenido", icon: Camera },
   { href: "/landings", label: "Landings", icon: FileText },
   { href: "/experimentos", label: "Experimentos", icon: FlaskConical },
   { href: "/configuracion", label: "Configuración", icon: Settings },

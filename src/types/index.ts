@@ -99,6 +99,38 @@ export interface GrowthExperiment {
   created_at: string
 }
 
+export type ContentStatus = "draft" | "approved" | "published" | "archived"
+export type ContentChannel = "instagram" | "google_business"
+
+export interface ContentSource {
+  title: string
+  url: string
+  publication: string
+  published_at: string
+  summary: string
+}
+
+export interface ContentItem {
+  id: string
+  topic: string
+  category: string
+  format: "reel" | "historia" | "carrusel" | "post"
+  goal: string
+  status: ContentStatus
+  channels: ContentChannel[]
+  hook: string
+  caption: string
+  google_text: string
+  hashtags: string
+  visual_headline: string
+  visual_subtitle: string
+  visual_style: "rose" | "blue" | "teal"
+  source: ContentSource | null
+  created_at: string
+  updated_at: string
+  approved_at: string | null
+}
+
 export interface ClassifyResult {
   intent: LeadIntent
   requested_service: RequestedService

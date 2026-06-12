@@ -1,9 +1,28 @@
 import { NextResponse } from "next/server"
-import { generateInstagramContent, generateGooglePost, generateReviewReply } from "@/lib/claude"
+import { generateContentPlan, generateInstagramContent, generateGooglePost, generateReviewReply } from "@/lib/claude"
+import { createClient } from "@/lib/supabase/server"
 
 export async function POST(request: Request) {
   try {
-    const { type, category, content_type, cta, topic } = await request.json()
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+
+    const { type, category, content_type, cta, topic, source } = await request.json()
+
+    if (type === "content_plan") {
+      if (!topic || !category || !content_type) {
+        return NextResponse.json({ error: "topic, category and content_type required" }, { status: 400 })
+      }
+      const result = await generateContentPlan({
+        topic,
+        category,
+        format: content_type,
+        cta: cta ?? "Escribi TURNO y te paso como pedir turno",
+        source,
+      })
+      return NextResponse.json(result)
+    }
 
     if (type === "instagram") {
       if (!category || !content_type) {
@@ -32,7 +51,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ text })
     }
 
-    return NextResponse.json({ error: "type must be instagram, google_post, or review_reply" }, { status: 400 })
+    return NextResponse.json({ error: "invalid content type" }, { status: 400 })
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
     return NextResponse.json({ error: msg }, { status: 500 })

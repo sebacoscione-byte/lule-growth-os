@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { LeadStatusEditor } from "./lead-status-editor"
 import {
-  STATUS_LABELS, STATUS_COLORS, CHANNEL_LABELS, SERVICE_LABELS, LOCATION_LABELS,
+  CHANNEL_LABELS, SERVICE_LABELS, LOCATION_LABELS,
   type Lead, type Message
 } from "@/types"
 import { formatDate } from "@/lib/utils"

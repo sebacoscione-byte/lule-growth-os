@@ -4,7 +4,7 @@ import { Plus, AlertTriangle, Clock, ChevronRight } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   STATUS_LABELS, STATUS_COLORS, CHANNEL_LABELS, SERVICE_LABELS,
-  type Lead, type LeadStatus,
+  type Lead,
 } from "@/types"
 import { timeAgo } from "@/lib/utils"
 
