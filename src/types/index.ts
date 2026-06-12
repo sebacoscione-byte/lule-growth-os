@@ -75,6 +75,15 @@ export interface Lead {
   referred_at: string | null
   followup_due_at: string | null
   confirmed_booked: boolean
+  utm_source: string | null
+  utm_medium: string | null
+  utm_campaign: string | null
+  utm_content: string | null
+  origin_url: string | null
+  landing_page: string | null
+  clicked_cimel_cta: boolean
+  clicked_swiss_cta: boolean
+  booking_instruction_viewed: boolean
 }
 
 export interface Message {

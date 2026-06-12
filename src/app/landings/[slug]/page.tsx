@@ -1,6 +1,7 @@
 import type { Metadata } from "next"
 import { notFound } from "next/navigation"
 import { Heart, MapPin, Clock, AlertTriangle } from "lucide-react"
+import { LandingInteractions } from "./landing-interactions"
 
 const LANDING_DATA: Record<string, {
   title: string
@@ -16,10 +17,7 @@ const LANDING_DATA: Record<string, {
     h1: "Dra. Lucía Chahin — Cardióloga",
     intro: "La Dra. Lucía Chahin es médica cardióloga especializada en consultas cardiológicas y ecocardiogramas. Atiende en Lanús y Lomas de Zamora.",
     services: ["Consulta cardiológica", "Ecocardiograma", "Control cardiológico", "Evaluación cardiovascular"],
-    locations: [
-      { name: "CIMEL Lanús", address: "Tucumán 1314, Lanús", day: "Martes", instruction: "Llamá a CIMEL Lanús y pedí turno con la Dra. Lucía Chahin para cardiología o ecocardiograma." },
-      { name: "Swiss Medical Lomas", day: "Viernes", instruction: "Pedí turno por los canales oficiales de Swiss Medical Lomas y solicitá atención con la Dra. Lucía Chahin." },
-    ],
+    locations: [],
   },
   "cardiologa-lanus": {
     title: "Cardióloga en Lanús — Dra. Lucía Chahin | CIMEL Lanús",
@@ -98,6 +96,8 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
   const data = LANDING_DATA[slug]
   if (!data) notFound()
 
+  const isMain = slug === "dra-lucia-chahin"
+
   return (
     <main className="min-h-screen bg-white">
       {/* Hero */}
@@ -110,6 +110,11 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
           </div>
           <h1 className="text-3xl font-bold text-gray-900 mb-4">{data.h1}</h1>
           <p className="text-lg text-gray-600">{data.intro}</p>
+          {isMain && (
+            <p className="text-sm text-gray-500 mt-3">
+              Consultas cardiológicas y ecocardiogramas · Lanús y Lomas de Zamora
+            </p>
+          )}
         </div>
       </section>
 
@@ -128,32 +133,43 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
         </div>
       </section>
 
-      {/* Cómo pedir turno */}
-      <section className="py-12 px-4 bg-blue-50">
-        <div className="max-w-2xl mx-auto">
-          <h2 className="text-xl font-bold text-gray-900 mb-6 text-center">Cómo pedir turno</h2>
-          <div className="space-y-4">
-            {data.locations.map((loc) => (
-              <div key={loc.name} className="bg-white rounded-xl border border-blue-200 p-6">
-                <div className="flex items-center gap-2 mb-3">
-                  <MapPin className="h-5 w-5 text-blue-600" />
-                  <h3 className="font-semibold text-gray-900">{loc.name}</h3>
+      {/* Interacciones para /dra-lucia-chahin: CTAs expandibles + formulario */}
+      {isMain ? (
+        <LandingInteractions slug={slug} />
+      ) : (
+        /* Instrucciones estáticas para landings SEO */
+        <section className="py-12 px-4 bg-blue-50">
+          <div className="max-w-2xl mx-auto">
+            <h2 className="text-xl font-bold text-gray-900 mb-6 text-center">Cómo pedir turno</h2>
+            <div className="space-y-4">
+              {data.locations.map((loc) => (
+                <div key={loc.name} className="bg-white rounded-xl border border-blue-200 p-6">
+                  <div className="flex items-center gap-2 mb-3">
+                    <MapPin className="h-5 w-5 text-blue-600" />
+                    <h3 className="font-semibold text-gray-900">{loc.name}</h3>
+                  </div>
+                  <div className="flex items-center gap-2 text-sm text-gray-500 mb-3">
+                    <Clock className="h-4 w-4" />
+                    <span>Atención los {loc.day}</span>
+                  </div>
+                  {loc.address && (
+                    <p className="text-sm text-gray-500 mb-3">{loc.address}</p>
+                  )}
+                  <div className="rounded-lg bg-blue-50 p-4">
+                    <p className="text-sm text-blue-900 font-medium">{loc.instruction}</p>
+                  </div>
+                  <p className="mt-3 text-sm text-gray-500">
+                    Para más información,{" "}
+                    <a href="/dra-lucia-chahin" className="text-blue-600 underline underline-offset-2">
+                      visitá la página de la Dra. Lucía Chahin
+                    </a>.
+                  </p>
                 </div>
-                <div className="flex items-center gap-2 text-sm text-gray-500 mb-3">
-                  <Clock className="h-4 w-4" />
-                  <span>Atención los {loc.day}</span>
-                </div>
-                {loc.address && (
-                  <p className="text-sm text-gray-500 mb-3">{loc.address}</p>
-                )}
-                <div className="rounded-lg bg-blue-50 p-4">
-                  <p className="text-sm text-blue-900 font-medium">{loc.instruction}</p>
-                </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
+      )}
 
       {/* Aviso */}
       <section className="py-8 px-4">

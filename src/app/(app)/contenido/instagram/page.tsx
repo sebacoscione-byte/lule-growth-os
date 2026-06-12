@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import {
   Archive, BookOpen, Check, Copy, Download, ExternalLink, Loader2,
-  RefreshCw, Search, Send, Sparkles,
+  RefreshCw, Search, Send, Sparkles, Pin,
 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -233,6 +233,204 @@ function ManualPanel({
 }
 
 // ---------------------------------------------------------------------------
+// Bio y Fijados panel
+// ---------------------------------------------------------------------------
+
+interface CopyBlockProps {
+  title: string
+  subtitle?: string
+  content: string
+}
+
+function CopyBlock({ title, subtitle, content }: CopyBlockProps) {
+  const [copied, setCopied] = useState(false)
+
+  function doCopy() {
+    navigator.clipboard.writeText(content).catch(() => {
+      const el = document.createElement("textarea")
+      el.value = content
+      document.body.appendChild(el)
+      el.select()
+      document.execCommand("copy")
+      document.body.removeChild(el)
+    })
+    setCopied(true)
+    setTimeout(() => setCopied(false), 1800)
+  }
+
+  return (
+    <Card>
+      <CardHeader className="pb-2">
+        <div className="flex items-center justify-between">
+          <div>
+            <CardTitle className="text-sm font-semibold text-gray-900">{title}</CardTitle>
+            {subtitle && <p className="text-xs text-gray-500 mt-0.5">{subtitle}</p>}
+          </div>
+          <Button variant="outline" size="sm" onClick={doCopy} className="gap-1.5 shrink-0">
+            {copied ? <Check className="h-3.5 w-3.5 text-green-600" /> : <Copy className="h-3.5 w-3.5" />}
+            {copied ? "Copiado" : "Copiar"}
+          </Button>
+        </div>
+      </CardHeader>
+      <CardContent>
+        <pre className="text-sm text-gray-700 whitespace-pre-wrap font-sans leading-relaxed bg-gray-50 rounded-lg p-4 border border-gray-200">
+          {content}
+        </pre>
+      </CardContent>
+    </Card>
+  )
+}
+
+const BIO_TEMPLATE = `Dra. Lucía Chahin
+Cardióloga | Ecocardiogramas
+Martes: CIMEL Lanús
+Viernes: Swiss Medical Lomas
+👇 Cómo pedir turno`
+
+const POST_FIJADO_1 = `📌 Cómo pedir turno con la Dra. Lucía Chahin
+
+La Dra. Lucía Chahin atiende:
+
+📍 CIMEL Lanús — martes
+📍 Swiss Medical Lomas — viernes
+
+Realiza:
+• Consultas de cardiología
+• Ecocardiogramas
+
+Para pedir turno, comunicate con la institución correspondiente y solicitá atención con la Dra. Lucía Chahin.
+
+Para solicitar turno con la Dra. Lucía Chahin, ingresá al link de la bio y elegí la sede donde querés atenderte.`
+
+const POST_FIJADO_2 = `❤️ Consulta cardiológica y ecocardiograma
+
+La Dra. Lucía Chahin atiende consultas cardiológicas y realiza ecocardiogramas.
+
+Podés solicitar turno en:
+• CIMEL Lanús
+• Swiss Medical Lomas
+
+En el link de la bio te explicamos cómo pedirlo.`
+
+const POST_FIJADO_3 = `📍 Dónde atiende la Dra. Lucía Chahin
+
+Martes: CIMEL Lanús, Tucumán 1314, Lanús
+Viernes: Swiss Medical Lomas
+
+Para pedir turno, ingresá al link de la bio y elegí la sede que prefieras.`
+
+const DESTACADAS_TEMPLATE = `Historias destacadas sugeridas:
+
+1. 📅 Turnos
+   → Cómo pedir turno paso a paso:
+   1. Elegí sede (CIMEL o Swiss Medical)
+   2. Comunicate con la institución
+   3. Pedí turno con la Dra. Lucía Chahin
+   4. Indicá si buscás consulta cardiológica o ecocardiograma
+
+2. 🏥 CIMEL
+   → Información sobre CIMEL Lanús
+   → Dirección y cómo llegar
+   → Días de atención (martes)
+
+3. 🏥 Swiss
+   → Información sobre Swiss Medical Lomas
+   → Días de atención (viernes)
+
+4. ❤️ Ecocardiograma
+   → Qué es un ecocardiograma
+   → Cómo solicitar turno
+   → En qué sedes se realiza
+
+5. 🩺 Cardiología
+   → Qué es una consulta cardiológica
+   → Cuándo consultar
+   → Cómo pedir turno
+
+6. ❓ FAQ
+   → Preguntas frecuentes
+   → ¿Cómo pedir turno? ¿Dónde atiende? ¿Qué días?`
+
+const CTAS_TEMPLATE = `CTAs correctos para posts y stories:
+
+✅ USAR:
+• "Para solicitar turno con la Dra. Lucía Chahin, ingresá al link de la bio y elegí la sede donde querés atenderte."
+• "¿Buscás consulta cardiológica o ecocardiograma? En el link de la bio te explicamos cómo pedir turno."
+• "La Dra. Lucía Chahin atiende los martes en CIMEL Lanús y los viernes en Swiss Medical Lomas."
+• "En el link de la bio te explicamos cómo pedir turno."
+• "Escribí CARDIO y te pasamos cómo solicitar turno."
+• "Escribí ECO si necesitás información sobre ecocardiograma."
+
+❌ NO USAR:
+• "Sacá turno ya"
+• "Últimos lugares"
+• "No te dejes estar"
+• "Si tenés palpitaciones vení"
+• "Tu dolor de pecho puede ser grave"`
+
+function BioYFijadosTab() {
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center gap-2 text-sm text-gray-500 bg-amber-50 border border-amber-200 rounded-lg p-3">
+        <Pin className="h-4 w-4 text-amber-600 shrink-0" />
+        <span>Copiá cada bloque y pegalo directamente en Instagram. Estos textos están ajustados a los guardrails médicos.</span>
+      </div>
+
+      <div>
+        <h3 className="text-base font-semibold text-gray-900 mb-3">Bio de Instagram</h3>
+        <CopyBlock
+          title="Bio sugerida"
+          subtitle="Pegala en Editar perfil → Biografía"
+          content={BIO_TEMPLATE}
+        />
+      </div>
+
+      <div>
+        <h3 className="text-base font-semibold text-gray-900 mb-3">Publicaciones fijadas (3)</h3>
+        <p className="text-sm text-gray-500 mb-3">
+          Fijá estos 3 posts al principio del perfil. Aparecen antes del feed y son lo primero que ve alguien que llega al perfil.
+        </p>
+        <div className="space-y-4">
+          <CopyBlock
+            title="Post fijado 1 — Cómo pedir turno"
+            subtitle="El más importante. Explica el proceso completo."
+            content={POST_FIJADO_1}
+          />
+          <CopyBlock
+            title="Post fijado 2 — Servicios"
+            subtitle="Qué hace la Dra. Lucía Chahin."
+            content={POST_FIJADO_2}
+          />
+          <CopyBlock
+            title="Post fijado 3 — Dónde atiende"
+            subtitle="Sedes y días."
+            content={POST_FIJADO_3}
+          />
+        </div>
+      </div>
+
+      <div>
+        <h3 className="text-base font-semibold text-gray-900 mb-3">Historias destacadas</h3>
+        <CopyBlock
+          title="Estructura de destacadas sugerida"
+          subtitle="Crear 6 carpetas de destacadas con estos temas."
+          content={DESTACADAS_TEMPLATE}
+        />
+      </div>
+
+      <div>
+        <h3 className="text-base font-semibold text-gray-900 mb-3">CTAs correctos</h3>
+        <CopyBlock
+          title="Llamados a la acción — qué usar y qué evitar"
+          subtitle="Para posts, reels, stories y carruseles."
+          content={CTAS_TEMPLATE}
+        />
+      </div>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
 // Main page
 // ---------------------------------------------------------------------------
 
@@ -457,6 +655,7 @@ export default function ContentStudioPage() {
         <TabsList>
           <TabsTrigger value="crear">{IS_MANUAL_MODE ? "Preparar prompt" : "Crear con IA"}</TabsTrigger>
           <TabsTrigger value="biblioteca">Biblioteca</TabsTrigger>
+          <TabsTrigger value="fijados">Bio y Fijados</TabsTrigger>
         </TabsList>
 
         <TabsContent value="crear" className="mt-4">
@@ -571,6 +770,10 @@ export default function ContentStudioPage() {
               </Card>
             )}
           </div>
+        </TabsContent>
+
+        <TabsContent value="fijados" className="mt-4">
+          <BioYFijadosTab />
         </TabsContent>
 
         <TabsContent value="biblioteca" className="mt-4">

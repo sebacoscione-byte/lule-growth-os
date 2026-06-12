@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from "react"
 import {
   Loader2, Sparkles, Star, Trash2, Send, RefreshCw,
-  CheckCircle2, ExternalLink, LogOut, MapPin
+  CheckCircle2, ExternalLink, LogOut, MapPin, Link2,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
@@ -223,6 +223,187 @@ function ConnectView() {
           </Button>
         </a>
         <p className="text-xs text-gray-400">Solo necesitás hacerlo una vez</p>
+      </div>
+    </div>
+  )
+}
+
+// ─── Checklist tab ────────────────────────────────────────────────────────────
+
+interface ChecklistItem {
+  id: string
+  item_key: string
+  completed: boolean
+  notes: string | null
+  updated_at: string
+}
+
+const CHECKLIST_META: Record<string, { label: string; description: string; priority?: boolean }> = {
+  nombre_correcto: {
+    label: "Nombre correcto en Google",
+    description: "Aparece como \"Dra. Lucía Chahin\" sin keywords adicionales ni nombre de institución.",
+  },
+  categoria_principal: {
+    label: "Categoría principal configurada",
+    description: "Cardióloga. Si no aparece esa opción, usar Médico.",
+  },
+  categoria_cardiologia: {
+    label: "Categoría secundaria Cardiología",
+    description: "Agregar Cardiología como categoría adicional si la plataforma lo permite.",
+  },
+  ubicacion_cimel: {
+    label: "Ubicación en CIMEL Lanús",
+    description: "Dirección: Tucumán 1314, Lanús. Verificar que el pin en el mapa sea correcto.",
+  },
+  horario_real: {
+    label: "Horarios configurados",
+    description: "Solo los días reales: martes (CIMEL Lanús). No cargar viernes si Swiss no tiene perfil propio.",
+  },
+  servicios_cargados: {
+    label: "Servicios cargados",
+    description: "Consulta cardiológica, Ecocardiograma, Control cardiológico.",
+  },
+  descripcion_cargada: {
+    label: "Descripción del perfil",
+    description: "Describir servicios, sedes y días de atención. Máx. 750 caracteres. Sin keywords artificiales.",
+  },
+  link_landing: {
+    label: "Link → /dra-lucia-chahin",
+    description: "El campo 'Sitio web' debe apuntar a la landing principal. No usar Instagram como enlace principal.",
+    priority: true,
+  },
+  link_instagram_bio: {
+    label: "Bio de Instagram apunta a /dra-lucia-chahin",
+    description: "El link en la bio de Instagram debe llevar a la landing principal, no a WhatsApp ni Linktree.",
+  },
+  fotos_profesionales: {
+    label: "Fotos subidas",
+    description: "Foto de perfil profesional, foto del consultorio y/o foto exterior de CIMEL Lanús.",
+  },
+  telefono_configurado: {
+    label: "Teléfono configurado",
+    description: "Teléfono de contacto para CIMEL Lanús o número propio de la doctora.",
+  },
+  primera_publicacion: {
+    label: "Primera publicación publicada",
+    description: "Al menos un post explicando cómo pedir turno con la Dra. Lucía Chahin.",
+  },
+  preguntas_frecuentes: {
+    label: "Preguntas frecuentes (Q&A)",
+    description: "Agregar preguntas como: ¿Cómo saco turno? ¿Qué días atiende? ¿Hace ecocardiogramas?",
+  },
+  posts_fijados_3: {
+    label: "3 publicaciones fijadas en Instagram",
+    description: "Post 1: Cómo pedir turno. Post 2: Servicios. Post 3: Dónde atiende.",
+  },
+}
+
+function ChecklistTab() {
+  const [items, setItems] = useState<ChecklistItem[]>([])
+  const [loading, setLoading] = useState(true)
+  const [toggling, setToggling] = useState<string | null>(null)
+
+  useEffect(() => {
+    // Initial remote state hydration.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    fetch("/api/checklist")
+      .then(r => r.json())
+      .then(data => { if (Array.isArray(data)) setItems(data) })
+      .finally(() => setLoading(false))
+  }, [])
+
+  async function toggle(item: ChecklistItem) {
+    setToggling(item.item_key)
+    const next = !item.completed
+    const res = await fetch("/api/checklist", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ item_key: item.item_key, completed: next, notes: item.notes }),
+    })
+    const updated = await res.json()
+    setItems(prev => prev.map(i => i.item_key === item.item_key ? { ...i, ...updated } : i))
+    setToggling(null)
+  }
+
+  const completed = items.filter(i => i.completed).length
+  const total = items.length
+
+  if (loading) {
+    return <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-gray-400" /></div>
+  }
+
+  return (
+    <div className="space-y-4">
+      {/* Progreso */}
+      <Card>
+        <CardContent className="pt-4">
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-sm font-medium text-gray-700">Progreso del perfil</p>
+            <span className="text-sm font-bold text-gray-900">{completed}/{total}</span>
+          </div>
+          <div className="h-2 rounded-full bg-gray-100">
+            <div
+              className="h-2 rounded-full bg-blue-500 transition-all"
+              style={{ width: total > 0 ? `${(completed / total) * 100}%` : "0%" }}
+            />
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Alerta de link prioritario */}
+      <div className="flex items-start gap-3 rounded-lg border border-blue-200 bg-blue-50 p-4">
+        <Link2 className="h-5 w-5 text-blue-600 shrink-0 mt-0.5" />
+        <div className="text-sm text-blue-800">
+          <p className="font-medium mb-1">Recomendación clave</p>
+          <p>
+            El campo <strong>Sitio web</strong> del perfil de Google debe apuntar a{" "}
+            <code className="bg-blue-100 px-1 rounded">/dra-lucia-chahin</code>.
+            Quien llega desde Google Maps tiene intención alta — hay que llevarlos directo a esa landing.
+          </p>
+        </div>
+      </div>
+
+      {/* Items del checklist */}
+      <div className="space-y-2">
+        {items.map(item => {
+          const meta = CHECKLIST_META[item.item_key]
+          if (!meta) return null
+          return (
+            <Card
+              key={item.item_key}
+              className={item.completed ? "opacity-70" : meta.priority ? "border-blue-300" : ""}
+            >
+              <CardContent className="pt-4 pb-4">
+                <div className="flex items-start gap-3">
+                  <button
+                    onClick={() => toggle(item)}
+                    disabled={toggling === item.item_key}
+                    className="mt-0.5 shrink-0"
+                  >
+                    {toggling === item.item_key ? (
+                      <Loader2 className="h-5 w-5 animate-spin text-gray-400" />
+                    ) : item.completed ? (
+                      <CheckCircle2 className="h-5 w-5 text-green-500" />
+                    ) : (
+                      <div className="h-5 w-5 rounded-full border-2 border-gray-300 hover:border-blue-400 transition-colors" />
+                    )}
+                  </button>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className={`text-sm font-medium ${item.completed ? "line-through text-gray-400" : "text-gray-900"}`}>
+                        {meta.label}
+                      </p>
+                      {meta.priority && !item.completed && (
+                        <Badge className="text-xs bg-blue-100 text-blue-700 border-blue-200">Prioritario</Badge>
+                      )}
+                    </div>
+                    <p className="text-xs text-gray-500 mt-0.5">{meta.description}</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )
+        })}
       </div>
     </div>
   )
@@ -896,12 +1077,17 @@ export default function GoogleLocalPage() {
       ) : status?.needsLocationPick ? (
         <LocationPickerView onPicked={fetchStatus} />
       ) : (
-        <Tabs defaultValue="posts">
+        <Tabs defaultValue="checklist">
           <TabsList>
+            <TabsTrigger value="checklist">Checklist</TabsTrigger>
             <TabsTrigger value="posts">Publicaciones</TabsTrigger>
             <TabsTrigger value="reviews">Reseñas</TabsTrigger>
             <TabsTrigger value="profile">Perfil</TabsTrigger>
           </TabsList>
+
+          <TabsContent value="checklist" className="mt-4">
+            <ChecklistTab />
+          </TabsContent>
 
           <TabsContent value="posts" className="mt-4">
             <PostsTab />
