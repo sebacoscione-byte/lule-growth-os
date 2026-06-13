@@ -2,15 +2,15 @@
 
 ## Flujo
 
-1. Elegir categoria, definir un tema concreto, formato y CTA.
+1. Elegir categoria, formato y CTA. El tema es opcional.
 2. Buscar informacion reciente cuando el contenido mencione novedades o datos clinicos.
 3. Seleccionar una fuente visible o continuar sin fuente para contenido evergreen.
 4. Generar una propuesta completa con IA.
-5. Revisar y editar hook, caption, hashtags, direccion visual, slides y texto de Google.
-6. Copiar el prompt visual, generar la imagen sin texto en Gemini y agregar el titular despues.
+5. Revisar y editar hook, caption, hashtags, slides y texto de Google.
+6. Generar la placa final con Gemini desde el editor y descargarla.
 7. Aprobar el borrador y copiar el contenido a Instagram o publicar en Google Business.
 
-El brief muestra si esta listo para generar y exige un tema o enfoque concreto. La biblioteca permite buscar por tema, categoria o hook y filtrar por estado y formato.
+El brief queda listo cuando tiene categoria. Si el tema o enfoque queda vacio, la IA elige de forma autonoma el angulo mas atractivo, util y concreto dentro de esa categoria. La biblioteca permite buscar por tema, categoria o hook y filtrar por estado y formato.
 
 ## Fuentes
 
@@ -35,13 +35,18 @@ La revision humana guarda todos los campos editables de la pieza. Para aprobar s
 
 Cada pieza nueva incluye:
 
-- `image_prompt`: prompt en ingles listo para generar la imagen principal en Gemini.
+- `image_prompt`: direccion creativa en ingles decidida por la IA.
 - `image_alt_text`: descripcion breve en espanol para accesibilidad.
-- `visual_headline` y `visual_subtitle`: textos para agregar despues sobre la imagen.
+- `visual_headline` y `visual_subtitle`: textos que Gemini integra en la placa final.
 
-El prompt visual define una sola direccion creativa, proporcion vertical, punto focal, composicion, luz, color y espacio negativo. Pide una imagen editorial sin texto y prohibe logos, marcas de agua, collages, posters, gradientes genericos y cliches medicos.
+El prompt visual define una sola direccion creativa, proporcion vertical, punto focal, composicion, luz, color, jerarquia tipografica y zonas seguras. Pide una pieza editorial legible en pantalla chica y prohibe logos, marcas de agua, texto extra, collages, gradientes genericos y cliches medicos.
 
-La placa con gradiente que muestra la app es solo una maqueta de composicion. No representa la imagen final.
+El editor llama a Gemini Image para generar una placa final 4:5 para feed/carrusel o 9:16 para historia. La persona revisa el resultado y lo descarga; no tiene que armar la composicion visual.
+
+Variables:
+
+- `GEMINI_IMAGE_MODEL`: modelo de imagen; por defecto `gemini-3.1-flash-image`.
+- `GEMINI_IMAGE_SIZE`: resolucion; por defecto `1K`.
 
 ## Criterio de captacion
 
@@ -56,7 +61,7 @@ La captacion no puede usar miedo, culpa, escasez, promesas ni asumir que el lect
 
 ## Canales
 
-- Instagram: descarga de placa SVG y copia del texto listo para publicar. La publicacion automatica requiere Instagram Graph API.
+- Instagram: generacion y descarga de placa con Gemini y copia del texto listo para publicar. La publicacion automatica requiere Instagram Graph API.
 - Google Business: publicacion desde la app solo para contenido aprobado y cuando Google habilita la API para la cuenta.
 
 ## Guardrails

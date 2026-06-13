@@ -1,6 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import Image from "next/image"
 import {
   Archive, ArchiveRestore, BookOpen, Check, ChevronDown, ChevronUp, Copy, Download, ExternalLink, Loader2,
   ImageIcon, Plus, Save, Search, Send, ShieldCheck, Sparkles, Pin, WandSparkles, X,
@@ -71,14 +72,14 @@ function CharacterCount({ value, limit }: { value: string; limit?: number }) {
 
 function fallbackImagePrompt(item: ContentItem) {
   const ratio = item.format === "historia" ? "9:16 vertical Instagram Story" : "4:5 vertical Instagram feed"
-  return `Create a scroll-stopping premium editorial image for a cardiology social media post about "${item.topic}". ${ratio}. Use one instantly understandable focal point and a relatable everyday moment that makes a potential patient feel recognized or motivated to take a preventive step. Create gentle visual tension between postponing care and choosing to take care of oneself, without fear, pain or urgency. Sophisticated deep blue, burgundy and warm neutral palette, natural cinematic lighting, realistic texture and depth. Leave clean negative space in the upper third for a headline that will be added later. Avoid cold hospital imagery, generic medical stock photography, recognizable real physicians and advertising clichés. No text, no letters, no numbers, no logos, no watermark.`
+  return `Create a scroll-stopping premium editorial plate for a cardiology social media post about "${item.topic}". ${ratio}. Use one instantly understandable focal point and a relatable everyday moment that makes a potential patient feel recognized or motivated to take a preventive step. Create gentle visual tension between postponing care and choosing to take care of oneself, without fear, pain or urgency. Sophisticated deep blue, burgundy and warm neutral palette, natural cinematic lighting, realistic texture and depth. Reserve a clean, high-contrast area for the exact requested Spanish headline and subtitle. Avoid cold hospital imagery, generic medical stock photography, recognizable real physicians and advertising clichés. No extra text, no logos, no watermark.`
 }
 
 function VisualCard({ item, compact = false }: { item: ContentItem; compact?: boolean }) {
   return (
     <div className={`aspect-square rounded-2xl bg-gradient-to-br ${STYLE_CLASSES[item.visual_style]} p-6 text-white flex flex-col justify-between shadow-sm`}>
       <div className="flex items-center justify-between text-xs uppercase tracking-[0.2em] text-white/75">
-        <span>Maqueta de texto</span>
+        <span>Concepto generado por IA</span>
         <ImageIcon className="h-4 w-4" />
       </div>
       <div>
@@ -135,48 +136,6 @@ function CarouselPreview({ item, compact = false }: { item: ContentItem; compact
       <p className="text-xs text-gray-400 text-center">Total: {slides.length + 1} slides. Usá estos contenidos en Canva o Instagram para armar las placas.</p>
     </div>
   )
-}
-
-function escapeXml(value: string) {
-  return value.replace(/[<>&'"]/g, char => ({
-    "<": "&lt;", ">": "&gt;", "&": "&amp;", "'": "&apos;", '"': "&quot;",
-  })[char]!)
-}
-
-function wrapText(value: string, max = 27) {
-  const words = value.split(/\s+/)
-  const lines: string[] = []
-  words.forEach(word => {
-    const current = lines[lines.length - 1]
-    if (!current || `${current} ${word}`.length > max) lines.push(word)
-    else lines[lines.length - 1] = `${current} ${word}`
-  })
-  return lines.slice(0, 5)
-}
-
-function downloadVisual(item: ContentItem) {
-  const colors = {
-    rose: ["#e11d48", "#831843"],
-    blue: ["#2563eb", "#0f172a"],
-    teal: ["#0d9488", "#164e63"],
-  }[item.visual_style]
-  const headline = wrapText(item.visual_headline)
-    .map((line, index) => `<text x="72" y="${420 + index * 88}" font-size="68" font-weight="700" fill="white">${escapeXml(line)}</text>`)
-    .join("")
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1080">
-    <defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop stop-color="${colors[0]}"/><stop offset="1" stop-color="${colors[1]}"/></linearGradient></defs>
-    <rect width="1080" height="1080" rx="48" fill="url(#g)"/>
-    <text x="72" y="90" font-size="24" letter-spacing="5" fill="white" opacity=".75">CARDIOLOGIA</text>
-    <text x="1008" y="90" text-anchor="end" font-size="24" fill="white" opacity=".75">Dra. Lucia Chahin</text>
-    ${headline}
-    <text x="72" y="880" font-size="30" fill="white" opacity=".82">${escapeXml(item.visual_subtitle.slice(0, 58))}</text>
-    <text x="72" y="1000" font-size="24" fill="white" opacity=".72">Martes en Lanus · Viernes en Lomas</text>
-  </svg>`
-  const link = document.createElement("a")
-  link.href = URL.createObjectURL(new Blob([svg], { type: "image/svg+xml" }))
-  link.download = `lule-${item.topic.toLowerCase().replace(/[^a-z0-9]+/g, "-")}.svg`
-  link.click()
-  URL.revokeObjectURL(link.href)
 }
 
 // ---------------------------------------------------------------------------
@@ -615,7 +574,6 @@ export default function ContentStudioPage() {
   async function generate() {
     const nextBriefErrors = {
       ...(!category.trim() ? { category: "Elegí o escribí una categoría." } : {}),
-      ...(!topic.trim() ? { topic: "Escribí un tema o enfoque concreto." } : {}),
     }
     if (Object.keys(nextBriefErrors).length > 0) {
       setBriefErrors(nextBriefErrors)
@@ -847,8 +805,8 @@ export default function ContentStudioPage() {
               <CardHeader className="space-y-3">
                 <div className="flex items-center justify-between gap-3">
                   <CardTitle className="text-base">Brief editorial</CardTitle>
-                  <Badge variant={category.trim() && topic.trim() ? "success" : "warning"}>
-                    {category.trim() && topic.trim() ? "Listo para generar" : "Completá categoría y tema"}
+                  <Badge variant={category.trim() ? "success" : "warning"}>
+                    {category.trim() ? "Listo para generar" : "Completá la categoría"}
                   </Badge>
                 </div>
                 <div className="grid grid-cols-1 gap-1 text-left text-[11px] sm:grid-cols-3 sm:gap-2 sm:text-center">
@@ -923,7 +881,7 @@ export default function ContentStudioPage() {
                   {briefErrors.category && <p className="text-xs font-medium text-red-600">{briefErrors.category}</p>}
                 </div>
                 <div className="space-y-1.5">
-                  <Label className="text-gray-900">Tema o enfoque</Label>
+                  <Label className="text-gray-900">Tema o enfoque <span className="font-normal text-gray-400">(opcional)</span></Label>
                   <Input
                     value={topic}
                     onChange={event => {
@@ -935,7 +893,7 @@ export default function ContentStudioPage() {
                     aria-invalid={Boolean(briefErrors.topic)}
                   />
                   {briefErrors.topic && <p className="text-xs font-medium text-red-600">{briefErrors.topic}</p>}
-                  <p className="text-xs text-gray-500">Escribí una idea concreta: será el eje de todos los textos.</p>
+                  <p className="text-xs text-gray-500">Si lo dejás vacío, la IA elegirá el enfoque más atractivo y útil dentro de la categoría.</p>
                 </div>
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                   <div className="space-y-1.5">
@@ -969,11 +927,11 @@ export default function ContentStudioPage() {
                   />
                   <p className="text-xs text-gray-400">Si no tenés link todavía, dejalo vacío y el prompt usará &ldquo;link en la bio&rdquo;.</p>
                 </div>
-                <Button variant="outline" onClick={research} disabled={researching || !topic.trim()} className="w-full gap-2">
+                <Button variant="outline" onClick={research} disabled={researching || (!topic.trim() && !category.trim())} className="w-full gap-2">
                   {researching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
                   Buscar informacion reciente
                 </Button>
-                {!researching && sources.length === 0 && topic.trim() && (
+                {!researching && sources.length === 0 && (topic.trim() || category.trim()) && (
                   <p className="text-xs text-gray-500">La fuente es opcional. Buscá evidencia reciente si el contenido menciona novedades o datos clínicos.</p>
                 )}
                 {sources.length > 0 && (
@@ -998,7 +956,7 @@ export default function ContentStudioPage() {
                 <p className="text-xs text-gray-500">
                   {IS_MANUAL_MODE
                     ? "Se genera el prompt listo para pegar en ChatGPT, Gemini o Claude. Vos pegás la respuesta y la app la guarda."
-                    : "La IA crea textos y un prompt visual listo para generar una imagen atractiva en Gemini. Todo queda como borrador hasta tu aprobación."}
+                    : "La IA crea los textos y decide la dirección visual. Después, Gemini genera la placa final lista para descargar."}
                 </p>
 
                 {/* Direct entry */}
@@ -1055,7 +1013,6 @@ export default function ContentStudioPage() {
                 onChange={setActive}
                 onSave={changes => updateItem(active, changes)}
                 onCopy={() => copyInstagram(active)}
-                onDownload={() => downloadVisual(active)}
                 onPublishGoogle={() => publishGoogle(active)}
               />
             ) : (
@@ -1152,7 +1109,7 @@ export default function ContentStudioPage() {
 // Editor component
 // ---------------------------------------------------------------------------
 
-function Editor({ item, working, copied, hasUnsavedChanges, onChange, onSave, onCopy, onDownload, onPublishGoogle }: {
+function Editor({ item, working, copied, hasUnsavedChanges, onChange, onSave, onCopy, onPublishGoogle }: {
   item: ContentItem
   working: string | null
   copied: boolean
@@ -1160,12 +1117,12 @@ function Editor({ item, working, copied, hasUnsavedChanges, onChange, onSave, on
   onChange: (item: ContentItem) => void
   onSave: (changes: Partial<ContentItem>) => void
   onCopy: () => void
-  onDownload: () => void
   onPublishGoogle: () => void
 }) {
   const busy = working === item.id
-  const isCarousel = item.format === "carrusel" && item.slides && item.slides.length > 0
-  const [imagePromptCopied, setImagePromptCopied] = useState(false)
+  const [generatedVisual, setGeneratedVisual] = useState<{ itemId: string; url: string } | null>(null)
+  const [visualGenerating, setVisualGenerating] = useState(false)
+  const [visualError, setVisualError] = useState<string | null>(null)
   const imagePrompt = item.image_prompt?.trim() || fallbackImagePrompt(item)
   const approvalReady = Boolean(
     item.hook.trim() &&
@@ -1183,10 +1140,41 @@ function Editor({ item, working, copied, hasUnsavedChanges, onChange, onSave, on
     })
   }
 
-  async function copyImagePrompt() {
-    await navigator.clipboard.writeText(imagePrompt)
-    setImagePromptCopied(true)
-    setTimeout(() => setImagePromptCopied(false), 1800)
+  async function generateVisual() {
+    setVisualGenerating(true)
+    setVisualError(null)
+    try {
+      const response = await fetch("/api/content/visual", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          category: item.category,
+          topic: item.topic,
+          format: item.format,
+          visual_headline: item.visual_headline,
+          visual_subtitle: item.visual_subtitle,
+          image_prompt: imagePrompt,
+        }),
+      })
+      const data = await response.json()
+      if (!response.ok || data.error) {
+        setVisualError(data.error ?? "No se pudo generar la placa visual.")
+        return
+      }
+      setGeneratedVisual({ itemId: item.id, url: `data:${data.mime_type};base64,${data.image_data}` })
+    } catch {
+      setVisualError("No se pudo conectar con Gemini para generar la placa.")
+    } finally {
+      setVisualGenerating(false)
+    }
+  }
+
+  function downloadGeneratedVisual() {
+    if (!generatedVisual || generatedVisual.itemId !== item.id) return
+    const link = document.createElement("a")
+    link.href = generatedVisual.url
+    link.download = `lule-${item.topic.toLowerCase().replace(/[^a-z0-9]+/g, "-")}.png`
+    link.click()
   }
 
   return (
@@ -1196,30 +1184,44 @@ function Editor({ item, working, copied, hasUnsavedChanges, onChange, onSave, on
           <CardHeader className="pb-3">
             <CardTitle className="flex items-center gap-2 text-base text-gray-900">
               <WandSparkles className="h-4 w-4 text-violet-600" />
-              Imagen final con Gemini
+              Placa final con Gemini
             </CardTitle>
             <p className="text-xs text-gray-600">
-              Generá una imagen que detenga el scroll, genere identificación y deje espacio para el titular. La placa inferior es solo una maqueta.
+              Gemini resuelve la escena, composición, tipografía, contraste y zonas seguras según el formato.
             </p>
           </CardHeader>
           <CardContent className="space-y-3">
-            <Textarea
-              rows={10}
-              value={imagePrompt}
-              onChange={event => onChange({ ...item, image_prompt: event.target.value })}
-              className="bg-white text-xs text-gray-900"
-              aria-label="Prompt de imagen para Gemini"
-            />
-            <div className="grid gap-2 sm:flex sm:flex-wrap">
-              <Button variant="outline" onClick={copyImagePrompt} className="w-full flex-1 gap-2">
-                {imagePromptCopied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-                {imagePromptCopied ? "Prompt copiado" : "Copiar prompt de imagen"}
+            {generatedVisual?.itemId === item.id ? (
+              <Image
+                src={generatedVisual.url}
+                alt={item.image_alt_text || `Placa visual sobre ${item.topic}`}
+                width={1024}
+                height={item.format === "historia" ? 1820 : 1280}
+                unoptimized
+                className="h-auto w-full rounded-xl border border-violet-100"
+              />
+            ) : (
+              <div className="flex min-h-56 items-center justify-center rounded-xl border border-dashed border-violet-200 bg-white p-6 text-center text-sm text-gray-500">
+                La dirección visual ya está definida por la IA. Generá la placa final cuando quieras revisarla o publicarla.
+              </div>
+            )}
+            {visualError && <p className="rounded-md bg-red-50 p-2 text-xs text-red-700">{visualError}</p>}
+            <div className="grid gap-2 sm:flex">
+              <Button onClick={generateVisual} disabled={visualGenerating} className="w-full flex-1 gap-2">
+                {visualGenerating ? <Loader2 className="h-4 w-4 animate-spin" /> : <WandSparkles className="h-4 w-4" />}
+                {generatedVisual?.itemId === item.id ? "Regenerar placa" : "Generar placa final"}
               </Button>
-              <Button variant="outline" onClick={() => window.open("https://gemini.google.com/", "_blank")} className="w-full flex-1 gap-2">
-                <ExternalLink className="h-4 w-4" />
-                Abrir Gemini
-              </Button>
+              {generatedVisual?.itemId === item.id && (
+                <Button variant="outline" onClick={downloadGeneratedVisual} className="w-full flex-1 gap-2">
+                  <Download className="h-4 w-4" />
+                  Descargar placa
+                </Button>
+              )}
             </div>
+            <details className="rounded-lg border border-violet-100 bg-white p-3 text-xs text-gray-600">
+              <summary className="cursor-pointer font-medium text-gray-800">Ver dirección visual decidida por la IA</summary>
+              <p className="mt-2 whitespace-pre-wrap">{imagePrompt}</p>
+            </details>
             <div className="space-y-1.5">
               <Label className="text-gray-900">Texto alternativo de la imagen</Label>
               <Input
@@ -1232,13 +1234,7 @@ function Editor({ item, working, copied, hasUnsavedChanges, onChange, onSave, on
             </div>
           </CardContent>
         </Card>
-        <CarouselPreview item={item} />
-        <div className="flex flex-col gap-2 sm:flex-row">
-          {!isCarousel && (
-            <Button variant="outline" onClick={onDownload} className="flex-1 gap-2"><Download className="h-4 w-4" /> Descargar placa</Button>
-          )}
-          <Button variant="outline" onClick={onCopy} className={`gap-2 ${isCarousel ? "w-full" : "flex-1"}`}>{copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />} Copiar Instagram</Button>
-        </div>
+        <Button variant="outline" onClick={onCopy} className="w-full gap-2">{copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />} Copiar Instagram</Button>
         {item.source && (
           <a href={item.source.url} target="_blank" rel="noreferrer" className="block rounded-lg border border-blue-100 bg-blue-50 p-3 text-xs text-blue-800">
             <span className="font-medium">Fuente revisada:</span> {item.source.title} <ExternalLink className="inline h-3 w-3" />
@@ -1280,28 +1276,6 @@ function Editor({ item, working, copied, hasUnsavedChanges, onChange, onSave, on
           <div className="space-y-1.5">
             <div className="flex items-center justify-between"><Label className="text-gray-900">Hashtags</Label><CharacterCount value={item.hashtags} /></div>
             <Textarea rows={3} value={item.hashtags} onChange={event => onChange({ ...item, hashtags: event.target.value })} className="text-gray-900" />
-          </div>
-          <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 space-y-3">
-            <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Placa visual</p>
-            <div className="space-y-1.5">
-              <div className="flex items-center justify-between"><Label className="text-gray-900">Titular</Label><CharacterCount value={item.visual_headline} limit={90} /></div>
-              <Input value={item.visual_headline} maxLength={90} onChange={event => onChange({ ...item, visual_headline: event.target.value })} className="bg-white text-gray-900" />
-            </div>
-            <div className="space-y-1.5">
-              <div className="flex items-center justify-between"><Label className="text-gray-900">Subtítulo</Label><CharacterCount value={item.visual_subtitle} limit={90} /></div>
-              <Input value={item.visual_subtitle} maxLength={90} onChange={event => onChange({ ...item, visual_subtitle: event.target.value })} className="bg-white text-gray-900" />
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-gray-900">Estilo</Label>
-              <Select value={item.visual_style} onValueChange={value => onChange({ ...item, visual_style: value as ContentItem["visual_style"] })}>
-                <SelectTrigger className="bg-white text-gray-900"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="rose">Rosa</SelectItem>
-                  <SelectItem value="blue">Azul</SelectItem>
-                  <SelectItem value="teal">Verde azulado</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
           </div>
           {item.slides && item.slides.length > 0 && (
             <div className="space-y-3 rounded-lg border border-gray-200 p-3">

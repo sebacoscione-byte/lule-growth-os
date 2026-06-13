@@ -1,23 +1,27 @@
-# En progreso - Categoria editable del generador
+# En progreso - Brief flexible y placa final con Gemini
 
 ## Objetivo
 
-Permitir que la categoria del brief pueda elegirse de las sugerencias o escribirse libremente.
+Permitir generar contenido sin escribir un tema y hacer que Gemini resuelva la placa visual final.
 
 ## Brechas encontradas
 
-- El selector actual muestra todas las categorias sugeridas, pero no permite crear una categoria nueva.
+- El tema o enfoque bloquea la generacion aunque la categoria ya define un punto de partida.
+- La IA entrega un prompt visual, pero la app delega en Lucia la composicion final de la placa.
+- La maqueta descargable de gradiente no refleja una direccion visual atractiva para carrusel o historia.
 
 ## Plan
 
-- [x] Disenar un selector editable consistente en mobile.
-- [x] Permitir escritura libre y filtrado de sugerencias.
+- [x] Hacer opcional el tema y adaptar prompts, validaciones y busqueda.
+- [x] Agregar generacion de placa final con Gemini Image segun el formato.
+- [x] Simplificar la revision visual para que Lucia no tenga que disenar la placa.
 - [x] Verificar, documentar, commitear y pushear.
 
 ## Resultado
 
-- La categoria comienza vacia y permite escritura libre.
-- Al abrir el campo sin texto se muestran todas las sugerencias.
-- Al escribir se filtran las sugerencias y, si no hay coincidencias, se conserva la categoria nueva.
-- La categoria se normaliza antes de enviarse al generador.
+- El brief queda listo con una categoria; el tema o enfoque es opcional.
+- Si no hay tema, la IA elige un enfoque concreto dentro de la categoria.
+- Gemini define la direccion visual y genera una placa final 4:5 o 9:16 desde el editor.
+- La placa integra titular y subtitulo con jerarquia, contraste y zonas seguras segun el formato.
+- Lucia revisa y descarga el resultado, sin tener que armar la composicion visual.
 - `npm run lint` y `npm run build` finalizaron correctamente.

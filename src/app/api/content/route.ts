@@ -23,12 +23,12 @@ export async function POST(request: Request) {
     // content_plan — supports both manual and gemini_api modes
     // -------------------------------------------------------------------------
     if (type === "content_plan") {
-      if (!topic || !category || !content_type) {
-        return NextResponse.json({ error: "topic, category and content_type required" }, { status: 400 })
+      if (!category || !content_type) {
+        return NextResponse.json({ error: "category and content_type required" }, { status: 400 })
       }
 
       const input = {
-        topic,
+        topic: typeof topic === "string" ? topic : "",
         category,
         format: content_type as "reel" | "historia" | "carrusel" | "post",
         cta: cta ?? "",

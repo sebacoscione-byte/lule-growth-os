@@ -101,6 +101,8 @@ Para usar Gemini, crear una API key en Google AI Studio y configurar:
 AI_PROVIDER=gemini
 GEMINI_API_KEY=...
 GEMINI_MODEL=gemini-3.5-flash
+GEMINI_IMAGE_MODEL=gemini-3.1-flash-image
+GEMINI_IMAGE_SIZE=1K
 ```
 
 En Vercel, agregar las mismas variables de entorno y volver a desplegar. La pantalla `Configuración` muestra el proveedor activo sin exponer las claves.

@@ -136,9 +136,9 @@ export async function getDailyRequestCount(): Promise<number> {
 // ---------------------------------------------------------------------------
 
 const IMAGE_PROMPT_RULES = `DIRECCION VISUAL PARA GEMINI:
-- Inclui "image_prompt": un prompt autocontenido, detallado y listo para pegar en Gemini para generar la imagen principal.
+- Inclui "image_prompt": un prompt autocontenido y detallado para que Gemini genere la placa visual final.
 - Redacta "image_prompt" en ingles para maximizar la precision visual; no incluyas instrucciones conversacionales ni explicaciones.
-- El prompt debe pedir una imagen editorial premium que detenga el scroll, conectada de forma concreta con el tema.
+- El prompt debe pedir una pieza editorial premium que detenga el scroll, conectada de forma concreta con el tema y adaptada al formato.
 - Define un unico punto focal claro y una escena que se entienda en menos de un segundo.
 - La escena debe activar curiosidad o identificacion en un paciente potencial: mostrar un momento cotidiano reconocible, una decision preventiva o el beneficio emocional de ocuparse de la salud.
 - Debe existir una tension visual suave entre "seguir postergando" y "ocuparse a tiempo", sin representar peligro, dolor, miedo ni urgencia.
@@ -147,14 +147,17 @@ const IMAGE_PROMPT_RULES = `DIRECCION VISUAL PARA GEMINI:
 - Describi sujeto, accion, encuadre, lente o perspectiva, iluminacion, profundidad, paleta, textura, estado de animo y ubicacion del espacio negativo.
 - Usa este orden dentro del prompt: objetivo y tema; escena principal; composicion; luz y color; acabado editorial; espacio negativo; restricciones.
 - Indica proporcion vertical 4:5 para feed; usa 9:16 solo si el formato es historia.
-- La imagen debe funcionar como fondo: deja espacio negativo limpio en el tercio superior o izquierdo para agregar el titular despues.
+- Reserva una zona limpia de alto contraste para integrar el titular y subtitulo sin tapar el punto focal.
+- El texto debe ser breve, grande, legible en pantalla chica y con jerarquia clara. Usa como maximo dos familias o pesos tipograficos.
+- Para historia, manten texto y elementos importantes dentro de la zona segura central, lejos de los bordes superior e inferior.
+- Para carrusel, crea una portada que abra una brecha de curiosidad y se entienda en menos de tres segundos.
 - Pedi iluminacion natural o cinematografica suave, profundidad, textura y una paleta sobria con acentos bordo, azul profundo o verde azulado.
 - Prioriza escenas humanas cotidianas, objetos o metaforas visuales inteligentes. Evita la placa de texto generica.
 - Si aparecen personas: adultas, aspecto argentino o latino diverso, expresion serena, nunca con dolor ni en una urgencia.
 - No representar a una medica real ni inventar el rostro de la Dra. Lucia Chahin.
-- PROHIBIDO dentro de la imagen: palabras, letras, numeros, tipografia, logos, marcas de agua, interfaces, diagnosticos, estudios legibles, anatomia gore, personas angustiadas, corazon rojo de stock, estetoscopio flotante o ECG decorativo.
+- PROHIBIDO dentro de la imagen: texto adicional al titular y subtitulo solicitados, logos, marcas de agua, interfaces, diagnosticos, estudios legibles, anatomia gore, personas angustiadas, corazon rojo de stock, estetoscopio flotante o ECG decorativo.
 - No pedir collages, infografias, posters, flyers, marcos, placas, fondos con gradiente ni composiciones divididas.
-- El prompt debe terminar reforzando: "No text, no letters, no numbers, no logos, no watermark."
+- El prompt debe terminar reforzando: "Render only the exact requested Spanish headline and subtitle. No extra text, no logos, no watermark."
 - Inclui "image_alt_text": descripcion accesible en espanol, factual y breve, maximo 180 caracteres.`
 
 const PATIENT_ACQUISITION_RULES = `CRITERIO DE CAPTACION DE PACIENTES:
@@ -213,7 +216,9 @@ importancia del chequeo cardiovascular preventivo. El objetivo es que el lector
 sienta que aprendió algo valioso y quiera pedir turno.
 
 PEDIDO:
-Tema: ${input.topic}
+${input.topic.trim()
+  ? `Tema o enfoque sugerido: ${input.topic}`
+  : "No se definio un tema. Elegi de forma autonoma el enfoque mas atractivo, util y concreto dentro de la categoria."}
 Categoría: ${input.category}
 Formato Instagram: ${input.format}
 ${input.cta ? `Estilo de cierre sugerido: ${input.cta}` : ""}
@@ -236,7 +241,7 @@ Usá exactamente estas claves:
   "visual_headline": "título de la portada, máximo 40 caracteres",
   "visual_subtitle": "subtítulo de la portada, máximo 60 caracteres",
   "visual_style": "rose",
-  "image_prompt": "prompt visual detallado listo para generar en Gemini, sin texto dentro de la imagen",
+  "image_prompt": "prompt visual detallado listo para que Gemini genere la portada final",
   "image_alt_text": "descripcion accesible breve en espanol",
   "slides": [
     {"headline": "Slide 1 — título", "text": "Contenido de esta slide en 1-2 oraciones."},
@@ -254,7 +259,7 @@ Usá exactamente estas claves:
   "visual_headline": "titular para la placa visual, máximo 60 caracteres",
   "visual_subtitle": "subtítulo para la placa visual, máximo 80 caracteres",
   "visual_style": "rose",
-  "image_prompt": "prompt visual detallado listo para generar en Gemini, sin texto dentro de la imagen",
+  "image_prompt": "prompt visual detallado listo para que Gemini genere la placa final",
   "image_alt_text": "descripcion accesible breve en espanol"
 }`}`
 }
@@ -559,7 +564,9 @@ No inventes resultados que no esten en el resumen. Menciona la fuente de forma g
   ]`
     : ""
 
-  const userContent = `Tema: ${input.topic}
+  const userContent = `${input.topic.trim()
+    ? `Tema o enfoque sugerido: ${input.topic}`
+    : "No se definio un tema. Elegi de forma autonoma el enfoque mas atractivo, util y concreto dentro de la categoria."}
 Categoria: ${input.category}
 Formato Instagram: ${input.format}
 CTA: ${input.cta}
@@ -593,7 +600,7 @@ Reglas:
 - Ante sintomas de alarma, indica guardia o atencion medica inmediata.
 - El objetivo es educar y explicar como pedir turno por canales oficiales.
 - Lucia atiende martes en CIMEL Lanus y viernes en Swiss Medical Lomas.
-- El titular y subtitulo se agregan despues; no deben aparecer dentro de la imagen generada.
+- Gemini resolvera despues la placa final e integrara el titular y subtitulo.
 ${IMAGE_PROMPT_RULES}
 ${PATIENT_ACQUISITION_RULES}
 - El texto de Google debe tener maximo 1500 caracteres.
@@ -625,6 +632,91 @@ ${PATIENT_ACQUISITION_RULES}
     image_prompt: (parsed.image_prompt as string).slice(0, 2400),
     image_alt_text: (parsed.image_alt_text as string).slice(0, 180),
     slides: slides && slides.length > 0 ? slides : undefined,
+  }
+}
+
+export async function generateContentVisual(input: {
+  category: string
+  topic: string
+  format: "reel" | "historia" | "carrusel" | "post"
+  visual_headline: string
+  visual_subtitle: string
+  image_prompt: string
+}): Promise<{ mime_type: string; image_data: string }> {
+  const apiKey = process.env.GEMINI_API_KEY
+  if (!apiKey) throw new Error("GEMINI_API_KEY no esta configurada.")
+
+  const dailyLimit = Number(process.env.DAILY_AI_REQUEST_LIMIT ?? 20)
+  if (await getDailyRequestCount() >= dailyLimit) {
+    throw new Error(`DAILY_LIMIT_EXCEEDED:${dailyLimit}`)
+  }
+
+  const model = process.env.GEMINI_IMAGE_MODEL || "gemini-3.1-flash-image"
+  const aspectRatio = input.format === "historia" ? "9:16" : "4:5"
+  const prompt = `Create the final publish-ready Instagram ${input.format} visual for a cardiology practice.
+
+CONTENT:
+- Category: ${input.category}
+- Topic: ${input.topic}
+- Exact Spanish headline: "${input.visual_headline}"
+- Exact Spanish subtitle: "${input.visual_subtitle}"
+
+CREATIVE DIRECTION:
+${input.image_prompt}
+
+FINAL ART DIRECTION:
+- Produce one polished ${aspectRatio} composition, not a mockup or template preview.
+- The visual must stop the scroll, communicate one idea in under three seconds and feel trustworthy to an adult patient in Argentina.
+- Use a clear focal point, strong visual hierarchy, high text/background contrast and generous breathing room.
+- Render the exact Spanish headline and subtitle once, with correct accents and no spelling changes.
+- Headline must dominate; subtitle must remain readable on a small phone screen.
+- ${input.format === "historia"
+    ? "Keep all text and essential elements inside the central Story safe zone, away from the top and bottom interface areas."
+    : "Use a 4:5 feed composition. For a carousel, make this an irresistible but medically responsible cover."}
+- No diagnosis, treatment claim, urgency marketing, fear, logos, watermark or extra text.
+- Do not depict the real doctor or invent her likeness.`
+  const promptHash = hashPrompt(prompt)
+
+  try {
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1/models/${encodeURIComponent(model)}:generateContent`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
+        body: JSON.stringify({
+          contents: [{ role: "user", parts: [{ text: prompt }] }],
+          generationConfig: {
+            responseModalities: ["IMAGE"],
+            responseFormat: {
+              image: {
+                aspectRatio,
+                imageSize: process.env.GEMINI_IMAGE_SIZE || "1K",
+              },
+            },
+          },
+        }),
+      }
+    )
+    const data = await response.json() as {
+      candidates?: Array<{ content?: { parts?: Array<{
+        inlineData?: { mimeType?: string; data?: string }
+        inline_data?: { mime_type?: string; data?: string }
+      }> } }>
+      error?: { message?: string }
+    }
+    if (!response.ok) throw new Error(data.error?.message || `Gemini respondio con estado ${response.status}.`)
+
+    const part = data.candidates?.[0]?.content?.parts?.find(candidate => candidate.inlineData?.data || candidate.inline_data?.data)
+    const imageData = part?.inlineData?.data || part?.inline_data?.data
+    const mimeType = part?.inlineData?.mimeType || part?.inline_data?.mime_type || "image/png"
+    if (!imageData) throw new Error("Gemini no devolvio una imagen.")
+
+    await logRequest("gemini", model, promptHash, "content_visual", true)
+    return { mime_type: mimeType, image_data: imageData }
+  } catch (error) {
+    await logRequest("gemini", model, promptHash, "content_visual", false,
+      error instanceof Error ? error.message : String(error))
+    throw error
   }
 }
 
