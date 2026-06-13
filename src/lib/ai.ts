@@ -135,6 +135,25 @@ export async function getDailyRequestCount(): Promise<number> {
 // Prompt builders — pure functions, no API calls
 // ---------------------------------------------------------------------------
 
+const IMAGE_PROMPT_RULES = `DIRECCION VISUAL PARA GEMINI:
+- Inclui "image_prompt": un prompt autocontenido, detallado y listo para pegar en Gemini para generar la imagen principal.
+- Redacta "image_prompt" en ingles para maximizar la precision visual; no incluyas instrucciones conversacionales ni explicaciones.
+- El prompt debe pedir una imagen editorial premium que detenga el scroll, conectada de forma concreta con el tema.
+- Define un unico punto focal claro y una escena que se entienda en menos de un segundo.
+- Elegi una sola direccion creativa concreta: momento humano cotidiano, naturaleza muerta editorial u objeto usado como metafora visual. No mezcles conceptos.
+- Describi sujeto, accion, encuadre, lente o perspectiva, iluminacion, profundidad, paleta, textura, estado de animo y ubicacion del espacio negativo.
+- Usa este orden dentro del prompt: objetivo y tema; escena principal; composicion; luz y color; acabado editorial; espacio negativo; restricciones.
+- Indica proporcion vertical 4:5 para feed; usa 9:16 solo si el formato es historia.
+- La imagen debe funcionar como fondo: deja espacio negativo limpio en el tercio superior o izquierdo para agregar el titular despues.
+- Pedi iluminacion natural o cinematografica suave, profundidad, textura y una paleta sobria con acentos bordo, azul profundo o verde azulado.
+- Prioriza escenas humanas cotidianas, objetos o metaforas visuales inteligentes. Evita la placa de texto generica.
+- Si aparecen personas: adultas, aspecto argentino o latino diverso, expresion serena, nunca con dolor ni en una urgencia.
+- No representar a una medica real ni inventar el rostro de la Dra. Lucia Chahin.
+- PROHIBIDO dentro de la imagen: palabras, letras, numeros, tipografia, logos, marcas de agua, interfaces, diagnosticos, estudios legibles, anatomia gore, personas angustiadas, corazon rojo de stock, estetoscopio flotante o ECG decorativo.
+- No pedir collages, infografias, posters, flyers, marcos, placas, fondos con gradiente ni composiciones divididas.
+- El prompt debe terminar reforzando: "No text, no letters, no numbers, no logos, no watermark."
+- Inclui "image_alt_text": descripcion accesible en espanol, factual y breve, maximo 180 caracteres.`
+
 export function buildContentPlanPrompt(input: {
   topic: string
   category: string
@@ -170,6 +189,8 @@ REGLAS OBLIGATORIAS:
 - No lenguaje alarmista ni que asuma condiciones del lector
 - Ante síntomas de alarma → siempre derivar a guardia
 
+${IMAGE_PROMPT_RULES}
+
 ENFOQUE DEL CONTENIDO:
 El contenido debe captar pacientes potenciales educándolos. Usá datos relevantes,
 desmitificá creencias comunes, explicá conceptos de forma accesible, o destacá la
@@ -200,6 +221,8 @@ Usá exactamente estas claves:
   "visual_headline": "título de la portada, máximo 40 caracteres",
   "visual_subtitle": "subtítulo de la portada, máximo 60 caracteres",
   "visual_style": "rose",
+  "image_prompt": "prompt visual detallado listo para generar en Gemini, sin texto dentro de la imagen",
+  "image_alt_text": "descripcion accesible breve en espanol",
   "slides": [
     {"headline": "Slide 1 — título", "text": "Contenido de esta slide en 1-2 oraciones."},
     {"headline": "Slide 2 — título", "text": "Contenido de esta slide."},
@@ -215,7 +238,9 @@ Usá exactamente estas claves:
   "hashtags": "#hashtag1 #hashtag2 (10-15 hashtags relevantes al tema y cardiología)",
   "visual_headline": "titular para la placa visual, máximo 60 caracteres",
   "visual_subtitle": "subtítulo para la placa visual, máximo 80 caracteres",
-  "visual_style": "rose"
+  "visual_style": "rose",
+  "image_prompt": "prompt visual detallado listo para generar en Gemini, sin texto dentro de la imagen",
+  "image_alt_text": "descripcion accesible breve en espanol"
 }`}`
 }
 
@@ -495,6 +520,8 @@ export async function generateContentPlan(input: {
   visual_headline: string
   visual_subtitle: string
   visual_style: "rose" | "blue" | "teal"
+  image_prompt: string
+  image_alt_text: string
   slides?: Array<{ headline: string; text: string }>
 }> {
   const sourceContext = input.source
@@ -531,11 +558,13 @@ ${input.format === "carrusel" ? "Es un CARRUSEL: generá 4-5 slides con headline
   "google_text": "...",
   "hashtags": "...",
   "visual_headline": "...",
-  "visual_subtitle": "..."${slidesSchema}
+  "visual_subtitle": "...",
+  "image_prompt": "...",
+  "image_alt_text": "..."${slidesSchema}
 }`
 
   const text = await generateText({
-    maxTokens: 1600,
+    maxTokens: 2200,
     json: true,
     purpose: "content_plan",
     system: `Sos responsable de contenido de la Dra. Lucia Chahin, cardiologa.
@@ -549,14 +578,15 @@ Reglas:
 - Ante sintomas de alarma, indica guardia o atencion medica inmediata.
 - El objetivo es educar y explicar como pedir turno por canales oficiales.
 - Lucia atiende martes en CIMEL Lanus y viernes en Swiss Medical Lomas.
-- La placa visual debe funcionar sin fotos: titular breve, subtitulo y estilo de marca.
+- El titular y subtitulo se agregan despues; no deben aparecer dentro de la imagen generada.
+${IMAGE_PROMPT_RULES}
 - El texto de Google debe tener maximo 1500 caracteres.
 - Devolve SOLO JSON valido.`,
     messages: [{ role: "user", content: userContent }],
   })
 
   const parsed = parseJson<Record<string, unknown>>(text)
-  const required = ["hook", "caption", "google_text", "hashtags", "visual_headline", "visual_subtitle"]
+  const required = ["hook", "caption", "google_text", "hashtags", "visual_headline", "visual_subtitle", "image_prompt", "image_alt_text"]
   if (required.some(key => typeof parsed[key] !== "string")) throw new Error("Plan de contenido incompleto.")
 
   const rawSlides = parsed.slides
@@ -576,6 +606,8 @@ Reglas:
     visual_style: ["rose", "blue", "teal"].includes(parsed.visual_style as string)
       ? parsed.visual_style as "rose" | "blue" | "teal"
       : "blue",
+    image_prompt: (parsed.image_prompt as string).slice(0, 2400),
+    image_alt_text: (parsed.image_alt_text as string).slice(0, 180),
     slides: slides && slides.length > 0 ? slides : undefined,
   }
 }

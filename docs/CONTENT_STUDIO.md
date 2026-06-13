@@ -6,9 +6,9 @@
 2. Buscar informacion reciente cuando el contenido mencione novedades o datos clinicos.
 3. Seleccionar una fuente visible o continuar sin fuente para contenido evergreen.
 4. Generar una propuesta completa con IA.
-5. Revisar y editar hook, caption, hashtags, placa visual, slides y texto de Google.
-6. Descargar la placa visual y aprobar el borrador.
-7. Copiar el contenido a Instagram o publicar en Google Business.
+5. Revisar y editar hook, caption, hashtags, direccion visual, slides y texto de Google.
+6. Copiar el prompt visual, generar la imagen sin texto en Gemini y agregar el titular despues.
+7. Aprobar el borrador y copiar el contenido a Instagram o publicar en Google Business.
 
 El brief muestra si esta listo para generar y exige un tema o enfoque concreto. La biblioteca permite buscar por tema, categoria o hook y filtrar por estado y formato.
 
@@ -30,6 +30,18 @@ Estados:
 - `archived`: retirado de la biblioteca activa.
 
 La revision humana guarda todos los campos editables de la pieza. Para aprobar se requieren hook, caption, texto de Google y titular visual. Si se edita una pieza aprobada o publicada, vuelve a borrador para requerir una nueva revision.
+
+## Imagenes con Gemini
+
+Cada pieza nueva incluye:
+
+- `image_prompt`: prompt en ingles listo para generar la imagen principal en Gemini.
+- `image_alt_text`: descripcion breve en espanol para accesibilidad.
+- `visual_headline` y `visual_subtitle`: textos para agregar despues sobre la imagen.
+
+El prompt visual define una sola direccion creativa, proporcion vertical, punto focal, composicion, luz, color y espacio negativo. Pide una imagen editorial sin texto y prohibe logos, marcas de agua, collages, posters, gradientes genericos y cliches medicos.
+
+La placa con gradiente que muestra la app es solo una maqueta de composicion. No representa la imagen final.
 
 ## Canales
 

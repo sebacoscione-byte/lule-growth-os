@@ -139,6 +139,8 @@ export interface ContentItem {
   visual_headline: string
   visual_subtitle: string
   visual_style: "rose" | "blue" | "teal"
+  image_prompt?: string
+  image_alt_text?: string
   slides?: ContentSlide[]
   source: ContentSource | null
   created_at: string

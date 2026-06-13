@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import {
   Archive, ArchiveRestore, BookOpen, Check, ChevronDown, ChevronUp, Copy, Download, ExternalLink, Loader2,
-  Plus, Save, Search, Send, ShieldCheck, Sparkles, Pin, X,
+  ImageIcon, Plus, Save, Search, Send, ShieldCheck, Sparkles, Pin, WandSparkles, X,
 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -53,7 +53,7 @@ const STYLE_CLASSES = {
 
 const EDITABLE_FIELDS: Array<keyof ContentItem> = [
   "hook", "caption", "google_text", "hashtags", "visual_headline",
-  "visual_subtitle", "visual_style", "slides",
+  "visual_subtitle", "visual_style", "image_prompt", "image_alt_text", "slides",
 ]
 
 function editableContent(item: ContentItem) {
@@ -69,12 +69,17 @@ function CharacterCount({ value, limit }: { value: string; limit?: number }) {
   )
 }
 
+function fallbackImagePrompt(item: ContentItem) {
+  const ratio = item.format === "historia" ? "9:16 vertical Instagram Story" : "4:5 vertical Instagram feed"
+  return `Create a premium editorial image for a cardiology social media post about "${item.topic}". ${ratio}. Show a visually compelling, calm and relatable concept connected to ${item.category}, using a sophisticated deep blue, burgundy and warm neutral palette. Use natural cinematic lighting, realistic texture and depth. Leave clean negative space in the upper third for a headline that will be added later. Avoid generic medical stock imagery and avoid depicting pain, emergencies or a recognizable real physician. No text, no letters, no numbers, no logos, no watermark.`
+}
+
 function VisualCard({ item, compact = false }: { item: ContentItem; compact?: boolean }) {
   return (
     <div className={`aspect-square rounded-2xl bg-gradient-to-br ${STYLE_CLASSES[item.visual_style]} p-6 text-white flex flex-col justify-between shadow-sm`}>
       <div className="flex items-center justify-between text-xs uppercase tracking-[0.2em] text-white/75">
-        <span>Cardiologia</span>
-        <span>Dra. Lucia Chahin</span>
+        <span>Maqueta de texto</span>
+        <ImageIcon className="h-4 w-4" />
       </div>
       <div>
         <p className={`${compact ? "text-xl" : "text-3xl"} font-bold leading-tight`}>{item.visual_headline}</p>
@@ -684,6 +689,8 @@ export default function ContentStudioPage() {
       visual_style: (["rose", "blue", "teal"].includes(generated.visual_style as string)
         ? generated.visual_style
         : "blue") as "rose" | "blue" | "teal",
+      image_prompt: (generated.image_prompt as string | undefined)?.slice(0, 2400),
+      image_alt_text: (generated.image_alt_text as string | undefined)?.slice(0, 180),
       slides: slides && slides.length > 0 ? slides : undefined,
     }
 
@@ -726,7 +733,7 @@ export default function ContentStudioPage() {
       throw new Error("El JSON pegado tiene un error de formato. Intentá copiar la respuesta nuevamente.")
     }
 
-    const required = ["hook", "caption", "google_text", "hashtags", "visual_headline", "visual_subtitle"]
+    const required = ["hook", "caption", "google_text", "hashtags", "visual_headline", "visual_subtitle", "image_prompt", "image_alt_text"]
     const missing = required.filter(k => typeof parsed[k] !== "string")
     if (missing.length > 0) {
       throw new Error(`Faltan campos en la respuesta: ${missing.join(", ")}. Pedile a la IA que devuelva el JSON completo.`)
@@ -913,7 +920,7 @@ export default function ContentStudioPage() {
                 <p className="text-xs text-gray-500">
                   {IS_MANUAL_MODE
                     ? "Se genera el prompt listo para pegar en ChatGPT, Gemini o Claude. Vos pegás la respuesta y la app la guarda."
-                    : "La IA crea texto para ambos canales y una placa visual descargable. Todo queda como borrador hasta tu aprobacion."}
+                    : "La IA crea textos y un prompt visual listo para generar una imagen atractiva en Gemini. Todo queda como borrador hasta tu aprobación."}
                 </p>
 
                 {/* Direct entry */}
@@ -933,7 +940,7 @@ export default function ContentStudioPage() {
                         rows={8}
                         value={directPaste}
                         onChange={e => { setDirectPaste(e.target.value); setDirectError(null) }}
-                        placeholder={`Pegá acá la respuesta JSON de Gemini, Claude o ChatGPT.\n\nEj: {"hook":"...","caption":"...","google_text":"...","hashtags":"...","visual_headline":"...","visual_subtitle":"...","visual_style":"rose"}`}
+                        placeholder={`Pegá acá la respuesta JSON completa. Debe incluir los textos, image_prompt listo para Gemini e image_alt_text.`}
                         className="font-mono text-xs text-gray-900 placeholder:text-gray-400 resize-none"
                       />
                       {directError && (
@@ -1080,6 +1087,8 @@ function Editor({ item, working, copied, hasUnsavedChanges, onChange, onSave, on
 }) {
   const busy = working === item.id
   const isCarousel = item.format === "carrusel" && item.slides && item.slides.length > 0
+  const [imagePromptCopied, setImagePromptCopied] = useState(false)
+  const imagePrompt = item.image_prompt?.trim() || fallbackImagePrompt(item)
   const approvalReady = Boolean(
     item.hook.trim() &&
     item.caption.trim() &&
@@ -1096,9 +1105,55 @@ function Editor({ item, working, copied, hasUnsavedChanges, onChange, onSave, on
     })
   }
 
+  async function copyImagePrompt() {
+    await navigator.clipboard.writeText(imagePrompt)
+    setImagePromptCopied(true)
+    setTimeout(() => setImagePromptCopied(false), 1800)
+  }
+
   return (
     <div className="grid gap-5 lg:grid-cols-2">
       <div className="space-y-3">
+        <Card className="border-violet-200 bg-violet-50/40">
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-base text-gray-900">
+              <WandSparkles className="h-4 w-4 text-violet-600" />
+              Imagen final con Gemini
+            </CardTitle>
+            <p className="text-xs text-gray-600">
+              Generá una imagen sin texto y agregá el titular después. La placa inferior es solo una maqueta de composición.
+            </p>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <Textarea
+              rows={10}
+              value={imagePrompt}
+              onChange={event => onChange({ ...item, image_prompt: event.target.value })}
+              className="bg-white text-xs text-gray-900"
+              aria-label="Prompt de imagen para Gemini"
+            />
+            <div className="flex flex-wrap gap-2">
+              <Button variant="outline" onClick={copyImagePrompt} className="flex-1 gap-2">
+                {imagePromptCopied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                {imagePromptCopied ? "Prompt copiado" : "Copiar prompt de imagen"}
+              </Button>
+              <Button variant="outline" onClick={() => window.open("https://gemini.google.com/", "_blank")} className="flex-1 gap-2">
+                <ExternalLink className="h-4 w-4" />
+                Abrir Gemini
+              </Button>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-gray-900">Texto alternativo de la imagen</Label>
+              <Input
+                value={item.image_alt_text ?? ""}
+                maxLength={180}
+                onChange={event => onChange({ ...item, image_alt_text: event.target.value })}
+                placeholder="Descripción breve para accesibilidad"
+                className="bg-white text-gray-900"
+              />
+            </div>
+          </CardContent>
+        </Card>
         <CarouselPreview item={item} />
         <div className="flex gap-2">
           {!isCarousel && (

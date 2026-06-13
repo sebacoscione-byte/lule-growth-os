@@ -1,38 +1,29 @@
-# En progreso - Mejora del Estudio de contenido
+# En progreso - Prompts visuales para Gemini
 
 ## Objetivo
 
-Hacer que la creacion y revision de contenido sea mas clara, completa y operable:
-
-- Guiar el brief y mostrar que falta antes de generar.
-- Permitir revisar y guardar todos los textos de una pieza.
-- Facilitar encontrar y gestionar borradores en la biblioteca.
-- Mantener visibles los guardrails medicos durante la revision.
+Mejorar la direccion visual de las piezas para que Gemini genere imagenes atractivas y utilizables, en lugar de placas genericas con texto.
 
 ## Brechas encontradas
 
-- El brief no comunica progreso ni valida el tema antes de generar.
-- La revision humana solo guarda caption y texto de Google.
-- No se pueden corregir hook, hashtags ni textos de la placa.
-- La biblioteca no tiene busqueda ni filtros por estado o formato.
-- Los errores no se pueden descartar desde la interfaz.
+- El prompt actual solo pide titular, subtitulo y un color.
+- No existe un prompt listo para generar una imagen en Gemini.
+- La IA recibe la instruccion de que la placa funcione sin fotos, lo que favorece resultados genericos.
+- No se define composicion, proporcion, espacio para texto ni elementos a evitar.
 
 ## Plan
 
-- [x] Auditar flujo, APIs, tipos y documentacion.
-- [x] Mejorar brief y estados de creacion.
-- [x] Ampliar editor y persistencia.
-- [x] Mejorar biblioteca.
-- [x] Actualizar documentacion.
+- [x] Auditar prompts, tipos y flujo visual actual.
+- [x] Agregar contrato de direccion visual para Gemini.
+- [x] Permitir editar y copiar el prompt desde el estudio.
+- [x] Actualizar persistencia y documentacion.
 - [x] Verificar, commitear y pushear.
 
 ## Resultado
 
-- El brief guia el flujo, exige un tema concreto y comunica si esta listo para generar.
-- La busqueda de fuentes es opcional y explica cuando conviene usarla.
-- La revision humana permite editar y guardar la pieza completa.
-- La aprobacion exige contenido minimo y mantiene visibles los guardrails medicos.
-- Editar una pieza aprobada o publicada la devuelve a borrador.
-- La biblioteca permite buscar, filtrar, archivar y restaurar piezas.
+- Cada propuesta nueva incluye un prompt visual en ingles listo para Gemini.
+- El prompt exige una imagen editorial sin texto, con un unico foco y espacio negativo.
+- Se prohiben placas, posters, collages, gradientes genericos, logos y cliches medicos.
+- El editor permite ajustar y copiar el prompt, abrir Gemini y guardar texto alternativo.
+- Los borradores anteriores reciben un prompt visual de respaldo.
 - `npm run lint` y `npm run build` finalizaron correctamente.
-- La ruta protegida se verifico en navegador hasta la redireccion a login; no habia una sesion de prueba disponible para revisar la pantalla autenticada.
