@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
-import type { ContentItem, ContentStatus } from "@/types"
+import type { ContentItem } from "@/types"
 
 const CONFIG_KEY = "content_pipeline"
 
@@ -60,24 +60,68 @@ export async function POST(request: NextRequest) {
 
 export async function PATCH(request: NextRequest) {
   try {
-    const body = await request.json() as {
-      id: string
-      status?: ContentStatus
-      caption?: string
-      google_text?: string
-    }
+    const body = await request.json() as Partial<ContentItem> & { id: string }
     const items = await readItems()
+    const current = items.find(item => item.id === body.id)
+    if (!current) return NextResponse.json({ error: "Borrador no encontrado" }, { status: 404 })
+
+    const textFields: Array<keyof ContentItem> = [
+      "hook", "caption", "google_text", "hashtags", "visual_headline", "visual_subtitle",
+    ]
+    if (textFields.some(field => body[field] !== undefined && typeof body[field] !== "string")) {
+      return NextResponse.json({ error: "Hay campos de texto invalidos" }, { status: 400 })
+    }
+    if (body.status && !["draft", "approved", "published", "archived"].includes(body.status)) {
+      return NextResponse.json({ error: "Estado invalido" }, { status: 400 })
+    }
+    if (body.visual_style && !["rose", "blue", "teal"].includes(body.visual_style)) {
+      return NextResponse.json({ error: "Estilo visual invalido" }, { status: 400 })
+    }
+    if ((body.google_text?.length ?? 0) > 1500 || (body.visual_headline?.length ?? 0) > 90 || (body.visual_subtitle?.length ?? 0) > 90) {
+      return NextResponse.json({ error: "Uno o mas campos superan el limite permitido" }, { status: 400 })
+    }
+    if (body.slides && (!Array.isArray(body.slides) || body.slides.some(slide =>
+      typeof slide?.headline !== "string" || typeof slide?.text !== "string" ||
+      slide.headline.length > 60 || slide.text.length > 300
+    ))) {
+      return NextResponse.json({ error: "Slides invalidos" }, { status: 400 })
+    }
+
     const now = new Date().toISOString()
-    const updated = items.map(item => item.id === body.id ? {
-      ...item,
-      ...(body.status ? { status: body.status } : {}),
-      ...(body.caption !== undefined ? { caption: body.caption } : {}),
-      ...(body.google_text !== undefined ? { google_text: body.google_text } : {}),
+    const editableFields: Array<keyof ContentItem> = [
+      "status",
+      "hook",
+      "caption",
+      "google_text",
+      "hashtags",
+      "visual_headline",
+      "visual_subtitle",
+      "visual_style",
+      "slides",
+    ]
+    const changes = Object.fromEntries(
+      editableFields
+        .filter(field => body[field] !== undefined)
+        .map(field => [field, body[field]])
+    ) as Partial<ContentItem>
+    const hasContentChanges = editableFields.some(field => field !== "status" && body[field] !== undefined)
+    const resetApproval = hasContentChanges && !body.status && ["approved", "published"].includes(current.status)
+    const nextItem = {
+      ...current,
+      ...changes,
+      ...(resetApproval ? { status: "draft" as const } : {}),
       updated_at: now,
-      approved_at: body.status === "approved" ? now : item.approved_at,
-    } : item)
+      approved_at: body.status === "approved" ? now : resetApproval ? null : current.approved_at,
+    }
+    if (nextItem.status === "approved" && [
+      nextItem.hook, nextItem.caption, nextItem.google_text, nextItem.visual_headline,
+    ].some(value => !value.trim())) {
+      return NextResponse.json({ error: "Completá hook, caption, texto de Google y titular visual antes de aprobar" }, { status: 400 })
+    }
+
+    const updated = items.map(item => item.id === body.id ? nextItem : item)
     await writeItems(updated)
-    return NextResponse.json({ item: updated.find(item => item.id === body.id) })
+    return NextResponse.json({ item: nextItem })
   } catch (error) {
     return errorResponse(error)
   }

@@ -2,8 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import {
-  Archive, BookOpen, Check, ChevronDown, ChevronUp, Copy, Download, ExternalLink, Loader2,
-  RefreshCw, Search, Send, Sparkles, Pin,
+  Archive, ArchiveRestore, BookOpen, Check, ChevronDown, ChevronUp, Copy, Download, ExternalLink, Loader2,
+  Plus, Save, Search, Send, ShieldCheck, Sparkles, Pin, X,
 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -49,6 +49,24 @@ const STYLE_CLASSES = {
   rose: "from-rose-600 to-pink-800",
   blue: "from-blue-600 to-slate-900",
   teal: "from-teal-600 to-cyan-900",
+}
+
+const EDITABLE_FIELDS: Array<keyof ContentItem> = [
+  "hook", "caption", "google_text", "hashtags", "visual_headline",
+  "visual_subtitle", "visual_style", "slides",
+]
+
+function editableContent(item: ContentItem) {
+  return Object.fromEntries(EDITABLE_FIELDS.map(field => [field, item[field]])) as Partial<ContentItem>
+}
+
+function CharacterCount({ value, limit }: { value: string; limit?: number }) {
+  const overLimit = limit !== undefined && value.length > limit
+  return (
+    <span className={`text-xs ${overLimit ? "font-medium text-red-600" : "text-gray-400"}`}>
+      {value.length}{limit ? ` / ${limit}` : ""} caracteres
+    </span>
+  )
 }
 
 function VisualCard({ item, compact = false }: { item: ContentItem; compact?: boolean }) {
@@ -503,6 +521,9 @@ export default function ContentStudioPage() {
   const [directPaste, setDirectPaste] = useState("")
   const [directSaving, setDirectSaving] = useState(false)
   const [directError, setDirectError] = useState<string | null>(null)
+  const [libraryQuery, setLibraryQuery] = useState("")
+  const [libraryStatus, setLibraryStatus] = useState<ContentStatus | "active">("active")
+  const [libraryFormat, setLibraryFormat] = useState<ContentItem["format"] | "all">("all")
 
   const lastGenRef = useRef(0)
 
@@ -528,19 +549,57 @@ export default function ContentStudioPage() {
     approved: items.filter(item => item.status === "approved").length,
   }), [items])
 
+  const filteredItems = useMemo(() => {
+    const query = libraryQuery.trim().toLocaleLowerCase("es")
+    return items.filter(item => {
+      const matchesStatus = libraryStatus === "active"
+        ? item.status !== "archived"
+        : item.status === libraryStatus
+      const matchesFormat = libraryFormat === "all" || item.format === libraryFormat
+      const matchesQuery = !query || [item.topic, item.category, item.hook]
+        .some(value => value.toLocaleLowerCase("es").includes(query))
+      return matchesStatus && matchesFormat && matchesQuery
+    })
+  }, [items, libraryFormat, libraryQuery, libraryStatus])
+
+  const savedActive = active ? items.find(item => item.id === active.id) : null
+  const hasUnsavedChanges = Boolean(
+    active && savedActive && JSON.stringify(editableContent(active)) !== JSON.stringify(editableContent(savedActive))
+  )
+
+  function startNewPiece() {
+    if (hasUnsavedChanges && !window.confirm("Hay cambios sin guardar. ¿Querés descartarlos y crear una pieza nueva?")) return
+    setActive(null)
+    setManualPrompt(null)
+    setError(null)
+    setTopic("")
+    setSources([])
+    setSelectedSource(null)
+    setTab("crear")
+  }
+
   async function research() {
     setResearching(true)
     setError(null)
     setSelectedSource(null)
-    const response = await fetch(`/api/content/sources?topic=${encodeURIComponent(topic || category)}`)
-    const data = await response.json()
-    setResearching(false)
-    if (data.error) return setError(data.error)
-    setSources(data.sources ?? [])
-    setSelectedSource(data.sources?.[0] ?? null)
+    try {
+      const response = await fetch(`/api/content/sources?topic=${encodeURIComponent(topic || category)}`)
+      const data = await response.json()
+      if (!response.ok || data.error) return setError(data.error ?? "No se pudieron buscar fuentes")
+      setSources(data.sources ?? [])
+      setSelectedSource(data.sources?.[0] ?? null)
+    } catch {
+      setError("No se pudieron buscar fuentes. Revisá tu conexión e intentá nuevamente.")
+    } finally {
+      setResearching(false)
+    }
   }
 
   async function generate() {
+    if (!topic.trim()) {
+      setError("Definí un tema o enfoque concreto antes de generar.")
+      return
+    }
     // Debounce: ignore if clicked within 2s of previous attempt
     const now = Date.now()
     if (now - lastGenRef.current < 2000) return
@@ -550,25 +609,33 @@ export default function ContentStudioPage() {
     setError(null)
     setManualPrompt(null)
 
-    const response = await fetch("/api/content", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        type: "content_plan",
-        topic: topic || category,
-        category,
-        content_type: format,
-        cta: cta === "none" ? "" : cta,
-        appointment_link: appointmentLink.trim() || null,
-        source: selectedSource,
-      }),
-    })
-    const generated = await response.json()
+    let response: Response
+    let generated: Record<string, unknown> & { error?: string; prompt?: string; mode?: string }
+    try {
+      response = await fetch("/api/content", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: "content_plan",
+          topic: topic.trim(),
+          category,
+          content_type: format,
+          cta: cta === "none" ? "" : cta,
+          appointment_link: appointmentLink.trim() || null,
+          source: selectedSource,
+        }),
+      })
+      generated = await response.json()
+    } catch {
+      setGenerating(false)
+      setError("No se pudo conectar con el generador. Revisá tu conexión e intentá nuevamente.")
+      return
+    }
     setGenerating(false)
 
     // Rate limit fallback: show manual panel with the prompt
     if (response.status === 429 && generated.prompt) {
-      setError(generated.error)
+      setError(generated.error ?? "El proveedor de IA alcanzó su límite. Podés continuar en modo manual.")
       setManualPrompt(generated.prompt)
       return
     }
@@ -578,7 +645,7 @@ export default function ContentStudioPage() {
     }
 
     // Manual mode: show prompt panel
-    if (generated.mode === "manual") {
+    if (generated.mode === "manual" && generated.prompt) {
       setManualPrompt(generated.prompt)
       return
     }
@@ -598,7 +665,7 @@ export default function ContentStudioPage() {
 
     const item: ContentItem = {
       id: crypto.randomUUID(),
-      topic: topic || category,
+      topic: topic.trim() || category,
       category,
       format,
       goal: "Captar consultas y explicar como pedir turno",
@@ -670,16 +737,22 @@ export default function ContentStudioPage() {
 
   async function updateItem(item: ContentItem, changes: Partial<ContentItem>) {
     setWorking(item.id)
-    const response = await fetch("/api/content/items", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id: item.id, ...changes }),
-    })
-    const data = await response.json()
-    setWorking(null)
-    if (data.error) return setError(data.error)
-    setItems(previous => previous.map(existing => existing.id === item.id ? data.item : existing))
-    setActive(data.item)
+    setError(null)
+    try {
+      const response = await fetch("/api/content/items", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: item.id, ...changes }),
+      })
+      const data = await response.json()
+      if (!response.ok || data.error) return setError(data.error ?? "No se pudieron guardar los cambios")
+      setItems(previous => previous.map(existing => existing.id === item.id ? data.item : existing))
+      setActive(data.item)
+    } catch {
+      setError("No se pudieron guardar los cambios. Revisá tu conexión e intentá nuevamente.")
+    } finally {
+      setWorking(null)
+    }
   }
 
   async function publishGoogle(item: ContentItem) {
@@ -713,6 +786,10 @@ export default function ContentStudioPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={startNewPiece} className="gap-1.5">
+            <Plus className="h-4 w-4" />
+            Nueva pieza
+          </Button>
           {IS_MANUAL_MODE && (
             <Badge variant="outline" className="border-amber-300 text-amber-700 bg-amber-50">
               Modo manual
@@ -724,8 +801,11 @@ export default function ContentStudioPage() {
       </div>
 
       {error && (
-        <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
-          {error}
+        <div className="flex items-start justify-between gap-3 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700" role="alert">
+          <span>{error}</span>
+          <button type="button" onClick={() => setError(null)} aria-label="Cerrar error" className="rounded p-0.5 hover:bg-red-100">
+            <X className="h-4 w-4" />
+          </button>
         </div>
       )}
 
@@ -740,7 +820,19 @@ export default function ContentStudioPage() {
           <div className="grid gap-6 xl:grid-cols-[380px_1fr]">
             {/* Left: brief form */}
             <Card>
-              <CardHeader><CardTitle className="text-base">Brief editorial</CardTitle></CardHeader>
+              <CardHeader className="space-y-3">
+                <div className="flex items-center justify-between gap-3">
+                  <CardTitle className="text-base">Brief editorial</CardTitle>
+                  <Badge variant={topic.trim() ? "success" : "warning"}>
+                    {topic.trim() ? "Listo para generar" : "Falta definir el tema"}
+                  </Badge>
+                </div>
+                <div className="grid grid-cols-3 gap-2 text-center text-[11px]">
+                  <div className="rounded-md bg-blue-50 px-2 py-1.5 font-medium text-blue-700">1. Definir brief</div>
+                  <div className={`rounded-md px-2 py-1.5 font-medium ${selectedSource ? "bg-blue-50 text-blue-700" : "bg-gray-100 text-gray-500"}`}>2. Fuente opcional</div>
+                  <div className="rounded-md bg-gray-100 px-2 py-1.5 font-medium text-gray-500">3. Generar y revisar</div>
+                </div>
+              </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-1.5">
                   <Label className="text-gray-900">Categoria</Label>
@@ -757,7 +849,8 @@ export default function ContentStudioPage() {
                 </div>
                 <div className="space-y-1.5">
                   <Label className="text-gray-900">Tema o enfoque</Label>
-                  <Input value={topic} onChange={event => setTopic(event.target.value)} placeholder="Ej: novedades sobre control de presion" className="text-gray-900 placeholder:text-gray-400" />
+                  <Input value={topic} onChange={event => setTopic(event.target.value)} placeholder="Ej: por qué controlar la presión aunque te sientas bien" className="text-gray-900 placeholder:text-gray-400" />
+                  <p className="text-xs text-gray-500">Escribí una idea concreta: será el eje de todos los textos.</p>
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1.5">
@@ -791,15 +884,21 @@ export default function ContentStudioPage() {
                   />
                   <p className="text-xs text-gray-400">Si no tenés link todavía, dejalo vacío y el prompt usará &ldquo;link en la bio&rdquo;.</p>
                 </div>
-                <Button variant="outline" onClick={research} disabled={researching} className="w-full gap-2">
+                <Button variant="outline" onClick={research} disabled={researching || !topic.trim()} className="w-full gap-2">
                   {researching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
                   Buscar informacion reciente
                 </Button>
+                {!researching && sources.length === 0 && topic.trim() && (
+                  <p className="text-xs text-gray-500">La fuente es opcional. Buscá evidencia reciente si el contenido menciona novedades o datos clínicos.</p>
+                )}
                 {sources.length > 0 && (
                   <div className="space-y-2">
-                    <Label>Fuente para fundamentar el contenido</Label>
+                    <div className="flex items-center justify-between">
+                      <Label>Fuente para fundamentar</Label>
+                      <button type="button" onClick={() => setSelectedSource(null)} className="text-xs text-gray-500 hover:text-gray-900">Usar sin fuente</button>
+                    </div>
                     {sources.slice(0, 3).map(source => (
-                      <button key={source.url} onClick={() => setSelectedSource(source)}
+                      <button type="button" key={source.url} onClick={() => setSelectedSource(source)}
                         className={`w-full rounded-lg border p-3 text-left text-xs ${selectedSource?.url === source.url ? "border-blue-500 bg-blue-50" : "border-gray-200"}`}>
                         <span className="font-medium text-gray-800 line-clamp-2">{source.title}</span>
                         <span className="mt-1 block text-gray-500">{source.publication} · {source.published_at}</span>
@@ -807,7 +906,7 @@ export default function ContentStudioPage() {
                     ))}
                   </div>
                 )}
-                <Button onClick={generate} disabled={generating} className="w-full gap-2">
+                <Button onClick={generate} disabled={generating || !topic.trim()} className="w-full gap-2">
                   {generating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
                   {IS_MANUAL_MODE ? "Preparar prompt para copiar" : "Generar propuesta completa"}
                 </Button>
@@ -867,6 +966,7 @@ export default function ContentStudioPage() {
                 item={active}
                 working={working}
                 copied={copied}
+                hasUnsavedChanges={hasUnsavedChanges}
                 onChange={setActive}
                 onSave={changes => updateItem(active, changes)}
                 onCopy={() => copyInstagram(active)}
@@ -892,8 +992,44 @@ export default function ContentStudioPage() {
 
         <TabsContent value="biblioteca" className="mt-4">
           {loadingItems ? <Loader2 className="mx-auto mt-12 h-6 w-6 animate-spin text-gray-400" /> : (
-            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-              {items.filter(item => item.status !== "archived").map(item => (
+            <div className="space-y-4">
+              <div className="flex flex-col gap-3 rounded-lg border border-gray-200 bg-white p-3 md:flex-row">
+                <div className="relative flex-1">
+                  <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
+                  <Input
+                    value={libraryQuery}
+                    onChange={event => setLibraryQuery(event.target.value)}
+                    placeholder="Buscar por tema, categoría o hook"
+                    className="pl-9 text-gray-900"
+                  />
+                </div>
+                <Select value={libraryStatus} onValueChange={value => setLibraryStatus(value as ContentStatus | "active")}>
+                  <SelectTrigger className="w-full text-gray-900 md:w-44"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="active">Piezas activas</SelectItem>
+                    <SelectItem value="draft">Borradores</SelectItem>
+                    <SelectItem value="approved">Aprobados</SelectItem>
+                    <SelectItem value="published">Publicados</SelectItem>
+                    <SelectItem value="archived">Archivados</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Select value={libraryFormat} onValueChange={value => setLibraryFormat(value as ContentItem["format"] | "all")}>
+                  <SelectTrigger className="w-full text-gray-900 md:w-44"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos los formatos</SelectItem>
+                    {FORMATS.map(item => <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              {filteredItems.length === 0 ? (
+                <Card>
+                  <CardContent className="py-12 text-center text-sm text-gray-500">
+                    No hay piezas que coincidan con estos filtros.
+                  </CardContent>
+                </Card>
+              ) : (
+              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+              {filteredItems.map(item => (
                 <Card key={item.id} className="overflow-hidden">
                   <CardContent className="p-4 space-y-3">
                     <CarouselPreview item={item} compact />
@@ -905,13 +1041,20 @@ export default function ContentStudioPage() {
                       <Button variant="outline" size="sm" className="flex-1" onClick={() => { setActive(item); setManualPrompt(null); setTab("crear") }}>
                         <BookOpen className="h-4 w-4" /> Abrir
                       </Button>
-                      <Button variant="ghost" size="icon" onClick={() => updateItem(item, { status: "archived" })}>
-                        <Archive className="h-4 w-4" />
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        aria-label={item.status === "archived" ? "Restaurar pieza" : "Archivar pieza"}
+                        onClick={() => updateItem(item, { status: item.status === "archived" ? "draft" : "archived" })}
+                      >
+                        {item.status === "archived" ? <ArchiveRestore className="h-4 w-4" /> : <Archive className="h-4 w-4" />}
                       </Button>
                     </div>
                   </CardContent>
                 </Card>
               ))}
+              </div>
+              )}
             </div>
           )}
         </TabsContent>
@@ -924,10 +1067,11 @@ export default function ContentStudioPage() {
 // Editor component
 // ---------------------------------------------------------------------------
 
-function Editor({ item, working, copied, onChange, onSave, onCopy, onDownload, onPublishGoogle }: {
+function Editor({ item, working, copied, hasUnsavedChanges, onChange, onSave, onCopy, onDownload, onPublishGoogle }: {
   item: ContentItem
   working: string | null
   copied: boolean
+  hasUnsavedChanges: boolean
   onChange: (item: ContentItem) => void
   onSave: (changes: Partial<ContentItem>) => void
   onCopy: () => void
@@ -936,6 +1080,22 @@ function Editor({ item, working, copied, onChange, onSave, onCopy, onDownload, o
 }) {
   const busy = working === item.id
   const isCarousel = item.format === "carrusel" && item.slides && item.slides.length > 0
+  const approvalReady = Boolean(
+    item.hook.trim() &&
+    item.caption.trim() &&
+    item.google_text.trim() &&
+    item.visual_headline.trim() &&
+    item.google_text.length <= 1500
+  )
+
+  function updateSlide(index: number, changes: Partial<ContentSlide>) {
+    if (!item.slides) return
+    onChange({
+      ...item,
+      slides: item.slides.map((slide, slideIndex) => slideIndex === index ? { ...slide, ...changes } : slide),
+    })
+  }
+
   return (
     <div className="grid gap-5 lg:grid-cols-2">
       <div className="space-y-3">
@@ -953,19 +1113,76 @@ function Editor({ item, working, copied, onChange, onSave, onCopy, onDownload, o
         )}
       </div>
       <Card>
-        <CardHeader className="flex-row items-center justify-between">
-          <CardTitle className="text-base">Revision humana</CardTitle>
-          <Badge variant="outline">{STATUS_LABELS[item.status]}</Badge>
+        <CardHeader className="space-y-3">
+          <div className="flex items-center justify-between gap-3">
+            <CardTitle className="text-base">Revisión humana</CardTitle>
+            <div className="flex items-center gap-2">
+              {hasUnsavedChanges && <Badge variant="warning">Cambios sin guardar</Badge>}
+              <Badge variant="outline">{STATUS_LABELS[item.status]}</Badge>
+            </div>
+          </div>
+          <div className="flex gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
+            <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0" />
+            <span>Verificá que no haya diagnósticos, tratamientos, interpretación de estudios ni promesas. Ante síntomas de alarma, derivá a guardia.</span>
+          </div>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="space-y-1.5"><Label className="text-gray-900">Instagram</Label><Textarea rows={9} value={item.caption} onChange={event => onChange({ ...item, caption: event.target.value })} className="text-gray-900" /></div>
-          <div className="space-y-1.5"><Label className="text-gray-900">Google Business</Label><Textarea rows={6} value={item.google_text} onChange={event => onChange({ ...item, google_text: event.target.value })} className="text-gray-900" /></div>
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between"><Label className="text-gray-900">Hook de Instagram</Label><CharacterCount value={item.hook} /></div>
+            <Textarea rows={2} value={item.hook} onChange={event => onChange({ ...item, hook: event.target.value })} className="text-gray-900" />
+          </div>
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between"><Label className="text-gray-900">Caption de Instagram</Label><CharacterCount value={item.caption} /></div>
+            <Textarea rows={9} value={item.caption} onChange={event => onChange({ ...item, caption: event.target.value })} className="text-gray-900" />
+          </div>
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between"><Label className="text-gray-900">Hashtags</Label><CharacterCount value={item.hashtags} /></div>
+            <Textarea rows={3} value={item.hashtags} onChange={event => onChange({ ...item, hashtags: event.target.value })} className="text-gray-900" />
+          </div>
+          <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 space-y-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Placa visual</p>
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between"><Label className="text-gray-900">Titular</Label><CharacterCount value={item.visual_headline} limit={90} /></div>
+              <Input value={item.visual_headline} maxLength={90} onChange={event => onChange({ ...item, visual_headline: event.target.value })} className="bg-white text-gray-900" />
+            </div>
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between"><Label className="text-gray-900">Subtítulo</Label><CharacterCount value={item.visual_subtitle} limit={90} /></div>
+              <Input value={item.visual_subtitle} maxLength={90} onChange={event => onChange({ ...item, visual_subtitle: event.target.value })} className="bg-white text-gray-900" />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-gray-900">Estilo</Label>
+              <Select value={item.visual_style} onValueChange={value => onChange({ ...item, visual_style: value as ContentItem["visual_style"] })}>
+                <SelectTrigger className="bg-white text-gray-900"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="rose">Rosa</SelectItem>
+                  <SelectItem value="blue">Azul</SelectItem>
+                  <SelectItem value="teal">Verde azulado</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          {item.slides && item.slides.length > 0 && (
+            <div className="space-y-3 rounded-lg border border-gray-200 p-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Slides del carrusel</p>
+              {item.slides.map((slide, index) => (
+                <div key={index} className="space-y-2 rounded-md bg-gray-50 p-3">
+                  <Label className="text-gray-900">Slide {index + 1}</Label>
+                  <Input value={slide.headline} maxLength={60} onChange={event => updateSlide(index, { headline: event.target.value })} className="bg-white text-gray-900" />
+                  <Textarea rows={3} value={slide.text} maxLength={300} onChange={event => updateSlide(index, { text: event.target.value })} className="bg-white text-gray-900" />
+                </div>
+              ))}
+            </div>
+          )}
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between"><Label className="text-gray-900">Google Business</Label><CharacterCount value={item.google_text} limit={1500} /></div>
+            <Textarea rows={6} value={item.google_text} maxLength={1500} onChange={event => onChange({ ...item, google_text: event.target.value })} className="text-gray-900" />
+          </div>
           <div className="flex flex-wrap gap-2">
-            <Button variant="outline" onClick={() => onSave({ caption: item.caption, google_text: item.google_text })} disabled={busy} className="gap-2">
-              {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />} Guardar cambios
+            <Button variant="outline" onClick={() => onSave(editableContent(item))} disabled={busy || !hasUnsavedChanges} className="gap-2">
+              {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Guardar cambios
             </Button>
-            {item.status !== "approved" && (
-              <Button onClick={() => onSave({ status: "approved", caption: item.caption, google_text: item.google_text })} disabled={busy} className="gap-2">
+            {item.status === "draft" && (
+              <Button onClick={() => onSave({ ...editableContent(item), status: "approved" })} disabled={busy || !approvalReady} className="gap-2">
                 <Check className="h-4 w-4" /> Aprobar
               </Button>
             )}
@@ -975,6 +1192,9 @@ function Editor({ item, working, copied, onChange, onSave, onCopy, onDownload, o
               </Button>
             )}
           </div>
+          {!approvalReady && item.status === "draft" && (
+            <p className="text-xs text-amber-700">Para aprobar, completá hook, caption, texto de Google y titular visual.</p>
+          )}
           <p className="text-xs text-gray-500">Instagram requiere copiar/publicar manualmente hasta conectar Instagram Graph API. Google publica solo despues de aprobar y si la API de la cuenta lo permite.</p>
         </CardContent>
       </Card>

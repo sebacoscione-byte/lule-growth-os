@@ -2,13 +2,15 @@
 
 ## Flujo
 
-1. Elegir categoria, tema, formato y CTA.
-2. Buscar informacion reciente.
-3. Seleccionar una fuente visible.
+1. Elegir categoria, definir un tema concreto, formato y CTA.
+2. Buscar informacion reciente cuando el contenido mencione novedades o datos clinicos.
+3. Seleccionar una fuente visible o continuar sin fuente para contenido evergreen.
 4. Generar una propuesta completa con IA.
-5. Revisar y editar los textos.
+5. Revisar y editar hook, caption, hashtags, placa visual, slides y texto de Google.
 6. Descargar la placa visual y aprobar el borrador.
 7. Copiar el contenido a Instagram o publicar en Google Business.
+
+El brief muestra si esta listo para generar y exige un tema o enfoque concreto. La biblioteca permite buscar por tema, categoria o hook y filtrar por estado y formato.
 
 ## Fuentes
 
@@ -27,6 +29,8 @@ Estados:
 - `published`: enviado a Google Business.
 - `archived`: retirado de la biblioteca activa.
 
+La revision humana guarda todos los campos editables de la pieza. Para aprobar se requieren hook, caption, texto de Google y titular visual. Si se edita una pieza aprobada o publicada, vuelve a borrador para requerir una nueva revision.
+
 ## Canales
 
 - Instagram: descarga de placa SVG y copia del texto listo para publicar. La publicacion automatica requiere Instagram Graph API.
@@ -35,6 +39,8 @@ Estados:
 ## Guardrails
 
 Todo contenido debe evitar diagnosticos, tratamientos, interpretacion de estudios, promesas y mensajes que asuman una condicion medica del lector. Los sintomas de alarma deben derivarse a guardia o atencion medica inmediata.
+
+Estos guardrails se muestran dentro del editor antes de aprobar una pieza.
 
 ## Proveedor e idioma
 
