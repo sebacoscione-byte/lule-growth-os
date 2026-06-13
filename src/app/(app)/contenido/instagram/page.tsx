@@ -505,8 +505,9 @@ function BioYFijadosTab() {
 // ---------------------------------------------------------------------------
 
 export default function ContentStudioPage() {
-  const [category, setCategory] = useState(CATEGORIES[0])
+  const [category, setCategory] = useState("")
   const [topic, setTopic] = useState("")
+  const [briefErrors, setBriefErrors] = useState<{ category?: string; topic?: string }>({})
   const [format, setFormat] = useState<ContentItem["format"]>("reel")
   const [cta, setCta] = useState("none")
   const [appointmentLink, setAppointmentLink] = useState("")
@@ -577,6 +578,8 @@ export default function ContentStudioPage() {
     setActive(null)
     setManualPrompt(null)
     setError(null)
+    setBriefErrors({})
+    setCategory("")
     setTopic("")
     setSources([])
     setSelectedSource(null)
@@ -601,8 +604,12 @@ export default function ContentStudioPage() {
   }
 
   async function generate() {
-    if (!topic.trim()) {
-      setError("Definí un tema o enfoque concreto antes de generar.")
+    const nextBriefErrors = {
+      ...(!category ? { category: "Seleccioná una categoría." } : {}),
+      ...(!topic.trim() ? { topic: "Escribí un tema o enfoque concreto." } : {}),
+    }
+    if (Object.keys(nextBriefErrors).length > 0) {
+      setBriefErrors(nextBriefErrors)
       return
     }
     // Debounce: ignore if clicked within 2s of previous attempt
@@ -612,6 +619,7 @@ export default function ContentStudioPage() {
 
     setGenerating(true)
     setError(null)
+    setBriefErrors({})
     setManualPrompt(null)
 
     let response: Response
@@ -830,8 +838,8 @@ export default function ContentStudioPage() {
               <CardHeader className="space-y-3">
                 <div className="flex items-center justify-between gap-3">
                   <CardTitle className="text-base">Brief editorial</CardTitle>
-                  <Badge variant={topic.trim() ? "success" : "warning"}>
-                    {topic.trim() ? "Listo para generar" : "Falta definir el tema"}
+                  <Badge variant={category && topic.trim() ? "success" : "warning"}>
+                    {category && topic.trim() ? "Listo para generar" : "Completá categoría y tema"}
                   </Badge>
                 </div>
                 <div className="grid grid-cols-1 gap-1 text-left text-[11px] sm:grid-cols-3 sm:gap-2 sm:text-center">
@@ -843,20 +851,35 @@ export default function ContentStudioPage() {
               <CardContent className="space-y-4">
                 <div className="space-y-1.5">
                   <Label className="text-gray-900">Categoria</Label>
-                  <Input
+                  <Select
                     value={category}
-                    onChange={e => setCategory(e.target.value)}
-                    list="categories-list"
-                    placeholder="Seleccioná o escribí una categoría"
-                    className="text-gray-900 placeholder:text-gray-400"
-                  />
-                  <datalist id="categories-list">
-                    {CATEGORIES.map(value => <option key={value} value={value} />)}
-                  </datalist>
+                    onValueChange={value => {
+                      setCategory(value)
+                      setBriefErrors(previous => ({ ...previous, category: undefined }))
+                    }}
+                  >
+                    <SelectTrigger className="text-gray-900" aria-invalid={Boolean(briefErrors.category)}>
+                      <SelectValue placeholder="Seleccioná una categoría" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {CATEGORIES.map(value => <SelectItem key={value} value={value}>{value}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                  {briefErrors.category && <p className="text-xs font-medium text-red-600">{briefErrors.category}</p>}
                 </div>
                 <div className="space-y-1.5">
                   <Label className="text-gray-900">Tema o enfoque</Label>
-                  <Input value={topic} onChange={event => setTopic(event.target.value)} placeholder="Ej: por qué controlar la presión aunque te sientas bien" className="text-gray-900 placeholder:text-gray-400" />
+                  <Input
+                    value={topic}
+                    onChange={event => {
+                      setTopic(event.target.value)
+                      setBriefErrors(previous => ({ ...previous, topic: undefined }))
+                    }}
+                    placeholder="Ej: por qué controlar la presión aunque te sientas bien"
+                    className="text-gray-900 placeholder:text-gray-400"
+                    aria-invalid={Boolean(briefErrors.topic)}
+                  />
+                  {briefErrors.topic && <p className="text-xs font-medium text-red-600">{briefErrors.topic}</p>}
                   <p className="text-xs text-gray-500">Escribí una idea concreta: será el eje de todos los textos.</p>
                 </div>
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -913,7 +936,7 @@ export default function ContentStudioPage() {
                     ))}
                   </div>
                 )}
-                <Button onClick={generate} disabled={generating || !topic.trim()} className="w-full gap-2">
+                <Button onClick={generate} disabled={generating} className="w-full gap-2">
                   {generating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
                   {IS_MANUAL_MODE ? "Preparar prompt para copiar" : "Generar propuesta completa"}
                 </Button>

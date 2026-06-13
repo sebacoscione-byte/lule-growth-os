@@ -1,30 +1,26 @@
-# En progreso - Experiencia mobile-first
+# En progreso - Correcciones del generador de prompts
 
 ## Objetivo
 
-Lograr que todas las funciones disponibles en desktop sean accesibles y utilizables desde mobile, con navegacion completa y layouts que prioricen pantallas pequenas.
+Hacer que el brief editorial comience sin categoria preseleccionada, muestre todas las opciones en mobile y explique claramente por que no puede generarse un prompt.
 
 ## Brechas encontradas
 
-- La navegacion movil oculta Contenido, Landings y Experimentos.
-- El acceso "Mas" lleva directo a Configuracion en lugar de mostrar todas las secciones.
-- Hay formularios y grupos de acciones con columnas fijas que se comprimen en mobile.
-- Algunas tabs y barras de controles no permiten desplazamiento horizontal.
-- Varias pantallas usan padding desktop como valor base.
+- La categoria se inicializa con la primera opcion.
+- El `datalist` nativo de Android muestra sugerencias de forma inconsistente.
+- El boton para preparar el prompt queda deshabilitado cuando falta el tema y no muestra feedback al tocarlo.
 
 ## Plan
 
-- [x] Auditar layouts, navegacion y pantallas en mobile.
-- [x] Implementar navegacion movil completa.
-- [x] Aplicar patrones mobile-first compartidos.
-- [x] Corregir rutas operativas principales.
+- [x] Auditar estado inicial y validacion del generador.
+- [x] Reemplazar la categoria por un selector mobile consistente.
+- [x] Agregar validacion visible para categoria y tema.
 - [x] Verificar, documentar, commitear y pushear.
 
 ## Resultado
 
-- La navegacion mobile permite acceder a las ocho secciones.
-- `Mas` abre un menu completo en lugar de redirigir a Configuracion.
-- Tabs, formularios, horarios y acciones principales responden desde mobile.
-- Las tarjetas mobile de Leads conservan informacion relevante de la tabla desktop.
-- Las superficies publicas no presentan desborde horizontal a 375 px.
+- El brief inicia con la categoria vacia.
+- La categoria usa un selector que muestra todas las opciones de forma consistente en mobile.
+- El boton de generacion solo se deshabilita mientras esta generando.
+- Al intentar generar sin datos, categoria y tema muestran errores junto al campo correspondiente.
 - `npm run lint` y `npm run build` finalizaron correctamente.
