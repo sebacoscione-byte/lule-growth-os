@@ -140,6 +140,9 @@ const IMAGE_PROMPT_RULES = `DIRECCION VISUAL PARA GEMINI:
 - Redacta "image_prompt" en ingles para maximizar la precision visual; no incluyas instrucciones conversacionales ni explicaciones.
 - El prompt debe pedir una imagen editorial premium que detenga el scroll, conectada de forma concreta con el tema.
 - Define un unico punto focal claro y una escena que se entienda en menos de un segundo.
+- La escena debe activar curiosidad o identificacion en un paciente potencial: mostrar un momento cotidiano reconocible, una decision preventiva o el beneficio emocional de ocuparse de la salud.
+- Debe existir una tension visual suave entre "seguir postergando" y "ocuparse a tiempo", sin representar peligro, dolor, miedo ni urgencia.
+- La imagen debe sentirse cercana y confiable, no fria, hospitalaria ni publicitaria de stock.
 - Elegi una sola direccion creativa concreta: momento humano cotidiano, naturaleza muerta editorial u objeto usado como metafora visual. No mezcles conceptos.
 - Describi sujeto, accion, encuadre, lente o perspectiva, iluminacion, profundidad, paleta, textura, estado de animo y ubicacion del espacio negativo.
 - Usa este orden dentro del prompt: objetivo y tema; escena principal; composicion; luz y color; acabado editorial; espacio negativo; restricciones.
@@ -153,6 +156,16 @@ const IMAGE_PROMPT_RULES = `DIRECCION VISUAL PARA GEMINI:
 - No pedir collages, infografias, posters, flyers, marcos, placas, fondos con gradiente ni composiciones divididas.
 - El prompt debe terminar reforzando: "No text, no letters, no numbers, no logos, no watermark."
 - Inclui "image_alt_text": descripcion accesible en espanol, factual y breve, maximo 180 caracteres.`
+
+const PATIENT_ACQUISITION_RULES = `CRITERIO DE CAPTACION DE PACIENTES:
+- Cada pieza debe seguir esta secuencia: detener el scroll, generar identificacion, entregar una idea util y facilitar el proximo paso.
+- El hook y el titular deben ser especificos, faciles de entender en menos de tres segundos y abrir una brecha de curiosidad relevante.
+- El hook, el titular y la imagen deben trabajar juntos: la imagen atrae e intriga; el titular aclara la promesa de valor sin repetir literalmente lo mismo.
+- Habla de situaciones, dudas o decisiones cotidianas que una persona puede reconocer sin asumir que tiene una enfermedad.
+- Entrega valor real antes del CTA: una explicacion clara, un mito corregido, una pregunta util o un motivo concreto para un control preventivo.
+- Conecta el aprendizaje con considerar una consulta cardiologica o ecocardiograma cuando corresponda, sin presionar ni prometer resultados.
+- El CTA debe reducir friccion y explicar el siguiente paso por canales oficiales. Nunca uses escasez, culpa, miedo o urgencia comercial.
+- Evita hooks vagos o genericos como "cuidar tu corazon es importante", "todo lo que tenes que saber" o "la salud es lo primero".`
 
 export function buildContentPlanPrompt(input: {
   topic: string
@@ -190,6 +203,8 @@ REGLAS OBLIGATORIAS:
 - Ante síntomas de alarma → siempre derivar a guardia
 
 ${IMAGE_PROMPT_RULES}
+
+${PATIENT_ACQUISITION_RULES}
 
 ENFOQUE DEL CONTENIDO:
 El contenido debe captar pacientes potenciales educándolos. Usá datos relevantes,
@@ -580,6 +595,7 @@ Reglas:
 - Lucia atiende martes en CIMEL Lanus y viernes en Swiss Medical Lomas.
 - El titular y subtitulo se agregan despues; no deben aparecer dentro de la imagen generada.
 ${IMAGE_PROMPT_RULES}
+${PATIENT_ACQUISITION_RULES}
 - El texto de Google debe tener maximo 1500 caracteres.
 - Devolve SOLO JSON valido.`,
     messages: [{ role: "user", content: userContent }],

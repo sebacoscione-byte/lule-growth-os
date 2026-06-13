@@ -71,7 +71,7 @@ function CharacterCount({ value, limit }: { value: string; limit?: number }) {
 
 function fallbackImagePrompt(item: ContentItem) {
   const ratio = item.format === "historia" ? "9:16 vertical Instagram Story" : "4:5 vertical Instagram feed"
-  return `Create a premium editorial image for a cardiology social media post about "${item.topic}". ${ratio}. Show a visually compelling, calm and relatable concept connected to ${item.category}, using a sophisticated deep blue, burgundy and warm neutral palette. Use natural cinematic lighting, realistic texture and depth. Leave clean negative space in the upper third for a headline that will be added later. Avoid generic medical stock imagery and avoid depicting pain, emergencies or a recognizable real physician. No text, no letters, no numbers, no logos, no watermark.`
+  return `Create a scroll-stopping premium editorial image for a cardiology social media post about "${item.topic}". ${ratio}. Use one instantly understandable focal point and a relatable everyday moment that makes a potential patient feel recognized or motivated to take a preventive step. Create gentle visual tension between postponing care and choosing to take care of oneself, without fear, pain or urgency. Sophisticated deep blue, burgundy and warm neutral palette, natural cinematic lighting, realistic texture and depth. Leave clean negative space in the upper third for a headline that will be added later. Avoid cold hospital imagery, generic medical stock photography, recognizable real physicians and advertising clichés. No text, no letters, no numbers, no logos, no watermark.`
 }
 
 function VisualCard({ item, compact = false }: { item: ContentItem; compact?: boolean }) {
@@ -1121,7 +1121,7 @@ function Editor({ item, working, copied, hasUnsavedChanges, onChange, onSave, on
               Imagen final con Gemini
             </CardTitle>
             <p className="text-xs text-gray-600">
-              Generá una imagen sin texto y agregá el titular después. La placa inferior es solo una maqueta de composición.
+              Generá una imagen que detenga el scroll, genere identificación y deje espacio para el titular. La placa inferior es solo una maqueta.
             </p>
           </CardHeader>
           <CardContent className="space-y-3">
@@ -1179,6 +1179,15 @@ function Editor({ item, working, copied, hasUnsavedChanges, onChange, onSave, on
           <div className="flex gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
             <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0" />
             <span>Verificá que no haya diagnósticos, tratamientos, interpretación de estudios ni promesas. Ante síntomas de alarma, derivá a guardia.</span>
+          </div>
+          <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 text-xs text-blue-900">
+            <p className="font-semibold">Checklist de captación</p>
+            <ul className="mt-2 space-y-1">
+              <li>• ¿El hook se entiende y despierta curiosidad en menos de 3 segundos?</li>
+              <li>• ¿La imagen conecta con una situación o aspiración reconocible?</li>
+              <li>• ¿La pieza entrega valor antes de invitar a pedir turno?</li>
+              <li>• ¿El CTA explica un próximo paso simple, sin miedo ni presión?</li>
+            </ul>
           </div>
         </CardHeader>
         <CardContent className="space-y-4">

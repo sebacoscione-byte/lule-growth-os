@@ -43,6 +43,17 @@ El prompt visual define una sola direccion creativa, proporcion vertical, punto 
 
 La placa con gradiente que muestra la app es solo una maqueta de composicion. No representa la imagen final.
 
+## Criterio de captacion
+
+Cada pieza debe cumplir una secuencia:
+
+1. Detener el scroll con un hook y una imagen que se entiendan rapido.
+2. Generar identificacion con una duda, situacion cotidiana o aspiracion reconocible.
+3. Entregar valor real antes de pedir una accion.
+4. Facilitar un proximo paso simple para considerar una consulta por canales oficiales.
+
+La captacion no puede usar miedo, culpa, escasez, promesas ni asumir que el lector tiene una condicion. El editor muestra este checklist antes de aprobar.
+
 ## Canales
 
 - Instagram: descarga de placa SVG y copia del texto listo para publicar. La publicacion automatica requiere Instagram Graph API.
