@@ -46,9 +46,15 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
-    const item = await request.json() as ContentItem
-    if (!item.id || !item.caption || !item.topic) {
-      return NextResponse.json({ error: "Borrador incompleto" }, { status: 400 })
+    const incoming = await request.json() as ContentItem
+    const topic = [incoming.topic, incoming.visual_headline, incoming.hook, incoming.category]
+      .find(value => typeof value === "string" && value.trim())?.trim() || "Contenido generado"
+    const category = typeof incoming.category === "string" && incoming.category.trim()
+      ? incoming.category.trim()
+      : "Contenido generado"
+    const item = { ...incoming, topic: topic.slice(0, 200), category: category.slice(0, 160) }
+    if (!item.id || typeof item.caption !== "string" || !item.caption.trim()) {
+      return NextResponse.json({ error: "El borrador no tiene caption y no se puede guardar." }, { status: 400 })
     }
     const items = await readItems()
     await writeItems([item, ...items.filter(existing => existing.id !== item.id)].slice(0, 100))

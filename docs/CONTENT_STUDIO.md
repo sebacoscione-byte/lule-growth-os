@@ -77,3 +77,5 @@ El estudio usa la capa comun de IA de la app. Se puede seleccionar Google Gemini
 Con `AI_PROVIDER=auto`, Gemini tiene prioridad cuando `GEMINI_API_KEY` esta configurada. Si un proveedor no tiene saldo o alcanza su cuota, la interfaz muestra un mensaje breve y accionable en lugar del error tecnico de la API.
 
 En modo manual, el pegado intenta reparar automaticamente comillas internas sin escapar y saltos de linea que algunos modelos devuelven dentro de campos JSON.
+
+El ingreso directo no exige completar el brief. Si categoria o tema estan vacios, la app usa el titular visual o el hook para nombrar la pieza y la guarda bajo la categoria `Contenido generado`.

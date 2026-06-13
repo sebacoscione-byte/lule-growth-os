@@ -632,11 +632,29 @@ export default function ContentStudioPage() {
     }
 
     // API mode: create content item directly
-    await saveGeneratedItem(generated)
+    try {
+      await saveGeneratedItem(generated)
+    } catch (saveError) {
+      setError(saveError instanceof Error ? saveError.message : "Se generó el contenido pero no se pudo guardar.")
+    }
   }
 
   async function saveGeneratedItem(generated: Record<string, unknown>) {
     const now = new Date().toISOString()
+    const generatedText = (field: string) => typeof generated[field] === "string"
+      ? (generated[field] as string).trim()
+      : ""
+    const inferredTopic =
+      topic.trim() ||
+      generatedText("topic") ||
+      generatedText("visual_headline") ||
+      generatedText("hook") ||
+      category.trim() ||
+      "Contenido generado"
+    const inferredCategory =
+      category.trim() ||
+      generatedText("category") ||
+      "Contenido generado"
     const rawSlides = generated.slides
     const slides = Array.isArray(rawSlides)
       ? (rawSlides as Array<Record<string, unknown>>)
@@ -646,8 +664,8 @@ export default function ContentStudioPage() {
 
     const item: ContentItem = {
       id: crypto.randomUUID(),
-      topic: topic.trim() || category.trim(),
-      category: category.trim(),
+      topic: inferredTopic.slice(0, 200),
+      category: inferredCategory.slice(0, 160),
       format,
       goal: "Captar consultas y explicar como pedir turno",
       status: "draft",
@@ -676,8 +694,8 @@ export default function ContentStudioPage() {
       body: JSON.stringify(item),
     })
     if (!saved.ok) {
-      setError("Se genero el contenido pero no se pudo guardar")
-      return
+      const data = await saved.json().catch(() => null) as { error?: string } | null
+      throw new Error(data?.error || "Se generó el contenido pero no se pudo guardar.")
     }
     setItems(previous => [item, ...previous])
     setActive(item)
