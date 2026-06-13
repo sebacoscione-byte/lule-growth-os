@@ -75,3 +75,5 @@ Estos guardrails se muestran dentro del editor antes de aprobar una pieza.
 El estudio usa la capa comun de IA de la app. Se puede seleccionar Google Gemini o Anthropic con `AI_PROVIDER`, y todas las propuestas se solicitan explicitamente en espanol.
 
 Con `AI_PROVIDER=auto`, Gemini tiene prioridad cuando `GEMINI_API_KEY` esta configurada. Si un proveedor no tiene saldo o alcanza su cuota, la interfaz muestra un mensaje breve y accionable en lugar del error tecnico de la API.
+
+En modo manual, el pegado intenta reparar automaticamente comillas internas sin escapar y saltos de linea que algunos modelos devuelven dentro de campos JSON.

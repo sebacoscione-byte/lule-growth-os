@@ -1,6 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk"
 import { createHash } from "crypto"
 import { createClient as createSupabaseClient } from "@supabase/supabase-js"
+import { parseAiJson } from "@/lib/parse-ai-json"
 import type { ClassifyResult, ContentSource } from "@/types"
 
 export type AiMode = "manual" | "gemini_api"
@@ -229,6 +230,7 @@ El caption debe cerrar invitando al lector a usar ese link para pedir turno. NO 
 ${sourceSection}
 RESPUESTA ESPERADA:
 Devolvé ÚNICAMENTE el JSON válido, sin markdown, sin bloques de código, sin explicaciones.
+Si un texto necesita comillas, escapalas como \\\" o usa comillas simples para no romper el JSON.
 ${input.format === "carrusel" ? `Formato CARRUSEL: incluí un array "slides" con 4-5 slides de contenido (además de la portada).
 Cada slide tiene "headline" (máx. 40 caracteres) y "text" (1-2 oraciones del contenido de esa slide).
 Usá exactamente estas claves:
@@ -403,9 +405,7 @@ export function getPublicAiError(error: unknown): string {
 // ---------------------------------------------------------------------------
 
 function parseJson<T>(text: string): T {
-  const jsonMatch = text.match(/\{[\s\S]*\}/)
-  if (!jsonMatch) throw new Error("La IA no devolvio JSON valido.")
-  return JSON.parse(jsonMatch[0]) as T
+  return parseAiJson<T>(text)
 }
 
 // ---------------------------------------------------------------------------
@@ -604,6 +604,7 @@ Reglas:
 ${IMAGE_PROMPT_RULES}
 ${PATIENT_ACQUISITION_RULES}
 - El texto de Google debe tener maximo 1500 caracteres.
+- Si un texto necesita comillas, escapalas como \\\" o usa comillas simples para no romper el JSON.
 - Devolve SOLO JSON valido.`,
     messages: [{ role: "user", content: userContent }],
   })

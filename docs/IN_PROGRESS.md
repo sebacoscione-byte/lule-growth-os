@@ -1,27 +1,25 @@
-# En progreso - Brief flexible y placa final con Gemini
+# En progreso - Reparacion de respuestas JSON de IA
 
 ## Objetivo
 
-Permitir generar contenido sin escribir un tema y hacer que Gemini resuelva la placa visual final.
+Aceptar respuestas de Gemini que contienen comillas sin escapar dentro de los textos.
 
 ## Brechas encontradas
 
-- El tema o enfoque bloquea la generacion aunque la categoria ya define un punto de partida.
-- La IA entrega un prompt visual, pero la app delega en Lucia la composicion final de la placa.
-- La maqueta descargable de gradiente no refleja una direccion visual atractiva para carrusel o historia.
+- Gemini puede devolver frases como `"vuelco"` o `"raro"` sin escapar las comillas.
+- Esas respuestas parecen JSON, pero `JSON.parse` las rechaza y el usuario no puede guardar el borrador.
 
 ## Plan
 
-- [x] Hacer opcional el tema y adaptar prompts, validaciones y busqueda.
-- [x] Agregar generacion de placa final con Gemini Image segun el formato.
-- [x] Simplificar la revision visual para que Lucia no tenga que disenar la placa.
+- [x] Implementar un parser tolerante que preserve el intento de la respuesta.
+- [x] Reforzar los prompts para pedir comillas escapadas.
 - [x] Verificar, documentar, commitear y pushear.
 
 ## Resultado
 
-- El brief queda listo con una categoria; el tema o enfoque es opcional.
-- Si no hay tema, la IA elige un enfoque concreto dentro de la categoria.
-- Gemini define la direccion visual y genera una placa final 4:5 o 9:16 desde el editor.
-- La placa integra titular y subtitulo con jerarquia, contraste y zonas seguras segun el formato.
-- Lucia revisa y descarga el resultado, sin tener que armar la composicion visual.
+- El pegado acepta JSON valido sin modificarlo.
+- Si Gemini deja comillas internas sin escapar o saltos de linea crudos, la app intenta repararlos antes de rechazar la respuesta.
+- El mismo parser tolerante protege las respuestas recibidas por API.
+- Los prompts piden explicitamente escapar comillas internas.
+- Se verifico un caso equivalente con `"vuelco"` y `"raro", da...`.
 - `npm run lint` y `npm run build` finalizaron correctamente.

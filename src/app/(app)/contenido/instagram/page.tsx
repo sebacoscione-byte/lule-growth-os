@@ -14,6 +14,7 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
+import { parseAiJson } from "@/lib/parse-ai-json"
 import type { ContentItem, ContentSlide, ContentSource, ContentStatus } from "@/types"
 
 const IS_MANUAL_MODE = process.env.NEXT_PUBLIC_AI_MODE !== "gemini_api"
@@ -698,14 +699,11 @@ export default function ContentStudioPage() {
   }
 
   async function processManualResponse(pasted: string) {
-    const jsonMatch = pasted.match(/\{[\s\S]*\}/)
-    if (!jsonMatch) throw new Error("No se encontró JSON válido. Asegurate de copiar la respuesta completa de la IA.")
-
     let parsed: Record<string, unknown>
     try {
-      parsed = JSON.parse(jsonMatch[0])
-    } catch {
-      throw new Error("El JSON pegado tiene un error de formato. Intentá copiar la respuesta nuevamente.")
+      parsed = parseAiJson<Record<string, unknown>>(pasted)
+    } catch (error) {
+      throw new Error(error instanceof Error ? error.message : "No se pudo procesar la respuesta de la IA.")
     }
 
     const required = ["hook", "caption", "google_text", "hashtags", "visual_headline", "visual_subtitle", "image_prompt", "image_alt_text"]
