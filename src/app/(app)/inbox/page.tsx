@@ -143,7 +143,7 @@ export default function InboxPage() {
                   className="rounded"
                 />
                 <Sparkles className="h-3 w-3 text-blue-500" />
-                <span className="hidden sm:inline">Auto-IA</span>
+                <span>Auto-IA</span>
               </label>
               <Link href={`/leads/${selectedLead.id}`}>
                 <Button variant="outline" size="sm" className="text-xs">Ver</Button>

@@ -87,7 +87,7 @@ export default function NuevoLeadPage() {
   }
 
   return (
-    <div className="p-6 max-w-2xl">
+    <div className="max-w-2xl p-4 md:p-6">
       <div className="flex items-center gap-3 mb-6">
         <Link href="/leads">
           <Button variant="ghost" size="icon"><ArrowLeft className="h-4 w-4" /></Button>
@@ -99,7 +99,7 @@ export default function NuevoLeadPage() {
         <Card>
           <CardHeader><CardTitle className="text-base">Datos de contacto</CardTitle></CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div className="space-y-1.5">
                 <Label>Nombre</Label>
                 <Input placeholder="Nombre completo" value={form.name} onChange={e => update("name", e.target.value)} />
@@ -138,7 +138,7 @@ export default function NuevoLeadPage() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div className="space-y-1.5">
                 <Label>Campaña</Label>
                 <Input placeholder="Nombre de campaña" value={form.origin_campaign} onChange={e => update("origin_campaign", e.target.value)} />
@@ -176,7 +176,7 @@ export default function NuevoLeadPage() {
             {classified && (
               <div className="rounded-lg bg-blue-50 border border-blue-200 p-4 space-y-2 text-sm">
                 <p className="font-medium text-blue-900">Resultado de clasificación</p>
-                <div className="grid grid-cols-2 gap-2 text-blue-800">
+                <div className="grid grid-cols-1 gap-2 text-blue-800 sm:grid-cols-2">
                   <span>Intent: <strong>{classified.intent}</strong></span>
                   <span>Servicio: <strong>{classified.requested_service}</strong></span>
                   <span>Ubicación: <strong>{classified.suggested_location}</strong></span>
@@ -196,12 +196,12 @@ export default function NuevoLeadPage() {
           </CardContent>
         </Card>
 
-        <div className="flex gap-3">
-          <Button type="submit" disabled={saving}>
+        <div className="grid gap-3 sm:flex">
+          <Button type="submit" disabled={saving} className="w-full sm:w-auto">
             {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : "Guardar lead"}
           </Button>
           <Link href="/leads">
-            <Button type="button" variant="outline">Cancelar</Button>
+            <Button type="button" variant="outline" className="w-full sm:w-auto">Cancelar</Button>
           </Link>
         </div>
       </form>

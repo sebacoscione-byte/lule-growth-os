@@ -78,13 +78,13 @@ export default function ExperimentosPage() {
   const finished = experiments.filter(e => e.end_date && new Date(e.end_date) < new Date())
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="space-y-4 p-4 md:space-y-6 md:p-6">
+      <div className="flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Experimentos de crecimiento</h1>
           <p className="text-sm text-gray-500">{experiments.length} experimentos registrados</p>
         </div>
-        <Button onClick={() => setShowForm(!showForm)}>
+        <Button onClick={() => setShowForm(!showForm)} className="w-full sm:w-auto">
           <Plus className="h-4 w-4" />
           Nuevo experimento
         </Button>
@@ -95,7 +95,7 @@ export default function ExperimentosPage() {
           <CardHeader><CardTitle className="text-base">Nuevo experimento</CardTitle></CardHeader>
           <CardContent>
             <form onSubmit={save} className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div className="space-y-1.5">
                   <Label>Nombre</Label>
                   <Input placeholder="Ej: Landing cardióloga Lanús" value={form.name} onChange={e => update("name", e.target.value)} required />
@@ -118,7 +118,7 @@ export default function ExperimentosPage() {
                 <Label>Acción / contenido</Label>
                 <Textarea placeholder="Qué vas a hacer exactamente" value={form.content_or_action} onChange={e => update("content_or_action", e.target.value)} required />
               </div>
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                 <div className="space-y-1.5">
                   <Label>Fecha inicio</Label>
                   <Input type="date" value={form.start_date} onChange={e => update("start_date", e.target.value)} required />
@@ -132,11 +132,11 @@ export default function ExperimentosPage() {
                   <Input placeholder="leads desde Google Maps" value={form.metric_to_improve} onChange={e => update("metric_to_improve", e.target.value)} required />
                 </div>
               </div>
-              <div className="flex gap-2">
-                <Button type="submit" disabled={saving}>
+              <div className="grid gap-2 sm:flex">
+                <Button type="submit" disabled={saving} className="w-full sm:w-auto">
                   {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : "Guardar"}
                 </Button>
-                <Button type="button" variant="outline" onClick={() => setShowForm(false)}>Cancelar</Button>
+                <Button type="button" variant="outline" onClick={() => setShowForm(false)} className="w-full sm:w-auto">Cancelar</Button>
               </div>
             </form>
           </CardContent>

@@ -614,27 +614,27 @@ function ProfileTab({ onRefresh }: { status: StatusData; onRefresh: () => void }
         <CardContent className="space-y-3">
           <div className="space-y-2">
             {ALL_DAYS.map(day => (
-              <div key={day} className="flex items-center gap-3">
+              <div key={day} className="flex flex-col items-stretch gap-2 rounded-md border border-gray-100 p-2 sm:flex-row sm:items-center sm:border-0 sm:p-0">
                 <button
                   onClick={() => setHours(h => ({ ...h, [day]: { ...h[day], enabled: !h[day]?.enabled } }))}
-                  className={`w-24 text-sm text-left font-medium ${hours[day]?.enabled ? "text-gray-900" : "text-gray-300"}`}
+                  className={`w-full text-left text-sm font-medium sm:w-24 ${hours[day]?.enabled ? "text-gray-900" : "text-gray-300"}`}
                 >
                   {DAYS_ES[day]}
                 </button>
                 {hours[day]?.enabled ? (
-                  <div className="flex items-center gap-2">
+                  <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
                     <Input
                       type="time"
                       value={hours[day].open}
                       onChange={e => setHours(h => ({ ...h, [day]: { ...h[day], open: e.target.value } }))}
-                      className="w-32 text-sm"
+                      className="w-full text-sm sm:w-32"
                     />
                     <span className="text-gray-400 text-sm">–</span>
                     <Input
                       type="time"
                       value={hours[day].close}
                       onChange={e => setHours(h => ({ ...h, [day]: { ...h[day], close: e.target.value } }))}
-                      className="w-32 text-sm"
+                      className="w-full text-sm sm:w-32"
                     />
                   </div>
                 ) : (
@@ -1037,8 +1037,8 @@ export default function GoogleLocalPage() {
   }
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex items-start justify-between">
+    <div className="space-y-4 p-4 md:space-y-6 md:p-6">
+      <div className="flex flex-col items-start justify-between gap-3 sm:flex-row">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Google Business</h1>
           <p className="text-sm text-gray-500">
@@ -1048,13 +1048,13 @@ export default function GoogleLocalPage() {
           </p>
         </div>
         {status?.connected && (
-          <div className="flex items-center gap-3">
+          <div className="flex w-full items-center gap-2 sm:w-auto sm:gap-3">
             <a
               href="https://business.google.com/"
               target="_blank"
               rel="noreferrer"
             >
-              <Button variant="outline" size="sm" className="gap-1">
+              <Button variant="outline" size="sm" className="w-full gap-1 sm:w-auto">
                 <ExternalLink className="h-4 w-4" /> Ver en Google
               </Button>
             </a>

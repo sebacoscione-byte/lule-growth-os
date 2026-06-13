@@ -234,11 +234,11 @@ export default function ConfiguracionPage() {
 
       {/* ── Instituciones ────────────────────────────────────── */}
       <div className="space-y-4">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">
           <h2 className="text-base font-semibold text-gray-700 flex items-center gap-2">
             <MapPin className="h-4 w-4 text-blue-500" /> Lugares de atención
           </h2>
-          <Button variant="outline" size="sm" onClick={addLocation}>
+          <Button variant="outline" size="sm" onClick={addLocation} className="w-full sm:w-auto">
             <Plus className="h-4 w-4 mr-1" /> Agregar lugar
           </Button>
         </div>
@@ -417,9 +417,9 @@ export default function ConfiguracionPage() {
 
 function Row({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex justify-between gap-2 text-sm">
+    <div className="flex flex-col gap-1 text-sm sm:flex-row sm:justify-between sm:gap-2">
       <span className="text-gray-500 shrink-0">{label}</span>
-      <span className="text-gray-900 font-medium text-right">{value}</span>
+      <span className="break-words font-medium text-gray-900 sm:text-right">{value}</span>
     </div>
   )
 }
@@ -480,12 +480,12 @@ function StringList({
 
 function SaveCancel({ saving, onSave, onCancel }: { saving: boolean; onSave: () => void; onCancel: () => void }) {
   return (
-    <div className="flex gap-2 pt-2">
-      <Button size="sm" onClick={onSave} disabled={saving}>
+    <div className="grid gap-2 pt-2 sm:flex">
+      <Button size="sm" onClick={onSave} disabled={saving} className="w-full sm:w-auto">
         {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4 mr-1" />}
         Guardar
       </Button>
-      <Button variant="ghost" size="sm" onClick={onCancel}>
+      <Button variant="ghost" size="sm" onClick={onCancel} className="w-full sm:w-auto">
         <X className="h-4 w-4 mr-1" /> Cancelar
       </Button>
     </div>

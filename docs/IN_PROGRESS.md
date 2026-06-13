@@ -1,28 +1,30 @@
-# En progreso - Contenido orientado a captar pacientes
+# En progreso - Experiencia mobile-first
 
 ## Objetivo
 
-Hacer que cada propuesta combine atractivo visual con una funcion clara de captacion: detener el scroll, generar identificacion, entregar valor y facilitar que una persona considere pedir turno.
+Lograr que todas las funciones disponibles en desktop sean accesibles y utilizables desde mobile, con navegacion completa y layouts que prioricen pantallas pequenas.
 
 ## Brechas encontradas
 
-- La direccion visual prioriza calidad editorial, pero no exige una idea que genere interes inmediato.
-- El contenido educativo no define una transicion clara desde la atencion hasta la consulta.
-- La revision humana no muestra criterios de captacion antes de aprobar.
+- La navegacion movil oculta Contenido, Landings y Experimentos.
+- El acceso "Mas" lleva directo a Configuracion en lugar de mostrar todas las secciones.
+- Hay formularios y grupos de acciones con columnas fijas que se comprimen en mobile.
+- Algunas tabs y barras de controles no permiten desplazamiento horizontal.
+- Varias pantallas usan padding desktop como valor base.
 
 ## Plan
 
-- [x] Revisar contrato visual y puntos de revision actuales.
-- [x] Reforzar prompts para atraccion y conversion de pacientes.
-- [x] Agregar criterios visibles de revision en el estudio.
-- [x] Actualizar documentacion.
-- [x] Verificar, commitear y pushear.
+- [x] Auditar layouts, navegacion y pantallas en mobile.
+- [x] Implementar navegacion movil completa.
+- [x] Aplicar patrones mobile-first compartidos.
+- [x] Corregir rutas operativas principales.
+- [x] Verificar, documentar, commitear y pushear.
 
 ## Resultado
 
-- Los prompts siguen la secuencia atencion, identificacion, valor y proximo paso.
-- La imagen debe activar curiosidad o identificacion sin usar miedo ni urgencia.
-- Los hooks genericos quedan explicitamente desaconsejados.
-- El editor muestra un checklist de captacion antes de aprobar.
-- El prompt de respaldo para piezas anteriores usa el mismo criterio.
+- La navegacion mobile permite acceder a las ocho secciones.
+- `Mas` abre un menu completo en lugar de redirigir a Configuracion.
+- Tabs, formularios, horarios y acciones principales responden desde mobile.
+- Las tarjetas mobile de Leads conservan informacion relevante de la tabla desktop.
+- Las superficies publicas no presentan desborde horizontal a 375 px.
 - `npm run lint` y `npm run build` finalizaron correctamente.

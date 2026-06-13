@@ -26,7 +26,7 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
   const msgs = (messages ?? []) as Message[]
 
   return (
-    <div className="p-6 max-w-4xl">
+    <div className="max-w-4xl p-4 md:p-6">
       <div className="flex items-center gap-3 mb-6">
         <Link href="/leads">
           <Button variant="ghost" size="icon"><ArrowLeft className="h-4 w-4" /></Button>
@@ -94,7 +94,7 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
         {/* Conversación */}
         <div className="lg:col-span-2">
           <Card className="h-full flex flex-col">
-            <CardHeader className="flex-row items-center justify-between">
+            <CardHeader className="flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
               <CardTitle className="text-base">Conversación</CardTitle>
               <Link href={`/inbox?lead_id=${l.id}`}>
                 <Button variant="outline" size="sm">Abrir en inbox</Button>
@@ -110,7 +110,7 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
                     className={`flex ${msg.role === "user" ? "justify-start" : "justify-end"}`}
                   >
                     <div
-                      className={`max-w-[80%] rounded-lg px-3 py-2 text-sm ${
+                      className={`max-w-[92%] rounded-lg px-3 py-2 text-sm sm:max-w-[80%] ${
                         msg.role === "user"
                           ? "bg-gray-100 text-gray-900"
                           : "bg-blue-600 text-white"

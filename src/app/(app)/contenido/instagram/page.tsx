@@ -126,7 +126,7 @@ function CarouselPreview({ item, compact = false }: { item: ContentItem; compact
       </div>
       <div>
         <p className="text-xs font-medium text-gray-500 mb-1.5 uppercase tracking-wide">Slides de contenido ({slides.length})</p>
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
           {slides.map((slide, i) => (
             <SlideCard key={i} slide={slide} index={i} style={item.visual_style} />
           ))}
@@ -782,8 +782,8 @@ export default function ContentStudioPage() {
   }
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex flex-wrap items-start justify-between gap-3">
+    <div className="space-y-4 p-4 md:space-y-6 md:p-6">
+      <div className="flex flex-col items-start justify-between gap-3 sm:flex-row">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Estudio de contenido</h1>
           <p className="text-sm text-gray-500">
@@ -792,8 +792,8 @@ export default function ContentStudioPage() {
               : "Investigá, generá, revisá y aprobá contenido para Instagram y Google."}
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={startNewPiece} className="gap-1.5">
+        <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
+          <Button variant="outline" size="sm" onClick={startNewPiece} className="flex-1 gap-1.5 sm:flex-none">
             <Plus className="h-4 w-4" />
             Nueva pieza
           </Button>
@@ -834,7 +834,7 @@ export default function ContentStudioPage() {
                     {topic.trim() ? "Listo para generar" : "Falta definir el tema"}
                   </Badge>
                 </div>
-                <div className="grid grid-cols-3 gap-2 text-center text-[11px]">
+                <div className="grid grid-cols-1 gap-1 text-left text-[11px] sm:grid-cols-3 sm:gap-2 sm:text-center">
                   <div className="rounded-md bg-blue-50 px-2 py-1.5 font-medium text-blue-700">1. Definir brief</div>
                   <div className={`rounded-md px-2 py-1.5 font-medium ${selectedSource ? "bg-blue-50 text-blue-700" : "bg-gray-100 text-gray-500"}`}>2. Fuente opcional</div>
                   <div className="rounded-md bg-gray-100 px-2 py-1.5 font-medium text-gray-500">3. Generar y revisar</div>
@@ -859,7 +859,7 @@ export default function ContentStudioPage() {
                   <Input value={topic} onChange={event => setTopic(event.target.value)} placeholder="Ej: por qué controlar la presión aunque te sientas bien" className="text-gray-900 placeholder:text-gray-400" />
                   <p className="text-xs text-gray-500">Escribí una idea concreta: será el eje de todos los textos.</p>
                 </div>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                   <div className="space-y-1.5">
                     <Label className="text-gray-900">Formato</Label>
                     <Select value={format} onValueChange={value => setFormat(value as ContentItem["format"])}>
@@ -1132,12 +1132,12 @@ function Editor({ item, working, copied, hasUnsavedChanges, onChange, onSave, on
               className="bg-white text-xs text-gray-900"
               aria-label="Prompt de imagen para Gemini"
             />
-            <div className="flex flex-wrap gap-2">
-              <Button variant="outline" onClick={copyImagePrompt} className="flex-1 gap-2">
+            <div className="grid gap-2 sm:flex sm:flex-wrap">
+              <Button variant="outline" onClick={copyImagePrompt} className="w-full flex-1 gap-2">
                 {imagePromptCopied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
                 {imagePromptCopied ? "Prompt copiado" : "Copiar prompt de imagen"}
               </Button>
-              <Button variant="outline" onClick={() => window.open("https://gemini.google.com/", "_blank")} className="flex-1 gap-2">
+              <Button variant="outline" onClick={() => window.open("https://gemini.google.com/", "_blank")} className="w-full flex-1 gap-2">
                 <ExternalLink className="h-4 w-4" />
                 Abrir Gemini
               </Button>
@@ -1155,7 +1155,7 @@ function Editor({ item, working, copied, hasUnsavedChanges, onChange, onSave, on
           </CardContent>
         </Card>
         <CarouselPreview item={item} />
-        <div className="flex gap-2">
+        <div className="flex flex-col gap-2 sm:flex-row">
           {!isCarousel && (
             <Button variant="outline" onClick={onDownload} className="flex-1 gap-2"><Download className="h-4 w-4" /> Descargar placa</Button>
           )}
@@ -1241,7 +1241,7 @@ function Editor({ item, working, copied, hasUnsavedChanges, onChange, onSave, on
             <div className="flex items-center justify-between"><Label className="text-gray-900">Google Business</Label><CharacterCount value={item.google_text} limit={1500} /></div>
             <Textarea rows={6} value={item.google_text} maxLength={1500} onChange={event => onChange({ ...item, google_text: event.target.value })} className="text-gray-900" />
           </div>
-          <div className="flex flex-wrap gap-2">
+          <div className="grid gap-2 sm:flex sm:flex-wrap">
             <Button variant="outline" onClick={() => onSave(editableContent(item))} disabled={busy || !hasUnsavedChanges} className="gap-2">
               {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Guardar cambios
             </Button>

@@ -36,7 +36,7 @@ export default async function LeadsPage({
         <Link href="/leads/nuevo">
           <Button size="sm">
             <Plus className="h-4 w-4" />
-            <span className="hidden sm:inline ml-1">Nuevo lead</span>
+            <span className="ml-1">Nuevo lead</span>
           </Button>
         </Link>
       </div>
@@ -91,6 +91,10 @@ export default async function LeadsPage({
                       <p className="font-medium text-gray-900 truncate text-sm">
                         {lead.name ?? lead.instagram_username ?? lead.phone ?? "Anónimo"}
                       </p>
+                      <p className="mt-0.5 truncate text-xs text-gray-500">
+                        {CHANNEL_LABELS[lead.origin_channel]} · {SERVICE_LABELS[lead.requested_service]}
+                      </p>
+                      {lead.phone && <p className="truncate text-xs text-gray-400">{lead.phone}</p>}
                       <div className="flex items-center gap-2 mt-0.5">
                         <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium ${STATUS_COLORS[lead.status]}`}>
                           {STATUS_LABELS[lead.status]}

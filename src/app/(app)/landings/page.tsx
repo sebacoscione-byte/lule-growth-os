@@ -65,7 +65,7 @@ const LANDINGS = [
 
 export default function LandingsPage() {
   return (
-    <div className="p-6 space-y-6">
+    <div className="space-y-4 p-4 md:space-y-6 md:p-6">
       <div>
         <h1 className="text-2xl font-bold text-gray-900">Landing Pages</h1>
         <p className="text-sm text-gray-500">Páginas SEO local para captación de tráfico orgánico</p>

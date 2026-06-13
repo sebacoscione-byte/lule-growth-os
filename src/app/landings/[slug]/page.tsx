@@ -122,7 +122,7 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
       <section className="py-12 px-4">
         <div className="max-w-2xl mx-auto">
           <h2 className="text-xl font-bold text-gray-900 mb-6 text-center">Servicios</h2>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             {data.services.map((service) => (
               <div key={service} className="flex items-center gap-2 p-4 rounded-lg border border-gray-200 bg-gray-50">
                 <Heart className="h-4 w-4 text-rose-400 shrink-0" />
