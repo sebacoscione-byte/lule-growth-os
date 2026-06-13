@@ -506,6 +506,7 @@ function BioYFijadosTab() {
 
 export default function ContentStudioPage() {
   const [category, setCategory] = useState("")
+  const [categorySuggestionsOpen, setCategorySuggestionsOpen] = useState(false)
   const [topic, setTopic] = useState("")
   const [briefErrors, setBriefErrors] = useState<{ category?: string; topic?: string }>({})
   const [format, setFormat] = useState<ContentItem["format"]>("reel")
@@ -568,6 +569,13 @@ export default function ContentStudioPage() {
     })
   }, [items, libraryFormat, libraryQuery, libraryStatus])
 
+  const filteredCategories = useMemo(() => {
+    const query = category.trim().toLocaleLowerCase("es")
+    return query
+      ? CATEGORIES.filter(value => value.toLocaleLowerCase("es").includes(query))
+      : CATEGORIES
+  }, [category])
+
   const savedActive = active ? items.find(item => item.id === active.id) : null
   const hasUnsavedChanges = Boolean(
     active && savedActive && JSON.stringify(editableContent(active)) !== JSON.stringify(editableContent(savedActive))
@@ -580,6 +588,7 @@ export default function ContentStudioPage() {
     setError(null)
     setBriefErrors({})
     setCategory("")
+    setCategorySuggestionsOpen(false)
     setTopic("")
     setSources([])
     setSelectedSource(null)
@@ -605,7 +614,7 @@ export default function ContentStudioPage() {
 
   async function generate() {
     const nextBriefErrors = {
-      ...(!category ? { category: "Seleccioná una categoría." } : {}),
+      ...(!category.trim() ? { category: "Elegí o escribí una categoría." } : {}),
       ...(!topic.trim() ? { topic: "Escribí un tema o enfoque concreto." } : {}),
     }
     if (Object.keys(nextBriefErrors).length > 0) {
@@ -631,7 +640,7 @@ export default function ContentStudioPage() {
         body: JSON.stringify({
           type: "content_plan",
           topic: topic.trim(),
-          category,
+          category: category.trim(),
           content_type: format,
           cta: cta === "none" ? "" : cta,
           appointment_link: appointmentLink.trim() || null,
@@ -678,8 +687,8 @@ export default function ContentStudioPage() {
 
     const item: ContentItem = {
       id: crypto.randomUUID(),
-      topic: topic.trim() || category,
-      category,
+      topic: topic.trim() || category.trim(),
+      category: category.trim(),
       format,
       goal: "Captar consultas y explicar como pedir turno",
       status: "draft",
@@ -838,8 +847,8 @@ export default function ContentStudioPage() {
               <CardHeader className="space-y-3">
                 <div className="flex items-center justify-between gap-3">
                   <CardTitle className="text-base">Brief editorial</CardTitle>
-                  <Badge variant={category && topic.trim() ? "success" : "warning"}>
-                    {category && topic.trim() ? "Listo para generar" : "Completá categoría y tema"}
+                  <Badge variant={category.trim() && topic.trim() ? "success" : "warning"}>
+                    {category.trim() && topic.trim() ? "Listo para generar" : "Completá categoría y tema"}
                   </Badge>
                 </div>
                 <div className="grid grid-cols-1 gap-1 text-left text-[11px] sm:grid-cols-3 sm:gap-2 sm:text-center">
@@ -851,20 +860,66 @@ export default function ContentStudioPage() {
               <CardContent className="space-y-4">
                 <div className="space-y-1.5">
                   <Label className="text-gray-900">Categoria</Label>
-                  <Select
-                    value={category}
-                    onValueChange={value => {
-                      setCategory(value)
-                      setBriefErrors(previous => ({ ...previous, category: undefined }))
+                  <div
+                    className="relative"
+                    onBlur={event => {
+                      if (!event.currentTarget.contains(event.relatedTarget)) setCategorySuggestionsOpen(false)
                     }}
                   >
-                    <SelectTrigger className="text-gray-900" aria-invalid={Boolean(briefErrors.category)}>
-                      <SelectValue placeholder="Seleccioná una categoría" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {CATEGORIES.map(value => <SelectItem key={value} value={value}>{value}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
+                    <Input
+                      value={category}
+                      onChange={event => {
+                        setCategory(event.target.value)
+                        setCategorySuggestionsOpen(true)
+                        setBriefErrors(previous => ({ ...previous, category: undefined }))
+                      }}
+                      onFocus={() => setCategorySuggestionsOpen(true)}
+                      placeholder="Elegí o escribí una categoría"
+                      className="pr-10 text-gray-900 placeholder:text-gray-400"
+                      aria-invalid={Boolean(briefErrors.category)}
+                      aria-expanded={categorySuggestionsOpen}
+                      aria-controls="category-suggestions"
+                      role="combobox"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setCategorySuggestionsOpen(open => !open)}
+                      aria-label={categorySuggestionsOpen ? "Cerrar categorías sugeridas" : "Ver categorías sugeridas"}
+                      className="absolute right-0 top-0 flex h-9 w-10 items-center justify-center rounded-r-md text-gray-500 hover:text-gray-900"
+                    >
+                      <ChevronDown className={`h-4 w-4 transition-transform ${categorySuggestionsOpen ? "rotate-180" : ""}`} />
+                    </button>
+                    {categorySuggestionsOpen && (
+                      <div
+                        id="category-suggestions"
+                        role="listbox"
+                        className="absolute z-20 mt-1 max-h-60 w-full overflow-y-auto rounded-md border border-gray-200 bg-white p-1 text-sm text-gray-900 shadow-lg"
+                      >
+                        {filteredCategories.map(value => (
+                          <button
+                            key={value}
+                            type="button"
+                            role="option"
+                            aria-selected={category === value}
+                            onClick={() => {
+                              setCategory(value)
+                              setCategorySuggestionsOpen(false)
+                              setBriefErrors(previous => ({ ...previous, category: undefined }))
+                            }}
+                            className="w-full rounded-sm px-3 py-2.5 text-left hover:bg-gray-100 focus:bg-gray-100 focus:outline-none"
+                          >
+                            {value}
+                          </button>
+                        ))}
+                        {filteredCategories.length === 0 && (
+                          <p className="px-3 py-2.5 text-gray-500">
+                            Usar nueva categoría: <span className="font-medium text-gray-900">{category.trim()}</span>
+                          </p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                  <p className="text-xs text-gray-500">Elegí una sugerencia o escribí una categoría nueva.</p>
                   {briefErrors.category && <p className="text-xs font-medium text-red-600">{briefErrors.category}</p>}
                 </div>
                 <div className="space-y-1.5">

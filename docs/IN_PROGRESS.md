@@ -1,26 +1,23 @@
-# En progreso - Correcciones del generador de prompts
+# En progreso - Categoria editable del generador
 
 ## Objetivo
 
-Hacer que el brief editorial comience sin categoria preseleccionada, muestre todas las opciones en mobile y explique claramente por que no puede generarse un prompt.
+Permitir que la categoria del brief pueda elegirse de las sugerencias o escribirse libremente.
 
 ## Brechas encontradas
 
-- La categoria se inicializa con la primera opcion.
-- El `datalist` nativo de Android muestra sugerencias de forma inconsistente.
-- El boton para preparar el prompt queda deshabilitado cuando falta el tema y no muestra feedback al tocarlo.
+- El selector actual muestra todas las categorias sugeridas, pero no permite crear una categoria nueva.
 
 ## Plan
 
-- [x] Auditar estado inicial y validacion del generador.
-- [x] Reemplazar la categoria por un selector mobile consistente.
-- [x] Agregar validacion visible para categoria y tema.
+- [x] Disenar un selector editable consistente en mobile.
+- [x] Permitir escritura libre y filtrado de sugerencias.
 - [x] Verificar, documentar, commitear y pushear.
 
 ## Resultado
 
-- El brief inicia con la categoria vacia.
-- La categoria usa un selector que muestra todas las opciones de forma consistente en mobile.
-- El boton de generacion solo se deshabilita mientras esta generando.
-- Al intentar generar sin datos, categoria y tema muestran errores junto al campo correspondiente.
+- La categoria comienza vacia y permite escritura libre.
+- Al abrir el campo sin texto se muestran todas las sugerencias.
+- Al escribir se filtran las sugerencias y, si no hay coincidencias, se conserva la categoria nueva.
+- La categoria se normaliza antes de enviarse al generador.
 - `npm run lint` y `npm run build` finalizaron correctamente.
