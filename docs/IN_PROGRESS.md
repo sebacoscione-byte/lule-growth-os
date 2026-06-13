@@ -1,25 +1,25 @@
-# En progreso - Guardado directo sin brief
+# En progreso - Diagnostico de Gemini Image
 
 ## Objetivo
 
-Permitir guardar una respuesta pegada aunque categoria y tema no se hayan completado en el brief.
+Explicar y manejar correctamente los fallos de generacion automatica de placas.
 
 ## Brechas encontradas
 
-- El ingreso directo construye `topic` solamente desde el brief.
-- Con categoria y tema vacios, la API rechaza el borrador como incompleto.
-- La interfaz reemplaza el error real de la API por un mensaje generico.
+- La clave configurada devuelve cuota gratuita `0` para los modelos de imagen de Gemini.
+- La interfaz oculta ese dato bajo un error generico de proveedor.
+- El payload agrega configuracion innecesaria frente al ejemplo REST oficial.
 
 ## Plan
 
-- [x] Inferir tema y categoria desde el contenido pegado cuando falte el brief.
-- [x] Mostrar el error real y conservar el contenido si guardar falla.
+- [x] Alinear la llamada REST con el flujo oficial de Gemini Image.
+- [x] Mostrar un error especifico y accionable cuando no hay cuota de imagenes.
 - [x] Verificar, documentar, commitear y pushear.
 
 ## Resultado
 
-- El ingreso directo se puede usar con categoria y tema vacios.
-- La pieza usa `visual_headline`, `hook` o un nombre generico como tema cuando falta el brief.
-- La API aplica el mismo fallback para proteger clientes anteriores.
-- Si guardar falla, se muestra el error real y el contenido pegado queda disponible para reintentar.
+- Se probo la clave configurada contra `gemini-3.1-flash-image` y `gemini-2.5-flash-image`.
+- Ambos modelos respondieron `429 RESOURCE_EXHAUSTED` porque la cuota gratuita de imagenes de la clave es `0`.
+- La llamada REST usa ahora el payload basico recomendado por la documentacion oficial.
+- La interfaz explica que falta cuota o billing y ofrece un acceso directo para revisarlo.
 - `npm run lint` y `npm run build` finalizaron correctamente.

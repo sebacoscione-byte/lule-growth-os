@@ -1139,6 +1139,7 @@ function Editor({ item, working, copied, hasUnsavedChanges, onChange, onSave, on
   const [generatedVisual, setGeneratedVisual] = useState<{ itemId: string; url: string } | null>(null)
   const [visualGenerating, setVisualGenerating] = useState(false)
   const [visualError, setVisualError] = useState<string | null>(null)
+  const [visualHelpUrl, setVisualHelpUrl] = useState<string | null>(null)
   const imagePrompt = item.image_prompt?.trim() || fallbackImagePrompt(item)
   const approvalReady = Boolean(
     item.hook.trim() &&
@@ -1159,6 +1160,7 @@ function Editor({ item, working, copied, hasUnsavedChanges, onChange, onSave, on
   async function generateVisual() {
     setVisualGenerating(true)
     setVisualError(null)
+    setVisualHelpUrl(null)
     try {
       const response = await fetch("/api/content/visual", {
         method: "POST",
@@ -1175,6 +1177,7 @@ function Editor({ item, working, copied, hasUnsavedChanges, onChange, onSave, on
       const data = await response.json()
       if (!response.ok || data.error) {
         setVisualError(data.error ?? "No se pudo generar la placa visual.")
+        setVisualHelpUrl(typeof data.help_url === "string" ? data.help_url : null)
         return
       }
       setGeneratedVisual({ itemId: item.id, url: `data:${data.mime_type};base64,${data.image_data}` })
@@ -1221,7 +1224,22 @@ function Editor({ item, working, copied, hasUnsavedChanges, onChange, onSave, on
                 La dirección visual ya está definida por la IA. Generá la placa final cuando quieras revisarla o publicarla.
               </div>
             )}
-            {visualError && <p className="rounded-md bg-red-50 p-2 text-xs text-red-700">{visualError}</p>}
+            {visualError && (
+              <div className="space-y-2 rounded-md bg-red-50 p-3 text-xs text-red-700">
+                <p>{visualError}</p>
+                {visualHelpUrl && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => window.open(visualHelpUrl, "_blank")}
+                    className="gap-2 border-red-200 bg-white text-red-700 hover:bg-red-100"
+                  >
+                    <ExternalLink className="h-3.5 w-3.5" />
+                    Revisar cuota de Gemini
+                  </Button>
+                )}
+              </div>
+            )}
             <div className="grid gap-2 sm:flex">
               <Button onClick={generateVisual} disabled={visualGenerating} className="w-full flex-1 gap-2">
                 {visualGenerating ? <Loader2 className="h-4 w-4 animate-spin" /> : <WandSparkles className="h-4 w-4" />}

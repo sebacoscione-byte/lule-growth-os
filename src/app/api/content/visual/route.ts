@@ -29,6 +29,15 @@ export async function POST(request: Request) {
     })
     return NextResponse.json(visual)
   } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    const normalized = message.toLowerCase()
+    if (normalized.includes("quota") || normalized.includes("resource_exhausted") || normalized.includes("rate limit")) {
+      return NextResponse.json({
+        code: "IMAGE_QUOTA_UNAVAILABLE",
+        error: "La clave de Gemini no tiene cuota disponible para generar imágenes. Activá billing o una cuota de imágenes en Google AI Studio y volvé a intentar.",
+        help_url: "https://ai.dev/rate-limit",
+      }, { status: 429 })
+    }
     return NextResponse.json({ error: getPublicAiError(error) }, { status: 500 })
   }
 }

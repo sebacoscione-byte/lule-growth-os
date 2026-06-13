@@ -46,7 +46,8 @@ El editor llama a Gemini Image para generar una placa final 4:5 para feed/carrus
 Variables:
 
 - `GEMINI_IMAGE_MODEL`: modelo de imagen; por defecto `gemini-3.1-flash-image`.
-- `GEMINI_IMAGE_SIZE`: resolucion; por defecto `1K`.
+
+La generacion automatica de placas requiere cuota disponible para modelos de imagen en la clave de Gemini. Algunas claves tienen limite gratuito `0`; en ese caso la app muestra el enlace para revisar cuota o activar billing en lugar de un error generico.
 
 ## Criterio de captacion
 

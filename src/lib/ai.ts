@@ -686,15 +686,6 @@ FINAL ART DIRECTION:
         headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
         body: JSON.stringify({
           contents: [{ role: "user", parts: [{ text: prompt }] }],
-          generationConfig: {
-            responseModalities: ["IMAGE"],
-            responseFormat: {
-              image: {
-                aspectRatio,
-                imageSize: process.env.GEMINI_IMAGE_SIZE || "1K",
-              },
-            },
-          },
         }),
       }
     )
