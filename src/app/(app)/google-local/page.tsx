@@ -74,7 +74,6 @@ function LocationPickerView({ onPicked }: { onPicked: () => void }) {
   const [selecting, setSelecting] = useState<string | null>(null)
 
   // Manual entry state
-  const [accountId, setAccountId] = useState("")
   const [locationId, setLocationId] = useState("")
   const [saving, setSaving] = useState(false)
   const [manualError, setManualError] = useState<string | null>(null)
@@ -107,31 +106,28 @@ function LocationPickerView({ onPicked }: { onPicked: () => void }) {
   }
 
   async function saveManual() {
-    const aid = accountId.trim()
     const lid = locationId.trim()
-    if (!aid || !lid) { setManualError("Completá los dos campos"); return }
+    if (!lid) { setManualError("Completa el Location ID"); return }
     setSaving(true)
     setManualError(null)
     const res = await fetch("/api/google-business/select-location", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        accountId: aid,
-        accountName: `accounts/${aid}`,
         locationId: lid,
-        locationName: `accounts/${aid}/locations/${lid}`,
+        locationName: `locations/${lid}`,
       }),
     })
     setSaving(false)
     if (res.ok) onPicked()
-    else setManualError("Error al guardar. Verificá los IDs.")
+    else setManualError("Error al guardar. Verifica el Location ID.")
   }
 
   return (
     <div className="flex flex-col items-center justify-center py-12 gap-6">
       <div>
-        <h2 className="text-xl font-semibold text-gray-900 text-center">Elegí el negocio a administrar</h2>
-        <p className="text-sm text-gray-500 mt-1 text-center">Tu cuenta tiene varios negocios. Seleccioná el de la Dra. Lucía Chahin.</p>
+        <h2 className="text-xl font-semibold text-gray-900 text-center">Conecta el perfil a administrar</h2>
+        <p className="text-sm text-gray-500 mt-1 text-center">Usa el Location ID de la ficha de la Dra. Lucia Chahin.</p>
       </div>
 
       {loading ? (
@@ -139,30 +135,19 @@ function LocationPickerView({ onPicked }: { onPicked: () => void }) {
       ) : quotaError ? (
         <div className="w-full max-w-md space-y-4">
           <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 text-sm text-amber-800">
-            <p className="font-medium mb-1">Google no permite listar negocios automáticamente (cuota = 0)</p>
-            <p className="text-xs">Ingresá los IDs manualmente. Los encontrás en la URL de tu perfil de Google Business.</p>
+            <p className="font-medium mb-1">Google no permite listar negocios automaticamente (cuota = 0)</p>
+            <p className="text-xs">Ingresa el Location ID manualmente. Sirve para administrar el perfil cuando Google no expone el Account ID.</p>
           </div>
           <div className="space-y-3">
-            <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">Account ID</label>
-              <Input
-                value={accountId}
-                onChange={e => setAccountId(e.target.value)}
-                placeholder="Ej: 123456789012345678"
-              />
-              <p className="text-xs text-gray-400 mt-1">
-                Desde business.google.com → URL al abrir tu negocio → el número largo después de <code>/accounts/</code>
-              </p>
-            </div>
             <div>
               <label className="block text-xs font-medium text-gray-700 mb-1">Location ID</label>
               <Input
                 value={locationId}
                 onChange={e => setLocationId(e.target.value)}
-                placeholder="Ej: 987654321098765432"
+                placeholder="Ej: 06098973123847387208"
               />
               <p className="text-xs text-gray-400 mt-1">
-                El número después de <code>/locations/</code> en la misma URL
+                Es el numero que aparece arriba del nombre del perfil en Google Business.
               </p>
             </div>
             {manualError && <p className="text-xs text-red-600">{manualError}</p>}
@@ -774,7 +759,7 @@ function PostsTab() {
       ) : apiError ? (
         <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 text-sm text-amber-800">
           <p className="font-medium mb-1">Publicaciones no disponibles via API</p>
-          <p className="text-xs mb-3">Google eliminó el acceso público a esta función. Para publicar en Google, usá el panel oficial:</p>
+          <p className="text-xs mb-3">{apiError}</p>
           <a href="https://business.google.com/" target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-xs font-medium text-blue-600 underline">
             Ir a Google Business <ExternalLink className="h-3 w-3" />
           </a>
@@ -891,7 +876,7 @@ function ReviewsTab() {
       ) : apiError ? (
         <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 text-sm text-amber-800">
           <p className="font-medium mb-1">Reseñas no disponibles via API</p>
-          <p className="text-xs mb-3">Google eliminó el acceso público a esta función. Para responder reseñas, usá el panel oficial:</p>
+          <p className="text-xs mb-3">{apiError}</p>
           <a href="https://business.google.com/" target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-xs font-medium text-blue-600 underline">
             Ir a Google Business <ExternalLink className="h-3 w-3" />
           </a>

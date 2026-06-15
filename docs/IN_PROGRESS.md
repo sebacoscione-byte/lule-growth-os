@@ -1,25 +1,25 @@
-# En progreso - Diagnostico de Gemini Image
+# En progreso - Google Business Location ID
 
 ## Objetivo
 
-Explicar y manejar correctamente los fallos de generacion automatica de placas.
+Permitir conectar la ficha de Google Business cuando Google no expone el Account ID y la API de descubrimiento esta con cuota 0.
 
 ## Brechas encontradas
 
-- La clave configurada devuelve cuota gratuita `0` para los modelos de imagen de Gemini.
-- La interfaz oculta ese dato bajo un error generico de proveedor.
-- El payload agrega configuracion innecesaria frente al ejemplo REST oficial.
+- Google OAuth queda conectado, pero `accounts.list` no puede listar negocios si el proyecto tiene cuota 0.
+- La interfaz nueva de Google Business no muestra siempre el Account ID.
+- La app exigia Account ID aunque la Business Information API puede editar el perfil con `locations/{locationId}`.
 
 ## Plan
 
-- [x] Alinear la llamada REST con el flujo oficial de Gemini Image.
-- [x] Mostrar un error especifico y accionable cuando no hay cuota de imagenes.
-- [x] Verificar, documentar, commitear y pushear.
+- [x] Aceptar guardado manual con solo Location ID.
+- [x] Mantener Account ID como opcional para cuentas donde Google si lo devuelve.
+- [x] Explicar que publicaciones y resenas siguen requiriendo Account ID o acceso API aprobado.
+- [x] Verificar, commitear y pushear.
 
 ## Resultado
 
-- Se probo la clave configurada contra `gemini-3.1-flash-image` y `gemini-2.5-flash-image`.
-- Ambos modelos respondieron `429 RESOURCE_EXHAUSTED` porque la cuota gratuita de imagenes de la clave es `0`.
-- La llamada REST usa ahora el payload basico recomendado por la documentacion oficial.
-- La interfaz explica que falta cuota o billing y ofrece un acceso directo para revisarlo.
+- La seleccion manual de Google Business acepta solo Location ID.
+- El Account ID queda opcional para cuentas donde Google lo devuelve automaticamente.
+- Publicaciones y resenas muestran un mensaje especifico cuando falta Account ID.
 - `npm run lint` y `npm run build` finalizaron correctamente.

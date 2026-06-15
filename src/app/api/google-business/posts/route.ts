@@ -15,7 +15,7 @@ export async function GET() {
   const supabase = await createServiceClient()
   const info = await getConnectionInfo(supabase)
   if (!info?.google_account_id || !info?.google_location_id) {
-    return NextResponse.json({ error: "Not connected" }, { status: 401 })
+    return NextResponse.json({ error: "Falta Account ID. Google no lo expone en algunas cuentas; usa el panel oficial hasta que la API permita descubrirlo." }, { status: 400 })
   }
 
   const token = await getValidToken(supabase)
@@ -38,7 +38,7 @@ export async function POST(req: NextRequest) {
   const supabase = await createServiceClient()
   const info = await getConnectionInfo(supabase)
   if (!info?.google_account_id || !info?.google_location_id) {
-    return NextResponse.json({ error: "Not connected" }, { status: 401 })
+    return NextResponse.json({ error: "Falta Account ID. Google no lo expone en algunas cuentas; publica desde el panel oficial hasta que la API permita descubrirlo." }, { status: 400 })
   }
 
   const token = await getValidToken(supabase)
