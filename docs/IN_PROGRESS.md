@@ -15,11 +15,13 @@ Permitir conectar la ficha de Google Business cuando Google no expone el Account
 - [x] Aceptar guardado manual con solo Location ID.
 - [x] Mantener Account ID como opcional para cuentas donde Google si lo devuelve.
 - [x] Explicar que publicaciones y resenas siguen requiriendo Account ID o acceso API aprobado.
+- [x] Dejar Publicaciones en modo manual cuando falta Account ID.
 - [x] Verificar, commitear y pushear.
 
 ## Resultado
 
 - La seleccion manual de Google Business acepta solo Location ID.
 - El Account ID queda opcional para cuentas donde Google lo devuelve automaticamente.
-- Publicaciones y resenas muestran un mensaje especifico cuando falta Account ID.
+- Publicaciones permite generar y copiar texto manualmente cuando falta Account ID.
+- Resenas muestra un mensaje especifico cuando falta Account ID.
 - `npm run lint` y `npm run build` finalizaron correctamente.

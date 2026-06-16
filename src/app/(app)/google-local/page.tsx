@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react"
 import {
-  Loader2, Sparkles, Star, Trash2, Send, RefreshCw,
+  Loader2, Sparkles, Star, Trash2, Send, RefreshCw, Copy,
   CheckCircle2, ExternalLink, LogOut, MapPin, Link2,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -637,18 +637,26 @@ function ProfileTab({ onRefresh }: { status: StatusData; onRefresh: () => void }
 
 // ─── Posts tab ────────────────────────────────────────────────────────────────
 
-function PostsTab() {
+function PostsTab({ hasAccountId }: { hasAccountId: boolean }) {
   const [posts, setPosts] = useState<Post[]>([])
   const [loading, setLoading] = useState(true)
   const [apiError, setApiError] = useState<string | null>(null)
   const [topic, setTopic] = useState("")
   const [draftText, setDraftText] = useState("")
+  const [copied, setCopied] = useState(false)
   const [generating, setGenerating] = useState(false)
   const [publishing, setPublishing] = useState(false)
   const [publishError, setPublishError] = useState<string | null>(null)
   const [deleting, setDeleting] = useState<string | null>(null)
 
   const fetchPosts = useCallback(async () => {
+    if (!hasAccountId) {
+      setPosts([])
+      setApiError(null)
+      setLoading(false)
+      return
+    }
+
     setLoading(true)
     setApiError(null)
     const res = await fetch("/api/google-business/posts")
@@ -656,7 +664,7 @@ function PostsTab() {
     if (data.error) setApiError(data.error)
     else setPosts(data.localPosts ?? [])
     setLoading(false)
-  }, [])
+  }, [hasAccountId])
 
   useEffect(() => {
     // Initial remote state hydration.
@@ -679,6 +687,19 @@ function PostsTab() {
 
   async function publishPost() {
     if (!draftText.trim()) return
+
+    if (!hasAccountId) {
+      setPublishError(null)
+      try {
+        await navigator.clipboard.writeText(draftText)
+        setCopied(true)
+        setTimeout(() => setCopied(false), 3000)
+      } catch {
+        setPublishError("No se pudo copiar automaticamente. Selecciona el texto y copialo manualmente.")
+      }
+      return
+    }
+
     setPublishing(true)
     setPublishError(null)
     const res = await fetch("/api/google-business/posts", {
@@ -736,8 +757,16 @@ function PostsTab() {
               <div className="flex justify-between items-center">
                 <span className="text-xs text-gray-400">{draftText.length}/1500 caracteres</span>
                 <Button onClick={publishPost} disabled={publishing || !draftText.trim()} className="gap-2">
-                  {publishing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-                  Publicar en Google
+                  {publishing ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : hasAccountId ? (
+                    <Send className="h-4 w-4" />
+                  ) : copied ? (
+                    <CheckCircle2 className="h-4 w-4" />
+                  ) : (
+                    <Copy className="h-4 w-4" />
+                  )}
+                  {hasAccountId ? "Publicar en Google" : copied ? "Copiado" : "Copiar para Google"}
                 </Button>
               </div>
             </>
@@ -751,8 +780,17 @@ function PostsTab() {
         </div>
       )}
 
-      {/* Existing posts */}
-      {loading ? (
+      {!hasAccountId ? (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-sm text-blue-900">
+          <p className="font-medium mb-1">Publicacion manual</p>
+          <p className="text-xs mb-3">
+            Google no expone el Account ID de esta cuenta, asi que la app prepara el texto para copiarlo y pegarlo en el panel oficial.
+          </p>
+          <a href="https://business.google.com/" target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-xs font-medium text-blue-700 underline">
+            Ir a Google Business <ExternalLink className="h-3 w-3" />
+          </a>
+        </div>
+      ) : loading ? (
         <div className="flex justify-center py-8">
           <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
         </div>
@@ -1074,7 +1112,7 @@ export default function GoogleLocalPage() {
           </TabsContent>
 
           <TabsContent value="posts" className="mt-4">
-            <PostsTab />
+            <PostsTab hasAccountId={Boolean(status.accountId)} />
           </TabsContent>
 
           <TabsContent value="reviews" className="mt-4">
