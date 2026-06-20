@@ -8,6 +8,9 @@ export async function GET(request: Request) {
   if (!lead_id) return NextResponse.json({ error: "lead_id required" }, { status: 400 })
 
   const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+
   const { data, error } = await supabase
     .from("messages")
     .select("*")
@@ -21,6 +24,8 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   const { lead_id, content, generate_reply } = await request.json()
   const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
   const { data: userMessage } = await supabase
     .from("messages")

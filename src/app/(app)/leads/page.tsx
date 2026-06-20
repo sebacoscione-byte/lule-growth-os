@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/server"
 import Link from "next/link"
-import { Plus, AlertTriangle, Clock, ChevronRight } from "lucide-react"
+import { Plus, AlertTriangle, Clock, ChevronRight, Download } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   STATUS_LABELS, STATUS_COLORS, CHANNEL_LABELS, SERVICE_LABELS,
@@ -33,12 +33,20 @@ export default async function LeadsPage({
           <h1 className="text-xl md:text-2xl font-bold text-gray-900">Leads</h1>
           <p className="text-sm text-gray-500">{all.length} lead{all.length !== 1 ? "s" : ""}</p>
         </div>
-        <Link href="/leads/nuevo">
-          <Button size="sm">
-            <Plus className="h-4 w-4" />
-            <span className="ml-1">Nuevo lead</span>
-          </Button>
-        </Link>
+        <div className="flex items-center gap-2">
+          <a href="/api/leads/export" download>
+            <Button variant="outline" size="sm">
+              <Download className="h-4 w-4" />
+              <span className="ml-1 hidden sm:inline">Exportar CSV</span>
+            </Button>
+          </a>
+          <Link href="/leads/nuevo">
+            <Button size="sm">
+              <Plus className="h-4 w-4" />
+              <span className="ml-1">Nuevo lead</span>
+            </Button>
+          </Link>
+        </div>
       </div>
 
       {/* Filtros — scroll horizontal en móvil */}

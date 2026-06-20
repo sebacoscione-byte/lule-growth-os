@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef } from "react"
 import { useSearchParams } from "next/navigation"
-import { Send, Loader2, Sparkles, Users, ArrowLeft } from "lucide-react"
+import { Send, Loader2, Sparkles, Users, ArrowLeft, CheckCircle2, XCircle } from "lucide-react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -18,6 +18,7 @@ export default function InboxPage() {
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState("")
   const [sending, setSending] = useState(false)
+  const [closingAction, setClosingAction] = useState(false)
   const [autoReply, setAutoReply] = useState(true)
   const bottomRef = useRef<HTMLDivElement>(null)
 
@@ -39,6 +40,23 @@ export default function InboxPage() {
   }, [messages])
 
   const selectedLead = leads.find(l => l.id === selectedLeadId)
+
+  async function closeWithStatus(newStatus: "confirmo_que_pidio_turno" | "no_pudo_pedir_turno") {
+    if (!selectedLeadId) return
+    setClosingAction(true)
+    const extra = newStatus === "confirmo_que_pidio_turno"
+      ? { confirmed_booked: true }
+      : { requires_human: true }
+    await fetch(`/api/leads/${selectedLeadId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status: newStatus, ...extra }),
+    })
+    setLeads(prev => prev.map(l =>
+      l.id === selectedLeadId ? { ...l, status: newStatus, ...extra } : l
+    ))
+    setClosingAction(false)
+  }
 
   async function sendMessage() {
     if (!input.trim() || !selectedLeadId) return
@@ -134,7 +152,34 @@ export default function InboxPage() {
                 {STATUS_LABELS[selectedLead.status]}
               </span>
             </div>
-            <div className="flex items-center gap-2 shrink-0">
+            <div className="flex items-center gap-1.5 shrink-0 flex-wrap justify-end">
+              {selectedLead.status !== "confirmo_que_pidio_turno" &&
+               selectedLead.status !== "no_pudo_pedir_turno" &&
+               selectedLead.status !== "descartado" &&
+               selectedLead.status !== "spam" && (
+                <>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="border-green-300 text-green-700 hover:bg-green-50 text-xs h-7 px-2"
+                    disabled={closingAction}
+                    onClick={() => closeWithStatus("confirmo_que_pidio_turno")}
+                  >
+                    <CheckCircle2 className="h-3 w-3 mr-1" />
+                    Ya pidió turno
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="border-red-300 text-red-700 hover:bg-red-50 text-xs h-7 px-2"
+                    disabled={closingAction}
+                    onClick={() => closeWithStatus("no_pudo_pedir_turno")}
+                  >
+                    <XCircle className="h-3 w-3 mr-1" />
+                    No pudo
+                  </Button>
+                </>
+              )}
               <label className="flex items-center gap-1 text-xs text-gray-500 cursor-pointer">
                 <input
                   type="checkbox"
@@ -143,10 +188,10 @@ export default function InboxPage() {
                   className="rounded"
                 />
                 <Sparkles className="h-3 w-3 text-blue-500" />
-                <span>Auto-IA</span>
+                <span>IA</span>
               </label>
               <Link href={`/leads/${selectedLead.id}`}>
-                <Button variant="outline" size="sm" className="text-xs">Ver</Button>
+                <Button variant="outline" size="sm" className="text-xs h-7 px-2">Ver</Button>
               </Link>
             </div>
           </div>

@@ -128,6 +128,20 @@ create table if not exists ai_outputs (
 );
 
 -- ============================================================
+-- LANDING EVENTS (clicks anónimos en CTAs — sin login)
+-- ============================================================
+create table if not exists landing_events (
+  id uuid default uuid_generate_v4() primary key,
+  event_type text not null
+    check (event_type in ('cta_cimel', 'cta_swiss', 'instructions_viewed', 'form_started', 'form_submitted')),
+  slug text not null,
+  utm_source text,
+  utm_medium text,
+  utm_campaign text,
+  created_at timestamptz not null default now()
+);
+
+-- ============================================================
 -- INDEXES
 -- ============================================================
 create index if not exists leads_status_idx on leads(status);
@@ -140,6 +154,9 @@ create index if not exists messages_lead_id_idx on messages(lead_id);
 create unique index if not exists ai_outputs_prompt_hash_idx on ai_outputs(prompt_hash);
 create index if not exists ai_requests_created_at_idx on ai_requests(created_at);
 create index if not exists ai_requests_prompt_hash_idx on ai_requests(prompt_hash);
+create index if not exists landing_events_slug_idx on landing_events(slug);
+create index if not exists landing_events_event_type_idx on landing_events(event_type);
+create index if not exists landing_events_created_at_idx on landing_events(created_at desc);
 
 -- ============================================================
 -- UPDATED_AT trigger
@@ -202,6 +219,14 @@ create policy "service_role_write_ai_outputs"
 
 create policy "authenticated_read_ai_outputs"
   on ai_outputs for select to authenticated using (true);
+
+alter table landing_events enable row level security;
+
+create policy "service_role_write_landing_events"
+  on landing_events for all to service_role using (true) with check (true);
+
+create policy "authenticated_read_landing_events"
+  on landing_events for select to authenticated using (true);
 
 -- ============================================================
 -- SEED: Configuración inicial

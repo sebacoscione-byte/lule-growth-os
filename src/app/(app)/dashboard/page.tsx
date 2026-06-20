@@ -8,47 +8,89 @@ import { STATUS_LABELS, STATUS_COLORS, type Lead } from "@/types"
 import { timeAgo } from "@/lib/utils"
 import Link from "next/link"
 
+async function count(supabase: Awaited<ReturnType<typeof createClient>>, filter: Record<string, unknown>) {
+  const query = supabase.from("leads").select("id", { count: "exact", head: true })
+  let q = query
+  for (const [key, value] of Object.entries(filter)) {
+    q = q.eq(key as string, value as string)
+  }
+  const { count: n } = await q
+  return n ?? 0
+}
+
 async function getDashboardData() {
   const supabase = await createClient()
 
   const [
-    { data: leads },
+    { count: total },
     { data: recentLeads },
+    confirmed,
+    requires_human,
+    emergencies,
+    followup_pending,
+    derivado_cimel,
+    derivado_swiss,
+    gm, gs, ig, wa, manual,
+    consulta, eco,
   ] = await Promise.all([
-    supabase.from("leads").select("*"),
+    supabase.from("leads").select("id", { count: "exact", head: true }),
     supabase.from("leads").select("*").order("created_at", { ascending: false }).limit(5),
+    count(supabase, { confirmed_booked: true }),
+    count(supabase, { requires_human: true }),
+    count(supabase, { possible_emergency: true }),
+    count(supabase, { status: "seguimiento_pendiente" }),
+    count(supabase, { status: "derivado_cimel" }),
+    count(supabase, { status: "derivado_swiss" }),
+    count(supabase, { origin_channel: "google_maps" }),
+    count(supabase, { origin_channel: "google_search" }),
+    count(supabase, { origin_channel: "instagram" }),
+    count(supabase, { origin_channel: "whatsapp" }),
+    count(supabase, { origin_channel: "manual" }),
+    count(supabase, { requested_service: "consulta_cardiologia" }),
+    count(supabase, { requested_service: "ecocardiograma" }),
   ])
 
-  const all = (leads ?? []) as Lead[]
-
+  const totalLeads = total ?? 0
   const metrics = {
-    total: all.length,
-    confirmed: all.filter(l => l.confirmed_booked).length,
-    requires_human: all.filter(l => l.requires_human).length,
-    emergencies: all.filter(l => l.possible_emergency).length,
-    followup_pending: all.filter(l => l.status === "seguimiento_pendiente").length,
-    derivado_cimel: all.filter(l => l.status === "derivado_cimel").length,
-    derivado_swiss: all.filter(l => l.status === "derivado_swiss").length,
-    by_channel: {
-      google_maps: all.filter(l => l.origin_channel === "google_maps").length,
-      google_search: all.filter(l => l.origin_channel === "google_search").length,
-      instagram: all.filter(l => l.origin_channel === "instagram").length,
-      whatsapp: all.filter(l => l.origin_channel === "whatsapp").length,
-      manual: all.filter(l => l.origin_channel === "manual").length,
-    },
-    consulta: all.filter(l => l.requested_service === "consulta_cardiologia").length,
-    eco: all.filter(l => l.requested_service === "ecocardiograma").length,
+    total: totalLeads,
+    confirmed,
+    requires_human,
+    emergencies,
+    followup_pending,
+    derivado_cimel,
+    derivado_swiss,
+    by_channel: { google_maps: gm, google_search: gs, instagram: ig, whatsapp: wa, manual },
+    consulta,
+    eco,
   }
 
-  const conversionRate = metrics.total > 0
-    ? Math.round((metrics.confirmed / metrics.total) * 100)
+  const conversionRate = totalLeads > 0
+    ? Math.round((confirmed / totalLeads) * 100)
     : 0
 
-  return { metrics, conversionRate, recentLeads: (recentLeads ?? []) as Lead[] }
+  // Landing events (tabla puede no existir todavía — no bloquea el dashboard)
+  const landingMetrics = await (async () => {
+    try {
+      const [
+        { count: cimel },
+        { count: swiss },
+        { count: forms },
+      ] = await Promise.all([
+        supabase.from("landing_events").select("id", { count: "exact", head: true }).eq("event_type", "cta_cimel"),
+        supabase.from("landing_events").select("id", { count: "exact", head: true }).eq("event_type", "cta_swiss"),
+        supabase.from("landing_events").select("id", { count: "exact", head: true }).eq("event_type", "form_submitted"),
+      ])
+      return { cimel: cimel ?? 0, swiss: swiss ?? 0, forms: forms ?? 0, available: true }
+    } catch {
+      return { cimel: 0, swiss: 0, forms: 0, available: false }
+    }
+  })()
+
+  return { metrics, conversionRate, recentLeads: (recentLeads ?? []) as Lead[], landingMetrics }
 }
 
 export default async function DashboardPage() {
-  const { metrics, conversionRate, recentLeads } = await getDashboardData()
+  const { metrics, conversionRate, recentLeads, landingMetrics } = await getDashboardData()
 
   return (
     <div className="p-4 md:p-6 space-y-4 md:space-y-6">
@@ -185,6 +227,31 @@ export default async function DashboardPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Métricas de landings */}
+      {landingMetrics.available && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Métricas de landings</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-3 gap-4 text-center">
+              <div>
+                <p className="text-2xl font-bold text-blue-600">{landingMetrics.cimel}</p>
+                <p className="text-xs text-gray-500 mt-1">Instrucciones CIMEL vistas</p>
+              </div>
+              <div>
+                <p className="text-2xl font-bold text-teal-600">{landingMetrics.swiss}</p>
+                <p className="text-xs text-gray-500 mt-1">Instrucciones Swiss vistas</p>
+              </div>
+              <div>
+                <p className="text-2xl font-bold text-green-600">{landingMetrics.forms}</p>
+                <p className="text-xs text-gray-500 mt-1">Formularios enviados</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   )
 }

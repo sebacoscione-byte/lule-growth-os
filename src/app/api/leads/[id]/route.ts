@@ -18,6 +18,17 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   return NextResponse.json(data)
 }
 
+const PATCHABLE_FIELDS = new Set([
+  "name", "phone", "instagram_username", "origin_channel", "origin_campaign",
+  "searched_keyword", "insurance", "general_reason", "consent_to_contact",
+  "requested_service", "preferred_location", "preferred_day", "status",
+  "priority_score", "requires_human", "possible_emergency", "confirmed_booked",
+  "ai_summary", "last_message", "followup_due_at", "referred_at",
+  "utm_source", "utm_medium", "utm_campaign", "utm_content",
+  "origin_url", "landing_page", "clicked_cimel_cta", "clicked_swiss_cta",
+  "booking_instruction_viewed",
+])
+
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const supabase = await getAuthedClient()
   if (!supabase) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
@@ -25,14 +36,19 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   const { id } = await params
   const body = await request.json()
 
-  // Auto-set followup_due_at when transitioning to seguimiento_pendiente
-  if (body.status === "seguimiento_pendiente" && !body.followup_due_at) {
-    body.followup_due_at = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
+  const update: Record<string, unknown> = {}
+  for (const key of Object.keys(body)) {
+    if (PATCHABLE_FIELDS.has(key)) update[key] = body[key]
+  }
+
+  // Auto-set followup_due_at when transitioning to seguimiento_pendiente without explicit date
+  if (update.status === "seguimiento_pendiente" && !update.followup_due_at) {
+    update.followup_due_at = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
   }
 
   const { data, error } = await supabase
     .from("leads")
-    .update(body)
+    .update(update)
     .eq("id", id)
     .select()
     .single()

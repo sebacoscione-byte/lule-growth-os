@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Button } from "@/components/ui/button"
 import { STATUS_LABELS, STATUS_COLORS, type LeadStatus } from "@/types"
-import { Clock, Loader2 } from "lucide-react"
+import { CheckCircle2, Clock, Loader2, XCircle } from "lucide-react"
 
 const ALL_STATUSES: LeadStatus[] = [
   "nuevo", "interesado", "calificado", "derivado_cimel", "derivado_swiss",
@@ -27,13 +27,10 @@ export function LeadStatusEditor({
   const [saving, setSaving] = useState(false)
   const [pendingStatus, setPendingStatus] = useState<LeadStatus | null>(null)
 
-  async function save(newStatus: LeadStatus, followupHours?: number) {
+  async function save(newStatus: LeadStatus, extra?: Record<string, unknown>) {
     setSaving(true)
     setPendingStatus(null)
-    const body: Record<string, unknown> = { status: newStatus }
-    if (followupHours) {
-      body.followup_due_at = new Date(Date.now() + followupHours * 60 * 60 * 1000).toISOString()
-    }
+    const body: Record<string, unknown> = { status: newStatus, ...extra }
     await fetch(`/api/leads/${leadId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -47,6 +44,10 @@ export function LeadStatusEditor({
   function handleStatusChange(newStatus: LeadStatus) {
     if (newStatus === "seguimiento_pendiente") {
       setPendingStatus(newStatus)
+    } else if (newStatus === "confirmo_que_pidio_turno") {
+      save(newStatus, { confirmed_booked: true })
+    } else if (newStatus === "no_pudo_pedir_turno") {
+      save(newStatus, { requires_human: true })
     } else {
       save(newStatus)
     }
@@ -55,11 +56,40 @@ export function LeadStatusEditor({
   const followupDate = followupDueAt ? new Date(followupDueAt) : null
   const isOverdue = followupDate && followupDate < new Date()
 
+  const isTerminal =
+    status === "confirmo_que_pidio_turno" || status === "no_pudo_pedir_turno"
+
   return (
     <div className="space-y-3">
       <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${STATUS_COLORS[status]}`}>
         {STATUS_LABELS[status]}
       </span>
+
+      {/* Acciones rápidas de cierre — solo visibles cuando el lead está activo */}
+      {!isTerminal && status !== "descartado" && status !== "spam" && (
+        <div className="grid grid-cols-2 gap-2">
+          <Button
+            size="sm"
+            variant="outline"
+            className="border-green-300 text-green-700 hover:bg-green-50 text-xs"
+            disabled={saving}
+            onClick={() => save("confirmo_que_pidio_turno", { confirmed_booked: true })}
+          >
+            <CheckCircle2 className="h-3.5 w-3.5 mr-1" />
+            Ya pidió turno
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            className="border-red-300 text-red-700 hover:bg-red-50 text-xs"
+            disabled={saving}
+            onClick={() => save("no_pudo_pedir_turno", { requires_human: true })}
+          >
+            <XCircle className="h-3.5 w-3.5 mr-1" />
+            No pudo pedir
+          </Button>
+        </div>
+      )}
 
       <Select value={status} onValueChange={(v) => handleStatusChange(v as LeadStatus)}>
         <SelectTrigger className="w-full">
@@ -78,10 +108,10 @@ export function LeadStatusEditor({
             <Clock className="h-3.5 w-3.5" /> ¿Cuándo hacer seguimiento?
           </p>
           <div className="flex gap-2">
-            <Button size="sm" variant="outline" className="flex-1 text-xs" onClick={() => save("seguimiento_pendiente", 24)}>
+            <Button size="sm" variant="outline" className="flex-1 text-xs" onClick={() => save("seguimiento_pendiente", { followup_due_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString() })}>
               24 horas
             </Button>
-            <Button size="sm" variant="outline" className="flex-1 text-xs" onClick={() => save("seguimiento_pendiente", 48)}>
+            <Button size="sm" variant="outline" className="flex-1 text-xs" onClick={() => save("seguimiento_pendiente", { followup_due_at: new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString() })}>
               48 horas
             </Button>
           </div>

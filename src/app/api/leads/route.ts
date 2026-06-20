@@ -36,9 +36,38 @@ export async function POST(request: Request) {
 
   const body = await request.json()
 
+  const allowed = {
+    name: body.name ?? null,
+    phone: body.phone ?? null,
+    instagram_username: body.instagram_username ?? null,
+    origin_channel: body.origin_channel ?? "manual",
+    origin_campaign: body.origin_campaign ?? null,
+    searched_keyword: body.searched_keyword ?? null,
+    insurance: body.insurance ?? null,
+    general_reason: body.general_reason ?? null,
+    consent_to_contact: body.consent_to_contact ?? false,
+    requested_service: body.requested_service ?? "no_definido",
+    preferred_location: body.preferred_location ?? "sin_definir",
+    preferred_day: body.preferred_day ?? "sin_definir",
+    status: body.status ?? "nuevo",
+    priority_score: body.priority_score ?? 5,
+    requires_human: body.requires_human ?? false,
+    possible_emergency: body.possible_emergency ?? false,
+    confirmed_booked: body.confirmed_booked ?? false,
+    ai_summary: body.ai_summary ?? null,
+    last_message: body.last_message ?? null,
+    followup_due_at: body.followup_due_at ?? null,
+    utm_source: body.utm_source ?? null,
+    utm_medium: body.utm_medium ?? null,
+    utm_campaign: body.utm_campaign ?? null,
+    utm_content: body.utm_content ?? null,
+    origin_url: body.origin_url ?? null,
+    landing_page: body.landing_page ?? null,
+  }
+
   const { data, error } = await supabase
     .from("leads")
-    .insert([body])
+    .insert([allowed])
     .select()
     .single()
 

@@ -5,6 +5,9 @@ import { LOCATION_LABELS } from "@/types"
 
 export async function GET() {
   const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+
   const now = new Date().toISOString()
 
   const { data, error } = await supabase
@@ -18,8 +21,11 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  const { lead_id } = await request.json()
   const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+
+  const { lead_id } = await request.json()
 
   const { data: lead } = await supabase.from("leads").select("*").eq("id", lead_id).single()
   if (!lead) return NextResponse.json({ error: "lead not found" }, { status: 404 })

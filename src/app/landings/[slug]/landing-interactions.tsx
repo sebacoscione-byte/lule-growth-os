@@ -159,6 +159,7 @@ function LeadForm({ slug, clickedCimel, clickedSwiss, utms }: LeadFormProps) {
         const data = await res.json()
         setSubmitError(data.error ?? "Error al enviar. Intentá de nuevo.")
       } else {
+        fireEvent("form_submitted", slug, utms)
         setSubmitted(true)
       }
     } catch {
@@ -279,6 +280,18 @@ function LeadForm({ slug, clickedCimel, clickedSwiss, utms }: LeadFormProps) {
 
 // ─── Componente principal ─────────────────────────────────────────────────────
 
+function fireEvent(
+  event_type: string,
+  slug: string,
+  utms: Record<string, string>
+) {
+  fetch("/api/public/click", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ event_type, slug, ...utms }),
+  }).catch(() => {})
+}
+
 export function LandingInteractions({ slug }: { slug: string }) {
   const [expandedCta, setExpandedCta] = useState<"cimel" | "swiss" | null>(null)
   const [clickedCimel, setClickedCimel] = useState(false)
@@ -286,12 +299,20 @@ export function LandingInteractions({ slug }: { slug: string }) {
   const utms = useUtmParams()
 
   function toggleCimel() {
+    const willExpand = expandedCta !== "cimel"
     setExpandedCta(prev => prev === "cimel" ? null : "cimel")
-    setClickedCimel(true)
+    if (willExpand && !clickedCimel) {
+      setClickedCimel(true)
+      fireEvent("cta_cimel", slug, utms)
+    }
   }
   function toggleSwiss() {
+    const willExpand = expandedCta !== "swiss"
     setExpandedCta(prev => prev === "swiss" ? null : "swiss")
-    setClickedSwiss(true)
+    if (willExpand && !clickedSwiss) {
+      setClickedSwiss(true)
+      fireEvent("cta_swiss", slug, utms)
+    }
   }
 
   return (
