@@ -55,6 +55,7 @@ src/
 NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_ANON_KEY=
 SUPABASE_SERVICE_ROLE_KEY=
+SUPABASE_DB_PASSWORD=   # Para migraciones: npm run migrate. Ver: Supabase → Project Settings → Database → Password
 AI_PROVIDER=auto
 GEMINI_API_KEY=
 GEMINI_MODEL=gemini-3.5-flash
@@ -84,6 +85,9 @@ powershell.exe -NoProfile -Command "[System.Environment]::SetEnvironmentVariable
 
 # Dev
 powershell.exe -NoProfile -Command "[System.Environment]::SetEnvironmentVariable('Path', 'C:\Program Files\nodejs;' + [System.Environment]::GetEnvironmentVariable('Path', 'User'), 'Process'); npm run dev"
+
+# Migraciones de Supabase (requiere SUPABASE_DB_PASSWORD en .env.local)
+powershell.exe -NoProfile -Command "[System.Environment]::SetEnvironmentVariable('Path', 'C:\Program Files\nodejs;' + [System.Environment]::GetEnvironmentVariable('Path', 'User'), 'Process'); npm run migrate"
 ```
 
 ## Preferencias de interacción
