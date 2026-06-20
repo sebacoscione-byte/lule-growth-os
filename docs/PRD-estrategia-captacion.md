@@ -285,11 +285,11 @@ Después de que un lead complete el formulario o vea instrucciones:
 
 | ID | Descripción | Estado |
 |---|---|---|
-| RF-WEB-001 | Sitio web público de Lucía en `/dra-lucia-chahin` | Pendiente: hoy existe versión parcial en `/landings/dra-lucia-chahin`, falta ruta raíz pública |
-| RF-WEB-002 | Página institucional con quién es Lucía, servicios, sedes, días, instrucciones, avisos y formulario | Parcial |
-| RF-WEB-003 | Usar `/dra-lucia-chahin` como link principal para Instagram Bio y Google Business Profile | Pendiente hasta publicar ruta raíz |
-| RF-LANDING-001 | Landing principal /dra-lucia-chahin | Parcial: implementada bajo `/landings/dra-lucia-chahin` |
-| RF-LANDING-002 | Landings SEO locales (6 slugs) | Parcial: implementadas bajo `/landings/[slug]`, faltan slugs raíz |
+| RF-WEB-001 | Sitio web público de Lucía en `/dra-lucia-chahin` | ✅ Implementado |
+| RF-WEB-002 | Página institucional con quién es Lucía, servicios, sedes, días, instrucciones, avisos y formulario | ✅ Implementado |
+| RF-WEB-003 | Usar `/dra-lucia-chahin` como link principal para Instagram Bio y Google Business Profile | Listo para configurar: ruta raíz publicada |
+| RF-LANDING-001 | Landing principal /dra-lucia-chahin | ✅ Implementado |
+| RF-LANDING-002 | Landings SEO locales (6 slugs) | ✅ Implementado en rutas raíz y bajo `/landings/[slug]` |
 | RF-LANDING-003 | CTAs expandibles con instrucciones paso a paso | ✅ Implementado |
 | RF-LANDING-004 | Formulario "No pude pedir turno" con captura de lead | ✅ Implementado |
 | RF-LANDING-005 | API pública /api/public/lead sin autenticación | ✅ Implementado |
@@ -300,7 +300,7 @@ Después de que un lead complete el formulario o vea instrucciones:
 | RF-INSTAGRAM-002 | Tab "Bio y Fijados" con plantillas para bio, 3 posts fijados, destacadas, CTAs | ✅ Implementado |
 | RF-GOOGLE-001 | Módulo Google Local con posts, reseñas y perfil editable | ✅ Implementado |
 | RF-GOOGLE-002 | Tab Checklist en Google Local con ítem prioritario de link landing | ✅ Implementado |
-| RF-FOLLOWUP-001 | Crear seguimiento automático +24h desde formulario público | Pendiente |
+| RF-FOLLOWUP-001 | Crear seguimiento automático +24h desde formulario público | ✅ Implementado |
 | RF-FOLLOWUP-002 | Marcar `confirmed_booked` cuando el lead confirma turno | Parcial: existe campo, falta flujo dedicado |
 | RF-FOLLOWUP-003 | Estado `no_pudo_pedir_turno` con escalado a humano | Parcial |
 

@@ -1,5 +1,8 @@
 import { createServerClient } from "@supabase/ssr"
 import { NextResponse, type NextRequest } from "next/server"
+import { PUBLIC_LANDING_SLUGS } from "@/lib/public-landings"
+
+const PUBLIC_ROOT_PATHS = new Set(PUBLIC_LANDING_SLUGS.map((slug) => `/${slug}`))
 
 export async function middleware(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request })
@@ -31,7 +34,8 @@ export async function middleware(request: NextRequest) {
   const isPublicRoute =
     request.nextUrl.pathname.startsWith("/landings") ||
     request.nextUrl.pathname.startsWith("/api") ||
-    request.nextUrl.pathname === "/"
+    request.nextUrl.pathname === "/" ||
+    PUBLIC_ROOT_PATHS.has(request.nextUrl.pathname)
 
   if (!user && !isAuthRoute && !isPublicRoute) {
     const url = request.nextUrl.clone()

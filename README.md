@@ -66,6 +66,7 @@ src/
 │   │   └── configuracion/  # Datos de la doctora
 │   ├── (auth)/login/
 │   ├── api/
+│   ├── [slug]/              # Slugs SEO públicos en raíz
 │   └── landings/[slug]/    # Landing pages SEO públicas
 ├── lib/supabase/ · lib/ai.ts · lib/utils.ts
 ├── types/index.ts
@@ -76,11 +77,15 @@ src/
 
 | URL | Búsqueda objetivo |
 |-----|-------------------|
-| `/landings/dra-lucia-chahin` | dra lucia chahin |
-| `/landings/cardiologa-lanus` | cardióloga en lanús |
-| `/landings/cardiologa-lomas` | cardióloga en lomas |
-| `/landings/ecocardiograma-lanus` | ecocardiograma en lanús |
-| `/landings/ecocardiograma-lomas` | ecocardiograma en lomas |
+| `/dra-lucia-chahin` | dra lucia chahin |
+| `/cardiologa-lanus` | cardióloga en lanús |
+| `/cardiologa-lomas` | cardióloga en lomas |
+| `/ecocardiograma-lanus` | ecocardiograma en lanús |
+| `/ecocardiograma-lomas` | ecocardiograma en lomas |
+| `/consulta-cardiologica-lanus` | consulta cardiológica en lanús |
+| `/consulta-cardiologica-lomas` | consulta cardiológica en lomas |
+
+Las rutas antiguas bajo `/landings/[slug]` siguen disponibles, pero el link principal para Instagram Bio y Google Business Profile debe ser `/dra-lucia-chahin`.
 
 ## Guardrails médicos
 

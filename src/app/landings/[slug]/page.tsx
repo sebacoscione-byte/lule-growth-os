@@ -1,85 +1,9 @@
 import type { Metadata } from "next"
+import Link from "next/link"
 import { notFound } from "next/navigation"
 import { Heart, MapPin, Clock, AlertTriangle } from "lucide-react"
+import { LANDING_DATA } from "@/lib/public-landings"
 import { LandingInteractions } from "./landing-interactions"
-
-const LANDING_DATA: Record<string, {
-  title: string
-  description: string
-  h1: string
-  intro: string
-  services: string[]
-  locations: { name: string; address?: string; day: string; instruction: string }[]
-}> = {
-  "dra-lucia-chahin": {
-    title: "Dra. Lucía Chahin — Cardióloga | CIMEL Lanús · Swiss Medical Lomas",
-    description: "La Dra. Lucía Chahin es médica cardióloga. Atiende consultas de cardiología y realiza ecocardiogramas en CIMEL Lanús (martes) y Swiss Medical Lomas (viernes).",
-    h1: "Dra. Lucía Chahin — Cardióloga",
-    intro: "La Dra. Lucía Chahin es médica cardióloga especializada en consultas cardiológicas y ecocardiogramas. Atiende en Lanús y Lomas de Zamora.",
-    services: ["Consulta cardiológica", "Ecocardiograma", "Control cardiológico", "Evaluación cardiovascular"],
-    locations: [],
-  },
-  "cardiologa-lanus": {
-    title: "Cardióloga en Lanús — Dra. Lucía Chahin | CIMEL Lanús",
-    description: "¿Buscás una cardióloga en Lanús? La Dra. Lucía Chahin atiende consultas de cardiología los martes en CIMEL Lanús (Tucumán 1314).",
-    h1: "Cardióloga en Lanús — Dra. Lucía Chahin",
-    intro: "Si buscás una cardióloga en Lanús, la Dra. Lucía Chahin atiende los martes en CIMEL Lanús. Realizá consultas cardiológicas y ecocardiogramas.",
-    services: ["Consulta cardiológica", "Ecocardiograma", "Control cardiológico"],
-    locations: [
-      { name: "CIMEL Lanús", address: "Tucumán 1314, Lanús", day: "Martes", instruction: "Llamá a CIMEL Lanús y pedí turno con la Dra. Lucía Chahin para cardiología." },
-    ],
-  },
-  "cardiologa-lomas": {
-    title: "Cardióloga en Lomas de Zamora — Dra. Lucía Chahin | Swiss Medical",
-    description: "¿Buscás una cardióloga en Lomas de Zamora? La Dra. Lucía Chahin atiende consultas de cardiología los viernes en Swiss Medical Lomas.",
-    h1: "Cardióloga en Lomas de Zamora — Dra. Lucía Chahin",
-    intro: "Si buscás una cardióloga en Lomas de Zamora, la Dra. Lucía Chahin atiende los viernes en Swiss Medical Lomas.",
-    services: ["Consulta cardiológica", "Ecocardiograma", "Control cardiológico"],
-    locations: [
-      { name: "Swiss Medical Lomas", day: "Viernes", instruction: "Pedí turno por los canales oficiales de Swiss Medical Lomas y solicitá atención con la Dra. Lucía Chahin." },
-    ],
-  },
-  "ecocardiograma-lanus": {
-    title: "Ecocardiograma en Lanús — Dra. Lucía Chahin | CIMEL Lanús",
-    description: "¿Necesitás un ecocardiograma en Lanús? La Dra. Lucía Chahin realiza ecocardiogramas los martes en CIMEL Lanús (Tucumán 1314).",
-    h1: "Ecocardiograma en Lanús — Dra. Lucía Chahin",
-    intro: "Si necesitás un ecocardiograma en Lanús, la Dra. Lucía Chahin lo realiza los martes en CIMEL Lanús.",
-    services: ["Ecocardiograma", "Consulta cardiológica"],
-    locations: [
-      { name: "CIMEL Lanús", address: "Tucumán 1314, Lanús", day: "Martes", instruction: "Llamá a CIMEL Lanús y pedí turno con la Dra. Lucía Chahin para ecocardiograma." },
-    ],
-  },
-  "ecocardiograma-lomas": {
-    title: "Ecocardiograma en Lomas de Zamora — Dra. Lucía Chahin | Swiss Medical",
-    description: "¿Necesitás un ecocardiograma en Lomas de Zamora? La Dra. Lucía Chahin realiza ecocardiogramas los viernes en Swiss Medical Lomas.",
-    h1: "Ecocardiograma en Lomas de Zamora — Dra. Lucía Chahin",
-    intro: "Si necesitás un ecocardiograma en Lomas de Zamora, la Dra. Lucía Chahin lo realiza los viernes en Swiss Medical Lomas.",
-    services: ["Ecocardiograma", "Consulta cardiológica"],
-    locations: [
-      { name: "Swiss Medical Lomas", day: "Viernes", instruction: "Pedí turno por los canales oficiales de Swiss Medical Lomas y solicitá atención con la Dra. Lucía Chahin para ecocardiograma." },
-    ],
-  },
-  "consulta-cardiologica-lanus": {
-    title: "Consulta Cardiológica en Lanús — Dra. Lucía Chahin | CIMEL",
-    description: "Consulta cardiológica en Lanús con la Dra. Lucía Chahin. Atiende los martes en CIMEL Lanús, Tucumán 1314.",
-    h1: "Consulta Cardiológica en Lanús — Dra. Lucía Chahin",
-    intro: "Para una consulta cardiológica en Lanús, la Dra. Lucía Chahin atiende los martes en CIMEL Lanús.",
-    services: ["Consulta cardiológica", "Ecocardiograma", "Control cardiovascular"],
-    locations: [
-      { name: "CIMEL Lanús", address: "Tucumán 1314, Lanús", day: "Martes", instruction: "Llamá a CIMEL Lanús y pedí turno con la Dra. Lucía Chahin para consulta de cardiología." },
-    ],
-  },
-  "consulta-cardiologica-lomas": {
-    title: "Consulta Cardiológica en Lomas de Zamora — Dra. Lucía Chahin | Swiss Medical",
-    description: "Consulta cardiológica en Lomas de Zamora con la Dra. Lucía Chahin. Atiende los viernes en Swiss Medical Lomas.",
-    h1: "Consulta Cardiológica en Lomas de Zamora — Dra. Lucía Chahin",
-    intro: "Para una consulta cardiológica en Lomas de Zamora, la Dra. Lucía Chahin atiende los viernes en Swiss Medical Lomas.",
-    services: ["Consulta cardiológica", "Ecocardiograma", "Control cardiovascular"],
-    locations: [
-      { name: "Swiss Medical Lomas", day: "Viernes", instruction: "Pedí turno por los canales oficiales de Swiss Medical Lomas y solicitá atención con la Dra. Lucía Chahin." },
-    ],
-  },
-}
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
   const { slug } = await params
@@ -88,6 +12,9 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   return {
     title: data.title,
     description: data.description,
+    alternates: {
+      canonical: `/${slug}`,
+    },
   }
 }
 
@@ -118,6 +45,50 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
         </div>
       </section>
 
+      {isMain && (
+        <>
+          <section className="px-4 py-12">
+            <div className="mx-auto max-w-2xl">
+              <h2 className="mb-4 text-center text-xl font-bold text-gray-900">Sobre la Dra. Lucía Chahin</h2>
+              <div className="rounded-lg border border-gray-200 bg-gray-50 p-6 text-sm leading-6 text-gray-700">
+                <p>
+                  La Dra. Lucía Chahin es médica cardióloga. Atiende pacientes que buscan consulta cardiológica,
+                  controles cardiovasculares y ecocardiogramas en Lanús y Lomas de Zamora.
+                </p>
+                <p className="mt-3">
+                  Esta web reúne la información necesaria para elegir sede, conocer los días de atención y pedir
+                  turno por los canales oficiales de cada institución.
+                </p>
+              </div>
+            </div>
+          </section>
+
+          <section className="bg-gray-50 px-4 py-12">
+            <div className="mx-auto max-w-2xl">
+              <h2 className="mb-6 text-center text-xl font-bold text-gray-900">Dónde atiende</h2>
+              <div className="grid gap-4 sm:grid-cols-2">
+                {data.locations.map((loc) => (
+                  <div key={loc.name} className="rounded-lg border border-gray-200 bg-white p-5">
+                    <div className="mb-3 flex items-center gap-2">
+                      <MapPin className="h-5 w-5 text-blue-600" />
+                      <h3 className="font-semibold text-gray-900">{loc.name}</h3>
+                    </div>
+                    <div className="mb-2 flex items-center gap-2 text-sm text-gray-500">
+                      <Clock className="h-4 w-4" />
+                      <span>Atención los {loc.day}</span>
+                    </div>
+                    {loc.address && <p className="text-sm text-gray-500">{loc.address}</p>}
+                    <p className="mt-4 rounded-lg bg-blue-50 p-3 text-sm font-medium text-blue-900">
+                      {loc.instruction}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </section>
+        </>
+      )}
+
       {/* Servicios */}
       <section className="py-12 px-4">
         <div className="max-w-2xl mx-auto">
@@ -143,7 +114,7 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
             <h2 className="text-xl font-bold text-gray-900 mb-6 text-center">Cómo pedir turno</h2>
             <div className="space-y-4">
               {data.locations.map((loc) => (
-                <div key={loc.name} className="bg-white rounded-xl border border-blue-200 p-6">
+                <div key={loc.name} className="bg-white rounded-lg border border-blue-200 p-6">
                   <div className="flex items-center gap-2 mb-3">
                     <MapPin className="h-5 w-5 text-blue-600" />
                     <h3 className="font-semibold text-gray-900">{loc.name}</h3>
@@ -160,9 +131,12 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
                   </div>
                   <p className="mt-3 text-sm text-gray-500">
                     Para más información,{" "}
-                    <a href="/dra-lucia-chahin" className="text-blue-600 underline underline-offset-2">
+                    <Link href="/dra-lucia-chahin" className="text-blue-600 underline underline-offset-2">
                       visitá la página de la Dra. Lucía Chahin
-                    </a>.
+                    </Link>.
+                  </p>
+                  <p className="mt-3 text-xs text-gray-500">
+                    No se otorgan turnos desde esta web. Para pedir turno, comunicarse con CIMEL o Swiss Medical y solicitar a la Dra. Lucía Chahin.
                   </p>
                 </div>
               ))}

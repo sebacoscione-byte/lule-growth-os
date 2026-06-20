@@ -59,3 +59,29 @@ Nota: reiniciar Codex para que las nuevas skills queden disponibles en una proxi
 - Backlog actualizado con pendientes de web publica, rutas raiz, seguimiento automatico, confirmacion de turno, metricas y schema.
 - `npm run lint` finalizo correctamente.
 - `npm run build` finalizo correctamente; Next aviso que `middleware` esta deprecado a favor de `proxy`.
+
+---
+
+# En progreso - Web publica y slugs SEO raiz
+
+## Objetivo
+
+Publicar el sitio publico de la Dra. Lucia Chahin en `/dra-lucia-chahin`, exponer las landings SEO en rutas raiz, completar contenido institucional y activar seguimiento automatico desde el formulario publico.
+
+## Plan
+
+- [x] Revisar backlog, PRD y landing existente.
+- [x] Publicar slugs raiz reutilizando la landing publica.
+- [x] Completar contenido institucional de `/dra-lucia-chahin`.
+- [x] Crear leads publicos como `seguimiento_pendiente` con `followup_due_at` +24h.
+- [x] Actualizar docs/backlog/schema.
+- [x] Correr lint/build, commitear y pushear.
+
+## Resultado
+
+- `/dra-lucia-chahin` y los seis slugs SEO locales quedaron publicados en raiz.
+- La pagina principal ahora incluye quien es Lucia, servicios, sedes, dias, instrucciones, avisos y formulario.
+- El formulario publico crea leads en `seguimiento_pendiente` con `followup_due_at` a 24 horas.
+- `docs/schema.sql` quedo alineado con tracking UTM/clicks y tablas IA.
+- `npm run lint` y `npm run build` finalizaron correctamente.
+- Verificacion Playwright: `/dra-lucia-chahin` y `/cardiologa-lanus` cargaron con HTTP 200, contenido visible y sin errores de consola.

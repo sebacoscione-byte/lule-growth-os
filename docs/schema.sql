@@ -42,7 +42,16 @@ create table if not exists leads (
   updated_at timestamptz not null default now(),
   referred_at timestamptz,
   followup_due_at timestamptz,
-  confirmed_booked boolean not null default false
+  confirmed_booked boolean not null default false,
+  utm_source text,
+  utm_medium text,
+  utm_campaign text,
+  utm_content text,
+  origin_url text,
+  landing_page text,
+  clicked_cimel_cta boolean not null default false,
+  clicked_swiss_cta boolean not null default false,
+  booking_instruction_viewed boolean not null default false
 );
 
 -- ============================================================
@@ -96,13 +105,41 @@ create table if not exists app_config (
 );
 
 -- ============================================================
+-- AI AUDIT + CACHE
+-- ============================================================
+create table if not exists ai_requests (
+  id uuid default uuid_generate_v4() primary key,
+  provider text not null,
+  model text,
+  prompt_hash text not null,
+  purpose text not null,
+  created_at timestamptz not null default now(),
+  success boolean not null default true,
+  error_message text
+);
+
+create table if not exists ai_outputs (
+  id uuid default uuid_generate_v4() primary key,
+  prompt_hash text not null,
+  purpose text not null,
+  input_prompt text not null,
+  output_text text not null,
+  created_at timestamptz not null default now()
+);
+
+-- ============================================================
 -- INDEXES
 -- ============================================================
 create index if not exists leads_status_idx on leads(status);
 create index if not exists leads_origin_channel_idx on leads(origin_channel);
 create index if not exists leads_created_at_idx on leads(created_at desc);
 create index if not exists leads_followup_due_idx on leads(followup_due_at) where followup_due_at is not null;
+create index if not exists leads_utm_source_idx on leads(utm_source);
+create index if not exists leads_landing_page_idx on leads(landing_page);
 create index if not exists messages_lead_id_idx on messages(lead_id);
+create unique index if not exists ai_outputs_prompt_hash_idx on ai_outputs(prompt_hash);
+create index if not exists ai_requests_created_at_idx on ai_requests(created_at);
+create index if not exists ai_requests_prompt_hash_idx on ai_requests(prompt_hash);
 
 -- ============================================================
 -- UPDATED_AT trigger
@@ -135,6 +172,8 @@ alter table messages enable row level security;
 alter table growth_experiments enable row level security;
 alter table google_local_checklist enable row level security;
 alter table app_config enable row level security;
+alter table ai_requests enable row level security;
+alter table ai_outputs enable row level security;
 
 -- Solo usuarios autenticados pueden ver y modificar todo
 create policy "Authenticated users can do everything on leads"
@@ -151,6 +190,18 @@ create policy "Authenticated users can do everything on checklist"
 
 create policy "Authenticated users can do everything on config"
   on app_config for all using (auth.role() = 'authenticated');
+
+create policy "service_role_write_ai_requests"
+  on ai_requests for all to service_role using (true) with check (true);
+
+create policy "authenticated_read_ai_requests"
+  on ai_requests for select to authenticated using (true);
+
+create policy "service_role_write_ai_outputs"
+  on ai_outputs for all to service_role using (true) with check (true);
+
+create policy "authenticated_read_ai_outputs"
+  on ai_outputs for select to authenticated using (true);
 
 -- ============================================================
 -- SEED: Configuración inicial
@@ -181,7 +232,10 @@ insert into google_local_checklist (item_key) values
   ('link_landing'),
   ('telefono_configurado'),
   ('primera_publicacion'),
-  ('preguntas_frecuentes')
+  ('preguntas_frecuentes'),
+  ('categoria_cardiologia'),
+  ('link_instagram_bio'),
+  ('posts_fijados_3')
 on conflict (item_key) do nothing;
 
 -- ============================================================
