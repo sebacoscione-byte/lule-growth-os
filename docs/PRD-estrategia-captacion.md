@@ -1,5 +1,5 @@
 # Lule Growth OS — PRD Estrategia de Captación de Pacientes
-**Versión:** 2.0 — 2026-06-12  
+**Versión:** 2.1 — 2026-06-20
 **Profesional:** Dra. Lucía Chahin — Médica Cardióloga  
 **App:** Lule Growth OS
 
@@ -34,7 +34,7 @@ Google Maps / Google Search
 Instagram
 Redes sociales / Referidos
         ↓
-Landing principal: /dra-lucia-chahin
+Sitio web público de Lucía: /dra-lucia-chahin
         ↓
 Elegir servicio y sede
         ↓
@@ -45,14 +45,30 @@ Confirmación: ¿Logró pedir turno?
 Seguimiento por la app si no pudo
 ```
 
-La landing es la pieza central de conversión. Instagram y Google Maps son canales de entrada.
+El sitio web público de Lucía es la pieza central de conversión. Instagram y Google Maps son canales de entrada.
+No debe tratarse solo como una landing aislada de campaña: debe ser la página pública principal donde una persona pueda entender quién es Lucía, qué servicios ofrece, dónde atiende y cómo pedir turno por los canales oficiales.
 
 ---
 
 ## 4. Landing principal
 
 **Ruta:** `/dra-lucia-chahin`  
-**Propósito:** Primera impresión clara, con instrucciones directas para pedir turno.
+**Propósito:** Página web pública e institucional de la Dra. Lucía Chahin, con primera impresión clara e instrucciones directas para pedir turno.
+
+Esta página es el activo público principal de captación. Debe funcionar para personas que llegan desde Google Business Profile, Google Search, Instagram, WhatsApp, referidos o pauta.
+
+### Información obligatoria
+
+1. Quién es la Dra. Lucía Chahin.
+2. Especialidad: cardiología.
+3. Servicios: consulta cardiológica, ecocardiograma, control cardiovascular y evaluación cardiovascular.
+4. Lugares de atención: CIMEL Lanús y Swiss Medical Lomas.
+5. Días de atención: martes en CIMEL Lanús y viernes en Swiss Medical Lomas.
+6. Cómo pedir turno en cada institución.
+7. Aviso claro: la web no da turnos, no reserva horarios y no confirma disponibilidad.
+8. Aviso médico y urgencias.
+9. Formulario "No pude pedir turno" para seguimiento.
+10. URL apta para usar como link principal en Instagram Bio y Google Business Profile.
 
 ### Estructura de la página
 
@@ -77,7 +93,7 @@ La landing es la pieza central de conversión. Instagram y Google Maps son canal
 ### Formulario "¿No pudiste pedir turno?"
 Campos: nombre · WhatsApp (requerido) · servicio buscado · sede preferida · mensaje opcional · consentimiento
 
-Este formulario crea un lead con `status: nuevo` y `origin_channel: landing_page` (o el UTM origin si aplica).
+Este formulario crea un lead con `status: seguimiento_pendiente`, `followup_due_at: +24h` y `origin_channel: landing_page` (o el UTM origin si aplica).
 
 ---
 
@@ -269,8 +285,11 @@ Después de que un lead complete el formulario o vea instrucciones:
 
 | ID | Descripción | Estado |
 |---|---|---|
-| RF-LANDING-001 | Landing principal /dra-lucia-chahin | ✅ Implementado |
-| RF-LANDING-002 | Landings SEO locales (6 slugs) | ✅ Implementado |
+| RF-WEB-001 | Sitio web público de Lucía en `/dra-lucia-chahin` | Pendiente: hoy existe versión parcial en `/landings/dra-lucia-chahin`, falta ruta raíz pública |
+| RF-WEB-002 | Página institucional con quién es Lucía, servicios, sedes, días, instrucciones, avisos y formulario | Parcial |
+| RF-WEB-003 | Usar `/dra-lucia-chahin` como link principal para Instagram Bio y Google Business Profile | Pendiente hasta publicar ruta raíz |
+| RF-LANDING-001 | Landing principal /dra-lucia-chahin | Parcial: implementada bajo `/landings/dra-lucia-chahin` |
+| RF-LANDING-002 | Landings SEO locales (6 slugs) | Parcial: implementadas bajo `/landings/[slug]`, faltan slugs raíz |
 | RF-LANDING-003 | CTAs expandibles con instrucciones paso a paso | ✅ Implementado |
 | RF-LANDING-004 | Formulario "No pude pedir turno" con captura de lead | ✅ Implementado |
 | RF-LANDING-005 | API pública /api/public/lead sin autenticación | ✅ Implementado |
@@ -281,9 +300,9 @@ Después de que un lead complete el formulario o vea instrucciones:
 | RF-INSTAGRAM-002 | Tab "Bio y Fijados" con plantillas para bio, 3 posts fijados, destacadas, CTAs | ✅ Implementado |
 | RF-GOOGLE-001 | Módulo Google Local con posts, reseñas y perfil editable | ✅ Implementado |
 | RF-GOOGLE-002 | Tab Checklist en Google Local con ítem prioritario de link landing | ✅ Implementado |
-| RF-FOLLOWUP-001 | Estado `seguimiento_pendiente` en leads | ✅ Implementado |
-| RF-FOLLOWUP-002 | Marcar `confirmed_booked` cuando el lead confirma turno | ✅ Implementado |
-| RF-FOLLOWUP-003 | Estado `no_pudo_pedir_turno` con escalado a humano | ✅ Implementado |
+| RF-FOLLOWUP-001 | Crear seguimiento automático +24h desde formulario público | Pendiente |
+| RF-FOLLOWUP-002 | Marcar `confirmed_booked` cuando el lead confirma turno | Parcial: existe campo, falta flujo dedicado |
+| RF-FOLLOWUP-003 | Estado `no_pudo_pedir_turno` con escalado a humano | Parcial |
 
 ---
 
