@@ -63,14 +63,17 @@ ANTHROPIC_MODEL=claude-sonnet-4-6
 # Google Business Profile API (OAuth 2.0)
 GOOGLE_CLIENT_ID=
 GOOGLE_CLIENT_SECRET=
-GOOGLE_REDIRECT_URI=http://localhost:3000/api/google-business/callback
+# Opcional si el host publico no coincide con la request:
+GOOGLE_OAUTH_BASE_URL=https://tu-dominio.com
 ```
 
 ## Google Business Profile — cómo configurar OAuth
 1. Ir a https://console.cloud.google.com/ → crear proyecto
 2. Habilitar: "My Business Business Information API", "My Business Account Management API", "Business Profile Performance API"
 3. OAuth consent screen → External → agregar scope `https://www.googleapis.com/auth/business.manage`
-4. Crear credencial OAuth 2.0 Web → Authorized redirect URI: `http://localhost:3000/api/google-business/callback` (+ URI de producción)
+4. Crear credencial OAuth 2.0 Web → Authorized redirect URIs:
+   - `http://localhost:3000/api/google-business/callback`
+   - `https://TU-DOMINIO/api/google-business/callback`
 5. Copiar Client ID y Client Secret a .env.local
 6. En la app ir a Google Business → "Conectar con Google Business Profile" → autorizar
 

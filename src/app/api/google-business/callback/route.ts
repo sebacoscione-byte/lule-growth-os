@@ -1,13 +1,27 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createServiceClient } from "@/lib/supabase/server"
 import { saveTokens, listAccounts, listLocations } from "@/lib/google-business"
+import {
+  GOOGLE_OAUTH_REDIRECT_COOKIE,
+  GOOGLE_OAUTH_STATE_COOKIE,
+  GOOGLE_OAUTH_VERIFIER_COOKIE,
+  getGoogleRedirectUri,
+} from "@/lib/google-oauth"
 
 export async function GET(req: NextRequest) {
   const code = req.nextUrl.searchParams.get("code")
   const error = req.nextUrl.searchParams.get("error")
+  const state = req.nextUrl.searchParams.get("state")
+  const expectedState = req.cookies.get(GOOGLE_OAUTH_STATE_COOKIE)?.value
+  const codeVerifier = req.cookies.get(GOOGLE_OAUTH_VERIFIER_COOKIE)?.value
+  const redirectUri = req.cookies.get(GOOGLE_OAUTH_REDIRECT_COOKIE)?.value ?? getGoogleRedirectUri(req)
 
   if (error || !code) {
     return NextResponse.redirect(new URL("/google-local?error=auth_denied", req.url))
+  }
+
+  if (!state || !expectedState || state !== expectedState || !codeVerifier) {
+    return NextResponse.redirect(new URL("/google-local?error=oauth_state", req.url))
   }
 
   // Exchange code for tokens
@@ -18,8 +32,9 @@ export async function GET(req: NextRequest) {
       code,
       client_id: process.env.GOOGLE_CLIENT_ID!,
       client_secret: process.env.GOOGLE_CLIENT_SECRET!,
-      redirect_uri: process.env.GOOGLE_REDIRECT_URI!,
+      redirect_uri: redirectUri,
       grant_type: "authorization_code",
+      code_verifier: codeVerifier,
     }),
   })
 
@@ -61,5 +76,10 @@ export async function GET(req: NextRequest) {
     // Non-fatal: tokens saved, location discovery failed
   }
 
-  return NextResponse.redirect(new URL("/google-local?connected=1", req.url))
+  const response = NextResponse.redirect(new URL("/google-local?connected=1", req.url))
+  response.cookies.set(GOOGLE_OAUTH_STATE_COOKIE, "", { path: "/api/google-business", maxAge: 0 })
+  response.cookies.set(GOOGLE_OAUTH_VERIFIER_COOKIE, "", { path: "/api/google-business", maxAge: 0 })
+  response.cookies.set(GOOGLE_OAUTH_REDIRECT_COOKIE, "", { path: "/api/google-business", maxAge: 0 })
+
+  return response
 }

@@ -184,7 +184,22 @@ function LocationPickerView({ onPicked }: { onPicked: () => void }) {
 
 // ─── Not connected state ──────────────────────────────────────────────────────
 
-function ConnectView() {
+function getAuthErrorMessage(error: string | null) {
+  if (error === "oauth_state") {
+    return "Google devolvió una respuesta que no coincide con la solicitud original. Volvé a intentar la conexión desde esta pantalla."
+  }
+  if (error === "token_exchange") {
+    return "Google autorizó la cuenta, pero no pudimos completar el intercambio de tokens. Revisá Client ID, Client Secret y el redirect URI autorizado."
+  }
+  if (error === "auth_denied") {
+    return "La autorización fue cancelada o Google no devolvió un código válido."
+  }
+  return null
+}
+
+function ConnectView({ authError }: { authError: string | null }) {
+  const authErrorMessage = getAuthErrorMessage(authError)
+
   return (
     <div className="flex flex-col items-center justify-center py-20 text-center gap-6">
       <div className="w-16 h-16 rounded-full bg-blue-50 flex items-center justify-center">
@@ -196,6 +211,12 @@ function ConnectView() {
           Conectá la app con tu Google Business Profile para publicar posts, responder reseñas y editar el perfil sin salir de acá.
         </p>
       </div>
+      {authErrorMessage && (
+        <div className="max-w-md rounded-lg border border-amber-200 bg-amber-50 p-4 text-left text-sm text-amber-800">
+          <p className="font-medium">No se pudo completar la conexión</p>
+          <p className="mt-1">{authErrorMessage}</p>
+        </div>
+      )}
       <div className="flex flex-col items-center gap-2">
         <Button asChild size="lg" className="gap-2">
           <Link href="/api/google-business/auth" prefetch={false}>
@@ -1029,6 +1050,7 @@ export default function GoogleLocalPage() {
   const [status, setStatus] = useState<StatusData | null>(null)
   const [loadingStatus, setLoadingStatus] = useState(true)
   const [disconnecting, setDisconnecting] = useState(false)
+  const [authError, setAuthError] = useState<string | null>(null)
 
   const fetchStatus = useCallback(async () => {
     setLoadingStatus(true)
@@ -1043,6 +1065,12 @@ export default function GoogleLocalPage() {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchStatus()
   }, [fetchStatus])
+
+  useEffect(() => {
+    const error = new URLSearchParams(window.location.search).get("error")
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setAuthError(error)
+  }, [])
 
   async function disconnect() {
     if (!confirm("¿Desconectar la app de Google Business?")) return
@@ -1096,7 +1124,7 @@ export default function GoogleLocalPage() {
       </div>
 
       {!status?.connected ? (
-        <ConnectView />
+        <ConnectView authError={authError} />
       ) : status?.needsLocationPick ? (
         <LocationPickerView onPicked={fetchStatus} />
       ) : (

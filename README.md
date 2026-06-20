@@ -111,6 +111,24 @@ GEMINI_IMAGE_MODEL=gemini-3.1-flash-image
 
 En Vercel, agregar las mismas variables de entorno y volver a desplegar. La pantalla `Configuración` muestra el proveedor activo sin exponer las claves.
 
+## Google Business OAuth
+
+Variables necesarias:
+
+```bash
+GOOGLE_CLIENT_ID=...
+GOOGLE_CLIENT_SECRET=...
+# Opcional si el host publico no coincide con la request:
+# GOOGLE_OAUTH_BASE_URL=https://tu-dominio.com
+```
+
+En Google Cloud Console, la credencial debe ser de tipo **Web application** y tener estos Authorized redirect URIs:
+
+- `http://localhost:3000/api/google-business/callback`
+- `https://TU-DOMINIO/api/google-business/callback`
+
+La app genera `state` y PKCE en `/api/google-business/auth`, y usa el mismo redirect URI en `/api/google-business/callback`.
+
 ---
 
 ## Getting Started (original)

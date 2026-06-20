@@ -85,3 +85,28 @@ Publicar el sitio publico de la Dra. Lucia Chahin en `/dra-lucia-chahin`, expone
 - `docs/schema.sql` quedo alineado con tracking UTM/clicks y tablas IA.
 - `npm run lint` y `npm run build` finalizaron correctamente.
 - Verificacion Playwright: `/dra-lucia-chahin` y `/cardiologa-lanus` cargaron con HTTP 200, contenido visible y sin errores de consola.
+
+---
+
+# En progreso - Google OAuth bloqueado por politica
+
+## Objetivo
+
+Resolver el bloqueo `Error 400: invalid_request` al conectar Google Business Profile, alineando el flujo OAuth con validaciones modernas de Google.
+
+## Plan
+
+- [x] Revisar rutas OAuth de Google Business.
+- [x] Agregar `state` y PKCE al inicio de autorizacion.
+- [x] Validar `state` y reutilizar el mismo redirect URI en callback.
+- [x] Derivar el callback desde el host actual y documentar `GOOGLE_OAUTH_BASE_URL` como override opcional.
+- [x] Correr lint/build, commitear y pushear.
+
+## Resultado
+
+- El inicio OAuth de Google Business ahora envia `state` y PKCE (`code_challenge_method=S256`).
+- El callback valida `state` y usa el mismo redirect URI guardado en cookie httpOnly.
+- El redirect URI se deriva del host actual; `GOOGLE_OAUTH_BASE_URL` queda como override opcional para proxies.
+- La pantalla Google Local muestra errores de callback en castellano.
+- `npm run lint` y `npm run build` finalizaron correctamente.
+- Verificacion local: `/api/google-business/auth` devuelve 307 a `accounts.google.com` con `state`, `code_challenge` y cookies OAuth.
