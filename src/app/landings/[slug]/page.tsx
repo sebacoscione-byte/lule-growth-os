@@ -2,8 +2,8 @@ import type { Metadata } from "next"
 import Image from "next/image"
 import Link from "next/link"
 import { notFound } from "next/navigation"
-import { MapPin, Clock, AlertTriangle, MessageCircle, Phone, Map } from "lucide-react"
-import { LANDING_DATA, buildWhatsAppUrl, WHATSAPP_MESSAGES } from "@/lib/public-landings"
+import { MapPin, Clock, AlertTriangle, Phone, Map } from "lucide-react"
+import { LANDING_DATA } from "@/lib/public-landings"
 import { LandingInteractions } from "./landing-interactions"
 
 function getBaseUrl(): string {
@@ -53,7 +53,6 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
         <section className="bg-gradient-to-b from-blue-50 to-white py-12 px-4">
           <div className="max-w-2xl mx-auto">
             <div className="flex flex-col sm:flex-row items-center gap-8">
-              {/* Foto */}
               <div className="shrink-0">
                 <div className="relative h-44 w-44 rounded-full overflow-hidden border-4 border-white shadow-lg">
                   <Image
@@ -65,7 +64,6 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
                   />
                 </div>
               </div>
-              {/* Texto */}
               <div className="text-center sm:text-left">
                 <h1 className="text-3xl font-bold text-gray-900">{data.h1}</h1>
                 <p className="text-blue-600 font-medium mt-1">Cardióloga y Ecocardiografista</p>
@@ -73,16 +71,6 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
                 <p className="text-sm text-gray-500 mt-2">
                   Consultas cardiológicas y ecocardiogramas · Lanús y Lomas de Zamora
                 </p>
-                {/* WhatsApp CTA principal */}
-                <a
-                  href={buildWhatsAppUrl(WHATSAPP_MESSAGES.general)}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 mt-5 bg-green-500 hover:bg-green-600 text-white font-medium px-5 py-2.5 rounded-full text-sm transition-colors shadow-sm"
-                >
-                  <MessageCircle className="h-4 w-4" />
-                  Consultar por WhatsApp
-                </a>
               </div>
             </div>
           </div>
@@ -92,21 +80,6 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
           <div className="max-w-2xl mx-auto text-center">
             <h1 className="text-3xl font-bold text-gray-900 mb-4">{data.h1}</h1>
             <p className="text-lg text-gray-600">{data.intro}</p>
-            <a
-              href={buildWhatsAppUrl(
-                data.locations[0]?.name.includes("CIMEL")
-                  ? WHATSAPP_MESSAGES.cimel
-                  : data.locations[0]?.name.includes("Swiss")
-                  ? WHATSAPP_MESSAGES.swiss
-                  : WHATSAPP_MESSAGES.general
-              )}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 mt-6 bg-green-500 hover:bg-green-600 text-white font-medium px-5 py-2.5 rounded-full text-sm transition-colors shadow-sm"
-            >
-              <MessageCircle className="h-4 w-4" />
-              Consultar por WhatsApp
-            </a>
           </div>
         </section>
       )}
@@ -156,30 +129,17 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
                     <p className="mt-3 rounded-lg bg-blue-50 p-3 text-sm font-medium text-blue-900">
                       {loc.instruction}
                     </p>
-                    <div className="mt-3 flex flex-col gap-2">
-                      {loc.mapsUrl && (
-                        <a
-                          href={loc.mapsUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="flex items-center gap-2 text-sm font-medium text-blue-600 hover:text-blue-700"
-                        >
-                          <Map className="h-4 w-4" />
-                          Ver en Google Maps
-                        </a>
-                      )}
+                    {loc.mapsUrl && (
                       <a
-                        href={buildWhatsAppUrl(
-                          loc.name.includes("CIMEL") ? WHATSAPP_MESSAGES.cimel : WHATSAPP_MESSAGES.swiss
-                        )}
+                        href={loc.mapsUrl}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="flex items-center gap-2 text-green-600 hover:text-green-700 text-sm font-medium"
+                        className="mt-3 flex items-center gap-2 text-sm font-medium text-blue-600 hover:text-blue-700"
                       >
-                        <MessageCircle className="h-4 w-4" />
-                        Consultar por WhatsApp
+                        <Map className="h-4 w-4" />
+                        Ver en Google Maps
                       </a>
-                    </div>
+                    )}
                   </div>
                 ))}
               </div>
@@ -235,17 +195,6 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
                     <p className="text-sm text-blue-900 font-medium">{loc.instruction}</p>
                   </div>
                   <div className="mt-4 flex flex-col sm:flex-row gap-3 flex-wrap">
-                    <a
-                      href={buildWhatsAppUrl(
-                        loc.name.includes("CIMEL") ? WHATSAPP_MESSAGES.cimel : WHATSAPP_MESSAGES.swiss
-                      )}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center justify-center gap-2 bg-green-500 hover:bg-green-600 text-white font-medium px-4 py-2 rounded-full text-sm transition-colors"
-                    >
-                      <MessageCircle className="h-4 w-4" />
-                      Consultar por WhatsApp
-                    </a>
                     {loc.mapsUrl && (
                       <a
                         href={loc.mapsUrl}
@@ -285,7 +234,6 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
               <p>
                 Este sitio no reemplaza una consulta médica y no debe usarse para urgencias.
                 Ante síntomas de alarma (dolor de pecho, falta de aire, etc.), concurrí a una guardia o llamá al 107.
-                WhatsApp no es un canal de urgencias.
               </p>
             </div>
           </div>
