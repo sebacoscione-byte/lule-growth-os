@@ -44,7 +44,7 @@ Google Maps, Instagram, WhatsApp y búsqueda orgánica.
 
 ### Profesionalización pendiente ⏳
 - [ ] Foto profesional de la Dra. Lucía Chahin en el hero *(requiere: foto de Lucía)*
-- [ ] Número de matrícula (MN o MP) visible junto al nombre *(requiere: matrícula)*
+- [ ] Número de matrícula (MN o MP) visible junto al nombre — genera confianza y es legalmente requerido; es un dato profesional público, verificable en SISA *(requiere: número de matrícula de Lucía)*
 - [ ] FAQ: preguntas frecuentes sobre turnos, servicios, cobertura y sedes
 - [ ] Links directos a Google Maps para CIMEL Lanús y Swiss Medical Lomas
 - [ ] Botón de WhatsApp con mensaje prearmado según sede elegida *(requiere: número WA)*
