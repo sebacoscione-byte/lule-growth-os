@@ -43,11 +43,11 @@ Google Maps, Instagram, WhatsApp y búsqueda orgánica.
 - [x] Bloque "Sobre la doctora" (contenido básico)
 
 ### Profesionalización pendiente ⏳
-- [ ] Foto profesional de la Dra. Lucía Chahin en el hero *(requiere: foto de Lucía)*
+- [x] Foto profesional de la Dra. Lucía Chahin en el hero — guardar como `public/lucia-chahin.jpg` *(foto recibida, pendiente de subir al servidor)*
 - [ ] Número de matrícula (MN o MP) visible junto al nombre — genera confianza y es legalmente requerido; es un dato profesional público, verificable en SISA *(requiere: número de matrícula de Lucía)*
 - [ ] FAQ: preguntas frecuentes sobre turnos, servicios, cobertura y sedes
 - [ ] Links directos a Google Maps para CIMEL Lanús y Swiss Medical Lomas
-- [ ] Botón de WhatsApp con mensaje prearmado según sede elegida *(requiere: número WA)*
+- [x] Botón de WhatsApp con mensaje prearmado según sede (+5491123842117) — en hero, en cada sede y en cada landing SEO
 - [ ] Dominio propio (`draluciachahin.com.ar` o similar) *(requiere: contratación del dominio)*
 
 ### Acciones externas (las hace Lucía)

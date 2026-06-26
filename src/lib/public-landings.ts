@@ -89,3 +89,15 @@ export const LANDING_DATA: Record<string, PublicLandingData> = {
 }
 
 export const PUBLIC_LANDING_SLUGS = Object.keys(LANDING_DATA)
+
+export const WHATSAPP_NUMBER = "5491123842117"
+
+export function buildWhatsAppUrl(message: string): string {
+  return `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(message)}`
+}
+
+export const WHATSAPP_MESSAGES = {
+  general: "Hola, me gustaría consultar cómo pedir turno con la Dra. Lucía Chahin.",
+  cimel: "Hola, me gustaría pedir turno con la Dra. Lucía Chahin en CIMEL Lanús (martes). ¿Me pueden ayudar?",
+  swiss: "Hola, me gustaría pedir turno con la Dra. Lucía Chahin en Swiss Medical Lomas (viernes). ¿Me pueden ayudar?",
+}

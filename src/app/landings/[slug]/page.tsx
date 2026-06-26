@@ -1,8 +1,9 @@
 import type { Metadata } from "next"
+import Image from "next/image"
 import Link from "next/link"
 import { notFound } from "next/navigation"
-import { Heart, MapPin, Clock, AlertTriangle } from "lucide-react"
-import { LANDING_DATA } from "@/lib/public-landings"
+import { MapPin, Clock, AlertTriangle, MessageCircle } from "lucide-react"
+import { LANDING_DATA, buildWhatsAppUrl, WHATSAPP_MESSAGES } from "@/lib/public-landings"
 import { LandingInteractions } from "./landing-interactions"
 
 function getBaseUrl(): string {
@@ -46,23 +47,69 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
 
   return (
     <main className="min-h-screen bg-white">
+
       {/* Hero */}
-      <section className="bg-gradient-to-b from-blue-50 to-white py-16 px-4">
-        <div className="max-w-2xl mx-auto text-center">
-          <div className="flex justify-center mb-4">
-            <div className="flex h-14 w-14 items-center justify-center rounded-full bg-rose-100">
-              <Heart className="h-7 w-7 text-rose-500" />
+      {isMain ? (
+        <section className="bg-gradient-to-b from-blue-50 to-white py-12 px-4">
+          <div className="max-w-2xl mx-auto">
+            <div className="flex flex-col sm:flex-row items-center gap-8">
+              {/* Foto */}
+              <div className="shrink-0">
+                <div className="relative h-44 w-44 rounded-full overflow-hidden border-4 border-white shadow-lg">
+                  <Image
+                    src="/lucia-chahin.jpg"
+                    alt="Dra. Lucía Chahin — Cardióloga"
+                    fill
+                    className="object-cover object-top"
+                    priority
+                  />
+                </div>
+              </div>
+              {/* Texto */}
+              <div className="text-center sm:text-left">
+                <h1 className="text-3xl font-bold text-gray-900">{data.h1}</h1>
+                <p className="text-blue-600 font-medium mt-1">Cardióloga y Ecocardiografista</p>
+                <p className="text-gray-600 mt-3 leading-relaxed">{data.intro}</p>
+                <p className="text-sm text-gray-500 mt-2">
+                  Consultas cardiológicas y ecocardiogramas · Lanús y Lomas de Zamora
+                </p>
+                {/* WhatsApp CTA principal */}
+                <a
+                  href={buildWhatsAppUrl(WHATSAPP_MESSAGES.general)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 mt-5 bg-green-500 hover:bg-green-600 text-white font-medium px-5 py-2.5 rounded-full text-sm transition-colors shadow-sm"
+                >
+                  <MessageCircle className="h-4 w-4" />
+                  Consultar por WhatsApp
+                </a>
+              </div>
             </div>
           </div>
-          <h1 className="text-3xl font-bold text-gray-900 mb-4">{data.h1}</h1>
-          <p className="text-lg text-gray-600">{data.intro}</p>
-          {isMain && (
-            <p className="text-sm text-gray-500 mt-3">
-              Consultas cardiológicas y ecocardiogramas · Lanús y Lomas de Zamora
-            </p>
-          )}
-        </div>
-      </section>
+        </section>
+      ) : (
+        <section className="bg-gradient-to-b from-blue-50 to-white py-16 px-4">
+          <div className="max-w-2xl mx-auto text-center">
+            <h1 className="text-3xl font-bold text-gray-900 mb-4">{data.h1}</h1>
+            <p className="text-lg text-gray-600">{data.intro}</p>
+            <a
+              href={buildWhatsAppUrl(
+                data.locations[0]?.name.includes("CIMEL")
+                  ? WHATSAPP_MESSAGES.cimel
+                  : data.locations[0]?.name.includes("Swiss")
+                  ? WHATSAPP_MESSAGES.swiss
+                  : WHATSAPP_MESSAGES.general
+              )}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 mt-6 bg-green-500 hover:bg-green-600 text-white font-medium px-5 py-2.5 rounded-full text-sm transition-colors shadow-sm"
+            >
+              <MessageCircle className="h-4 w-4" />
+              Consultar por WhatsApp
+            </a>
+          </div>
+        </section>
+      )}
 
       {isMain && (
         <>
@@ -71,8 +118,8 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
               <h2 className="mb-4 text-center text-xl font-bold text-gray-900">Sobre la Dra. Lucía Chahin</h2>
               <div className="rounded-lg border border-gray-200 bg-gray-50 p-6 text-sm leading-6 text-gray-700">
                 <p>
-                  La Dra. Lucía Chahin es médica cardióloga. Atiende pacientes que buscan consulta cardiológica,
-                  controles cardiovasculares y ecocardiogramas en Lanús y Lomas de Zamora.
+                  La Dra. Lucía Chahin es médica cardióloga y ecocardiografista. Atiende pacientes que buscan
+                  consulta cardiológica, controles cardiovasculares y ecocardiogramas en Lanús y Lomas de Zamora.
                 </p>
                 <p className="mt-3">
                   Esta web reúne la información necesaria para elegir sede, conocer los días de atención y pedir
@@ -100,6 +147,18 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
                     <p className="mt-4 rounded-lg bg-blue-50 p-3 text-sm font-medium text-blue-900">
                       {loc.instruction}
                     </p>
+                    {/* WhatsApp por sede */}
+                    <a
+                      href={buildWhatsAppUrl(
+                        loc.name.includes("CIMEL") ? WHATSAPP_MESSAGES.cimel : WHATSAPP_MESSAGES.swiss
+                      )}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="mt-3 flex items-center gap-2 text-green-600 hover:text-green-700 text-sm font-medium"
+                    >
+                      <MessageCircle className="h-4 w-4" />
+                      Consultar por WhatsApp
+                    </a>
                   </div>
                 ))}
               </div>
@@ -115,7 +174,7 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             {data.services.map((service) => (
               <div key={service} className="flex items-center gap-2 p-4 rounded-lg border border-gray-200 bg-gray-50">
-                <Heart className="h-4 w-4 text-rose-400 shrink-0" />
+                <span className="h-2 w-2 rounded-full bg-rose-400 shrink-0" />
                 <span className="text-sm font-medium text-gray-800">{service}</span>
               </div>
             ))}
@@ -123,11 +182,10 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
         </div>
       </section>
 
-      {/* Interacciones para /dra-lucia-chahin: CTAs expandibles + formulario */}
+      {/* Interacciones */}
       {isMain ? (
         <LandingInteractions slug={slug} />
       ) : (
-        /* Instrucciones estáticas para landings SEO */
         <section className="py-12 px-4 bg-blue-50">
           <div className="max-w-2xl mx-auto">
             <h2 className="text-xl font-bold text-gray-900 mb-6 text-center">Cómo pedir turno</h2>
@@ -148,14 +206,28 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
                   <div className="rounded-lg bg-blue-50 p-4">
                     <p className="text-sm text-blue-900 font-medium">{loc.instruction}</p>
                   </div>
-                  <p className="mt-3 text-sm text-gray-500">
-                    Para más información,{" "}
-                    <Link href="/dra-lucia-chahin" className="text-blue-600 underline underline-offset-2">
-                      visitá la página de la Dra. Lucía Chahin
-                    </Link>.
-                  </p>
+                  <div className="mt-4 flex flex-col sm:flex-row gap-3">
+                    <a
+                      href={buildWhatsAppUrl(
+                        loc.name.includes("CIMEL") ? WHATSAPP_MESSAGES.cimel : WHATSAPP_MESSAGES.swiss
+                      )}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center justify-center gap-2 bg-green-500 hover:bg-green-600 text-white font-medium px-4 py-2 rounded-full text-sm transition-colors"
+                    >
+                      <MessageCircle className="h-4 w-4" />
+                      Consultar por WhatsApp
+                    </a>
+                    <Link
+                      href="/dra-lucia-chahin"
+                      className="inline-flex items-center justify-center text-sm text-blue-600 hover:underline"
+                    >
+                      Ver página completa de la Dra. Lucía Chahin →
+                    </Link>
+                  </div>
                   <p className="mt-3 text-xs text-gray-500">
-                    No se otorgan turnos desde esta web. Para pedir turno, comunicarse con CIMEL o Swiss Medical y solicitar a la Dra. Lucía Chahin.
+                    No se otorgan turnos desde esta web. Para pedir turno, comunicarse con CIMEL o Swiss Medical
+                    y solicitar a la Dra. Lucía Chahin.
                   </p>
                 </div>
               ))}
@@ -171,16 +243,21 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
             <AlertTriangle className="h-5 w-5 text-orange-500 shrink-0 mt-0.5" />
             <div className="text-sm text-orange-800">
               <p className="font-medium mb-1">Aviso importante</p>
-              <p>Este sitio no reemplaza una consulta médica y no debe usarse para urgencias. Ante síntomas de alarma (dolor de pecho, falta de aire, etc.), concurrí a una guardia o llamá al 107.</p>
+              <p>
+                Este sitio no reemplaza una consulta médica y no debe usarse para urgencias.
+                Ante síntomas de alarma (dolor de pecho, falta de aire, etc.), concurrí a una guardia o llamá al 107.
+                WhatsApp no es un canal de urgencias.
+              </p>
             </div>
           </div>
         </div>
       </section>
 
       <footer className="py-6 px-4 text-center text-xs text-gray-400 border-t border-gray-100">
-        <p>Dra. Lucía Chahin — Médica Cardióloga</p>
+        <p>Dra. Lucía Chahin — Médica Cardióloga y Ecocardiografista</p>
         <p className="mt-1">Este sitio tiene carácter informativo y no reserva turnos ni confirma disponibilidad.</p>
       </footer>
+
     </main>
   )
 }
