@@ -4,7 +4,41 @@ import Link from "next/link"
 import { notFound } from "next/navigation"
 import { MapPin, Clock, AlertTriangle, Phone, Map } from "lucide-react"
 import { LANDING_DATA } from "@/lib/public-landings"
+import { createServiceClient } from "@/lib/supabase/server"
 import { LandingInteractions } from "./landing-interactions"
+
+export const dynamic = "force-dynamic"
+
+type ConfigLocation = {
+  id: string
+  name: string
+  address?: string
+  google_maps_link?: string
+  phone?: string
+  hours?: string
+  booking_instruction?: string
+  notes?: string
+}
+
+async function getConfigLocations(): Promise<ConfigLocation[]> {
+  try {
+    const supabase = await createServiceClient()
+    const { data } = await supabase.from("app_config").select("value").eq("key", "locations").single()
+    return Array.isArray(data?.value) ? (data.value as ConfigLocation[]) : []
+  } catch {
+    return []
+  }
+}
+
+function matchConfigLocation(locName: string, configLocations: ConfigLocation[]): ConfigLocation | undefined {
+  const lower = locName.toLowerCase()
+  return configLocations.find(c => {
+    const cName = (c.name ?? "").toLowerCase()
+    if (lower.includes("cimel") && cName.includes("cimel")) return true
+    if (lower.includes("swiss") && cName.includes("swiss")) return true
+    return cName === lower
+  })
+}
 
 function getBaseUrl(): string {
   if (process.env.GOOGLE_OAUTH_BASE_URL) return process.env.GOOGLE_OAUTH_BASE_URL.replace(/\/$/, "")
@@ -43,6 +77,7 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
   const data = LANDING_DATA[slug]
   if (!data) notFound()
 
+  const configLocations = await getConfigLocations()
   const isMain = slug === "dra-lucia-chahin"
 
   return (
@@ -106,42 +141,59 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
             <div className="mx-auto max-w-2xl">
               <h2 className="mb-6 text-center text-xl font-bold text-gray-900">Dónde atiende</h2>
               <div className="grid gap-4 sm:grid-cols-2">
-                {data.locations.map((loc) => (
-                  <div key={loc.name} className="rounded-lg border border-gray-200 bg-white p-5">
-                    <div className="mb-3 flex items-center gap-2">
-                      <MapPin className="h-5 w-5 text-blue-600" />
-                      <h3 className="font-semibold text-gray-900">{loc.name}</h3>
+                {data.locations.map((loc) => {
+                  const cfg = matchConfigLocation(loc.name, configLocations)
+                  const hours = cfg?.hours || null
+                  const phone = cfg?.phone || loc.phone
+                  const address = cfg?.address || loc.address
+                  const mapsUrl = cfg?.google_maps_link || loc.mapsUrl
+                  return (
+                    <div key={loc.name} className="rounded-lg border border-gray-200 bg-white p-5">
+                      <div className="mb-3 flex items-center gap-2">
+                        <MapPin className="h-5 w-5 text-blue-600" />
+                        <h3 className="font-semibold text-gray-900">{loc.name}</h3>
+                      </div>
+
+                      {/* Días y horarios — destacado */}
+                      {hours ? (
+                        <div className="mb-3 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white whitespace-pre-line">
+                          <Clock className="mb-0.5 inline h-3.5 w-3.5 mr-1" />
+                          {hours}
+                        </div>
+                      ) : (
+                        <div className="mb-3 flex items-center gap-2 text-sm text-gray-500">
+                          <Clock className="h-4 w-4" />
+                          <span>Atención los {loc.day}</span>
+                        </div>
+                      )}
+
+                      {address && <p className="text-sm text-gray-500">{address}</p>}
+                      {phone && (
+                        <a
+                          href={`tel:${phone.replace(/[\s-]/g, "")}`}
+                          className="mt-1 flex items-center gap-1.5 text-sm text-gray-700 hover:text-blue-600"
+                        >
+                          <Phone className="h-3.5 w-3.5" />
+                          {phone}
+                        </a>
+                      )}
+                      <p className="mt-3 rounded-lg bg-blue-50 p-3 text-sm font-medium text-blue-900">
+                        {cfg?.booking_instruction || loc.instruction}
+                      </p>
+                      {mapsUrl && (
+                        <a
+                          href={mapsUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="mt-3 flex items-center gap-2 text-sm font-medium text-blue-600 hover:text-blue-700"
+                        >
+                          <Map className="h-4 w-4" />
+                          Ver en Google Maps
+                        </a>
+                      )}
                     </div>
-                    <div className="mb-2 flex items-center gap-2 text-sm text-gray-500">
-                      <Clock className="h-4 w-4" />
-                      <span>Atención los {loc.day}</span>
-                    </div>
-                    {loc.address && <p className="text-sm text-gray-500">{loc.address}</p>}
-                    {loc.phone && (
-                      <a
-                        href={`tel:${loc.phone.replace(/\s/g, "")}`}
-                        className="mt-1 flex items-center gap-1.5 text-sm text-gray-700 hover:text-blue-600"
-                      >
-                        <Phone className="h-3.5 w-3.5" />
-                        {loc.phone}
-                      </a>
-                    )}
-                    <p className="mt-3 rounded-lg bg-blue-50 p-3 text-sm font-medium text-blue-900">
-                      {loc.instruction}
-                    </p>
-                    {loc.mapsUrl && (
-                      <a
-                        href={loc.mapsUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="mt-3 flex items-center gap-2 text-sm font-medium text-blue-600 hover:text-blue-700"
-                      >
-                        <Map className="h-4 w-4" />
-                        Ver en Google Maps
-                      </a>
-                    )}
-                  </div>
-                ))}
+                  )
+                })}
               </div>
             </div>
           </section>
@@ -171,54 +223,72 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
           <div className="max-w-2xl mx-auto">
             <h2 className="text-xl font-bold text-gray-900 mb-6 text-center">Cómo pedir turno</h2>
             <div className="space-y-4">
-              {data.locations.map((loc) => (
-                <div key={loc.name} className="bg-white rounded-lg border border-blue-200 p-6">
-                  <div className="flex items-center gap-2 mb-3">
-                    <MapPin className="h-5 w-5 text-blue-600" />
-                    <h3 className="font-semibold text-gray-900">{loc.name}</h3>
-                  </div>
-                  <div className="flex items-center gap-2 text-sm text-gray-500 mb-3">
-                    <Clock className="h-4 w-4" />
-                    <span>Atención los {loc.day}</span>
-                  </div>
-                  {loc.address && <p className="text-sm text-gray-500 mb-1">{loc.address}</p>}
-                  {loc.phone && (
-                    <a
-                      href={`tel:${loc.phone.replace(/\s/g, "")}`}
-                      className="mb-3 flex items-center gap-1.5 text-sm text-gray-700 hover:text-blue-600"
-                    >
-                      <Phone className="h-3.5 w-3.5" />
-                      {loc.phone}
-                    </a>
-                  )}
-                  <div className="rounded-lg bg-blue-50 p-4">
-                    <p className="text-sm text-blue-900 font-medium">{loc.instruction}</p>
-                  </div>
-                  <div className="mt-4 flex flex-col sm:flex-row gap-3 flex-wrap">
-                    {loc.mapsUrl && (
+              {data.locations.map((loc) => {
+                const cfg = matchConfigLocation(loc.name, configLocations)
+                const hours = cfg?.hours || null
+                const phone = cfg?.phone || loc.phone
+                const address = cfg?.address || loc.address
+                const mapsUrl = cfg?.google_maps_link || loc.mapsUrl
+                return (
+                  <div key={loc.name} className="bg-white rounded-lg border border-blue-200 p-6">
+                    <div className="flex items-center gap-2 mb-3">
+                      <MapPin className="h-5 w-5 text-blue-600" />
+                      <h3 className="font-semibold text-gray-900">{loc.name}</h3>
+                    </div>
+
+                    {/* Días y horarios — destacado */}
+                    {hours ? (
+                      <div className="mb-3 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white whitespace-pre-line">
+                        <Clock className="mb-0.5 inline h-3.5 w-3.5 mr-1" />
+                        {hours}
+                      </div>
+                    ) : (
+                      <div className="mb-3 flex items-center gap-2 text-sm text-gray-500">
+                        <Clock className="h-4 w-4" />
+                        <span>Atención los {loc.day}</span>
+                      </div>
+                    )}
+
+                    {address && <p className="text-sm text-gray-500 mb-1">{address}</p>}
+                    {phone && (
                       <a
-                        href={loc.mapsUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center justify-center gap-2 border border-blue-300 text-blue-600 hover:bg-blue-50 font-medium px-4 py-2 rounded-full text-sm transition-colors"
+                        href={`tel:${phone.replace(/[\s-]/g, "")}`}
+                        className="mb-3 flex items-center gap-1.5 text-sm text-gray-700 hover:text-blue-600"
                       >
-                        <Map className="h-4 w-4" />
-                        Ver en Google Maps
+                        <Phone className="h-3.5 w-3.5" />
+                        {phone}
                       </a>
                     )}
-                    <Link
-                      href="/dra-lucia-chahin"
-                      className="inline-flex items-center justify-center text-sm text-blue-600 hover:underline"
-                    >
-                      Ver página completa de la Dra. Lucía Chahin →
-                    </Link>
+                    <div className="rounded-lg bg-blue-50 p-4">
+                      <p className="text-sm text-blue-900 font-medium">
+                        {cfg?.booking_instruction || loc.instruction}
+                      </p>
+                    </div>
+                    <div className="mt-4 flex flex-col sm:flex-row gap-3 flex-wrap">
+                      {mapsUrl && (
+                        <a
+                          href={mapsUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center justify-center gap-2 border border-blue-300 text-blue-600 hover:bg-blue-50 font-medium px-4 py-2 rounded-full text-sm transition-colors"
+                        >
+                          <Map className="h-4 w-4" />
+                          Ver en Google Maps
+                        </a>
+                      )}
+                      <Link
+                        href="/dra-lucia-chahin"
+                        className="inline-flex items-center justify-center text-sm text-blue-600 hover:underline"
+                      >
+                        Ver página completa de la Dra. Lucía Chahin →
+                      </Link>
+                    </div>
+                    <p className="mt-3 text-xs text-gray-500">
+                      No se otorgan turnos desde esta web. Para pedir turno, comunicarse directamente con la institución.
+                    </p>
                   </div>
-                  <p className="mt-3 text-xs text-gray-500">
-                    No se otorgan turnos desde esta web. Para pedir turno, comunicarse con CIMEL o Swiss Medical
-                    y solicitar a la Dra. Lucía Chahin.
-                  </p>
-                </div>
-              ))}
+                )
+              })}
             </div>
           </div>
         </section>

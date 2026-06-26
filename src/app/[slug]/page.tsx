@@ -3,6 +3,8 @@ import LandingPage, { generateMetadata } from "../landings/[slug]/page"
 
 export { generateMetadata }
 
+export const dynamic = "force-dynamic"
+
 export function generateStaticParams() {
   return PUBLIC_LANDING_SLUGS.map((slug) => ({ slug }))
 }
