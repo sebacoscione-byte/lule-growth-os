@@ -1,10 +1,25 @@
 # Backlog — Lule Growth OS
 
 ## Fase 1 — MVP (en desarrollo)
-- [x] Sitio web público institucional de la Dra. Lucía Chahin en `/dra-lucia-chahin`
-- [x] Publicar slugs SEO en raíz (`/cardiologa-lanus`, `/ecocardiograma-lanus`, etc.) o redireccionar correctamente desde `/landings/[slug]`
+- [x] Sitio web público institucional de la Dra. Lucía Chahin en `/dra-lucia-chahin` (MVP básico)
+- [x] Publicar slugs SEO en raíz (`/cardiologa-lanus`, `/ecocardiograma-lanus`, etc.)
 - [x] Completar contenido institucional de la web pública: quién es Lucía, servicios, sedes, días, instrucciones, avisos y formulario
 - [ ] Usar `/dra-lucia-chahin` como link principal para Instagram Bio y Google Business Profile
+- [ ] **Profesionalizar `/dra-lucia-chahin`** *(bloqueado: necesita foto y matrícula de Lucía)*
+  - [ ] Hero con foto profesional de la Dra. Lucía Chahin
+  - [ ] Mostrar número de matrícula (MN o MP) junto al nombre
+  - [ ] Bloque "Sobre la doctora" expandido con trayectoria y especialidad
+  - [ ] Sección de FAQ con preguntas frecuentes por servicio/sede
+  - [ ] Links a Google Maps para cada institución (CIMEL y Swiss Medical)
+- [ ] WhatsApp como canal de consulta *(bloqueado: necesita número de WhatsApp de Lucía)*
+  - [ ] Botón de WhatsApp con mensaje prearmado según sede elegida
+  - [ ] Definir si WhatsApp va en `/dra-lucia-chahin`, en las landings SEO, o en ambas
+- [ ] SEO técnico — landings
+  - [x] `sitemap.xml` y `robots.txt` (generados automáticamente)
+  - [x] Metadata OG/Twitter única por landing
+  - [ ] Links internos entre landings SEO (ej. landing Lanús → landing Lomas y viceversa)
+  - [ ] Configurar Google Search Console con el sitemap
+  - [ ] Datos estructurados JSON-LD (Physician, MedicalBusiness, FAQPage)
 - [x] CRM de leads completo (lista, detalle, filtros, búsqueda)
 - [x] Carga manual de leads (`/leads/nuevo`)
 - [x] Clasificador y generacion con proveedor IA configurable (Gemini/Claude)
