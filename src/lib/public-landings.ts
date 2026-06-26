@@ -26,9 +26,10 @@ const CIMEL = {
 
 const SWISS = {
   name: "Swiss Medical Lomas",
+  address: "Oliden 141, Lomas de Zamora",
   day: "Viernes",
   phone: "0810-333-8876",
-  mapsUrl: "https://share.google/5G6sod19zMrEDPkeM",
+  mapsUrl: "https://maps.app.goo.gl/tzSVjSYm47UfNkLJ8",
 }
 
 export const LANDING_DATA: Record<string, PublicLandingData> = {
