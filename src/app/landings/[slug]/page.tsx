@@ -2,7 +2,7 @@ import type { Metadata } from "next"
 import Image from "next/image"
 import Link from "next/link"
 import { notFound } from "next/navigation"
-import { MapPin, Clock, AlertTriangle, MessageCircle, Phone, ExternalLink } from "lucide-react"
+import { MapPin, Clock, AlertTriangle, MessageCircle, Phone, Map } from "lucide-react"
 import { LANDING_DATA, buildWhatsAppUrl, WHATSAPP_MESSAGES } from "@/lib/public-landings"
 import { LandingInteractions } from "./landing-interactions"
 
@@ -143,23 +143,7 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
                       <Clock className="h-4 w-4" />
                       <span>Atención los {loc.day}</span>
                     </div>
-                    {loc.address && (
-                      <div className="flex items-center gap-1.5">
-                        {loc.mapsUrl ? (
-                          <a
-                            href={loc.mapsUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="flex items-center gap-1 text-sm text-blue-600 hover:underline"
-                          >
-                            {loc.address}
-                            <ExternalLink className="h-3 w-3" />
-                          </a>
-                        ) : (
-                          <p className="text-sm text-gray-500">{loc.address}</p>
-                        )}
-                      </div>
-                    )}
+                    {loc.address && <p className="text-sm text-gray-500">{loc.address}</p>}
                     {loc.phone && (
                       <a
                         href={`tel:${loc.phone.replace(/\s/g, "")}`}
@@ -172,18 +156,30 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
                     <p className="mt-3 rounded-lg bg-blue-50 p-3 text-sm font-medium text-blue-900">
                       {loc.instruction}
                     </p>
-                    {/* WhatsApp por sede */}
-                    <a
-                      href={buildWhatsAppUrl(
-                        loc.name.includes("CIMEL") ? WHATSAPP_MESSAGES.cimel : WHATSAPP_MESSAGES.swiss
+                    <div className="mt-3 flex flex-col gap-2">
+                      {loc.mapsUrl && (
+                        <a
+                          href={loc.mapsUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-2 text-sm font-medium text-blue-600 hover:text-blue-700"
+                        >
+                          <Map className="h-4 w-4" />
+                          Ver en Google Maps
+                        </a>
                       )}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="mt-3 flex items-center gap-2 text-green-600 hover:text-green-700 text-sm font-medium"
-                    >
-                      <MessageCircle className="h-4 w-4" />
-                      Consultar por WhatsApp
-                    </a>
+                      <a
+                        href={buildWhatsAppUrl(
+                          loc.name.includes("CIMEL") ? WHATSAPP_MESSAGES.cimel : WHATSAPP_MESSAGES.swiss
+                        )}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-2 text-green-600 hover:text-green-700 text-sm font-medium"
+                      >
+                        <MessageCircle className="h-4 w-4" />
+                        Consultar por WhatsApp
+                      </a>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -225,23 +221,7 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
                     <Clock className="h-4 w-4" />
                     <span>Atención los {loc.day}</span>
                   </div>
-                  {loc.address && (
-                    <div className="mb-1">
-                      {loc.mapsUrl ? (
-                        <a
-                          href={loc.mapsUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="flex items-center gap-1 text-sm text-blue-600 hover:underline"
-                        >
-                          {loc.address}
-                          <ExternalLink className="h-3 w-3" />
-                        </a>
-                      ) : (
-                        <p className="text-sm text-gray-500">{loc.address}</p>
-                      )}
-                    </div>
-                  )}
+                  {loc.address && <p className="text-sm text-gray-500 mb-1">{loc.address}</p>}
                   {loc.phone && (
                     <a
                       href={`tel:${loc.phone.replace(/\s/g, "")}`}
@@ -254,7 +234,7 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
                   <div className="rounded-lg bg-blue-50 p-4">
                     <p className="text-sm text-blue-900 font-medium">{loc.instruction}</p>
                   </div>
-                  <div className="mt-4 flex flex-col sm:flex-row gap-3">
+                  <div className="mt-4 flex flex-col sm:flex-row gap-3 flex-wrap">
                     <a
                       href={buildWhatsAppUrl(
                         loc.name.includes("CIMEL") ? WHATSAPP_MESSAGES.cimel : WHATSAPP_MESSAGES.swiss
@@ -266,6 +246,17 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
                       <MessageCircle className="h-4 w-4" />
                       Consultar por WhatsApp
                     </a>
+                    {loc.mapsUrl && (
+                      <a
+                        href={loc.mapsUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center justify-center gap-2 border border-blue-300 text-blue-600 hover:bg-blue-50 font-medium px-4 py-2 rounded-full text-sm transition-colors"
+                      >
+                        <Map className="h-4 w-4" />
+                        Ver en Google Maps
+                      </a>
+                    )}
                     <Link
                       href="/dra-lucia-chahin"
                       className="inline-flex items-center justify-center text-sm text-blue-600 hover:underline"
