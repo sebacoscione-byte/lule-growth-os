@@ -11,6 +11,7 @@ export async function GET(request: Request) {
   const channel = searchParams.get("channel")
   const service = searchParams.get("service")
   const q = searchParams.get("q")
+  const requiresHuman = searchParams.get("requires_human")
 
   let query = supabase
     .from("leads")
@@ -21,6 +22,7 @@ export async function GET(request: Request) {
   if (status) query = query.eq("status", status)
   if (channel) query = query.eq("origin_channel", channel)
   if (service) query = query.eq("requested_service", service)
+  if (requiresHuman === "true") query = query.eq("requires_human", true)
   if (q) query = query.or(`name.ilike.%${q}%,phone.ilike.%${q}%,instagram_username.ilike.%${q}%`)
 
   const { data, error } = await query

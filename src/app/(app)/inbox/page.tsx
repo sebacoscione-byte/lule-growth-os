@@ -20,6 +20,7 @@ export default function InboxPage() {
   const [sending, setSending] = useState(false)
   const [closingAction, setClosingAction] = useState(false)
   const [autoReply, setAutoReply] = useState(true)
+  const [suggesting, setSuggesting] = useState(false)
   const bottomRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -56,6 +57,19 @@ export default function InboxPage() {
       l.id === selectedLeadId ? { ...l, status: newStatus, ...extra } : l
     ))
     setClosingAction(false)
+  }
+
+  async function suggestMessage() {
+    if (!selectedLeadId) return
+    setSuggesting(true)
+    const res = await fetch("/api/ai/suggest", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ lead_id: selectedLeadId }),
+    })
+    const data = await res.json()
+    if (data.suggestion) setInput(data.suggestion)
+    setSuggesting(false)
   }
 
   async function sendMessage() {
@@ -215,16 +229,29 @@ export default function InboxPage() {
           </div>
 
           {/* Input */}
-          <div className="p-3 md:p-4 border-t border-gray-200 flex gap-2">
-            <Input
-              value={input}
-              onChange={e => setInput(e.target.value)}
-              onKeyDown={e => e.key === "Enter" && !e.shiftKey && sendMessage()}
-              placeholder="Escribí un mensaje..."
-              disabled={sending}
-            />
-            <Button onClick={sendMessage} disabled={sending || !input.trim()}>
-              {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+          <div className="p-3 md:p-4 border-t border-gray-200 space-y-2">
+            <div className="flex gap-2">
+              <Input
+                value={input}
+                onChange={e => setInput(e.target.value)}
+                onKeyDown={e => e.key === "Enter" && !e.shiftKey && sendMessage()}
+                placeholder="Escribí un mensaje..."
+                disabled={sending}
+              />
+              <Button onClick={sendMessage} disabled={sending || !input.trim()}>
+                {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+              </Button>
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-xs text-blue-600 hover:text-blue-700 hover:bg-blue-50 w-full"
+              onClick={suggestMessage}
+              disabled={suggesting || sending}
+            >
+              {suggesting
+                ? <><Loader2 className="h-3 w-3 animate-spin mr-1" /> Generando sugerencia...</>
+                : <><Sparkles className="h-3 w-3 mr-1" /> Sugerir mensaje de seguimiento</>}
             </Button>
           </div>
         </div>

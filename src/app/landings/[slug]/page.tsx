@@ -5,15 +5,34 @@ import { Heart, MapPin, Clock, AlertTriangle } from "lucide-react"
 import { LANDING_DATA } from "@/lib/public-landings"
 import { LandingInteractions } from "./landing-interactions"
 
+function getBaseUrl(): string {
+  if (process.env.GOOGLE_OAUTH_BASE_URL) return process.env.GOOGLE_OAUTH_BASE_URL.replace(/\/$/, "")
+  if (process.env.VERCEL_URL) return `https://${process.env.VERCEL_URL}`
+  return "https://draluciachahin.com.ar"
+}
+
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
   const { slug } = await params
   const data = LANDING_DATA[slug]
   if (!data) return { title: "No encontrado" }
+  const base = getBaseUrl()
+  const url = `${base}/${slug}`
   return {
     title: data.title,
     description: data.description,
-    alternates: {
-      canonical: `/${slug}`,
+    alternates: { canonical: url },
+    openGraph: {
+      title: data.title,
+      description: data.description,
+      url,
+      type: "website",
+      locale: "es_AR",
+      siteName: "Dra. Lucía Chahin — Cardióloga",
+    },
+    twitter: {
+      card: "summary",
+      title: data.title,
+      description: data.description,
     },
   }
 }

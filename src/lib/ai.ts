@@ -747,3 +747,35 @@ export async function generateFollowupMessage(leadName: string | null, location:
   const name = leadName ? `, ${leadName}` : ""
   return `Hola${name}, te escribo para saber si pudiste pedir turno con la Dra. Lucia Chahin en ${location}. Si tuviste algun problema para ubicarla, avisame y te paso nuevamente las indicaciones.\n\nPudiste pedir turno?\n1. Ya pedi turno\n2. No pude pedir\n3. Necesito los datos de nuevo\n4. Ya no me interesa`
 }
+
+export async function generateFollowupSuggestion(
+  leadContext: string,
+  conversationHistory: AiMessage[]
+): Promise<string> {
+  if (getAiMode() === "manual") {
+    throw new Error("Modo manual activo: la generación automática está deshabilitada.")
+  }
+  const historyContext = conversationHistory.length > 0
+    ? `Historial de conversación:\n${conversationHistory.map(m => `${m.role === "user" ? "Lead" : "Nosotros"}: ${m.content}`).join("\n")}`
+    : "Sin mensajes previos."
+
+  return generateText({
+    maxTokens: 400,
+    purpose: "followup_suggestion",
+    system: `${SYSTEM_PROMPT}
+
+Tu tarea es redactar el próximo mensaje que el equipo enviará al lead para hacer seguimiento.
+Generá un mensaje cálido, breve y en español rioplatense que:
+- Pregunte si pudo pedir turno con la Dra. Lucía Chahin
+- Ofrezca ayuda concreta si no pudo
+- No sea repetitivo si ya hubo conversación previa
+- Cierre con opciones simples (Ya pedí turno / No pude / Necesito los datos de nuevo)
+Solo devolvé el texto del mensaje, sin comillas ni formato extra.`,
+    messages: [
+      {
+        role: "user",
+        content: `${leadContext}\n\n${historyContext}\n\nRedactá el próximo mensaje de seguimiento.`,
+      },
+    ],
+  })
+}

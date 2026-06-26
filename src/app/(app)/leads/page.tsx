@@ -11,7 +11,7 @@ import { timeAgo } from "@/lib/utils"
 export default async function LeadsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ status?: string; channel?: string; service?: string; q?: string }>
+  searchParams: Promise<{ status?: string; channel?: string; service?: string; q?: string; requires_human?: string }>
 }) {
   const sp = await searchParams
   const supabase = await createClient()
@@ -21,6 +21,7 @@ export default async function LeadsPage({
   if (sp.status) query = query.eq("status", sp.status)
   if (sp.channel) query = query.eq("origin_channel", sp.channel)
   if (sp.service) query = query.eq("requested_service", sp.service)
+  if (sp.requires_human === "true") query = query.eq("requires_human", true)
   if (sp.q) query = query.or(`name.ilike.%${sp.q}%,phone.ilike.%${sp.q}%,instagram_username.ilike.%${sp.q}%`)
 
   const { data: leads } = await query
@@ -64,8 +65,8 @@ export default async function LeadsPage({
             Seguimiento
           </Button>
         </Link>
-        <Link href="/leads?status=requiere_humano" className="shrink-0">
-          <Button variant={sp.status === "requiere_humano" ? "default" : "outline"} size="sm">
+        <Link href="/leads?requires_human=true" className="shrink-0">
+          <Button variant={sp.requires_human === "true" ? "default" : "outline"} size="sm">
             Atención
           </Button>
         </Link>
