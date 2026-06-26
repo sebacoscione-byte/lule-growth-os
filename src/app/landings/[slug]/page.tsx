@@ -2,7 +2,7 @@ import type { Metadata } from "next"
 import Image from "next/image"
 import Link from "next/link"
 import { notFound } from "next/navigation"
-import { MapPin, Clock, AlertTriangle, MessageCircle } from "lucide-react"
+import { MapPin, Clock, AlertTriangle, MessageCircle, Phone, ExternalLink } from "lucide-react"
 import { LANDING_DATA, buildWhatsAppUrl, WHATSAPP_MESSAGES } from "@/lib/public-landings"
 import { LandingInteractions } from "./landing-interactions"
 
@@ -143,8 +143,33 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
                       <Clock className="h-4 w-4" />
                       <span>Atención los {loc.day}</span>
                     </div>
-                    {loc.address && <p className="text-sm text-gray-500">{loc.address}</p>}
-                    <p className="mt-4 rounded-lg bg-blue-50 p-3 text-sm font-medium text-blue-900">
+                    {loc.address && (
+                      <div className="flex items-center gap-1.5">
+                        {loc.mapsUrl ? (
+                          <a
+                            href={loc.mapsUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-1 text-sm text-blue-600 hover:underline"
+                          >
+                            {loc.address}
+                            <ExternalLink className="h-3 w-3" />
+                          </a>
+                        ) : (
+                          <p className="text-sm text-gray-500">{loc.address}</p>
+                        )}
+                      </div>
+                    )}
+                    {loc.phone && (
+                      <a
+                        href={`tel:${loc.phone.replace(/\s/g, "")}`}
+                        className="mt-1 flex items-center gap-1.5 text-sm text-gray-700 hover:text-blue-600"
+                      >
+                        <Phone className="h-3.5 w-3.5" />
+                        {loc.phone}
+                      </a>
+                    )}
+                    <p className="mt-3 rounded-lg bg-blue-50 p-3 text-sm font-medium text-blue-900">
                       {loc.instruction}
                     </p>
                     {/* WhatsApp por sede */}
@@ -201,7 +226,30 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
                     <span>Atención los {loc.day}</span>
                   </div>
                   {loc.address && (
-                    <p className="text-sm text-gray-500 mb-3">{loc.address}</p>
+                    <div className="mb-1">
+                      {loc.mapsUrl ? (
+                        <a
+                          href={loc.mapsUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-1 text-sm text-blue-600 hover:underline"
+                        >
+                          {loc.address}
+                          <ExternalLink className="h-3 w-3" />
+                        </a>
+                      ) : (
+                        <p className="text-sm text-gray-500">{loc.address}</p>
+                      )}
+                    </div>
+                  )}
+                  {loc.phone && (
+                    <a
+                      href={`tel:${loc.phone.replace(/\s/g, "")}`}
+                      className="mb-3 flex items-center gap-1.5 text-sm text-gray-700 hover:text-blue-600"
+                    >
+                      <Phone className="h-3.5 w-3.5" />
+                      {loc.phone}
+                    </a>
                   )}
                   <div className="rounded-lg bg-blue-50 p-4">
                     <p className="text-sm text-blue-900 font-medium">{loc.instruction}</p>

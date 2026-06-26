@@ -3,6 +3,8 @@ export interface PublicLandingLocation {
   address?: string
   day: string
   instruction: string
+  phone?: string
+  mapsUrl?: string
 }
 
 export interface PublicLandingData {
@@ -14,6 +16,14 @@ export interface PublicLandingData {
   locations: PublicLandingLocation[]
 }
 
+const CIMEL = {
+  name: "CIMEL Lanús",
+  address: "Tucumán 1314, Lanús",
+  day: "Martes",
+  phone: "011 4249-3412",
+  mapsUrl: "https://share.google/rsph8WtMpJAiRkeki",
+}
+
 export const LANDING_DATA: Record<string, PublicLandingData> = {
   "dra-lucia-chahin": {
     title: "Dra. Lucía Chahin — Cardióloga | CIMEL Lanús · Swiss Medical Lomas",
@@ -22,7 +32,7 @@ export const LANDING_DATA: Record<string, PublicLandingData> = {
     intro: "La Dra. Lucía Chahin es médica cardióloga especializada en consultas cardiológicas y ecocardiogramas. Atiende en Lanús y Lomas de Zamora.",
     services: ["Consulta cardiológica", "Ecocardiograma", "Control cardiológico", "Evaluación cardiovascular"],
     locations: [
-      { name: "CIMEL Lanús", address: "Tucumán 1314, Lanús", day: "Martes", instruction: "Comunicate con CIMEL Lanús y pedí turno con la Dra. Lucía Chahin." },
+      { ...CIMEL, instruction: "Llamá al 011 4249-3412, solicitá turno con la Dra. Lucía Chahin y mencioná que es para cardiología." },
       { name: "Swiss Medical Lomas", day: "Viernes", instruction: "Pedí turno por los canales oficiales de Swiss Medical Lomas y solicitá atención con la Dra. Lucía Chahin." },
     ],
   },
@@ -33,7 +43,7 @@ export const LANDING_DATA: Record<string, PublicLandingData> = {
     intro: "Si buscás una cardióloga en Lanús, la Dra. Lucía Chahin atiende los martes en CIMEL Lanús. Realizá consultas cardiológicas y ecocardiogramas.",
     services: ["Consulta cardiológica", "Ecocardiograma", "Control cardiológico"],
     locations: [
-      { name: "CIMEL Lanús", address: "Tucumán 1314, Lanús", day: "Martes", instruction: "Llamá a CIMEL Lanús y pedí turno con la Dra. Lucía Chahin para cardiología." },
+      { ...CIMEL, instruction: "Llamá al 011 4249-3412, pedí turno con la Dra. Lucía Chahin y mencioná que es para cardiología." },
     ],
   },
   "cardiologa-lomas": {
@@ -53,7 +63,7 @@ export const LANDING_DATA: Record<string, PublicLandingData> = {
     intro: "Si necesitás un ecocardiograma en Lanús, la Dra. Lucía Chahin lo realiza los martes en CIMEL Lanús.",
     services: ["Ecocardiograma", "Consulta cardiológica"],
     locations: [
-      { name: "CIMEL Lanús", address: "Tucumán 1314, Lanús", day: "Martes", instruction: "Llamá a CIMEL Lanús y pedí turno con la Dra. Lucía Chahin para ecocardiograma." },
+      { ...CIMEL, instruction: "Llamá al 011 4249-3412, pedí turno con la Dra. Lucía Chahin y mencioná que es para ecocardiograma." },
     ],
   },
   "ecocardiograma-lomas": {
@@ -73,7 +83,7 @@ export const LANDING_DATA: Record<string, PublicLandingData> = {
     intro: "Para una consulta cardiológica en Lanús, la Dra. Lucía Chahin atiende los martes en CIMEL Lanús.",
     services: ["Consulta cardiológica", "Ecocardiograma", "Control cardiovascular"],
     locations: [
-      { name: "CIMEL Lanús", address: "Tucumán 1314, Lanús", day: "Martes", instruction: "Llamá a CIMEL Lanús y pedí turno con la Dra. Lucía Chahin para consulta de cardiología." },
+      { ...CIMEL, instruction: "Llamá al 011 4249-3412, pedí turno con la Dra. Lucía Chahin y mencioná que es para consulta de cardiología." },
     ],
   },
   "consulta-cardiologica-lomas": {
