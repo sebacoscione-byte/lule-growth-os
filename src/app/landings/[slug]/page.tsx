@@ -2,7 +2,7 @@ import type { Metadata } from "next"
 import Image from "next/image"
 import Link from "next/link"
 import { notFound } from "next/navigation"
-import { MapPin, Clock, AlertTriangle, Phone, Map } from "lucide-react"
+import { MapPin, Clock, AlertTriangle, Phone, Map, Stethoscope, Shield } from "lucide-react"
 import { LANDING_DATA } from "@/lib/public-landings"
 import { createServiceClient } from "@/lib/supabase/server"
 import { LandingInteractions } from "./landing-interactions"
@@ -18,6 +18,8 @@ type ConfigLocation = {
   hours?: string
   booking_instruction?: string
   notes?: string
+  practices?: string[]
+  obras_sociales?: string[]
 }
 
 async function getConfigLocations(): Promise<ConfigLocation[]> {
@@ -147,6 +149,8 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
                   const phone = cfg?.phone || loc.phone
                   const address = cfg?.address || loc.address
                   const mapsUrl = cfg?.google_maps_link || loc.mapsUrl
+                  const practices = cfg?.practices ?? []
+                  const obrasSociales = cfg?.obras_sociales ?? []
                   return (
                     <div key={loc.name} className="rounded-lg border border-gray-200 bg-white p-5">
                       <div className="mb-3 flex items-center gap-2">
@@ -177,6 +181,35 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
                           {phone}
                         </a>
                       )}
+
+                      {practices.length > 0 && (
+                        <div className="mt-3 flex items-start gap-2">
+                          <Stethoscope className="h-4 w-4 text-gray-400 mt-0.5 shrink-0" />
+                          <div>
+                            <p className="text-xs text-gray-500 mb-1">Prácticas</p>
+                            <div className="flex flex-wrap gap-1">
+                              {practices.map(p => (
+                                <span key={p} className="bg-blue-50 text-blue-700 text-xs px-2 py-0.5 rounded-full">{p}</span>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {obrasSociales.length > 0 && (
+                        <div className="mt-3 flex items-start gap-2">
+                          <Shield className="h-4 w-4 text-gray-400 mt-0.5 shrink-0" />
+                          <div>
+                            <p className="text-xs text-gray-500 mb-1">Obras sociales / prepagas</p>
+                            <div className="flex flex-wrap gap-1">
+                              {obrasSociales.map(o => (
+                                <span key={o} className="bg-green-50 text-green-700 text-xs px-2 py-0.5 rounded-full">{o}</span>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
                       <p className="mt-3 rounded-lg bg-blue-50 p-3 text-sm font-medium text-blue-900">
                         {cfg?.booking_instruction || loc.instruction}
                       </p>
@@ -229,6 +262,8 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
                 const phone = cfg?.phone || loc.phone
                 const address = cfg?.address || loc.address
                 const mapsUrl = cfg?.google_maps_link || loc.mapsUrl
+                const practices = cfg?.practices ?? []
+                const obrasSociales = cfg?.obras_sociales ?? []
                 return (
                   <div key={loc.name} className="bg-white rounded-lg border border-blue-200 p-6">
                     <div className="flex items-center gap-2 mb-3">
@@ -259,6 +294,35 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
                         {phone}
                       </a>
                     )}
+
+                    {practices.length > 0 && (
+                      <div className="mb-3 flex items-start gap-2">
+                        <Stethoscope className="h-4 w-4 text-gray-400 mt-0.5 shrink-0" />
+                        <div>
+                          <p className="text-xs text-gray-500 mb-1">Prácticas</p>
+                          <div className="flex flex-wrap gap-1">
+                            {practices.map(p => (
+                              <span key={p} className="bg-blue-50 text-blue-700 text-xs px-2 py-0.5 rounded-full">{p}</span>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {obrasSociales.length > 0 && (
+                      <div className="mb-3 flex items-start gap-2">
+                        <Shield className="h-4 w-4 text-gray-400 mt-0.5 shrink-0" />
+                        <div>
+                          <p className="text-xs text-gray-500 mb-1">Obras sociales / prepagas</p>
+                          <div className="flex flex-wrap gap-1">
+                            {obrasSociales.map(o => (
+                              <span key={o} className="bg-green-50 text-green-700 text-xs px-2 py-0.5 rounded-full">{o}</span>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
                     <div className="rounded-lg bg-blue-50 p-4">
                       <p className="text-sm text-blue-900 font-medium">
                         {cfg?.booking_instruction || loc.instruction}
