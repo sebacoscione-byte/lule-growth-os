@@ -234,8 +234,8 @@ create policy "authenticated_read_landing_events"
 insert into app_config (key, value) values
   ('doctor', '{"name": "Dra. Lucía Chahin", "specialty": "Cardiología", "services": ["Consulta cardiológica", "Ecocardiograma"]}'),
   ('locations', '[
-    {"id": "cimel_lanus", "name": "CIMEL Lanús", "address": "Tucumán 1314, Lanús", "day": "martes", "services": ["Consulta cardiológica", "Ecocardiograma"], "booking_instruction": "Comunicate con CIMEL Lanús y solicitá turno con la Dra. Lucía Chahin."},
-    {"id": "swiss_lomas", "name": "Swiss Medical Lomas", "address": null, "day": "viernes", "services": ["Consulta cardiológica", "Ecocardiograma"], "booking_instruction": "Pedí turno por los canales oficiales de Swiss Medical Lomas solicitando a la Dra. Lucía Chahin."}
+    {"id": "cimel_lanus", "name": "CIMEL Lanús", "address": "Tucumán 1314, Lanús", "phone": "011 4249-3412", "day": "martes", "services": ["Consulta cardiológica", "Ecocardiograma"], "booking_instruction": "Llamá al 011 4249-3412 y solicitá turno con la Dra. Lucía Chahin."},
+    {"id": "swiss_lomas", "name": "Swiss Medical Lomas", "address": null, "phone": "0810-333-8876", "day": "viernes", "services": ["Consulta cardiológica", "Ecocardiograma"], "booking_instruction": "Llamá al 0810-333-8876 o buscala en la app de Swiss Medical, y solicitá turno con la Dra. Lucía Chahin."}
   ]'),
   ('messages', '{
     "initial": "Hola, soy el asistente de la Dra. Lucía Chahin. Ella atiende consultas de cardiología y realiza ecocardiogramas.\n\nActualmente atiende:\n- Martes en CIMEL Lanús.\n- Viernes en Swiss Medical Lomas.\n\nPara orientarte, ¿buscás una consulta cardiológica o un ecocardiograma?",

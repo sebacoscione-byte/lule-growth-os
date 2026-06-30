@@ -189,9 +189,12 @@ export async function handleIncomingMessage(params: {
           `Perfecto. Para sacar turno con la *Dra. Lucía Chahin* en *CIMEL Lanús*:${phoneText}\n🏥 Dirección: Tucumán 1314, Lanús\n📅 Ella atiende los *martes*\n\nSolicitá turno de consulta cardiológica o ecocardiograma con la Dra. Lucía Chahin.\n\n¡Ante cualquier duda, acá estamos! 😊`
         )
       } else {
+        const locations = await getLocations()
+        const swiss = locations.find(l => l.id === "swiss_lomas")
+        const swissPhone = swiss?.phone || "0810-333-8876"
         await sendText(
           phone,
-          "Perfecto. Para sacar turno con la *Dra. Lucía Chahin* en *Swiss Medical Lomas*:\n\n📱 Pedí turno por los canales oficiales de *Swiss Medical*\n👩‍⚕️ Solicitá a la Dra. Lucía Chahin\n📅 Ella atiende los *viernes*\n\nIndicá si buscás consulta cardiológica o ecocardiograma.\n\n¡Ante cualquier duda, acá estamos! 😊"
+          `Perfecto. Para sacar turno con la *Dra. Lucía Chahin* en *Swiss Medical Lomas*:\n\n📞 Llamá al *${swissPhone}* o buscala en la *app de Swiss Medical*\n👩‍⚕️ Solicitá turno con la Dra. Lucía Chahin\n📅 Ella atiende los *viernes*\n\nIndicá si buscás consulta cardiológica o ecocardiograma.\n\n¡Ante cualquier duda, acá estamos! 😊`
         )
       }
       break

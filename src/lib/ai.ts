@@ -431,9 +431,9 @@ REGLAS OBLIGATORIAS:
 
 INFORMACION DE ATENCION:
 - Dra. Lucia Chahin atiende:
-  - Martes en CIMEL Lanus (Tucuman 1314, Lanus): consulta cardiologica y ecocardiograma
-  - Viernes en Swiss Medical Lomas: consulta cardiologica y ecocardiograma
-- Para pedir turno: comunicarse con la institucion y solicitar turno con la Dra. Lucia Chahin
+  - Martes en CIMEL Lanus (Tucuman 1314, Lanus): consulta cardiologica y ecocardiograma. Para pedir turno: llamar al 011 4249-3412.
+  - Viernes en Swiss Medical Lomas: consulta cardiologica y ecocardiograma. Para pedir turno: llamar al 0810-333-8876 o buscarla en la app de Swiss Medical.
+- En ambos casos hay que solicitar turno con la Dra. Lucia Chahin
 - La app NO reserva turnos ni confirma horarios
 
 DETECCION DE URGENCIAS:
@@ -721,7 +721,7 @@ export async function generateGooglePost(topic: string): Promise<string> {
     purpose: "google_post",
     system: `Generas publicaciones para Google Business Profile de la Dra. Lucia Chahin, cardiologa.
 Tono profesional y claro. Maximo 1500 caracteres. Sin promesas medicas.
-Siempre inclui donde atiende (CIMEL Lanus los martes, Swiss Medical Lomas los viernes).
+Siempre inclui donde atiende y como pedir turno: CIMEL Lanus los martes (llamando al 011 4249-3412), y Swiss Medical Lomas los viernes (llamando al 0810-333-8876 o buscandola en la app de Swiss Medical).
 Solo devolve el texto de la publicacion.`,
     messages: [{ role: "user", content: `Publicacion sobre: ${topic}` }],
   })

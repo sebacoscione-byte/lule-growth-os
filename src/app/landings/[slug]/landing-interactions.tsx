@@ -342,8 +342,8 @@ export function LandingInteractions({ slug }: { slug: string }) {
             title="Pedir turno en Swiss Medical Lomas"
             subtitle="Viernes"
             steps={[
-              "Ingresá o comunicate por los canales oficiales de Swiss Medical.",
-              "Buscá o solicitá a la Dra. Lucía Chahin.",
+              "Llamá al 0810-333-8876 o buscala en la app de Swiss Medical.",
+              "Solicitá turno con la Dra. Lucía Chahin.",
               "Indicá si buscás consulta cardiológica o ecocardiograma.",
             ]}
             note="Ella atiende los viernes en Swiss Medical Lomas."

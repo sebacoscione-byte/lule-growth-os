@@ -123,6 +123,7 @@ público para pedir turno.
 - [ ] Publicar los 3 posts fijados (cómo pedir turno / servicios / dónde atiende)
 - [ ] Crear las 6 historias destacadas: Turnos · CIMEL · Swiss · Ecocardiograma · Cardiología · FAQ
 - [ ] Establecer ritmo de publicación mensual: 2-3 conversión + 4-6 educativo + 2-3 local
+- [ ] Video explicativo corto: cómo buscar y pedir turno con la Dra. Lucía Chahin (llamando a CIMEL Lanús los martes, o por teléfono/app de Swiss Medical los viernes)
 
 ### Automatización (Etapa 7)
 - [ ] Publicar contenido aprobado directamente desde la app vía Instagram Graph API
