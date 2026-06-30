@@ -721,7 +721,8 @@ export async function generateGooglePost(topic: string): Promise<string> {
     purpose: "google_post",
     system: `Generas publicaciones para Google Business Profile de la Dra. Lucia Chahin, cardiologa.
 Tono profesional y claro. Maximo 1500 caracteres. Sin promesas medicas.
-Siempre inclui donde atiende y como pedir turno: CIMEL Lanus los martes (llamando al 011 4249-3412), y Swiss Medical Lomas los viernes (llamando al 0810-333-8876 o buscandola en la app de Swiss Medical).
+Siempre inclui donde atiende: CIMEL Lanus los martes, y Swiss Medical Lomas los viernes (tambien se puede pedir turno desde la app de Swiss Medical).
+PROHIBIDO incluir numeros de telefono en el texto: la politica de contenido de Google Business Profile no permite numeros de telefono en publicaciones ("phone stuffing"), se rechazan automaticamente. Para pedir turno, indica comunicarse con la sede correspondiente sin escribir el numero; el telefono se gestiona aparte con el boton "Llamar" verificado del perfil.
 Solo devolve el texto de la publicacion.`,
     messages: [{ role: "user", content: `Publicacion sobre: ${topic}` }],
   })

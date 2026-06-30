@@ -106,6 +106,10 @@ intención de turno: quien busca "cardióloga en Lanús" tiene alta probabilidad
 - [ ] Evaluar si crear ficha separada para Swiss Medical Lomas (requiere dirección verificable)
 - [ ] Definir estrategia de reseñas: cómo y cuándo pedirlas a pacientes actuales
 
+### Reglas de contenido a respetar en publicaciones de Google ⚠️
+- [x] **No incluir números de teléfono en el texto de las publicaciones** ("phone stuffing") — Google las rechaza automáticamente. El teléfono se gestiona aparte: el perfil debe tener el número verificado y se agrega un botón "Llamar" al crear la publicación (manual) o, si se automatiza, vía `callToAction` de tipo `CALL` en la API (hoy `createPost` en `src/lib/google-business.ts` no lo soporta — pendiente).
+- [ ] Agregar soporte de botón "Llamar ahora" / `callToAction` en `createPost` (`src/lib/google-business.ts`) para publicar con CTA desde la app sin depender del paso manual
+
 ---
 
 ## Etapa 5 — Instagram
