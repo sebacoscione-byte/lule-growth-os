@@ -48,7 +48,7 @@ Google Maps, Instagram, WhatsApp y búsqueda orgánica.
 - [ ] FAQ: preguntas frecuentes sobre turnos, servicios, cobertura y sedes
 - [ ] Links directos a Google Maps para CIMEL Lanús y Swiss Medical Lomas
 - [x] Botón de WhatsApp con mensaje prearmado según sede (+5491123842117) — en hero, en cada sede y en cada landing SEO
-- [ ] Dominio propio (`draluciachahin.com.ar` o similar) *(requiere: contratación del dominio)*
+- [x] Dominio propio — `draluciachahin.ar` registrado en NIC Argentina (1/7/2026)
 
 ### Acciones externas (las hace Lucía)
 - [ ] Configurar `/dra-lucia-chahin` como link de la bio en Instagram *(acción de Lucía)*

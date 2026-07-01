@@ -4,7 +4,7 @@ import { PUBLIC_LANDING_SLUGS } from "@/lib/public-landings"
 function getBaseUrl(): string {
   if (process.env.GOOGLE_OAUTH_BASE_URL) return process.env.GOOGLE_OAUTH_BASE_URL.replace(/\/$/, "")
   if (process.env.VERCEL_URL) return `https://${process.env.VERCEL_URL}`
-  return "https://draluciachahin.com.ar"
+  return "https://draluciachahin.ar"
 }
 
 export default function sitemap(): MetadataRoute.Sitemap {

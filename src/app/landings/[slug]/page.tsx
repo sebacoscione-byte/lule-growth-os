@@ -43,7 +43,7 @@ function matchConfigLocation(locName: string, configLocations: ConfigLocation[])
 function getBaseUrl(): string {
   if (process.env.GOOGLE_OAUTH_BASE_URL) return process.env.GOOGLE_OAUTH_BASE_URL.replace(/\/$/, "")
   if (process.env.VERCEL_URL) return `https://${process.env.VERCEL_URL}`
-  return "https://draluciachahin.com.ar"
+  return "https://draluciachahin.ar"
 }
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
