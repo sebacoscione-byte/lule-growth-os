@@ -37,6 +37,12 @@ export async function middleware(request: NextRequest) {
     request.nextUrl.pathname === "/" ||
     PUBLIC_ROOT_PATHS.has(request.nextUrl.pathname)
 
+  if (!user && request.nextUrl.pathname === "/") {
+    const url = request.nextUrl.clone()
+    url.pathname = "/dra-lucia-chahin"
+    return NextResponse.redirect(url)
+  }
+
   if (!user && !isAuthRoute && !isPublicRoute) {
     const url = request.nextUrl.clone()
     url.pathname = "/login"
