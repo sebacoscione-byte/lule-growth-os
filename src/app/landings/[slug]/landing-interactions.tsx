@@ -342,34 +342,17 @@ export function LandingInteractions({ slug }: { slug: string }) {
             title="Pedir turno en Swiss Medical Lomas"
             subtitle="Viernes"
             steps={[
-              "Ingresá o comunicate por los canales oficiales de Swiss Medical.",
+              "Llamá al 0810-333-8876 o usá la app de Swiss Medical.",
               "Buscá o solicitá a la Dra. Lucía Chahin.",
               "Indicá si buscás consulta cardiológica o ecocardiograma.",
             ]}
-            note="Ella atiende los viernes en Swiss Medical Lomas."
+            note="Ella atiende los viernes en Swiss Medical Lomas de Zamora."
             expanded={expandedCta === "swiss"}
             onToggle={toggleSwiss}
           />
         </div>
       </section>
 
-      {/* Formulario de seguimiento */}
-      <section className="py-12 px-4 bg-gray-50">
-        <div className="max-w-2xl mx-auto">
-          <h2 className="text-xl font-bold text-gray-900 mb-2 text-center">
-            ¿No pudiste pedir turno?
-          </h2>
-          <p className="text-center text-gray-500 text-sm mb-6">
-            Dejá tus datos y te ayudamos a coordinar el turno con la Dra. Lucía Chahin.
-          </p>
-          <LeadForm
-            slug={slug}
-            clickedCimel={clickedCimel}
-            clickedSwiss={clickedSwiss}
-            utms={utms}
-          />
-        </div>
-      </section>
     </>
   )
 }

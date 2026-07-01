@@ -41,7 +41,7 @@ export const LANDING_DATA: Record<string, PublicLandingData> = {
     services: ["Consulta cardiológica", "Ecocardiograma", "Control cardiológico", "Evaluación cardiovascular"],
     locations: [
       { ...CIMEL, instruction: "Llamá al 011 4249-3412, solicitá turno con la Dra. Lucía Chahin y mencioná que es para cardiología." },
-      { ...SWISS, instruction: "Llamá al 0810-333-8876, pedí turno con la Dra. Lucía Chahin y mencioná que es para cardiología." },
+      { ...SWISS, instruction: "Llamá al 0810-333-8876 o usá la app de Swiss Medical, pedí turno con la Dra. Lucía Chahin y mencioná que es para cardiología." },
     ],
   },
   "cardiologa-lanus": {
@@ -61,7 +61,7 @@ export const LANDING_DATA: Record<string, PublicLandingData> = {
     intro: "Si buscás una cardióloga en Lomas de Zamora, la Dra. Lucía Chahin atiende los viernes en Swiss Medical Lomas.",
     services: ["Consulta cardiológica", "Ecocardiograma", "Control cardiológico"],
     locations: [
-      { ...SWISS, instruction: "Llamá al 0810-333-8876, pedí turno con la Dra. Lucía Chahin y mencioná que es para cardiología." },
+      { ...SWISS, instruction: "Llamá al 0810-333-8876 o usá la app de Swiss Medical, pedí turno con la Dra. Lucía Chahin y mencioná que es para cardiología." },
     ],
   },
   "ecocardiograma-lanus": {
