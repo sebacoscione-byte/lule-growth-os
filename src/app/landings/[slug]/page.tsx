@@ -72,6 +72,93 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   }
 }
 
+const PERSON_JSON_LD = {
+  "@context": "https://schema.org",
+  "@type": "Physician",
+  "name": "Dra. Lucía Belén Chahin",
+  "alternateName": "Lucía Chahin",
+  "jobTitle": "Médica Cardióloga y Ecocardiografista",
+  "description": "Médica cardióloga y ecocardiografista egresada de la residencia de cardiología del Hospital Británico de Buenos Aires. Atiende en CIMEL Lanús los martes y en Swiss Medical Lomas de Zamora los viernes.",
+  "medicalSpecialty": "Cardiology",
+  "alumniOf": {
+    "@type": "MedicalOrganization",
+    "name": "Hospital Británico de Buenos Aires"
+  },
+  "worksFor": [
+    {
+      "@type": "MedicalOrganization",
+      "name": "CIMEL Lanús",
+      "telephone": "011 4249-3412",
+      "address": {
+        "@type": "PostalAddress",
+        "streetAddress": "Tucumán 1314",
+        "addressLocality": "Lanús",
+        "addressRegion": "Buenos Aires",
+        "addressCountry": "AR"
+      }
+    },
+    {
+      "@type": "MedicalOrganization",
+      "name": "Swiss Medical Lomas de Zamora",
+      "telephone": "0810-333-8876",
+      "address": {
+        "@type": "PostalAddress",
+        "streetAddress": "Oliden 141",
+        "addressLocality": "Lomas de Zamora",
+        "addressRegion": "Buenos Aires",
+        "addressCountry": "AR"
+      }
+    }
+  ]
+}
+
+const FAQ_JSON_LD = {
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "¿Dónde atiende la Dra. Lucía Chahin?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "La Dra. Lucía Chahin atiende en dos sedes: CIMEL Lanús (Tucumán 1314, Lanús) los martes, y Swiss Medical Lomas de Zamora (Oliden 141) los viernes."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "¿Qué estudios realiza la Dra. Lucía Chahin?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "La Dra. Lucía Chahin realiza consultas cardiológicas, ecocardiogramas, controles cardiovasculares y evaluaciones de riesgo cardíaco."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "¿Cómo pedir turno con la Dra. Lucía Chahin?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Para turno en CIMEL Lanús (martes): llamar al 011 4249-3412. Para turno en Swiss Medical Lomas de Zamora (viernes): llamar al 0810-333-8876. En ambos casos solicitar turno con la Dra. Lucía Chahin para cardiología."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "¿La Dra. Lucía Chahin atiende con obra social?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Para consultar cobertura con obra social, comunicarse directamente con CIMEL Lanús al 011 4249-3412 o con Swiss Medical al 0810-333-8876 según la sede elegida."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "¿Dónde se formó la Dra. Lucía Chahin?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "La Dra. Lucía Belén Chahin realizó su residencia de cardiología en el Hospital Británico de Buenos Aires, una de las instituciones de referencia en cardiología del país."
+      }
+    }
+  ]
+}
+
 export default async function LandingPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params
   const data = LANDING_DATA[slug]
@@ -82,6 +169,18 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
 
   return (
     <main className="min-h-screen bg-white">
+      {isMain && (
+        <>
+          <script
+            type="application/ld+json"
+            dangerouslySetInnerHTML={{ __html: JSON.stringify(PERSON_JSON_LD) }}
+          />
+          <script
+            type="application/ld+json"
+            dangerouslySetInnerHTML={{ __html: JSON.stringify(FAQ_JSON_LD) }}
+          />
+        </>
+      )}
 
       {/* Hero */}
       {isMain ? (
@@ -124,14 +223,24 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
           <section className="px-4 py-12">
             <div className="mx-auto max-w-2xl">
               <h2 className="mb-4 text-center text-xl font-bold text-gray-900">Sobre la Dra. Lucía Chahin</h2>
-              <div className="rounded-lg border border-gray-200 bg-gray-50 p-6 text-sm leading-6 text-gray-700">
+              <div className="rounded-lg border border-gray-200 bg-gray-50 p-6 text-sm leading-6 text-gray-700 space-y-3">
                 <p>
-                  La Dra. Lucía Chahin es médica cardióloga y ecocardiografista. Atiende pacientes que buscan
-                  consulta cardiológica, controles cardiovasculares y ecocardiogramas en Lanús y Lomas de Zamora.
+                  La Dra. <strong>Lucía Belén Chahin</strong> es médica cardióloga y ecocardiografista egresada
+                  de la residencia de cardiología del <strong>Hospital Británico de Buenos Aires</strong>, una de
+                  las instituciones de mayor referencia en cardiología del país.
                 </p>
-                <p className="mt-3">
-                  Esta web reúne la información necesaria para elegir sede, conocer los días de atención y pedir
-                  turno por los canales oficiales de cada institución.
+                <p>
+                  Participó en presentaciones científicas en congresos de la <strong>Sociedad Argentina de
+                  Cardiología (SAC)</strong> sobre compromiso cardíaco en enfermedades sistémicas.
+                </p>
+                <p>
+                  Atiende pacientes en <strong>CIMEL Lanús</strong> — centro médico de larga trayectoria en
+                  Lanús — y en <strong>Swiss Medical Lomas de Zamora</strong>. Realiza consultas cardiológicas,
+                  ecocardiogramas y controles cardiovasculares.
+                </p>
+                <p className="text-xs text-gray-500">
+                  Esta web reúne la información para elegir sede, conocer los días de atención y pedir turno por
+                  los canales oficiales de cada institución.
                 </p>
               </div>
             </div>
@@ -289,6 +398,47 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
                   </div>
                 )
               })}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* FAQ — solo en landing principal */}
+      {isMain && (
+        <section className="py-12 px-4 bg-gray-50">
+          <div className="max-w-2xl mx-auto">
+            <h2 className="text-xl font-bold text-gray-900 mb-6 text-center">Preguntas frecuentes</h2>
+            <div className="space-y-4">
+              {[
+                {
+                  q: "¿Dónde atiende la Dra. Lucía Chahin?",
+                  a: "La Dra. Lucía Chahin atiende en dos sedes: CIMEL Lanús (Tucumán 1314) los martes, y Swiss Medical Lomas de Zamora (Oliden 141) los viernes.",
+                },
+                {
+                  q: "¿Qué estudios realiza?",
+                  a: "Realiza consultas cardiológicas, ecocardiogramas, controles cardiovasculares y evaluaciones de riesgo cardíaco.",
+                },
+                {
+                  q: "¿Cómo pido turno?",
+                  a: "Para CIMEL Lanús: llamar al 011 4249-3412. Para Swiss Medical Lomas: llamar al 0810-333-8876. En ambos casos pedir turno con la Dra. Lucía Chahin para cardiología.",
+                },
+                {
+                  q: "¿Atiende con obra social?",
+                  a: "Para consultar cobertura con obra social, comunicarse directamente con la institución elegida: CIMEL Lanús (011 4249-3412) o Swiss Medical (0810-333-8876).",
+                },
+                {
+                  q: "¿Dónde se formó la Dra. Lucía Chahin?",
+                  a: "Realizó su residencia de cardiología en el Hospital Británico de Buenos Aires y participó en congresos de la Sociedad Argentina de Cardiología (SAC).",
+                },
+              ].map(({ q, a }) => (
+                <details key={q} className="group rounded-lg border border-gray-200 bg-white">
+                  <summary className="flex cursor-pointer items-center justify-between px-5 py-4 text-sm font-medium text-gray-900 marker:hidden list-none">
+                    {q}
+                    <span className="ml-4 shrink-0 text-gray-400 group-open:rotate-180 transition-transform">▾</span>
+                  </summary>
+                  <p className="px-5 pb-4 text-sm text-gray-600 leading-relaxed">{a}</p>
+                </details>
+              ))}
             </div>
           </div>
         </section>

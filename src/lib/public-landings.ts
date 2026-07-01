@@ -35,9 +35,9 @@ const SWISS = {
 export const LANDING_DATA: Record<string, PublicLandingData> = {
   "dra-lucia-chahin": {
     title: "Dra. Lucía Chahin — Cardióloga | CIMEL Lanús · Swiss Medical Lomas",
-    description: "La Dra. Lucía Chahin es médica cardióloga. Atiende consultas de cardiología y realiza ecocardiogramas en CIMEL Lanús (martes) y Swiss Medical Lomas (viernes).",
+    description: "Dra. Lucía Belén Chahin, médica cardióloga y ecocardiografista. Residencia de cardiología en el Hospital Británico de Buenos Aires. Atiende en CIMEL Lanús (martes) y Swiss Medical Lomas de Zamora (viernes).",
     h1: "Dra. Lucía Chahin — Cardióloga",
-    intro: "La Dra. Lucía Chahin es médica cardióloga especializada en consultas cardiológicas y ecocardiogramas. Atiende en Lanús y Lomas de Zamora.",
+    intro: "La Dra. Lucía Belén Chahin es médica cardióloga y ecocardiografista, formada en el Hospital Británico de Buenos Aires. Atiende consultas cardiológicas y ecocardiogramas en Lanús y Lomas de Zamora.",
     services: ["Consulta cardiológica", "Ecocardiograma", "Control cardiológico", "Evaluación cardiovascular"],
     locations: [
       { ...CIMEL, instruction: "Llamá al 011 4249-3412, solicitá turno con la Dra. Lucía Chahin y mencioná que es para cardiología." },
@@ -46,7 +46,7 @@ export const LANDING_DATA: Record<string, PublicLandingData> = {
   },
   "cardiologa-lanus": {
     title: "Cardióloga en Lanús — Dra. Lucía Chahin | CIMEL Lanús",
-    description: "¿Buscás una cardióloga en Lanús? La Dra. Lucía Chahin atiende consultas de cardiología los martes en CIMEL Lanús (Tucumán 1314).",
+    description: "¿Buscás una cardióloga en Lanús? La Dra. Lucía Belén Chahin atiende los martes en CIMEL Lanús, Tucumán 1314. Consultas cardiológicas y ecocardiogramas.",
     h1: "Cardióloga en Lanús — Dra. Lucía Chahin",
     intro: "Si buscás una cardióloga en Lanús, la Dra. Lucía Chahin atiende los martes en CIMEL Lanús. Realizá consultas cardiológicas y ecocardiogramas.",
     services: ["Consulta cardiológica", "Ecocardiograma", "Control cardiológico"],
@@ -56,7 +56,7 @@ export const LANDING_DATA: Record<string, PublicLandingData> = {
   },
   "cardiologa-lomas": {
     title: "Cardióloga en Lomas de Zamora — Dra. Lucía Chahin | Swiss Medical",
-    description: "¿Buscás una cardióloga en Lomas de Zamora? La Dra. Lucía Chahin atiende consultas de cardiología los viernes en Swiss Medical Lomas.",
+    description: "¿Buscás una cardióloga en Lomas de Zamora? La Dra. Lucía Belén Chahin atiende los viernes en Swiss Medical Lomas de Zamora. Consultas cardiológicas y ecocardiogramas.",
     h1: "Cardióloga en Lomas de Zamora — Dra. Lucía Chahin",
     intro: "Si buscás una cardióloga en Lomas de Zamora, la Dra. Lucía Chahin atiende los viernes en Swiss Medical Lomas.",
     services: ["Consulta cardiológica", "Ecocardiograma", "Control cardiológico"],
