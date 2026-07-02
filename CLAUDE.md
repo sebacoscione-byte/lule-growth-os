@@ -68,6 +68,12 @@ GOOGLE_CLIENT_SECRET=
 GOOGLE_OAUTH_BASE_URL=https://tu-dominio.com
 ```
 
+## Optimización de tokens / costos de IA
+- `src/lib/ai.ts` ya cachea outputs exactos por hash de prompt en la tabla `ai_outputs` (evita repetir la llamada si el input es idéntico).
+- Además usa **prompt caching nativo de Anthropic** (`cache_control: { type: "ephemeral" }`) para los system prompts que no dependen del request (instrucciones fijas tipo `SYSTEM_PROMPT`, reglas de imagen, reglas de captación). Esto se activa con la opción `cacheSystem: true` en `generateText`/`generateWithAnthropic`.
+- **Regla al agregar una función nueva en `ai.ts`**: si el `system` que le pasás es 100% estático (no interpola `leadContext`, `topic`, etc. dentro del `system`), agregá `cacheSystem: true`. Si el system tiene contenido dinámico, movelo a `messages` en vez del `system` para poder cachear igual.
+- No agregar SDKs/wrappers externos de terceros para esto: `@anthropic-ai/sdk` ya soporta `cache_control` de forma nativa.
+
 ## Google Business Profile — cómo configurar OAuth
 1. Ir a https://console.cloud.google.com/ → crear proyecto
 2. Habilitar: "My Business Business Information API", "My Business Account Management API", "Business Profile Performance API"
