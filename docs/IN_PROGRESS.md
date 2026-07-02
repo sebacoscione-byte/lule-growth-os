@@ -110,3 +110,36 @@ Resolver el bloqueo `Error 400: invalid_request` al conectar Google Business Pro
 - La pantalla Google Local muestra errores de callback en castellano.
 - `npm run lint` y `npm run build` finalizaron correctamente.
 - Verificacion local: `/api/google-business/auth` devuelve 307 a `accounts.google.com` con `state`, `code_challenge` y cookies OAuth.
+
+---
+
+# En progreso - Publicacion automatica en Instagram (Graph API)
+
+## Objetivo
+
+El Estudio de contenido genera caption + placa visual pero requiere copiar/publicar
+manualmente en Instagram (nota existente en el editor: "Instagram requiere copiar/publicar
+manualmente hasta conectar Instagram Graph API"). Investigacion de repos publicos (insta-p8,
+MIT, mismo stack Next.js+Supabase) confirmo el patron correcto: Instagram API with Instagram
+Login (graph.instagram.com), sin necesidad de Facebook Page.
+
+## Plan
+
+- [x] Revisar patron OAuth existente de Google Business para replicarlo.
+- [x] Migracion: bucket publico de Supabase Storage para las placas generadas.
+- [x] `src/lib/instagram-oauth.ts` — state/PKCE/cookies (mismo patron que google-oauth.ts).
+- [x] `src/lib/instagram-business.ts` — tokens (app_config) + media container/publish helpers.
+- [x] Rutas API: auth, callback, status, disconnect, publish.
+- [x] UI: boton "Publicar en Instagram" en el editor + estado de conexion.
+- [x] Documentar setup OAuth de Meta en CLAUDE.md (igual que Google Business).
+- [x] Lint, build, commit y push.
+
+## Resultado
+
+- Bucket `content-media` (publico, solo service role escribe) vía migracion.
+- Conexion Instagram Business vía OAuth con Instagram Login, tokens de larga duracion
+  guardados/refrescados en `app_config` (mismo patron que Google).
+- Publicar sube la placa generada al bucket, crea el media container, hace polling del
+  estado y publica (feed post o story segun formato).
+- Boton "Publicar en Instagram" visible cuando el item esta aprobado, tiene placa generada
+  y el formato es post/historia (reel/carrusel quedan para una fase futura con soporte de video/multi-imagen).

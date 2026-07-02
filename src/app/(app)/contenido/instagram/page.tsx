@@ -2,9 +2,10 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import Image from "next/image"
+import Link from "next/link"
 import {
-  Archive, ArchiveRestore, BookOpen, Check, ChevronDown, ChevronUp, Copy, Download, ExternalLink, Loader2,
-  ImageIcon, Plus, Save, Search, Send, ShieldCheck, Sparkles, Pin, WandSparkles, X,
+  Archive, ArchiveRestore, BookOpen, Check, ChevronDown, ChevronUp, Copy, Download, ExternalLink, Link2, Loader2,
+  ImageIcon, Plus, Save, Search, Send, ShieldCheck, Sparkles, Pin, Unlink, WandSparkles, X,
 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -491,8 +492,42 @@ export default function ContentStudioPage() {
   const [libraryQuery, setLibraryQuery] = useState("")
   const [libraryStatus, setLibraryStatus] = useState<ContentStatus | "active">("active")
   const [libraryFormat, setLibraryFormat] = useState<ContentItem["format"] | "all">("all")
+  const [igConnected, setIgConnected] = useState(false)
+  const [igUsername, setIgUsername] = useState<string | null>(null)
+  const [igLoading, setIgLoading] = useState(true)
+  const [generatedVisual, setGeneratedVisual] = useState<{ itemId: string; url: string } | null>(null)
 
   const lastGenRef = useRef(0)
+
+  const loadIgStatus = useCallback(async () => {
+    try {
+      const response = await fetch("/api/instagram-business/status")
+      const data = await response.json()
+      setIgConnected(Boolean(data.connected))
+      setIgUsername(data.username ?? null)
+    } catch {
+      setIgConnected(false)
+    }
+    setIgLoading(false)
+  }, [])
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    loadIgStatus()
+    const params = new URLSearchParams(window.location.search)
+    if (params.has("ig_connected")) {
+      window.history.replaceState({}, "", window.location.pathname)
+    } else if (params.has("ig_error")) {
+      setError("No se pudo conectar Instagram. Volvé a intentar conectar la cuenta.")
+      window.history.replaceState({}, "", window.location.pathname)
+    }
+  }, [loadIgStatus])
+
+  async function disconnectInstagram() {
+    await fetch("/api/instagram-business/disconnect", { method: "POST" })
+    setIgConnected(false)
+    setIgUsername(null)
+  }
 
   const loadItems = useCallback(async () => {
     try {
@@ -766,6 +801,37 @@ export default function ContentStudioPage() {
     await updateItem(item, { status: "published" })
   }
 
+  async function publishInstagram(item: ContentItem) {
+    if (!generatedVisual || generatedVisual.itemId !== item.id) {
+      setError("Generá la placa final antes de publicar en Instagram.")
+      return
+    }
+    setWorking(item.id)
+    setError(null)
+    try {
+      const response = await fetch("/api/instagram-business/publish", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          itemId: item.id,
+          imageDataUrl: generatedVisual.url,
+          caption: `${item.hook}\n\n${item.caption}\n\n${item.hashtags}`,
+          format: item.format,
+        }),
+      })
+      const data = await response.json()
+      if (!response.ok || data.error) {
+        setError(data.error ?? "Instagram no permitio publicar")
+        return
+      }
+      await updateItem(item, { status: "published" })
+    } catch {
+      setError("No se pudo conectar con Instagram. Revisá tu conexión e intentá nuevamente.")
+    } finally {
+      setWorking(null)
+    }
+  }
+
   async function copyInstagram(item: ContentItem) {
     await navigator.clipboard.writeText(`${item.hook}\n\n${item.caption}\n\n${item.hashtags}`)
     setCopied(true)
@@ -792,6 +858,21 @@ export default function ContentStudioPage() {
             <Badge variant="outline" className="border-amber-300 text-amber-700 bg-amber-50">
               Modo manual
             </Badge>
+          )}
+          {!igLoading && (
+            igConnected ? (
+              <Button variant="outline" size="sm" onClick={disconnectInstagram} className="gap-1.5">
+                <Unlink className="h-3.5 w-3.5" />
+                {igUsername ? `@${igUsername}` : "Instagram conectado"}
+              </Button>
+            ) : (
+              <Button variant="outline" size="sm" asChild className="gap-1.5">
+                <Link href="/api/instagram-business/auth" prefetch={false}>
+                  <Link2 className="h-3.5 w-3.5" />
+                  Conectar Instagram
+                </Link>
+              </Button>
+            )
           )}
           <Badge variant="outline">{counts.draft} borradores</Badge>
           <Badge variant="outline" className="border-green-300 text-green-700">{counts.approved} aprobados</Badge>
@@ -1026,10 +1107,14 @@ export default function ContentStudioPage() {
                 working={working}
                 copied={copied}
                 hasUnsavedChanges={hasUnsavedChanges}
+                igConnected={igConnected}
+                generatedVisual={generatedVisual}
+                onGeneratedVisual={setGeneratedVisual}
                 onChange={setActive}
                 onSave={changes => updateItem(active, changes)}
                 onCopy={() => copyInstagram(active)}
                 onPublishGoogle={() => publishGoogle(active)}
+                onPublishInstagram={() => publishInstagram(active)}
               />
             ) : (
               <Card className="flex min-h-[420px] items-center justify-center">
@@ -1125,18 +1210,24 @@ export default function ContentStudioPage() {
 // Editor component
 // ---------------------------------------------------------------------------
 
-function Editor({ item, working, copied, hasUnsavedChanges, onChange, onSave, onCopy, onPublishGoogle }: {
+function Editor({
+  item, working, copied, hasUnsavedChanges, igConnected, generatedVisual, onGeneratedVisual,
+  onChange, onSave, onCopy, onPublishGoogle, onPublishInstagram,
+}: {
   item: ContentItem
   working: string | null
   copied: boolean
   hasUnsavedChanges: boolean
+  igConnected: boolean
+  generatedVisual: { itemId: string; url: string } | null
+  onGeneratedVisual: (visual: { itemId: string; url: string } | null) => void
   onChange: (item: ContentItem) => void
   onSave: (changes: Partial<ContentItem>) => void
   onCopy: () => void
   onPublishGoogle: () => void
+  onPublishInstagram: () => void
 }) {
   const busy = working === item.id
-  const [generatedVisual, setGeneratedVisual] = useState<{ itemId: string; url: string } | null>(null)
   const [visualGenerating, setVisualGenerating] = useState(false)
   const [visualError, setVisualError] = useState<string | null>(null)
   const [visualHelpUrl, setVisualHelpUrl] = useState<string | null>(null)
@@ -1180,7 +1271,7 @@ function Editor({ item, working, copied, hasUnsavedChanges, onChange, onSave, on
         setVisualHelpUrl(typeof data.help_url === "string" ? data.help_url : null)
         return
       }
-      setGeneratedVisual({ itemId: item.id, url: `data:${data.mime_type};base64,${data.image_data}` })
+      onGeneratedVisual({ itemId: item.id, url: `data:${data.mime_type};base64,${data.image_data}` })
     } catch {
       setVisualError("No se pudo conectar con Gemini para generar la placa.")
     } finally {
@@ -1341,11 +1432,25 @@ function Editor({ item, working, copied, hasUnsavedChanges, onChange, onSave, on
                 <Send className="h-4 w-4" /> Publicar en Google
               </Button>
             )}
+            {item.status === "approved" && igConnected && (item.format === "post" || item.format === "historia") && (
+              <Button
+                onClick={onPublishInstagram}
+                disabled={busy || generatedVisual?.itemId !== item.id}
+                className="gap-2"
+                title={generatedVisual?.itemId !== item.id ? "Generá la placa final primero" : undefined}
+              >
+                <Send className="h-4 w-4" /> Publicar en Instagram
+              </Button>
+            )}
           </div>
           {!approvalReady && item.status === "draft" && (
             <p className="text-xs text-amber-700">Para aprobar, completá hook, caption, texto de Google y titular visual.</p>
           )}
-          <p className="text-xs text-gray-500">Instagram requiere copiar/publicar manualmente hasta conectar Instagram Graph API. Google publica solo despues de aprobar y si la API de la cuenta lo permite.</p>
+          <p className="text-xs text-gray-500">
+            {igConnected
+              ? "Instagram publica posts e historias con la placa generada (conectá y generá la placa final antes). Reels y carruseles todavia requieren copiar/publicar manualmente."
+              : "Conectá Instagram arriba para publicar posts e historias directamente. Google publica solo despues de aprobar y si la API de la cuenta lo permite."}
+          </p>
         </CardContent>
       </Card>
     </div>

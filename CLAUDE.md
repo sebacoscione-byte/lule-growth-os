@@ -66,6 +66,11 @@ GOOGLE_CLIENT_ID=
 GOOGLE_CLIENT_SECRET=
 # Opcional si el host publico no coincide con la request:
 GOOGLE_OAUTH_BASE_URL=https://tu-dominio.com
+# Instagram API with Instagram Login (publicar posts/historias desde Estudio de contenido)
+INSTAGRAM_APP_ID=
+INSTAGRAM_APP_SECRET=
+# Opcional si el host publico no coincide con la request:
+INSTAGRAM_OAUTH_BASE_URL=https://tu-dominio.com
 ```
 
 ## Optimización de tokens / costos de IA
@@ -73,6 +78,21 @@ GOOGLE_OAUTH_BASE_URL=https://tu-dominio.com
 - Además usa **prompt caching nativo de Anthropic** (`cache_control: { type: "ephemeral" }`) para los system prompts que no dependen del request (instrucciones fijas tipo `SYSTEM_PROMPT`, reglas de imagen, reglas de captación). Esto se activa con la opción `cacheSystem: true` en `generateText`/`generateWithAnthropic`.
 - **Regla al agregar una función nueva en `ai.ts`**: si el `system` que le pasás es 100% estático (no interpola `leadContext`, `topic`, etc. dentro del `system`), agregá `cacheSystem: true`. Si el system tiene contenido dinámico, movelo a `messages` en vez del `system` para poder cachear igual.
 - No agregar SDKs/wrappers externos de terceros para esto: `@anthropic-ai/sdk` ya soporta `cache_control` de forma nativa.
+
+## Instagram Business — cómo configurar OAuth (publicar posts/historias)
+La app usa "Instagram API with Instagram Login" (graph.instagram.com) — NO requiere una Facebook Page vinculada,
+solo una cuenta de Instagram profesional (Business o Creator).
+1. Ir a https://developers.facebook.com/apps/ → crear app tipo "Business"
+2. Agregar el producto "Instagram" → configurar "Instagram Business Login"
+3. Scopes requeridos: `instagram_business_basic`, `instagram_business_content_publish`
+4. Authorized redirect URIs (OAuth):
+   - `http://localhost:3000/api/instagram-business/callback`
+   - `https://TU-DOMINIO/api/instagram-business/callback`
+5. Copiar Instagram App ID y App Secret a `.env.local` (`INSTAGRAM_APP_ID`, `INSTAGRAM_APP_SECRET`)
+6. Aplicar la migracion `20260702_instagram_content_media.sql` (crea el bucket público `content-media` donde se sube la placa antes de publicarla)
+7. En la app ir a Estudio de contenido → "Conectar Instagram" → autorizar con la cuenta de Lucía
+8. Publicar posts/historias requiere revisión de la app por parte de Meta antes de salir de modo desarrollo (probar primero con la cuenta agregada como tester en el Meta Developer Console)
+9. Reels y carruseles con múltiples imágenes no están soportados todavía (la API de publicación necesita video o varias imágenes por slide) — para esos formatos seguí usando "Copiar Instagram" y publicá manualmente
 
 ## Google Business Profile — cómo configurar OAuth
 1. Ir a https://console.cloud.google.com/ → crear proyecto
