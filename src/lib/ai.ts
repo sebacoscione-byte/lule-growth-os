@@ -15,6 +15,8 @@ type GenerateOptions = {
   maxTokens: number
   json?: boolean
   purpose?: string
+  /** Marcar true cuando `system` no depende de datos del request: habilita prompt caching de Anthropic. */
+  cacheSystem?: boolean
 }
 
 const SPANISH_INSTRUCTION = `Responde siempre en espanol rioplatense claro, natural y profesional.
@@ -294,10 +296,13 @@ function getAnthropic() {
 }
 
 async function generateWithAnthropic(options: GenerateOptions): Promise<string> {
+  const systemText = `${SPANISH_INSTRUCTION}\n\n${options.system}`
   const response = await getAnthropic().messages.create({
     model: process.env.ANTHROPIC_MODEL || "claude-sonnet-4-6",
     max_tokens: options.maxTokens,
-    system: `${SPANISH_INSTRUCTION}\n\n${options.system}`,
+    system: options.cacheSystem
+      ? [{ type: "text", text: systemText, cache_control: { type: "ephemeral" } }]
+      : systemText,
     messages: options.messages,
   })
   return response.content.filter(b => b.type === "text").map(b => b.text).join("")
@@ -465,6 +470,7 @@ export async function classifyMessage(message: string): Promise<ClassifyResult> 
     maxTokens: 1024,
     json: true,
     purpose: "classify",
+    cacheSystem: true,
     system: `${SYSTEM_PROMPT}
 
 Analiza el mensaje del usuario y devolve SOLO un JSON valido con esta estructura exacta:
@@ -515,6 +521,7 @@ export async function generateInstagramContent(
     maxTokens: 1024,
     json: true,
     purpose: "instagram_content",
+    cacheSystem: true,
     system: `Sos especialista en marketing medico para la Dra. Lucia Chahin, cardiologa.
 Generas contenido para Instagram en tono profesional, calido y argentino.
 NUNCA prometes resultados medicos, nunca das diagnosticos, nunca asumis condiciones del lector.
@@ -589,6 +596,7 @@ ${input.format === "carrusel" ? "Es un CARRUSEL: generá 4-5 slides con headline
     maxTokens: 2200,
     json: true,
     purpose: "content_plan",
+    cacheSystem: true,
     system: `Sos responsable de contenido de la Dra. Lucia Chahin, cardiologa.
 Creas una propuesta editorial lista para revision humana, adaptada a Instagram y Google Business.
 
@@ -719,6 +727,7 @@ export async function generateGooglePost(topic: string): Promise<string> {
   return generateText({
     maxTokens: 512,
     purpose: "google_post",
+    cacheSystem: true,
     system: `Generas publicaciones para Google Business Profile de la Dra. Lucia Chahin, cardiologa.
 Tono profesional y claro. Maximo 1500 caracteres. Sin promesas medicas.
 Siempre inclui donde atiende (CIMEL Lanus los martes, Swiss Medical Lomas los viernes).
@@ -736,6 +745,7 @@ export async function generateReviewReply(starRating: string, comment: string): 
   return generateText({
     maxTokens: 256,
     purpose: "review_reply",
+    cacheSystem: true,
     system: `Sos la Dra. Lucia Chahin y respondes resenas de Google en primera persona.
 Tono calido, profesional y breve (maximo 3 oraciones). Nunca hagas promesas medicas.
 Solo devolve el texto de la respuesta, sin comillas ni formato extra.`,
@@ -762,6 +772,7 @@ export async function generateFollowupSuggestion(
   return generateText({
     maxTokens: 400,
     purpose: "followup_suggestion",
+    cacheSystem: true,
     system: `${SYSTEM_PROMPT}
 
 Tu tarea es redactar el próximo mensaje que el equipo enviará al lead para hacer seguimiento.
