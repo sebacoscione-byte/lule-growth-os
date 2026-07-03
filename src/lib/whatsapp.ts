@@ -59,6 +59,27 @@ export async function sendButtons(
   })
 }
 
+export async function sendList(
+  to: string,
+  body: string,
+  buttonLabel: string,
+  rows: Array<{ id: string; title: string }>
+) {
+  return postToApi({
+    messaging_product: "whatsapp",
+    to,
+    type: "interactive",
+    interactive: {
+      type: "list",
+      body: { text: body },
+      action: {
+        button: buttonLabel,
+        sections: [{ title: "Opciones", rows }],
+      },
+    },
+  })
+}
+
 export function markAsRead(messageId: string) {
   return postToApi({
     messaging_product: "whatsapp",

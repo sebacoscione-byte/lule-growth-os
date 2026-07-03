@@ -61,6 +61,7 @@ export async function POST(req: NextRequest) {
           interactive?: {
             type: string
             button_reply?: { id: string; title: string }
+            list_reply?: { id: string; title: string }
           }
         }
 
@@ -69,7 +70,7 @@ export async function POST(req: NextRequest) {
         const waName = contact?.profile?.name
 
         let text = ""
-        let messageType: "text" | "button_reply" = "text"
+        let messageType: "text" | "button_reply" | "list_reply" = "text"
         let buttonId: string | undefined
 
         if (msg.type === "text") {
@@ -81,6 +82,13 @@ export async function POST(req: NextRequest) {
           messageType = "button_reply"
           buttonId = msg.interactive.button_reply?.id
           text = msg.interactive.button_reply?.title ?? ""
+        } else if (
+          msg.type === "interactive" &&
+          msg.interactive?.type === "list_reply"
+        ) {
+          messageType = "list_reply"
+          buttonId = msg.interactive.list_reply?.id
+          text = msg.interactive.list_reply?.title ?? ""
         } else {
           // Tipo no soportado (imagen, audio, etc.) — igualmente disparamos el bot
           // para que responda desde el estado actual de la sesión

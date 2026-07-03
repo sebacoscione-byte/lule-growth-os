@@ -1,7 +1,8 @@
 import { createClient } from "@supabase/supabase-js"
-import { sendText, sendButtons } from "@/lib/whatsapp"
+import { sendText, sendButtons, sendList } from "@/lib/whatsapp"
 
 type BotState = "nuevo" | "esperando_obra_social" | "esperando_sede" | "derivado"
+type MessageType = "text" | "button_reply" | "list_reply"
 
 interface WhatsAppSession {
   id: string
@@ -10,6 +11,7 @@ interface WhatsAppSession {
   state: BotState
   obra_social: string | null
   lead_id: string | null
+  updated_at?: string
 }
 
 interface LocationConfig {
@@ -21,6 +23,7 @@ interface LocationConfig {
   booking_url?: string
   day?: string
   booking_instruction?: string
+  obras_sociales?: string[]
 }
 
 function getDb() {
@@ -246,15 +249,74 @@ const SEDE_BUTTONS = [
   { id: "swiss_lomas", title: "Swiss Medical Lomas" },
 ]
 
+async function getObraSocialOptions(): Promise<{ id: string; title: string }[]> {
+  const locations = await getLocations()
+  const dynamic = Array.from(
+    new Set(locations.flatMap(l => l.obras_sociales ?? []).filter(Boolean))
+  )
+
+  const dynamicRows = dynamic.slice(0, 8).map((name, i) => ({
+    id: `os_${i}`,
+    title: name.length > 24 ? name.slice(0, 24) : name,
+  }))
+
+  return [
+    ...dynamicRows,
+    { id: "particular", title: "Particular" },
+    { id: "otra_obra_social", title: "Otra obra social" },
+  ]
+}
+
+// ── Timeout de inactividad ─────────────────────────────────
+const STALE_STATES: BotState[] = ["esperando_obra_social", "esperando_sede"]
+const TIMEOUT_MINUTES = 5
+
+const TIMEOUT_REPLY =
+  "🕐 Pasaron unos minutos sin respuesta, así que cerramos esta conversación por ahora. Cuando quieras retomar, escribinos de nuevo y arrancamos otra vez. ¡Hasta luego! 👋"
+
+function isStale(session: WhatsAppSession): boolean {
+  if (!STALE_STATES.includes(session.state) || !session.updated_at) return false
+  const elapsedMs = Date.now() - new Date(session.updated_at).getTime()
+  return elapsedMs > TIMEOUT_MINUTES * 60 * 1000
+}
+
+// No hay cron de un minuto disponible en el plan actual de Vercel, asi que
+// aprovechamos cualquier mensaje entrante para cerrar otras conversaciones
+// que quedaron esperando respuesta hace mas de 5 minutos.
+async function closeOtherStaleSessions(excludePhone: string) {
+  const db = getDb()
+  const cutoff = new Date(Date.now() - TIMEOUT_MINUTES * 60 * 1000).toISOString()
+
+  const { data: stale } = await db
+    .from("whatsapp_sessions")
+    .select("phone")
+    .neq("phone", excludePhone)
+    .in("state", STALE_STATES)
+    .lt("updated_at", cutoff)
+
+  for (const row of (stale ?? []) as { phone: string }[]) {
+    await sendText(row.phone, TIMEOUT_REPLY)
+    await updateSession(row.phone, { state: "nuevo", obra_social: null })
+  }
+}
+
 export async function handleIncomingMessage(params: {
   phone: string
   text: string
   waName?: string
-  messageType?: "text" | "button_reply"
+  messageType?: MessageType
   buttonId?: string
 }) {
   const { phone, text, waName, messageType = "text", buttonId } = params
-  const session = await getOrCreateSession(phone, waName)
+  let session = await getOrCreateSession(phone, waName)
+
+  await closeOtherStaleSessions(phone)
+
+  if (isStale(session)) {
+    await sendText(phone, TIMEOUT_REPLY)
+    await updateSession(phone, { state: "nuevo", obra_social: null })
+    session = { ...session, state: "nuevo", obra_social: null }
+  }
 
   if (messageType === "text" && isEmergencyMessage(text)) {
     await escalateEmergency(session, phone)
@@ -263,9 +325,12 @@ export async function handleIncomingMessage(params: {
 
   switch (session.state) {
     case "nuevo": {
-      await sendText(
+      const options = await getObraSocialOptions()
+      await sendList(
         phone,
-        "¡Hola! 👋 Soy el asistente de la *Dra. Lucía Chahin*, cardióloga.\n\nPara orientarte mejor, ¿con qué obra social o prepaga consultás? Si atendés por medicina pública o particular, escribilo también."
+        "¡Hola! 👋 Soy el asistente de la *Dra. Lucía Chahin*, cardióloga.\n\nElegí tu obra social o prepaga (o \"Particular\" si no tenés cobertura):",
+        "Elegir",
+        options
       )
       await updateSession(phone, {
         state: "esperando_obra_social",
@@ -275,7 +340,14 @@ export async function handleIncomingMessage(params: {
     }
 
     case "esperando_obra_social": {
-      const obraSocial = text.trim() || "no informada"
+      if (messageType !== "text" && buttonId === "otra_obra_social") {
+        await sendText(phone, "Contanos el nombre de tu obra social o prepaga.")
+        break
+      }
+
+      const obraSocial =
+        buttonId === "particular" ? "Particular / sin cobertura" : (text.trim() || "no informada")
+
       await updateSession(phone, {
         obra_social: obraSocial,
         state: "esperando_sede",
