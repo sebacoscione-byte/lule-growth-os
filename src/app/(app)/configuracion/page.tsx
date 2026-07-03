@@ -23,6 +23,7 @@ type Location = {
   google_maps_link: string
   phone: string
   hours: string
+  booking_url: string
   practices: string[]
   obras_sociales: string[]
   booking_instruction: string
@@ -39,6 +40,7 @@ const DEFAULT_LOCATION: Omit<Location, "id" | "name"> = {
   google_maps_link: "",
   phone: "",
   hours: "",
+  booking_url: "",
   practices: [],
   obras_sociales: [],
   booking_instruction: "",
@@ -293,6 +295,9 @@ export default function ConfiguracionPage() {
                         placeholder="Martes 9:00 a 13:00hs&#10;Jueves 14:00 a 18:00hs"
                       />
                     </Field>
+                    <Field label="Link para pedir turno (app o web)">
+                      <Input value={locationDraft.booking_url} onChange={e => setLocationDraft({ ...locationDraft, booking_url: e.target.value })} placeholder="https://www.swissmedical.com.ar/... o link de la app" />
+                    </Field>
                   </div>
 
                   {/* Prácticas */}
@@ -364,6 +369,17 @@ export default function ConfiguracionPage() {
                         <p className="text-gray-500">Google Maps</p>
                         <a href={loc.google_maps_link} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline break-all">
                           Ver en mapa
+                        </a>
+                      </div>
+                    </div>
+                  )}
+                  {loc.booking_url && (
+                    <div className="flex items-start gap-2">
+                      <Link2 className="h-3.5 w-3.5 text-gray-400 mt-0.5 shrink-0" />
+                      <div>
+                        <p className="text-gray-500">Link para pedir turno</p>
+                        <a href={loc.booking_url} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline break-all">
+                          {loc.booking_url}
                         </a>
                       </div>
                     </div>
