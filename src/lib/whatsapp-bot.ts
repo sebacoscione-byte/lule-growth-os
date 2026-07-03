@@ -282,7 +282,7 @@ async function getObraSocialOptions(): Promise<{ id: string; title: string }[]> 
 
 // ── Timeout de inactividad ─────────────────────────────────
 const STALE_STATES: BotState[] = ["esperando_obra_social", "esperando_sede"]
-const TIMEOUT_MINUTES = 5
+const TIMEOUT_MINUTES = 2
 
 const TIMEOUT_REPLY =
   "🕐 Pasaron unos minutos sin respuesta, así que cerramos esta conversación por ahora. Cuando quieras retomar, escribinos de nuevo y arrancamos otra vez. ¡Hasta luego! 👋"
