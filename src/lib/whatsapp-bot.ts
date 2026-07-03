@@ -24,6 +24,7 @@ interface LocationConfig {
   day?: string
   booking_instruction?: string
   obras_sociales?: string[]
+  practices?: string[]
 }
 
 function getDb() {
@@ -300,6 +301,67 @@ async function closeOtherStaleSessions(excludePhone: string) {
   }
 }
 
+async function getSessionPreferredLocation(
+  session: WhatsAppSession
+): Promise<"cimel_lanus" | "swiss_lomas" | null> {
+  if (!session.lead_id) return null
+  const db = getDb()
+  const { data } = await db
+    .from("leads")
+    .select("preferred_location")
+    .eq("id", session.lead_id)
+    .single()
+
+  const loc = data?.preferred_location
+  return loc === "cimel_lanus" || loc === "swiss_lomas" ? loc : null
+}
+
+// ── Preguntas frecuentes fuera del guion ────────────────────
+async function answerFaq(
+  text: string,
+  sede: "cimel_lanus" | "swiss_lomas" | null
+): Promise<string | null> {
+  const lower = text.toLowerCase()
+  const locations = await getLocations()
+  const loc = sede ? locations.find(l => l.id === sede) : undefined
+  const sedeName = sede ? SEDE_NAMES[sede] : null
+
+  const asksCoverage = ["obra social", "obras sociales", "cobertura", "prepaga", "pami", "aceptan"]
+    .some(k => lower.includes(k))
+  if (asksCoverage) {
+    if (loc?.obras_sociales?.length) {
+      return `En *${sedeName}* la Dra. Lucía Chahin atiende: ${loc.obras_sociales.join(", ")}.\n\nSi la tuya no está en la lista, escribinos y lo confirmamos.`
+    }
+    return "Todavía no tengo cargada la lista de obras sociales. Contanos cuál es la tuya y te confirmamos si atiende ahí."
+  }
+
+  const asksPractices = [
+    "ecocardiograma", "practica", "práctica",
+    "consulta cardiologica", "consulta cardiológica",
+    "que hace", "qué hace", "que hacen", "qué hacen",
+  ].some(k => lower.includes(k))
+  if (asksPractices) {
+    const list = loc?.practices?.length ? loc.practices.join(", ") : "Consulta cardiológica y Ecocardiograma"
+    return `${sedeName ? `En *${sedeName}*, la` : "La"} Dra. Lucía Chahin realiza: ${list}.`
+  }
+
+  const asksHours = ["horario", "horarios", "que dia", "qué día", "que dias", "qué días", "a que hora", "a qué hora"]
+    .some(k => lower.includes(k))
+  if (asksHours && sede) {
+    const hours = loc?.hours ?? `atiende los ${SEDE_DEFAULTS[sede].day}`
+    return `En *${sedeName}*, la Dra. Lucía Chahin ${loc?.hours ? `atiende: ${hours}` : hours}.`
+  }
+
+  const asksAddress = ["direccion", "dirección", "donde queda", "dónde queda", "como llego", "cómo llego", "ubicacion", "ubicación"]
+    .some(k => lower.includes(k))
+  if (asksAddress && sede) {
+    const address = loc?.address ?? SEDE_DEFAULTS[sede].address
+    if (address) return `*${sedeName}* está en: ${address}`
+  }
+
+  return null
+}
+
 export async function handleIncomingMessage(params: {
   phone: string
   text: string
@@ -382,6 +444,14 @@ export async function handleIncomingMessage(params: {
           await updateLeadLocation(session.lead_id, sede)
         }
         await sendSedeInstructions(phone, sede, "Listo, actualicé tu sede preferida.")
+        break
+      }
+
+      const currentSede = await getSessionPreferredLocation(session)
+      const faqAnswer = messageType === "text" ? await answerFaq(text, currentSede) : null
+
+      if (faqAnswer) {
+        await sendText(phone, faqAnswer)
       } else {
         await sendButtons(
           phone,
