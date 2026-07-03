@@ -119,6 +119,18 @@ async function updateLeadLocation(
     .eq("id", leadId)
 }
 
+async function updateLeadInsurance(leadId: string, insurance: string) {
+  const db = getDb()
+  await db.from("leads").update({ insurance }).eq("id", leadId)
+}
+
+function wantsToChangeObraSocial(text: string): boolean {
+  const lower = text.toLowerCase()
+  const mentionsCoverage = ["obra social", "cobertura", "prepaga"].some(k => lower.includes(k))
+  const mentionsChange = ["cambi", "actualiz"].some(k => lower.includes(k))
+  return mentionsCoverage && mentionsChange
+}
+
 const SEDE_NAMES: Record<"cimel_lanus" | "swiss_lomas", string> = {
   cimel_lanus: "CIMEL Lanús",
   swiss_lomas: "Swiss Medical Lomas",
@@ -410,6 +422,14 @@ export async function handleIncomingMessage(params: {
       const obraSocial =
         buttonId === "particular" ? "Particular / sin cobertura" : (text.trim() || "no informada")
 
+      if (session.lead_id) {
+        // Ya tenia sede asignada: estaba actualizando la obra social, no arrancando de cero.
+        await updateSession(phone, { obra_social: obraSocial, state: "derivado" })
+        await updateLeadInsurance(session.lead_id, obraSocial)
+        await sendText(phone, `Listo, actualicé tu obra social a *${obraSocial}*. ✅`)
+        break
+      }
+
       await updateSession(phone, {
         obra_social: obraSocial,
         state: "esperando_sede",
@@ -437,6 +457,18 @@ export async function handleIncomingMessage(params: {
     }
 
     case "derivado": {
+      if (messageType === "text" && wantsToChangeObraSocial(text)) {
+        const options = await getObraSocialOptions()
+        await sendList(
+          phone,
+          `Tenés cargada la obra social *${session.obra_social ?? "no informada"}*. Elegí la nueva (o "Particular" si no tenés cobertura):`,
+          "Elegir",
+          options
+        )
+        await updateSession(phone, { state: "esperando_obra_social" })
+        break
+      }
+
       const sede = parseSede(text, buttonId)
 
       if (sede) {
@@ -453,9 +485,12 @@ export async function handleIncomingMessage(params: {
       if (faqAnswer) {
         await sendText(phone, faqAnswer)
       } else {
+        const obraSocialLine = session.obra_social
+          ? `\n\nTenés cargada la obra social *${session.obra_social}*. Si cambió, escribinos "cambiar obra social".`
+          : ""
         await sendButtons(
           phone,
-          "Hola de nuevo 👋 Ya tenés las instrucciones para sacar turno con la Dra. Lucía Chahin. Si querés volver a ver los datos de una sede, elegí una opción (o escribinos si necesitás otra cosa):",
+          `Hola de nuevo 👋 Ya tenés las instrucciones para sacar turno con la Dra. Lucía Chahin. Si querés volver a ver los datos de una sede, elegí una opción (o escribinos si necesitás otra cosa):${obraSocialLine}`,
           SEDE_BUTTONS
         )
       }
