@@ -99,6 +99,41 @@ async function createLeadFromSession(
   return data?.id as string | undefined
 }
 
+async function updateLeadLocation(
+  leadId: string,
+  preferredLocation: "cimel_lanus" | "swiss_lomas"
+) {
+  const db = getDb()
+  const status =
+    preferredLocation === "cimel_lanus" ? "derivado_cimel" : "derivado_swiss"
+
+  await db
+    .from("leads")
+    .update({ preferred_location: preferredLocation, status })
+    .eq("id", leadId)
+}
+
+async function sendSedeInstructions(
+  phone: string,
+  sede: "cimel_lanus" | "swiss_lomas",
+  intro: string
+) {
+  if (sede === "cimel_lanus") {
+    const locations = await getLocations()
+    const cimel = locations.find(l => l.id === "cimel_lanus")
+    const phoneText = cimel?.phone ? `\n📞 *${cimel.phone}*` : ""
+    await sendText(
+      phone,
+      `${intro} Para sacar turno con la *Dra. Lucía Chahin* en *CIMEL Lanús*:${phoneText}\n🏥 Dirección: Tucumán 1314, Lanús\n📅 Ella atiende los *martes*\n\nSolicitá turno de consulta cardiológica o ecocardiograma con la Dra. Lucía Chahin.\n\n¡Ante cualquier duda, acá estamos! 😊`
+    )
+  } else {
+    await sendText(
+      phone,
+      `${intro} Para sacar turno con la *Dra. Lucía Chahin* en *Swiss Medical Lomas*:\n\n📱 Pedí turno por los canales oficiales de *Swiss Medical*\n👩‍⚕️ Solicitá a la Dra. Lucía Chahin\n📅 Ella atiende los *viernes*\n\nIndicá si buscás consulta cardiológica o ecocardiograma.\n\n¡Ante cualquier duda, acá estamos! 😊`
+    )
+  }
+}
+
 function parseSede(text: string, buttonId?: string): "cimel_lanus" | "swiss_lomas" | null {
   if (buttonId === "cimel_lanus") return "cimel_lanus"
   if (buttonId === "swiss_lomas") return "swiss_lomas"
@@ -179,29 +214,24 @@ export async function handleIncomingMessage(params: {
 
       await createLeadFromSession(session, sede)
       await updateSession(phone, { state: "derivado" })
-
-      if (sede === "cimel_lanus") {
-        const locations = await getLocations()
-        const cimel = locations.find(l => l.id === "cimel_lanus")
-        const phoneText = cimel?.phone ? `\n📞 *${cimel.phone}*` : ""
-        await sendText(
-          phone,
-          `Perfecto. Para sacar turno con la *Dra. Lucía Chahin* en *CIMEL Lanús*:${phoneText}\n🏥 Dirección: Tucumán 1314, Lanús\n📅 Ella atiende los *martes*\n\nSolicitá turno de consulta cardiológica o ecocardiograma con la Dra. Lucía Chahin.\n\n¡Ante cualquier duda, acá estamos! 😊`
-        )
-      } else {
-        await sendText(
-          phone,
-          "Perfecto. Para sacar turno con la *Dra. Lucía Chahin* en *Swiss Medical Lomas*:\n\n📱 Pedí turno por los canales oficiales de *Swiss Medical*\n👩‍⚕️ Solicitá a la Dra. Lucía Chahin\n📅 Ella atiende los *viernes*\n\nIndicá si buscás consulta cardiológica o ecocardiograma.\n\n¡Ante cualquier duda, acá estamos! 😊"
-        )
-      }
+      await sendSedeInstructions(phone, sede, "Perfecto.")
       break
     }
 
     case "derivado": {
-      await sendText(
-        phone,
-        "Hola de nuevo 👋 Ya tenés las instrucciones para sacar turno con la Dra. Lucía Chahin. Si tuviste algún problema o necesitás más info, contanos y te ayudamos."
-      )
+      const sede = parseSede(text, buttonId)
+
+      if (sede) {
+        if (session.lead_id) {
+          await updateLeadLocation(session.lead_id, sede)
+        }
+        await sendSedeInstructions(phone, sede, "Listo, actualicé tu sede preferida.")
+      } else {
+        await sendText(
+          phone,
+          "Hola de nuevo 👋 Ya tenés las instrucciones para sacar turno con la Dra. Lucía Chahin. Si tuviste algún problema, necesitás más info, o querés cambiar de sede (CIMEL Lanús / Swiss Medical Lomas), contanos y te ayudamos."
+        )
+      }
       break
     }
   }
