@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import {
   MapPin, Heart, Settings, Pencil, Check, X, Plus, Trash2,
-  Loader2, Clock, Link2, Phone, Stethoscope, Shield, Bot,
+  Loader2, Clock, Link2, Phone, Stethoscope, Shield, Bot, Activity,
 } from "lucide-react"
 
 type Doctor = {
@@ -14,6 +14,8 @@ type Doctor = {
   specialty: string
   bio: string
   matricula: string
+  specializations: string[]
+  conditions_treated: string[]
 }
 
 type Location = {
@@ -94,8 +96,12 @@ export default function ConfiguracionPage() {
   // ── Doctor ──────────────────────────────────────────────
   function startEditDoctor() {
     setDoctorDraft(doctor
-      ? { ...doctor }
-      : { name: "", specialty: "", bio: "", matricula: "" }
+      ? {
+          ...doctor,
+          specializations: [...(doctor.specializations ?? [])],
+          conditions_treated: [...(doctor.conditions_treated ?? [])],
+        }
+      : { name: "", specialty: "", bio: "", matricula: "", specializations: [], conditions_treated: [] }
     )
     setEditingDoctor(true)
   }
@@ -213,6 +219,28 @@ export default function ConfiguracionPage() {
                   placeholder="Cardióloga con X años de experiencia, especializada en..."
                 />
               </Field>
+              <div className="space-y-3 border-t pt-4">
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide flex items-center gap-1">
+                  <Stethoscope className="h-3 w-3" /> Especialista en
+                </p>
+                <StringList
+                  items={doctorDraft.specializations ?? []}
+                  onChange={specializations => setDoctorDraft({ ...doctorDraft, specializations })}
+                  placeholder="Ej: Ecocardiografía"
+                  addLabel="Agregar especialización"
+                />
+              </div>
+              <div className="space-y-3 border-t pt-4">
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide flex items-center gap-1">
+                  <Activity className="h-3 w-3" /> Enfermedades tratadas
+                </p>
+                <StringList
+                  items={doctorDraft.conditions_treated ?? []}
+                  onChange={conditions_treated => setDoctorDraft({ ...doctorDraft, conditions_treated })}
+                  placeholder="Ej: Arritmias"
+                  addLabel="Agregar enfermedad tratada"
+                />
+              </div>
               <SaveCancel saving={saving} onSave={saveDoctor} onCancel={() => setEditingDoctor(false)} />
             </>
           ) : doctor ? (
@@ -224,6 +252,32 @@ export default function ConfiguracionPage() {
                 <div className="text-sm">
                   <span className="text-gray-500">Bio: </span>
                   <span className="text-gray-900">{doctor.bio}</span>
+                </div>
+              )}
+              {doctor.specializations?.length > 0 && (
+                <div className="flex items-start gap-2">
+                  <Stethoscope className="h-3.5 w-3.5 text-gray-400 mt-0.5 shrink-0" />
+                  <div>
+                    <p className="text-gray-500 mb-1">Especialista en</p>
+                    <div className="flex flex-wrap gap-1">
+                      {doctor.specializations.map(s => (
+                        <span key={s} className="bg-blue-50 text-blue-700 text-xs px-2 py-0.5 rounded-full">{s}</span>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+              {doctor.conditions_treated?.length > 0 && (
+                <div className="flex items-start gap-2">
+                  <Activity className="h-3.5 w-3.5 text-gray-400 mt-0.5 shrink-0" />
+                  <div>
+                    <p className="text-gray-500 mb-1">Enfermedades tratadas</p>
+                    <div className="flex flex-wrap gap-1">
+                      {doctor.conditions_treated.map(c => (
+                        <span key={c} className="bg-rose-50 text-rose-700 text-xs px-2 py-0.5 rounded-full">{c}</span>
+                      ))}
+                    </div>
+                  </div>
                 </div>
               )}
               {saved === "doctor" && <p className="text-xs text-green-600 font-medium">Guardado</p>}

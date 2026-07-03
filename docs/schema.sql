@@ -232,7 +232,18 @@ create policy "authenticated_read_landing_events"
 -- SEED: Configuración inicial
 -- ============================================================
 insert into app_config (key, value) values
-  ('doctor', '{"name": "Dra. Lucía Chahin", "specialty": "Cardiología", "services": ["Consulta cardiológica", "Ecocardiograma"]}'),
+  ('doctor', '{
+    "name": "Dra. Lucía Chahin",
+    "specialty": "Cardiología",
+    "services": ["Consulta cardiológica", "Ecocardiograma"],
+    "specializations": ["Ecocardiografía", "Electrocardiografía", "Cardiología Adulto"],
+    "conditions_treated": [
+      "Angina de pecho", "Arritmias", "Desmayo", "Embolismo pulmonar", "Endocarditis",
+      "Enfermedad de Chagas", "Enfermedad coronaria", "Enfermedad valvular",
+      "Enfermedad de las arterias carótidas", "Espasmo arterial", "Hipertensión arterial",
+      "Insuficiencia cardiaca", "Soplo cardiaco", "Infarto"
+    ]
+  }'),
   ('locations', '[
     {"id": "cimel_lanus", "name": "CIMEL Lanús", "address": "Tucumán 1314, Lanús", "day": "martes", "services": ["Consulta cardiológica", "Ecocardiograma"], "booking_instruction": "Comunicate con CIMEL Lanús y solicitá turno con la Dra. Lucía Chahin."},
     {"id": "swiss_lomas", "name": "Swiss Medical Lomas", "address": null, "day": "viernes", "services": ["Consulta cardiológica", "Ecocardiograma"], "booking_instruction": "Pedí turno por los canales oficiales de Swiss Medical Lomas solicitando a la Dra. Lucía Chahin."}

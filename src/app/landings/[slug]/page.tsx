@@ -20,6 +20,21 @@ type ConfigLocation = {
   notes?: string
 }
 
+type ConfigDoctor = {
+  specializations?: string[]
+  conditions_treated?: string[]
+}
+
+// Fallback: cargado desde la ficha profesional de la Dra. Lucía Chahin.
+// Se usa solo si todavía no se cargó nada en Configuración > Datos de la doctora.
+const FALLBACK_SPECIALIZATIONS = ["Ecocardiografía", "Electrocardiografía", "Cardiología Adulto"]
+const FALLBACK_CONDITIONS_TREATED = [
+  "Angina de pecho", "Arritmias", "Desmayo", "Embolismo pulmonar", "Endocarditis",
+  "Enfermedad de Chagas", "Enfermedad coronaria", "Enfermedad valvular",
+  "Enfermedad de las arterias carótidas", "Espasmo arterial", "Hipertensión arterial",
+  "Insuficiencia cardiaca", "Soplo cardiaco", "Infarto",
+]
+
 async function getConfigLocations(): Promise<ConfigLocation[]> {
   try {
     const supabase = await createServiceClient()
@@ -27,6 +42,20 @@ async function getConfigLocations(): Promise<ConfigLocation[]> {
     return Array.isArray(data?.value) ? (data.value as ConfigLocation[]) : []
   } catch {
     return []
+  }
+}
+
+async function getConfigDoctor(): Promise<ConfigDoctor> {
+  try {
+    const supabase = await createServiceClient()
+    const { data } = await supabase.from("app_config").select("value").eq("key", "doctor").single()
+    const value = (data?.value ?? {}) as ConfigDoctor
+    return {
+      specializations: value.specializations?.length ? value.specializations : FALLBACK_SPECIALIZATIONS,
+      conditions_treated: value.conditions_treated?.length ? value.conditions_treated : FALLBACK_CONDITIONS_TREATED,
+    }
+  } catch {
+    return { specializations: FALLBACK_SPECIALIZATIONS, conditions_treated: FALLBACK_CONDITIONS_TREATED }
   }
 }
 
@@ -164,8 +193,15 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
   const data = LANDING_DATA[slug]
   if (!data) notFound()
 
-  const configLocations = await getConfigLocations()
+  const [configLocations, configDoctor] = await Promise.all([getConfigLocations(), getConfigDoctor()])
+  const specializations = configDoctor.specializations ?? []
+  const conditionsTreated = configDoctor.conditions_treated ?? []
   const isMain = slug === "dra-lucia-chahin"
+
+  const personJsonLd = {
+    ...PERSON_JSON_LD,
+    knowsAbout: [...specializations, ...conditionsTreated],
+  }
 
   return (
     <main className="min-h-screen bg-white">
@@ -173,7 +209,7 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
         <>
           <script
             type="application/ld+json"
-            dangerouslySetInnerHTML={{ __html: JSON.stringify(PERSON_JSON_LD) }}
+            dangerouslySetInnerHTML={{ __html: JSON.stringify(personJsonLd) }}
           />
           <script
             type="application/ld+json"
@@ -323,6 +359,34 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
           </div>
         </div>
       </section>
+
+      {/* Especialidades y enfermedades tratadas */}
+      {(specializations.length > 0 || conditionsTreated.length > 0) && (
+        <section className="py-12 px-4 bg-gray-50">
+          <div className="max-w-2xl mx-auto space-y-8">
+            {specializations.length > 0 && (
+              <div>
+                <h2 className="text-xl font-bold text-gray-900 mb-4 text-center">Especialista en</h2>
+                <div className="flex flex-wrap justify-center gap-2">
+                  {specializations.map((s) => (
+                    <span key={s} className="bg-blue-100 text-blue-800 text-sm font-medium px-3 py-1.5 rounded-full">{s}</span>
+                  ))}
+                </div>
+              </div>
+            )}
+            {conditionsTreated.length > 0 && (
+              <div>
+                <h2 className="text-xl font-bold text-gray-900 mb-4 text-center">Enfermedades que trata</h2>
+                <div className="flex flex-wrap justify-center gap-2">
+                  {conditionsTreated.map((c) => (
+                    <span key={c} className="bg-rose-50 text-rose-700 text-sm px-3 py-1.5 rounded-full">{c}</span>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </section>
+      )}
 
       {/* Interacciones */}
       {isMain ? (

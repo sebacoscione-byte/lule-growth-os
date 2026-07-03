@@ -143,3 +143,39 @@ Login (graph.instagram.com), sin necesidad de Facebook Page.
   estado y publica (feed post o story segun formato).
 - Boton "Publicar en Instagram" visible cuando el item esta aprobado, tiene placa generada
   y el formato es post/historia (reel/carrusel quedan para una fase futura con soporte de video/multi-imagen).
+
+---
+
+# Especializaciones y enfermedades tratadas de la doctora
+
+## Objetivo
+
+Cargar en la base de la app las especializaciones ("Especialista en: Ecocardiografía,
+Electrocardiografía, Cardiología Adulto") y las enfermedades tratadas (Angina de pecho,
+Arritmias, Desmayo, Embolismo pulmonar, Endocarditis, Enfermedad de Chagas, Enfermedad
+coronaria, Enfermedad valvular, Enfermedad de las arterias carótidas, Espasmo arterial,
+Hipertensión arterial, Insuficiencia cardiaca, Soplo cardiaco, Infarto) que el usuario
+compartió desde la ficha profesional de Lucía, y mostrarlas también en la web pública.
+
+## Plan
+
+- [x] Agregar `specializations` y `conditions_treated` al tipo `Doctor` y a la card
+      "Datos de la doctora" en Configuración (editable con `StringList`, mismo patrón
+      que "Prácticas" y "Obras sociales").
+- [x] Mostrar ambas listas en la landing pública (todas las rutas `/[slug]`), con
+      fallback a los valores cargados si `app_config.doctor` todavía no los tiene.
+- [x] Sumar `knowsAbout` al JSON-LD `Physician` de la landing principal para SEO.
+- [x] Migración `supabase/migrations/20260703_doctor_specializations.sql` que agrega
+      los datos a `app_config` (`update ... value || jsonb` + `insert ... on conflict do nothing`
+      como respaldo si la fila no existe).
+- [x] Actualizar el seed de `docs/schema.sql` para instalaciones nuevas.
+- [x] `npm run lint` y `npm run build` finalizaron correctamente.
+
+## Nota importante
+
+- Esta sesión no tenía `.env.local` en el proyecto, así que **no se pudo correr
+  `npm run migrate` contra Supabase**. Falta ejecutarlo (o correr el SQL de
+  `supabase/migrations/20260703_doctor_specializations.sql` a mano en el SQL Editor
+  de Supabase) para que los datos queden persistidos en producción.
+- Mientras tanto, la landing pública ya muestra estos datos gracias al fallback
+  hardcodeado en `src/app/landings/[slug]/page.tsx`, así que el sitio no se ve afectado.
