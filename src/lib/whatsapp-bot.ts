@@ -188,6 +188,56 @@ function parseSede(text: string, buttonId?: string): "cimel_lanus" | "swiss_loma
   return null
 }
 
+const EMERGENCY_KEYWORDS = [
+  "dolor de pecho", "dolor en el pecho", "me duele el pecho",
+  "no puedo respirar", "falta de aire", "me falta el aire", "ahogo",
+  "desmayo", "desmaye", "desmayé", "me desmaye", "me desmayé",
+  "perdí el conocimiento", "perdi el conocimiento",
+  "convulsion", "convulsión",
+  "infarto", "paro cardiaco", "paro cardíaco",
+  "palpitaciones fuertes",
+  "urgencia", "emergencia", "911",
+]
+
+function isEmergencyMessage(text: string): boolean {
+  const lower = text.toLowerCase()
+  return EMERGENCY_KEYWORDS.some(keyword => lower.includes(keyword))
+}
+
+const EMERGENCY_REPLY =
+  "🚨 Esto puede ser una urgencia médica y no lo puedo evaluar por este medio.\n\n*Andá a la guardia más cercana ahora mismo* o llamá al *911*.\n\nLe avisamos al equipo de la Dra. Lucía Chahin para que te contacten apenas puedan."
+
+async function escalateEmergency(session: WhatsAppSession, phone: string) {
+  const db = getDb()
+
+  if (session.lead_id) {
+    await db
+      .from("leads")
+      .update({ status: "urgencia_derivada", possible_emergency: true, requires_human: true })
+      .eq("id", session.lead_id)
+  } else {
+    const { data } = await db
+      .from("leads")
+      .insert({
+        phone,
+        name: session.wa_name ?? null,
+        origin_channel: "whatsapp",
+        status: "urgencia_derivada",
+        possible_emergency: true,
+        requires_human: true,
+        consent_to_contact: true,
+      })
+      .select("id")
+      .single()
+
+    if (data?.id) {
+      await updateSession(phone, { lead_id: data.id })
+    }
+  }
+
+  await sendText(phone, EMERGENCY_REPLY)
+}
+
 const SEDE_QUESTION =
   "La Dra. Chahin atiende en dos sedes:\n\n🏥 *CIMEL Lanús* — Tucumán 1314 (martes)\n🏥 *Swiss Medical Lomas* (viernes)\n\n¿En cuál preferís atenderte?"
 
@@ -205,6 +255,11 @@ export async function handleIncomingMessage(params: {
 }) {
   const { phone, text, waName, messageType = "text", buttonId } = params
   const session = await getOrCreateSession(phone, waName)
+
+  if (messageType === "text" && isEmergencyMessage(text)) {
+    await escalateEmergency(session, phone)
+    return
+  }
 
   switch (session.state) {
     case "nuevo": {
