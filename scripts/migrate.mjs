@@ -16,7 +16,10 @@ const env = Object.fromEntries(
     .filter(l => l.includes("=") && !l.startsWith("#"))
     .map(l => {
       const idx = l.indexOf("=")
-      return [l.slice(0, idx).trim(), l.slice(idx + 1).trim()]
+      const key = l.slice(0, idx).trim()
+      let value = l.slice(idx + 1).trim()
+      if (value.startsWith('"') && value.endsWith('"')) value = value.slice(1, -1)
+      return [key, value]
     })
 )
 
