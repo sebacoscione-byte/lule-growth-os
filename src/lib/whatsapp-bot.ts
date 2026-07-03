@@ -256,9 +256,10 @@ export async function handleIncomingMessage(params: {
         }
         await sendSedeInstructions(phone, sede, "Listo, actualicé tu sede preferida.")
       } else {
-        await sendText(
+        await sendButtons(
           phone,
-          "Hola de nuevo 👋 Ya tenés las instrucciones para sacar turno con la Dra. Lucía Chahin. Si tuviste algún problema, necesitás más info, o querés cambiar de sede (CIMEL Lanús / Swiss Medical Lomas), contanos y te ayudamos."
+          "Hola de nuevo 👋 Ya tenés las instrucciones para sacar turno con la Dra. Lucía Chahin. Si querés volver a ver los datos de una sede, elegí una opción (o escribinos si necesitás otra cosa):",
+          SEDE_BUTTONS
         )
       }
       break
