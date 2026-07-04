@@ -1,5 +1,5 @@
 # Backlog — Lule Growth OS
-**Actualizado:** 2026-06-26 | **Basado en:** PRD Estrategia de Captación v2.1
+**Actualizado:** 2026-07-04 | **Basado en:** PRD Estrategia de Captación v2.1
 
 ---
 
@@ -56,7 +56,7 @@ Google Maps, Instagram, WhatsApp y búsqueda orgánica.
 - [x] Cards de sede con botones de acción reales: "Pedir turno online" (si hay `booking_url` cargado, ej. Swiss Medical), "Llamar" (`tel:`) y "Consultar por WhatsApp" (`wa.me`) — antes eran solo texto/instrucciones sin acción directa
 - [x] Servicios como cards con microcopy orientado a síntomas/motivo de consulta
 - [x] Sección "Obras sociales y formas de atención" — muestra coberturas cargadas por sede en Configuración, o mensaje honesto invitando a consultar si todavía no hay datos cargados *(pendiente: cargar `obras_sociales` reales por sede en Configuración — hoy están vacías)*
-- [x] Sección "Opiniones de pacientes" con placeholder honesto (sin inventar testimonios ni rating falso)
+- [x] Sección "Opiniones de pacientes" — reseñas reales de Google vía Places API (New) desde el 2026-07-04 (`GOOGLE_PLACES_API_KEY` + `GOOGLE_PLACE_ID`, ver CLAUDE.md). Cae al placeholder honesto si la API no está disponible.
 - [x] JSON-LD: `Physician` + `FAQPage` en todas las landings, `BreadcrumbList` en landings SEO, `identifier` (matrícula) cuando esté cargada *(pendiente: `MedicalClinic` por sede)*
 - [ ] Eventos de analítica ampliados (click en booking/whatsapp/maps/call por separado) — hoy se sigue registrando `cta_cimel`/`cta_swiss` al primer engagement con cada sede; el catálogo completo de eventos sugerido en el brief queda para Etapa 6
 
@@ -66,6 +66,18 @@ Google Maps, Instagram, WhatsApp y búsqueda orgánica.
 ### Acciones externas (las hace Lucía)
 - [ ] Configurar `/dra-lucia-chahin` como link de la bio en Instagram *(acción de Lucía)*
 - [ ] Configurar `/dra-lucia-chahin` como sitio web en Google Business Profile *(acción de Lucía)*
+
+### Decisión pendiente: Google Cloud — fin de la prueba gratuita (~90 días desde 2026-07-04)
+El proyecto de Google Cloud usado para Places API (reseñas) quedó en modo prueba gratuita
+($300 de crédito, 90 días) a propósito: mientras esté en prueba, Google no puede cobrar nada
+aunque se supere el crédito, solo pausa el servicio. Como respaldo para cuando eventualmente
+se decida activar la cuenta completa, ya se armó un corte automático de facturación
+(tema de Pub/Sub `presupuesto-alertas` → Cloud Run function `cortar-facturacion` → presupuesto
+de $1/mes que la dispara). Sin uso real, no hay apuro en activar.
+- [ ] Revisar antes de que venza la prueba (~inicios de octubre 2026): decidir si se activa la
+      cuenta completa (necesario si se quiere seguir mostrando reseñas de Google después de esa
+      fecha) o se deja pausar solo. Si se activa, confirmar que el corte automático de
+      facturación sigue funcionando.
 
 ---
 
