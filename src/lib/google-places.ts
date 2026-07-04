@@ -43,8 +43,10 @@ export async function getGooglePlaceReviews(): Promise<GooglePlaceReviews | null
         "X-Goog-Api-Key": apiKey,
         "X-Goog-FieldMask": "rating,userRatingCount,reviews,googleMapsUri",
       },
-      // Cachear 24h: evita pegarle a la API en cada visita y respetar cuota/costo.
-      next: { revalidate: 86400 },
+      // Cachear 7 días: las reseñas de un consultorio no cambian tan seguido, y esto
+      // reduce aún más las llamadas — aunque el límite real de gasto se controla en
+      // Google Cloud Billing, no acá (ver CLAUDE.md).
+      next: { revalidate: 604800 },
     })
     if (!res.ok) return null
     const data = (await res.json()) as PlaceDetailsResponse
