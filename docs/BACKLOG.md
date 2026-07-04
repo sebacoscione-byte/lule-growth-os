@@ -149,6 +149,7 @@ público para pedir turno.
 ## Etapa 7 — Automatización
 
 - [ ] WhatsApp Business API: envío automático de mensajes de seguimiento
+- [ ] Configurar `WHATSAPP_VERIFY_TOKEN` en `.env.local` + webhook de prueba separado (vía ngrok) para poder testear localmente cambios en la lógica de recepción de mensajes (`src/lib/whatsapp-bot.ts`) sin tocar el webhook de producción. Sin esto, cualquier cambio en cómo el bot procesa mensajes entrantes solo se puede probar directo en producción. No es urgente mientras no se toque esa lógica.
 - [ ] Instagram Graph API: publicación directa desde la app del contenido aprobado
 - [ ] Automatización de flujos de seguimiento con n8n
 - [ ] Reportes automáticos semanales (leads nuevos, conversión, canales)
