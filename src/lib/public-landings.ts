@@ -108,7 +108,7 @@ export const LANDING_DATA: Record<string, PublicLandingData> = {
 
 export const PUBLIC_LANDING_SLUGS = Object.keys(LANDING_DATA)
 
-export const WHATSAPP_NUMBER = "5491123842117"
+export const WHATSAPP_NUMBER = "5491178285006"
 
 export function buildWhatsAppUrl(message: string): string {
   return `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(message)}`

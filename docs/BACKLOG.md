@@ -47,7 +47,7 @@ Google Maps, Instagram, WhatsApp y búsqueda orgánica.
 - [ ] Número de matrícula (MN o MP) visible junto al nombre — código ya listo (se muestra en hero, "Sobre la doctora", footer y JSON-LD apenas se cargue) *(requiere: número de matrícula de Lucía en Configuración > Datos de la doctora)*
 - [x] FAQ: preguntas frecuentes sobre turnos, servicios, cobertura y sedes — 11 preguntas en la landing principal + FAQ corta específica en cada landing SEO
 - [x] Links directos a Google Maps para CIMEL Lanús y Swiss Medical Lomas
-- [x] Botón de WhatsApp con mensaje prearmado según sede (+5491123842117) — en cada card de sede (sección "Pedir turno") y en cada landing SEO
+- [x] Botón de WhatsApp con mensaje prearmado según sede (+5491178285006) — en cada card de sede (sección "Pedir turno") y en cada landing SEO
 - [x] Dominio propio — `draluciachahin.ar` registrado en NIC Argentina (1/7/2026)
 
 ### Rediseño de conversión (2026-07-04, brief basado en `deep-research-report.md`)
