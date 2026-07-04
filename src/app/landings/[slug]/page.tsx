@@ -26,6 +26,7 @@ type ConfigLocation = {
   booking_instruction?: string
   obras_sociales?: string[]
   notes?: string
+  whatsapp?: string
 }
 
 type ConfigDoctor = {
@@ -172,6 +173,7 @@ function buildSedeActions(locations: PublicLandingLocation[], configLocations: C
       bookingUrl: cfg?.booking_url || undefined,
       instruction: cfg?.booking_instruction || loc.instruction,
       whatsappMessage: WHATSAPP_MESSAGES[key],
+      whatsapp: cfg?.whatsapp || undefined,
       color: SEDE_COLOR[key] ?? "blue",
       preferredLocationValue: PREFERRED_LOCATION_BY_KEY[key] ?? "sin_definir",
     }

@@ -24,6 +24,7 @@ type Location = {
   address: string
   google_maps_link: string
   phone: string
+  whatsapp: string
   hours: string
   booking_url: string
   practices: string[]
@@ -41,6 +42,7 @@ const DEFAULT_LOCATION: Omit<Location, "id" | "name"> = {
   address: "",
   google_maps_link: "",
   phone: "",
+  whatsapp: "",
   hours: "",
   booking_url: "",
   practices: [],
@@ -340,6 +342,13 @@ export default function ConfiguracionPage() {
                     <Field label="Teléfono para turnos">
                       <Input value={locationDraft.phone} onChange={e => setLocationDraft({ ...locationDraft, phone: e.target.value })} placeholder="011 4xxx-xxxx" />
                     </Field>
+                    <Field label="WhatsApp propio de la institución (opcional)">
+                      <Input value={locationDraft.whatsapp} onChange={e => setLocationDraft({ ...locationDraft, whatsapp: e.target.value })} placeholder="Ej: 11 5051-9982" />
+                      <p className="text-xs text-gray-400 mt-1">
+                        Solo si la institución tiene su propio WhatsApp para turnos (ej: Swity de Swiss Medical).
+                        Si lo dejás vacío, el botón &ldquo;Consultar por WhatsApp&rdquo; de la landing usa el WhatsApp del consultorio.
+                      </p>
+                    </Field>
                     <Field label="Días y horarios">
                       <textarea
                         value={locationDraft.hours}
@@ -415,6 +424,9 @@ export default function ConfiguracionPage() {
                   )}
                   {loc.phone && (
                     <InfoRow icon={<Phone className="h-3.5 w-3.5 text-gray-400" />} label="Teléfono" value={loc.phone} />
+                  )}
+                  {loc.whatsapp && (
+                    <InfoRow icon={<Phone className="h-3.5 w-3.5 text-green-500" />} label="WhatsApp propio" value={loc.whatsapp} />
                   )}
                   {loc.google_maps_link && (
                     <div className="flex items-start gap-2">

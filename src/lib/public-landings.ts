@@ -110,8 +110,18 @@ export const PUBLIC_LANDING_SLUGS = Object.keys(LANDING_DATA)
 
 export const WHATSAPP_NUMBER = "5491178285006"
 
-export function buildWhatsAppUrl(message: string): string {
-  return `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(message)}`
+// Normaliza un teléfono argentino cargado en Configuración (ej: "11 5051-9982") al
+// formato que espera wa.me (54 + 9 + característica + número, sin 0 ni 15).
+function normalizeArWhatsAppNumber(raw: string): string {
+  const digits = raw.replace(/\D/g, "").replace(/^0/, "")
+  return digits.startsWith("54") ? digits : `549${digits}`
+}
+
+// `rawNumber` permite usar el WhatsApp propio de una sede (ej: Swity de Swiss Medical)
+// en vez del WhatsApp del consultorio, cuando la institución atiende consultas ahí.
+export function buildWhatsAppUrl(message: string, rawNumber?: string): string {
+  const number = rawNumber ? normalizeArWhatsAppNumber(rawNumber) : WHATSAPP_NUMBER
+  return `https://wa.me/${number}?text=${encodeURIComponent(message)}`
 }
 
 export const WHATSAPP_MESSAGES = {

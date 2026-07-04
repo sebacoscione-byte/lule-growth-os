@@ -15,6 +15,7 @@ export interface SedeAction {
   bookingUrl?: string
   instruction: string
   whatsappMessage: string
+  whatsapp?: string
   color: "blue" | "teal"
   preferredLocationValue: "cimel_lanus" | "swiss_lomas" | "sin_definir"
 }
@@ -61,7 +62,7 @@ function CtaCard({ sede, expanded, onToggle, onEngage }: CtaCardProps) {
     },
   }[sede.color]
 
-  const whatsappUrl = buildWhatsAppUrl(sede.whatsappMessage)
+  const whatsappUrl = buildWhatsAppUrl(sede.whatsappMessage, sede.whatsapp)
   const phoneHref = sede.phone ? `tel:${sede.phone.replace(/[\s-]/g, "")}` : null
 
   return (
