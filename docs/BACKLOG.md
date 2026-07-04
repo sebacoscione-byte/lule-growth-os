@@ -37,8 +37,7 @@ Google Maps, Instagram, WhatsApp y búsqueda orgánica.
 - [x] Sección servicios: consulta cardiológica, ecocardiograma, control, evaluación cardiovascular
 - [x] Sección "Dónde atiende": CIMEL Lanús — martes / Swiss Medical Lomas — viernes
 - [x] CTAs expandibles con instrucciones paso a paso para pedir turno en cada institución
-- [x] Formulario "No pude pedir turno" → crea lead `seguimiento_pendiente` con +24h
-- [x] Captura de UTM source/medium/campaign/content en el formulario
+- [x] Captura de UTM source/medium/campaign/content (se usa en los eventos `cta_cimel`/`cta_swiss`)
 - [x] Aviso médico visible: no reemplaza consulta, no apta para urgencias, llamar al 107
 - [x] Bloque "Sobre la doctora" (contenido básico)
 
@@ -58,9 +57,11 @@ Google Maps, Instagram, WhatsApp y búsqueda orgánica.
 - [x] Servicios como cards con microcopy orientado a síntomas/motivo de consulta
 - [x] Sección "Obras sociales y formas de atención" — muestra coberturas cargadas por sede en Configuración, o mensaje honesto invitando a consultar si todavía no hay datos cargados *(pendiente: cargar `obras_sociales` reales por sede en Configuración — hoy están vacías)*
 - [x] Sección "Opiniones de pacientes" con placeholder honesto (sin inventar testimonios ni rating falso)
-- [x] Campo "Obra social / prepaga" agregado al formulario público de "No pude pedir turno" (antes se guardaba `insurance: null` siempre)
 - [x] JSON-LD: `Physician` + `FAQPage` en todas las landings, `BreadcrumbList` en landings SEO, `identifier` (matrícula) cuando esté cargada *(pendiente: `MedicalClinic` por sede)*
-- [ ] Eventos de analítica ampliados (click en booking/whatsapp/maps/call por separado) — hoy se sigue registrando `cta_cimel`/`cta_swiss` al primer engagement con cada sede y `form_submitted`; el catálogo completo de eventos sugerido en el brief queda para Etapa 6
+- [ ] Eventos de analítica ampliados (click en booking/whatsapp/maps/call por separado) — hoy se sigue registrando `cta_cimel`/`cta_swiss` al primer engagement con cada sede; el catálogo completo de eventos sugerido en el brief queda para Etapa 6
+
+### Revertido (2026-07-04)
+- [x] ~~Formulario "No pude pedir turno" en las landings~~ — se sacó de la web pública. Creaba un lead `seguimiento_pendiente` prometiendo "te ayudamos", pero **hoy nadie revisa el CRM/Inbox** para mandar ese seguimiento manual (`/api/followup` requiere que un usuario logueado lo dispare a mano). Mostrar el formulario sin nadie contestando es peor que no tenerlo. Quedan solo los canales que responden solos: llamar y el bot de WhatsApp. El backend (`/api/public/lead`, con el campo `insurance` ya soportado) queda intacto sin uso — reactivar cuando haya alguien asignado a hacer el seguimiento manual, o cuando se automatice la respuesta por WhatsApp (Etapa 7).
 
 ### Acciones externas (las hace Lucía)
 - [ ] Configurar `/dra-lucia-chahin` como link de la bio en Instagram *(acción de Lucía)*
@@ -90,7 +91,7 @@ orgánico de búsqueda y convierten con instrucciones claras para pedir turno.
 - [x] FAQ específica por landing (preguntas frecuentes distintas por servicio/sede)
 - [x] Links internos entre landings (ej. Lanús → Lomas y viceversa, para SEO)
 - [x] Datos estructurados JSON-LD (Physician, FAQPage, BreadcrumbList) *(MedicalClinic por sede pendiente)*
-- [x] Formulario "No pude pedir turno" en cada landing SEO *(antes solo en /dra-lucia-chahin, ahora reutiliza el mismo componente en las 6 landings SEO)*
+- [ ] ~~Formulario "No pude pedir turno" en cada landing SEO~~ — revertido, ver nota en Etapa 2
 
 ### Acciones externas (las hace el equipo)
 - [ ] Configurar Google Search Console con el sitemap

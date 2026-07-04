@@ -1,17 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import {
-  MapPin, Clock, ChevronDown, ChevronUp, Phone, Map, MessageCircle, CalendarCheck,
-  CheckCircle2, Loader2, AlertCircle,
-} from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from "@/components/ui/select"
-import { Textarea } from "@/components/ui/textarea"
+import { MapPin, Clock, ChevronDown, ChevronUp, Phone, Map, MessageCircle, CalendarCheck } from "lucide-react"
 import { buildWhatsAppUrl } from "@/lib/public-landings"
 
 export interface SedeAction {
@@ -160,190 +150,6 @@ function CtaCard({ sede, expanded, onToggle, onEngage }: CtaCardProps) {
   )
 }
 
-// ─── Formulario de lead ───────────────────────────────────────────────────────
-
-interface LeadFormProps {
-  slug: string
-  locations: SedeAction[]
-  engagedKeys: Set<string>
-  utms: Record<string, string>
-}
-
-function LeadForm({ slug, locations, engagedKeys, utms }: LeadFormProps) {
-  const [name, setName] = useState("")
-  const [phone, setPhone] = useState("")
-  const [service, setService] = useState("no_definido")
-  const [location, setLocation] = useState<string>(
-    locations.length === 1 ? locations[0].preferredLocationValue : "sin_definir"
-  )
-  const [insurance, setInsurance] = useState("")
-  const [message, setMessage] = useState("")
-  const [consent, setConsent] = useState(false)
-  const [submitting, setSubmitting] = useState(false)
-  const [submitted, setSubmitted] = useState(false)
-  const [submitError, setSubmitError] = useState<string | null>(null)
-
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault()
-    if (!consent || !phone.trim()) return
-    setSubmitting(true)
-    setSubmitError(null)
-
-    try {
-      const res = await fetch("/api/public/lead", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: name.trim() || null,
-          phone: phone.trim(),
-          requested_service: service,
-          preferred_location: location,
-          insurance: insurance.trim() || null,
-          general_reason: message.trim() || null,
-          consent_to_contact: true,
-          clicked_cimel_cta: engagedKeys.has("cimel"),
-          clicked_swiss_cta: engagedKeys.has("swiss"),
-          landing_page: slug,
-          origin_url: window.location.href,
-          ...utms,
-        }),
-      })
-
-      if (!res.ok) {
-        const data = await res.json()
-        setSubmitError(data.error ?? "Error al enviar. Intentá de nuevo.")
-      } else {
-        fireEvent("form_submitted", slug, utms)
-        setSubmitted(true)
-      }
-    } catch {
-      setSubmitError("Error de red. Intentá de nuevo.")
-    }
-    setSubmitting(false)
-  }
-
-  if (submitted) {
-    return (
-      <div className="flex flex-col items-center gap-3 py-10 text-center">
-        <CheckCircle2 className="h-14 w-14 text-green-500" />
-        <p className="font-semibold text-lg text-gray-900">¡Recibimos tu mensaje!</p>
-        <p className="text-sm text-gray-500 max-w-xs">
-          Nos comunicamos a la brevedad para ayudarte a coordinar tu turno con la Dra. Lucía Chahin.
-        </p>
-      </div>
-    )
-  }
-
-  return (
-    <form onSubmit={handleSubmit} className="space-y-4 bg-white rounded-xl border border-gray-200 p-6">
-      <div className="grid sm:grid-cols-2 gap-4">
-        <div className="space-y-1.5">
-          <Label className="text-gray-900">Nombre</Label>
-          <Input
-            value={name}
-            onChange={e => setName(e.target.value)}
-            placeholder="Tu nombre"
-            className="text-gray-900 placeholder:text-gray-400"
-          />
-        </div>
-        <div className="space-y-1.5">
-          <Label className="text-gray-900">
-            WhatsApp <span className="text-red-500">*</span>
-          </Label>
-          <Input
-            value={phone}
-            onChange={e => setPhone(e.target.value)}
-            placeholder="+54 11..."
-            required
-            className="text-gray-900 placeholder:text-gray-400"
-          />
-        </div>
-      </div>
-
-      <div className="grid sm:grid-cols-2 gap-4">
-        <div className="space-y-1.5">
-          <Label className="text-gray-900">Servicio buscado</Label>
-          <Select value={service} onValueChange={setService}>
-            <SelectTrigger className="text-gray-900"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="no_definido">No lo sé todavía</SelectItem>
-              <SelectItem value="consulta_cardiologia">Consulta cardiológica</SelectItem>
-              <SelectItem value="ecocardiograma">Ecocardiograma</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="space-y-1.5">
-          <Label className="text-gray-900">Sede preferida</Label>
-          <Select value={location} onValueChange={setLocation}>
-            <SelectTrigger className="text-gray-900"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="sin_definir">Sin preferencia</SelectItem>
-              <SelectItem value="cimel_lanus">CIMEL Lanús — martes</SelectItem>
-              <SelectItem value="swiss_lomas">Swiss Medical Lomas — viernes</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
-
-      <div className="space-y-1.5">
-        <Label className="text-gray-900">
-          Obra social / prepaga <span className="text-gray-400 font-normal">(opcional)</span>
-        </Label>
-        <Input
-          value={insurance}
-          onChange={e => setInsurance(e.target.value)}
-          placeholder="OSDE, Swiss Medical, particular..."
-          className="text-gray-900 placeholder:text-gray-400"
-        />
-      </div>
-
-      <div className="space-y-1.5">
-        <Label className="text-gray-900">
-          Mensaje <span className="text-gray-400 font-normal">(opcional)</span>
-        </Label>
-        <Textarea
-          value={message}
-          onChange={e => setMessage(e.target.value)}
-          placeholder="¿Qué pasó cuando intentaste pedir turno? ¿Hay algo en particular que necesitás saber?"
-          rows={3}
-          className="resize-none text-gray-900 placeholder:text-gray-400"
-        />
-      </div>
-
-      <div className="flex items-start gap-3">
-        <input
-          type="checkbox"
-          id="consent"
-          checked={consent}
-          onChange={e => setConsent(e.target.checked)}
-          className="mt-1 h-4 w-4 rounded"
-          required
-        />
-        <label htmlFor="consent" className="text-sm text-gray-600 leading-relaxed">
-          Acepto ser contactado para recibir información sobre cómo pedir turno con la Dra. Lucía Chahin.
-          Mis datos no serán usados para ningún otro fin.
-        </label>
-      </div>
-
-      {submitError && (
-        <div className="flex items-center gap-2 text-sm text-red-600 bg-red-50 rounded-lg p-3">
-          <AlertCircle className="h-4 w-4 shrink-0" />
-          {submitError}
-        </div>
-      )}
-
-      <Button
-        type="submit"
-        disabled={submitting || !consent || !phone.trim()}
-        className="w-full"
-      >
-        {submitting && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
-        Enviar
-      </Button>
-    </form>
-  )
-}
-
 // ─── Componente principal ─────────────────────────────────────────────────────
 
 const TRACKED_KEYS = new Set(["cimel", "swiss"])
@@ -372,34 +178,23 @@ export function LandingInteractions({ slug, locations }: { slug: string; locatio
   }
 
   return (
-    <>
-      <section id="pedir-turno" className="scroll-mt-20 py-12 px-4">
-        <div className="max-w-2xl mx-auto space-y-4">
-          <h2 className="mb-2 text-center text-xl font-bold text-gray-900">Pedir turno</h2>
-          <p className="mb-4 text-center text-sm text-gray-500">
-            Elegí la sede y reservá por el canal que prefieras. No se otorgan turnos desde esta web.
-          </p>
+    <section id="pedir-turno" className="scroll-mt-20 py-12 px-4">
+      <div className="max-w-2xl mx-auto space-y-4">
+        <h2 className="mb-2 text-center text-xl font-bold text-gray-900">Pedir turno</h2>
+        <p className="mb-4 text-center text-sm text-gray-500">
+          Elegí la sede y reservá por el canal que prefieras. No se otorgan turnos desde esta web.
+        </p>
 
-          {locations.map(sede => (
-            <CtaCard
-              key={sede.key}
-              sede={sede}
-              expanded={expandedKey === sede.key}
-              onToggle={() => setExpandedKey(prev => prev === sede.key ? null : sede.key)}
-              onEngage={() => engage(sede.key)}
-            />
-          ))}
-        </div>
-      </section>
-
-      <section className="px-4 pb-12">
-        <div className="mx-auto max-w-2xl">
-          <p className="mb-4 text-center text-sm text-gray-500">
-            ¿No pudiste pedir turno? Dejanos tu contacto y te ayudamos.
-          </p>
-          <LeadForm slug={slug} locations={locations} engagedKeys={engagedKeys} utms={utms} />
-        </div>
-      </section>
-    </>
+        {locations.map(sede => (
+          <CtaCard
+            key={sede.key}
+            sede={sede}
+            expanded={expandedKey === sede.key}
+            onToggle={() => setExpandedKey(prev => prev === sede.key ? null : sede.key)}
+            onEngage={() => engage(sede.key)}
+          />
+        ))}
+      </div>
+    </section>
   )
 }
