@@ -2,7 +2,10 @@ import type { Metadata } from "next"
 import Image from "next/image"
 import Link from "next/link"
 import { notFound } from "next/navigation"
-import { MapPin, Clock, AlertTriangle, Phone, Map, CalendarCheck, Shield, Star } from "lucide-react"
+import {
+  MapPin, Clock, AlertTriangle, Phone, Map, CalendarCheck, Shield, Star,
+  Stethoscope, HeartPulse, ClipboardCheck, Heart, type LucideIcon,
+} from "lucide-react"
 import {
   LANDING_DATA, WHATSAPP_MESSAGES, whatsAppKeyForLocation, SERVICE_MICROCOPY,
   RELATED_LANDING_SLUGS, buildWhatsAppUrl, type PublicLandingLocation,
@@ -48,6 +51,14 @@ const PREFERRED_LOCATION_BY_KEY: Record<string, "cimel_lanus" | "swiss_lomas" | 
 }
 
 const SEDE_COLOR: Record<string, "blue" | "teal"> = { cimel: "blue", swiss: "teal", general: "blue" }
+
+const SERVICE_ICONS: Record<string, LucideIcon> = {
+  "Consulta cardiológica": Stethoscope,
+  "Ecocardiograma": HeartPulse,
+  "Control cardiológico": ClipboardCheck,
+  "Control cardiovascular": ClipboardCheck,
+  "Evaluación cardiovascular": HeartPulse,
+}
 
 const MAIN_FAQ = [
   {
@@ -358,7 +369,7 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
 
                 <div className="mt-4 flex flex-wrap justify-center gap-2 sm:justify-start">
                   {["Hospital Británico", "CIMEL Lanús", "Swiss Medical Lomas", "Ecocardiograma"].map(chip => (
-                    <span key={chip} className="rounded-full border border-blue-100 bg-white/70 px-3 py-1 text-xs font-medium text-blue-700">
+                    <span key={chip} className="rounded-full border border-blue-200 bg-white px-3 py-1 text-xs font-medium text-blue-700 shadow-sm">
                       {chip}
                     </span>
                   ))}
@@ -482,45 +493,55 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
         <div className="max-w-2xl mx-auto">
           <h2 className="text-xl font-bold text-gray-900 mb-6 text-center">Servicios</h2>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            {data.services.map((service) => (
-              <div key={service} className="p-4 rounded-lg border border-gray-200 bg-gray-50">
-                <div className="flex items-center gap-2">
-                  <span className="h-2 w-2 rounded-full bg-rose-400 shrink-0" />
-                  <span className="text-sm font-semibold text-gray-800">{service}</span>
+            {data.services.map((service) => {
+              const Icon = SERVICE_ICONS[service] ?? Heart
+              return (
+                <div key={service} className="p-4 rounded-lg border border-gray-200 bg-gray-50">
+                  <div className="flex items-center gap-2.5">
+                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-blue-100">
+                      <Icon className="h-4 w-4 text-blue-600" />
+                    </div>
+                    <span className="text-sm font-semibold text-gray-800">{service}</span>
+                  </div>
+                  {SERVICE_MICROCOPY[service] && (
+                    <p className="mt-2 text-xs leading-relaxed text-gray-500">{SERVICE_MICROCOPY[service]}</p>
+                  )}
                 </div>
-                {SERVICE_MICROCOPY[service] && (
-                  <p className="mt-2 text-xs leading-relaxed text-gray-500">{SERVICE_MICROCOPY[service]}</p>
-                )}
-              </div>
-            ))}
+              )
+            })}
           </div>
         </div>
       </section>
 
-      {/* Especialidades y enfermedades tratadas */}
+      {/* Especialidad y enfermedades tratadas */}
       {(specializations.length > 0 || conditionsTreated.length > 0) && (
         <section className="py-12 px-4 bg-gray-50">
-          <div className="max-w-2xl mx-auto space-y-8">
-            {specializations.length > 0 && (
-              <div>
-                <h2 className="text-xl font-bold text-gray-900 mb-4 text-center">Especialista en</h2>
-                <div className="flex flex-wrap justify-center gap-2">
-                  {specializations.map((s) => (
-                    <span key={s} className="bg-blue-100 text-blue-800 text-sm font-medium px-3 py-1.5 rounded-full">{s}</span>
-                  ))}
+          <div className="mx-auto max-w-2xl">
+            <h2 className="mb-4 text-center text-xl font-bold text-gray-900">Especialidad y enfermedades que trata</h2>
+            <div className="space-y-6 rounded-lg border border-gray-200 bg-white p-6">
+              {specializations.length > 0 && (
+                <div>
+                  <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-gray-400">Especialista en</p>
+                  <div className="flex flex-wrap gap-2">
+                    {specializations.map((s) => (
+                      <span key={s} className="bg-blue-50 text-blue-700 text-xs font-medium px-3 py-1 rounded-full">{s}</span>
+                    ))}
+                  </div>
                 </div>
-              </div>
-            )}
-            {conditionsTreated.length > 0 && (
-              <div>
-                <h2 className="text-xl font-bold text-gray-900 mb-4 text-center">Enfermedades que trata</h2>
-                <div className="flex flex-wrap justify-center gap-2">
-                  {conditionsTreated.map((c) => (
-                    <span key={c} className="bg-rose-50 text-rose-700 text-sm px-3 py-1.5 rounded-full">{c}</span>
-                  ))}
+              )}
+              {conditionsTreated.length > 0 && (
+                <div>
+                  <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-gray-400">
+                    Enfermedades y condiciones que trata
+                  </p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {conditionsTreated.map((c) => (
+                      <span key={c} className="bg-gray-100 text-gray-600 text-xs px-2.5 py-1 rounded-full">{c}</span>
+                    ))}
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
+            </div>
           </div>
         </section>
       )}
