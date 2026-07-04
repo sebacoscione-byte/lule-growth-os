@@ -44,11 +44,23 @@ Google Maps, Instagram, WhatsApp y búsqueda orgánica.
 
 ### Profesionalización pendiente ⏳
 - [x] Foto profesional de la Dra. Lucía Chahin en el hero — guardar como `public/lucia-chahin.jpg` *(foto recibida, pendiente de subir al servidor)*
-- [ ] Número de matrícula (MN o MP) visible junto al nombre — genera confianza y es legalmente requerido; es un dato profesional público, verificable en SISA *(requiere: número de matrícula de Lucía)*
-- [ ] FAQ: preguntas frecuentes sobre turnos, servicios, cobertura y sedes
-- [ ] Links directos a Google Maps para CIMEL Lanús y Swiss Medical Lomas
-- [x] Botón de WhatsApp con mensaje prearmado según sede (+5491123842117) — en hero, en cada sede y en cada landing SEO
+- [ ] Número de matrícula (MN o MP) visible junto al nombre — código ya listo (se muestra en hero, "Sobre la doctora", footer y JSON-LD apenas se cargue) *(requiere: número de matrícula de Lucía en Configuración > Datos de la doctora)*
+- [x] FAQ: preguntas frecuentes sobre turnos, servicios, cobertura y sedes — 11 preguntas en la landing principal + FAQ corta específica en cada landing SEO
+- [x] Links directos a Google Maps para CIMEL Lanús y Swiss Medical Lomas
+- [x] Botón de WhatsApp con mensaje prearmado según sede (+5491123842117) — en cada card de sede (sección "Pedir turno") y en cada landing SEO
 - [x] Dominio propio — `draluciachahin.ar` registrado en NIC Argentina (1/7/2026)
+
+### Rediseño de conversión (2026-07-04, brief basado en `deep-research-report.md`)
+- [x] Hero con CTA primario "Pedir turno" + secundario "Ver sedes y horarios" + chips de confianza
+- [x] Nav de anclas fijo (Servicios · Sedes · Obras sociales · FAQ · Pedir turno) en la landing principal
+- [x] CTA sticky en mobile ("Pedir turno con la Dra. Chahin") en todas las landings
+- [x] Cards de sede con botones de acción reales: "Pedir turno online" (si hay `booking_url` cargado, ej. Swiss Medical), "Llamar" (`tel:`) y "Consultar por WhatsApp" (`wa.me`) — antes eran solo texto/instrucciones sin acción directa
+- [x] Servicios como cards con microcopy orientado a síntomas/motivo de consulta
+- [x] Sección "Obras sociales y formas de atención" — muestra coberturas cargadas por sede en Configuración, o mensaje honesto invitando a consultar si todavía no hay datos cargados *(pendiente: cargar `obras_sociales` reales por sede en Configuración — hoy están vacías)*
+- [x] Sección "Opiniones de pacientes" con placeholder honesto (sin inventar testimonios ni rating falso)
+- [x] Campo "Obra social / prepaga" agregado al formulario público de "No pude pedir turno" (antes se guardaba `insurance: null` siempre)
+- [x] JSON-LD: `Physician` + `FAQPage` en todas las landings, `BreadcrumbList` en landings SEO, `identifier` (matrícula) cuando esté cargada *(pendiente: `MedicalClinic` por sede)*
+- [ ] Eventos de analítica ampliados (click en booking/whatsapp/maps/call por separado) — hoy se sigue registrando `cta_cimel`/`cta_swiss` al primer engagement con cada sede y `form_submitted`; el catálogo completo de eventos sugerido en el brief queda para Etapa 6
 
 ### Acciones externas (las hace Lucía)
 - [ ] Configurar `/dra-lucia-chahin` como link de la bio en Instagram *(acción de Lucía)*
@@ -75,10 +87,10 @@ orgánico de búsqueda y convierten con instrucciones claras para pedir turno.
 - [x] Link a `/dra-lucia-chahin` desde cada landing SEO
 
 ### Pendiente
-- [ ] FAQ específica por landing (preguntas frecuentes distintas por servicio/sede)
-- [ ] Links internos entre landings (ej. Lanús → Lomas y viceversa, para SEO)
-- [ ] Datos estructurados JSON-LD (Physician, MedicalBusiness, FAQPage)
-- [ ] Formulario "No pude pedir turno" en cada landing SEO *(hoy solo en /dra-lucia-chahin)*
+- [x] FAQ específica por landing (preguntas frecuentes distintas por servicio/sede)
+- [x] Links internos entre landings (ej. Lanús → Lomas y viceversa, para SEO)
+- [x] Datos estructurados JSON-LD (Physician, FAQPage, BreadcrumbList) *(MedicalClinic por sede pendiente)*
+- [x] Formulario "No pude pedir turno" en cada landing SEO *(antes solo en /dra-lucia-chahin, ahora reutiliza el mismo componente en las 6 landings SEO)*
 
 ### Acciones externas (las hace el equipo)
 - [ ] Configurar Google Search Console con el sitemap

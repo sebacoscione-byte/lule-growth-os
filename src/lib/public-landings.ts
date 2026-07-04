@@ -119,3 +119,30 @@ export const WHATSAPP_MESSAGES = {
   cimel: "Hola, me gustaría pedir turno con la Dra. Lucía Chahin en CIMEL Lanús (martes). ¿Me pueden ayudar?",
   swiss: "Hola, me gustaría pedir turno con la Dra. Lucía Chahin en Swiss Medical Lomas (viernes). ¿Me pueden ayudar?",
 }
+
+// Microcopy por servicio: ayuda al paciente a autoidentificarse antes de pedir turno.
+export const SERVICE_MICROCOPY: Record<string, string> = {
+  "Consulta cardiológica": "Evaluación inicial o de seguimiento para síntomas como palpitaciones, presión alta, dolor en el pecho o controles preventivos.",
+  "Ecocardiograma": "Estudio por imágenes para evaluar la estructura y función del corazón. Ideal si te lo indicó tu médico o necesitás control cardiológico.",
+  "Control cardiológico": "Seguimiento periódico de factores de riesgo, tratamiento y evolución clínica.",
+  "Evaluación cardiovascular": "Chequeo integral del riesgo cardiovascular, útil antes de una cirugía o para prevención.",
+  "Control cardiovascular": "Seguimiento periódico de factores de riesgo, tratamiento y evolución clínica.",
+}
+
+// Determina la key de mensaje de WhatsApp (y de evento de tracking) según el nombre de la sede.
+export function whatsAppKeyForLocation(name: string): keyof typeof WHATSAPP_MESSAGES {
+  const lower = name.toLowerCase()
+  if (lower.includes("cimel")) return "cimel"
+  if (lower.includes("swiss")) return "swiss"
+  return "general"
+}
+
+// Enlazado interno entre landings SEO hermanas (mismo servicio, otra sede) — mejora crawling y UX.
+export const RELATED_LANDING_SLUGS: Record<string, string[]> = {
+  "cardiologa-lanus": ["cardiologa-lomas"],
+  "cardiologa-lomas": ["cardiologa-lanus"],
+  "ecocardiograma-lanus": ["ecocardiograma-lomas"],
+  "ecocardiograma-lomas": ["ecocardiograma-lanus"],
+  "consulta-cardiologica-lanus": ["consulta-cardiologica-lomas"],
+  "consulta-cardiologica-lomas": ["consulta-cardiologica-lanus"],
+}

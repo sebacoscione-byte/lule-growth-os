@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import {
-  MapPin, Clock, ChevronDown, ChevronUp,
+  MapPin, Clock, ChevronDown, ChevronUp, Phone, Map, MessageCircle, CalendarCheck,
   CheckCircle2, Loader2, AlertCircle,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -12,6 +12,22 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
+import { buildWhatsAppUrl } from "@/lib/public-landings"
+
+export interface SedeAction {
+  key: string
+  name: string
+  day: string
+  hours?: string
+  address?: string
+  phone?: string
+  mapsUrl?: string
+  bookingUrl?: string
+  instruction: string
+  whatsappMessage: string
+  color: "blue" | "teal"
+  preferredLocationValue: "cimel_lanus" | "swiss_lomas" | "sin_definir"
+}
 
 function useUtmParams() {
   const [utms, setUtms] = useState<Record<string, string>>({})
@@ -28,82 +44,116 @@ function useUtmParams() {
   return utms
 }
 
-// ─── CTA expandible ───────────────────────────────────────────────────────────
+// ─── Card de sede con CTA persistente ──────────────────────────────────────────
 
 interface CtaCardProps {
-  color: "blue" | "teal"
-  title: string
-  subtitle: string
-  address?: string
-  steps: string[]
-  note: string
+  sede: SedeAction
   expanded: boolean
   onToggle: () => void
+  onEngage: () => void
 }
 
-function CtaCard({ color, title, subtitle, address, steps, note, expanded, onToggle }: CtaCardProps) {
+function CtaCard({ sede, expanded, onToggle, onEngage }: CtaCardProps) {
   const palette = {
     blue: {
       border: "border-blue-200",
-      header: "bg-blue-50 hover:bg-blue-100",
+      header: "bg-blue-50",
       icon: "bg-blue-600",
-      chevron: "text-blue-600",
-      step: "bg-blue-100 text-blue-700",
-      noteText: "text-blue-700",
+      primary: "bg-blue-600 hover:bg-blue-700 text-white",
+      secondary: "border border-blue-300 text-blue-700 hover:bg-blue-50",
     },
     teal: {
       border: "border-teal-200",
-      header: "bg-teal-50 hover:bg-teal-100",
+      header: "bg-teal-50",
       icon: "bg-teal-600",
-      chevron: "text-teal-600",
-      step: "bg-teal-100 text-teal-700",
-      noteText: "text-teal-700",
+      primary: "bg-teal-600 hover:bg-teal-700 text-white",
+      secondary: "border border-teal-300 text-teal-700 hover:bg-teal-50",
     },
-  }[color]
+  }[sede.color]
+
+  const whatsappUrl = buildWhatsAppUrl(sede.whatsappMessage)
+  const phoneHref = sede.phone ? `tel:${sede.phone.replace(/[\s-]/g, "")}` : null
 
   return (
-    <div className={`rounded-xl border-2 ${palette.border} overflow-hidden`}>
-      <button
-        onClick={onToggle}
-        className={`w-full flex items-center justify-between p-5 ${palette.header} transition-colors text-left`}
-      >
-        <div className="flex items-center gap-3">
-          <div className={`flex h-10 w-10 items-center justify-center rounded-full ${palette.icon}`}>
-            <MapPin className="h-5 w-5 text-white" />
-          </div>
-          <div>
-            <p className="font-semibold text-gray-900">{title}</p>
-            <div className="flex items-center gap-1 text-sm text-gray-500 mt-0.5">
-              <Clock className="h-3.5 w-3.5" />
-              <span>{subtitle}</span>
-              {address && (
-                <>
-                  <span className="text-gray-300">·</span>
-                  <span>{address}</span>
-                </>
-              )}
-            </div>
+    <div id={`sede-${sede.key}`} className={`scroll-mt-24 rounded-xl border-2 ${palette.border} overflow-hidden bg-white`}>
+      <div className={`flex items-center gap-3 p-5 ${palette.header}`}>
+        <div className={`flex h-10 w-10 items-center justify-center rounded-full ${palette.icon} shrink-0`}>
+          <MapPin className="h-5 w-5 text-white" />
+        </div>
+        <div>
+          <p className="font-semibold text-gray-900">{sede.name}</p>
+          <div className="flex flex-wrap items-center gap-1 text-sm text-gray-500 mt-0.5">
+            <Clock className="h-3.5 w-3.5" />
+            <span>{sede.hours || `Atención los ${sede.day}`}</span>
+            {sede.address && (
+              <>
+                <span className="text-gray-300">·</span>
+                <span>{sede.address}</span>
+              </>
+            )}
           </div>
         </div>
+      </div>
+
+      <div className="flex flex-wrap gap-2 p-5">
+        {sede.bookingUrl && (
+          <a
+            href={sede.bookingUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={onEngage}
+            className={`inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold transition-colors ${palette.primary}`}
+          >
+            <CalendarCheck className="h-4 w-4" />
+            Pedir turno online
+          </a>
+        )}
+        {phoneHref && (
+          <a
+            href={phoneHref}
+            onClick={onEngage}
+            className={`inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold transition-colors ${sede.bookingUrl ? palette.secondary : palette.primary}`}
+          >
+            <Phone className="h-4 w-4" />
+            Llamar
+          </a>
+        )}
+        <a
+          href={whatsappUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={onEngage}
+          className="inline-flex items-center gap-2 rounded-full border border-green-300 px-4 py-2 text-sm font-semibold text-green-700 hover:bg-green-50 transition-colors"
+        >
+          <MessageCircle className="h-4 w-4" />
+          Consultar por WhatsApp
+        </a>
+        {sede.mapsUrl && (
+          <a
+            href={sede.mapsUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium text-gray-500 hover:text-gray-700 transition-colors"
+          >
+            <Map className="h-4 w-4" />
+            Cómo llegar
+          </a>
+        )}
+      </div>
+
+      <button
+        onClick={() => { onToggle(); onEngage() }}
+        className="w-full flex items-center justify-between border-t border-gray-100 px-5 py-3 text-left text-sm text-gray-500 hover:text-gray-700"
+      >
+        Ver instrucciones detalladas para pedir turno
         {expanded
-          ? <ChevronUp className={`h-5 w-5 ${palette.chevron} shrink-0`} />
-          : <ChevronDown className="h-5 w-5 text-gray-400 shrink-0" />}
+          ? <ChevronUp className="h-4 w-4 shrink-0" />
+          : <ChevronDown className="h-4 w-4 shrink-0" />}
       </button>
 
       {expanded && (
-        <div className="bg-white p-6 border-t border-gray-100">
-          <p className="font-medium text-gray-900 mb-4">Pasos para pedir turno:</p>
-          <ol className="space-y-3">
-            {steps.map((step, i) => (
-              <li key={i} className="flex items-start gap-3">
-                <span className={`flex h-6 w-6 items-center justify-center rounded-full ${palette.step} text-sm font-bold shrink-0`}>
-                  {i + 1}
-                </span>
-                <span className="text-gray-700 text-sm pt-0.5">{step}</span>
-              </li>
-            ))}
-          </ol>
-          <p className={`mt-4 text-sm font-medium ${palette.noteText}`}>{note}</p>
+        <div className="border-t border-gray-100 bg-gray-50 p-5">
+          <p className="whitespace-pre-line text-sm leading-relaxed text-gray-700">{sede.instruction}</p>
         </div>
       )}
     </div>
@@ -114,16 +164,19 @@ function CtaCard({ color, title, subtitle, address, steps, note, expanded, onTog
 
 interface LeadFormProps {
   slug: string
-  clickedCimel: boolean
-  clickedSwiss: boolean
+  locations: SedeAction[]
+  engagedKeys: Set<string>
   utms: Record<string, string>
 }
 
-function LeadForm({ slug, clickedCimel, clickedSwiss, utms }: LeadFormProps) {
+function LeadForm({ slug, locations, engagedKeys, utms }: LeadFormProps) {
   const [name, setName] = useState("")
   const [phone, setPhone] = useState("")
   const [service, setService] = useState("no_definido")
-  const [location, setLocation] = useState("sin_definir")
+  const [location, setLocation] = useState<string>(
+    locations.length === 1 ? locations[0].preferredLocationValue : "sin_definir"
+  )
+  const [insurance, setInsurance] = useState("")
   const [message, setMessage] = useState("")
   const [consent, setConsent] = useState(false)
   const [submitting, setSubmitting] = useState(false)
@@ -145,10 +198,11 @@ function LeadForm({ slug, clickedCimel, clickedSwiss, utms }: LeadFormProps) {
           phone: phone.trim(),
           requested_service: service,
           preferred_location: location,
+          insurance: insurance.trim() || null,
           general_reason: message.trim() || null,
           consent_to_contact: true,
-          clicked_cimel_cta: clickedCimel,
-          clicked_swiss_cta: clickedSwiss,
+          clicked_cimel_cta: engagedKeys.has("cimel"),
+          clicked_swiss_cta: engagedKeys.has("swiss"),
           landing_page: slug,
           origin_url: window.location.href,
           ...utms,
@@ -233,6 +287,18 @@ function LeadForm({ slug, clickedCimel, clickedSwiss, utms }: LeadFormProps) {
 
       <div className="space-y-1.5">
         <Label className="text-gray-900">
+          Obra social / prepaga <span className="text-gray-400 font-normal">(opcional)</span>
+        </Label>
+        <Input
+          value={insurance}
+          onChange={e => setInsurance(e.target.value)}
+          placeholder="OSDE, Swiss Medical, particular..."
+          className="text-gray-900 placeholder:text-gray-400"
+        />
+      </div>
+
+      <div className="space-y-1.5">
+        <Label className="text-gray-900">
           Mensaje <span className="text-gray-400 font-normal">(opcional)</span>
         </Label>
         <Textarea
@@ -280,6 +346,8 @@ function LeadForm({ slug, clickedCimel, clickedSwiss, utms }: LeadFormProps) {
 
 // ─── Componente principal ─────────────────────────────────────────────────────
 
+const TRACKED_KEYS = new Set(["cimel", "swiss"])
+
 function fireEvent(
   event_type: string,
   slug: string,
@@ -292,67 +360,46 @@ function fireEvent(
   }).catch(() => {})
 }
 
-export function LandingInteractions({ slug }: { slug: string }) {
-  const [expandedCta, setExpandedCta] = useState<"cimel" | "swiss" | null>(null)
-  const [clickedCimel, setClickedCimel] = useState(false)
-  const [clickedSwiss, setClickedSwiss] = useState(false)
+export function LandingInteractions({ slug, locations }: { slug: string; locations: SedeAction[] }) {
+  const [expandedKey, setExpandedKey] = useState<string | null>(null)
+  const [engagedKeys, setEngagedKeys] = useState<Set<string>>(new Set())
   const utms = useUtmParams()
 
-  function toggleCimel() {
-    const willExpand = expandedCta !== "cimel"
-    setExpandedCta(prev => prev === "cimel" ? null : "cimel")
-    if (willExpand && !clickedCimel) {
-      setClickedCimel(true)
-      fireEvent("cta_cimel", slug, utms)
-    }
-  }
-  function toggleSwiss() {
-    const willExpand = expandedCta !== "swiss"
-    setExpandedCta(prev => prev === "swiss" ? null : "swiss")
-    if (willExpand && !clickedSwiss) {
-      setClickedSwiss(true)
-      fireEvent("cta_swiss", slug, utms)
-    }
+  function engage(key: string) {
+    if (engagedKeys.has(key)) return
+    setEngagedKeys(prev => new Set(prev).add(key))
+    if (TRACKED_KEYS.has(key)) fireEvent(`cta_${key}`, slug, utms)
   }
 
   return (
     <>
-      {/* CTAs expandibles */}
-      <section className="py-12 px-4">
+      <section id="pedir-turno" className="scroll-mt-20 py-12 px-4">
         <div className="max-w-2xl mx-auto space-y-4">
-          <h2 className="text-xl font-bold text-gray-900 mb-6 text-center">Cómo pedir turno</h2>
+          <h2 className="mb-2 text-center text-xl font-bold text-gray-900">Pedir turno</h2>
+          <p className="mb-4 text-center text-sm text-gray-500">
+            Elegí la sede y reservá por el canal que prefieras. No se otorgan turnos desde esta web.
+          </p>
 
-          <CtaCard
-            color="blue"
-            title="Pedir turno en CIMEL Lanús"
-            subtitle="Martes"
-            address="Tucumán 1314, Lanús"
-            steps={[
-              "Comunicate con CIMEL Lanús.",
-              "Pedí turno con la Dra. Lucía Chahin.",
-              "Indicá si buscás consulta cardiológica o ecocardiograma.",
-            ]}
-            note="Ella atiende los martes en CIMEL Lanús."
-            expanded={expandedCta === "cimel"}
-            onToggle={toggleCimel}
-          />
-
-          <CtaCard
-            color="teal"
-            title="Pedir turno en Swiss Medical Lomas"
-            subtitle="Viernes"
-            steps={[
-              "Llamá al 0810-333-8876 o usá la app de Swiss Medical.",
-              "Buscá o solicitá a la Dra. Lucía Chahin.",
-              "Indicá si buscás consulta cardiológica o ecocardiograma.",
-            ]}
-            note="Ella atiende los viernes en Swiss Medical Lomas de Zamora."
-            expanded={expandedCta === "swiss"}
-            onToggle={toggleSwiss}
-          />
+          {locations.map(sede => (
+            <CtaCard
+              key={sede.key}
+              sede={sede}
+              expanded={expandedKey === sede.key}
+              onToggle={() => setExpandedKey(prev => prev === sede.key ? null : sede.key)}
+              onEngage={() => engage(sede.key)}
+            />
+          ))}
         </div>
       </section>
 
+      <section className="px-4 pb-12">
+        <div className="mx-auto max-w-2xl">
+          <p className="mb-4 text-center text-sm text-gray-500">
+            ¿No pudiste pedir turno? Dejanos tu contacto y te ayudamos.
+          </p>
+          <LeadForm slug={slug} locations={locations} engagedKeys={engagedKeys} utms={utms} />
+        </div>
+      </section>
     </>
   )
 }
