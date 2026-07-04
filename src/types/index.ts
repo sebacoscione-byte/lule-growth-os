@@ -212,6 +212,7 @@ export interface WhatsAppTemplate {
   status: TemplateStatus
   body_text: string
   variables: string[]
+  variable_samples: string[]
 }
 
 export interface WhatsAppSettings {

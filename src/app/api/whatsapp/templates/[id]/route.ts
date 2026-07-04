@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 
-const EDITABLE_FIELDS = ["status", "body_text"] as const
+const EDITABLE_FIELDS = ["status", "body_text", "variable_samples"] as const
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params

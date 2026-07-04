@@ -203,6 +203,7 @@ create table if not exists templates (
     check (status in ('borrador', 'pendiente_meta', 'aprobado', 'rechazado')),
   body_text text not null,
   variables jsonb not null default '[]'::jsonb,
+  variable_samples jsonb not null default '[]'::jsonb,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -266,16 +267,16 @@ insert into whatsapp_pricing_rules (country_code, currency, category, is_templat
   ('AR', 'ARS', 'service', false, true, 'ctwa', 'cloud_api', 0, '2025-07-01', null, 'Free Entry Point (Click-to-WhatsApp/CTA de Pagina): ventana de 72h gratis para cualquier tipo de mensaje mientras este abierta.')
 on conflict do nothing;
 
-insert into templates (name, category, body_text, variables) values
-  ('confirmacion_turno', 'utility', 'Hola {{1}}, te confirmamos que gestionaste tu turno con la Dra. Lucía Chahin en {{2}} el día {{3}}. Ante cualquier cambio, contactate directamente con la institución.', '["nombre", "sede", "fecha"]'),
-  ('recordatorio_turno', 'utility', 'Hola {{1}}, te recordamos tu turno con la Dra. Lucía Chahin en {{2}} el día {{3}}. Si ya no podés asistir, gestioná el cambio directamente con la institución.', '["nombre", "sede", "fecha"]'),
-  ('preparacion_consulta_estudios', 'utility', 'Hola {{1}}, para tu turno de {{2}} con la Dra. Lucía Chahin te recomendamos: {{3}}. Cualquier duda, escribinos.', '["nombre", "practica", "indicaciones"]'),
-  ('solicitud_documentacion', 'utility', 'Hola {{1}}, para avanzar con tu consulta necesitamos que tengas a mano: {{2}}. Llevalo el día de tu turno.', '["nombre", "documentacion"]'),
-  ('seguimiento_post_consulta', 'utility', 'Hola {{1}}, ¿cómo seguís después de tu consulta con la Dra. Lucía Chahin? Cualquier duda sobre las indicaciones, consultá directamente con la institución donde te atendiste.', '["nombre"]'),
-  ('invitacion_protocolo', 'utility', 'Hola {{1}}, podrías ser compatible con el protocolo de investigación "{{2}}". Es voluntario y requiere tu consentimiento explícito. ¿Querés que te contactemos con el equipo para más información?', '["nombre", "protocolo"]'),
-  ('recontacto_incompleto', 'utility', 'Hola {{1}}, notamos que no pudiste terminar de coordinar tu turno con la Dra. Lucía Chahin. ¿Te ayudamos a retomarlo?', '["nombre"]'),
-  ('aviso_administrativo', 'utility', 'Hola {{1}}, te escribimos desde el consultorio de la Dra. Lucía Chahin con una novedad sobre tu atención: {{2}}. Ante cualquier duda, respondé este mensaje.', '["nombre", "aviso"]'),
-  ('derivacion_humano', 'utility', 'Hola {{1}}, tu consulta fue derivada a una persona del equipo de la Dra. Lucía Chahin, te va a contactar a la brevedad.', '["nombre"]')
+insert into templates (name, category, body_text, variables, variable_samples) values
+  ('confirmacion_turno', 'utility', 'Hola {{1}}, te confirmamos que gestionaste tu turno con la Dra. Lucía Chahin en {{2}} el día {{3}}. Ante cualquier cambio, contactate directamente con la institución.', '["nombre", "sede", "fecha"]', '["Juana", "CIMEL Lanús", "martes 10:00hs"]'),
+  ('recordatorio_turno', 'utility', 'Hola {{1}}, te recordamos tu turno con la Dra. Lucía Chahin en {{2}} el día {{3}}. Si ya no podés asistir, gestioná el cambio directamente con la institución.', '["nombre", "sede", "fecha"]', '["Juana", "CIMEL Lanús", "martes 10:00hs"]'),
+  ('preparacion_consulta_estudios', 'utility', 'Hola {{1}}, para tu turno de {{2}} con la Dra. Lucía Chahin te recomendamos: {{3}}. Cualquier duda, escribinos.', '["nombre", "practica", "indicaciones"]', '["Juana", "un ecocardiograma", "venir en ayunas"]'),
+  ('solicitud_documentacion', 'utility', 'Hola {{1}}, para avanzar con tu consulta necesitamos que tengas a mano: {{2}}. Llevalo el día de tu turno.', '["nombre", "documentacion"]', '["Juana", "tu DNI y el pedido médico"]'),
+  ('seguimiento_post_consulta', 'utility', 'Hola {{1}}, ¿cómo seguís después de tu consulta con la Dra. Lucía Chahin? Cualquier duda sobre las indicaciones, consultá directamente con la institución donde te atendiste.', '["nombre"]', '["Juana"]'),
+  ('invitacion_protocolo', 'utility', 'Hola {{1}}, podrías ser compatible con el protocolo de investigación "{{2}}". Es voluntario y requiere tu consentimiento explícito. ¿Querés que te contactemos con el equipo para más información?', '["nombre", "protocolo"]', '["Juana", "Estudio de arritmias 2026"]'),
+  ('recontacto_incompleto', 'utility', 'Hola {{1}}, notamos que no pudiste terminar de coordinar tu turno con la Dra. Lucía Chahin. ¿Te ayudamos a retomarlo?', '["nombre"]', '["Juana"]'),
+  ('aviso_administrativo', 'utility', 'Hola {{1}}, te escribimos desde el consultorio de la Dra. Lucía Chahin con una novedad sobre tu atención: {{2}}. Ante cualquier duda, respondé este mensaje.', '["nombre", "aviso"]', '["Juana", "el consultorio va a cerrar más temprano este viernes"]'),
+  ('derivacion_humano', 'utility', 'Hola {{1}}, tu consulta fue derivada a una persona del equipo de la Dra. Lucía Chahin, te va a contactar a la brevedad.', '["nombre"]', '["Juana"]')
 on conflict (name) do nothing;
 
 -- ============================================================

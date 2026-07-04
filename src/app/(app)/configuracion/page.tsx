@@ -448,6 +448,26 @@ export default function ConfiguracionPage() {
                     </div>
                   </div>
                 )}
+
+                {tpl.variable_samples?.length > 0 && (
+                  <div className="flex flex-wrap items-center gap-1.5 border-t border-gray-100 pt-2">
+                    <span className="text-[11px] text-gray-400 mr-1">Muestras para Meta:</span>
+                    {tpl.variable_samples.map((sample, i) => (
+                      <button
+                        key={i}
+                        type="button"
+                        onClick={() => copyToClipboard(`${tpl.id}-sample-${i}`, sample)}
+                        className="flex items-center gap-1 rounded-full border border-gray-200 bg-gray-50 px-2 py-0.5 text-[11px] text-gray-700 hover:border-blue-300 hover:text-blue-700"
+                        title={`Copiar muestra de {{${i + 1}}}`}
+                      >
+                        {copiedId === `${tpl.id}-sample-${i}`
+                          ? <ClipboardCheck className="h-3 w-3 text-green-600" />
+                          : <Copy className="h-3 w-3 text-gray-400" />}
+                        <span className="font-mono">{`{{${i + 1}}}`}</span> {sample}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
             ))}
             {templates.length === 0 && <p className="text-xs text-gray-400">Cargando templates…</p>}
