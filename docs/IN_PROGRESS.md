@@ -1,3 +1,55 @@
+# Revisión integral de gestión + diagnóstico "no puedo conectarme con Google Maps"
+
+## Objetivo
+
+Auditar las páginas de gestión ((app)) y resolver por qué la conexión con Google
+Business (mostrada como "Google Local" / percibida por la doctora como "Google Maps")
+deja de funcionar.
+
+## Diagnóstico
+
+- El flujo OAuth y el `redirect_uri` (`https://draluciachahin.ar/api/google-business/callback`)
+  están bien formados — confirmado pegándole directo al endpoint de producción.
+- `app_config` en Supabase tenía un `google_refresh_token` guardado el 2026-06-20 que dejó
+  de poder refrescarse: `/api/google-business/status` devuelve `connected:false` en producción.
+- Causa raíz: el proyecto de Google Cloud sigue en modo **Prueba** (no verificado) para el
+  scope `business.manage`. Google expira los refresh tokens emitidos por apps no verificadas
+  a los 7 días — coincide con la fecha del último refresh exitoso. Esto es una limitación de
+  Google, no un bug de la app: hay que reconectar periódicamente hasta que se verifique/publique
+  el OAuth consent screen en Google Cloud Console (o se agregue a la doctora como test user si
+  no lo está, para que al menos el reconectar funcione).
+- Hallazgo de seguridad no relacionado: `/api/config` devolvía **toda** la tabla `app_config`
+  (incluidos `google_access_token`/`google_refresh_token`) al navegador de la doctora cada vez
+  que abría Configuración, y ni el GET ni el POST verificaban sesión (dependían solo de RLS).
+  RLS sí bloqueaba a usuarios anónimos (verificado en producción), pero igual se corrigió como
+  defensa en profundidad.
+
+## Cambios
+
+- [x] `/api/config`: allowlist de claves (`doctor`, `locations`) + chequeo de sesión en GET/POST.
+- [x] `/api/google-business/status`: agrega `expired: true` cuando hubo conexión pero el
+      refresh token ya no es válido (distinto de "nunca conectado").
+- [x] `google-local`: `ConnectView` explica la reconexión de ~7 días en modo Prueba en vez de
+      mostrar el mismo mensaje genérico de "conectar por primera vez".
+- [x] Sanitiza el parámetro de búsqueda de leads antes de interpolarlo en `.or()` de PostgREST
+      (`src/lib/utils.ts#sanitizePostgrestValue`), en `/api/leads` y `/leads` (server component).
+- [x] Inbox: agrega polling (leads cada 20s, mensajes del lead abierto cada 8s) para que
+      conversaciones entrantes aparezcan sin recargar.
+- [x] `npm run lint` y `npm run build` finalizaron correctamente.
+
+## Pendiente (requiere acceso a Google Cloud Console — no lo puede hacer el agente)
+
+- Publicar/verificar el OAuth consent screen para el scope `business.manage`, o como mínimo
+  confirmar que la cuenta de Google que conecta la doctora está en la lista de "Test users".
+  Mientras siga en modo Prueba, va a pedir reconexión cada ~7 días (ahora con un mensaje claro
+  en pantalla explicando por qué).
+- Vercel tiene una env var `GOOGLE_REDIRECT_URI` (Production, creada hace 22 días) que no usa
+  ningún archivo del código — el código usa `GOOGLE_OAUTH_BASE_URL`. No se tocó porque
+  modificar env vars de producción no estaba pedido, pero conviene limpiarla o confirmar que
+  no la usa nada externo.
+
+---
+
 # En progreso - Google Business Location ID
 
 ## Objetivo
