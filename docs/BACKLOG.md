@@ -173,7 +173,15 @@ público para pedir turno.
 
 ## Etapa 7 — Automatización
 
-- [ ] WhatsApp Business API: envío automático de mensajes de seguimiento
+- [x] Arquitectura de costos de WhatsApp Business Platform (2026-07-04): tracking de mensajes/costo
+      por categoría (`whatsapp_pricing_rules`, `whatsapp_cost_events`), ventana de 24h + Free Entry
+      Point (Click-to-WhatsApp), gate de template fuera de ventana, `templates` (9 obligatorios),
+      `consent_records`, `handoff_events`, intents cerrados con reglas primero e IA de respaldo
+      opcional, modo ahorro y flag de simulación del cobro de octubre 2026, dashboard `/costos`,
+      suite de tests con Jest (nueva en el proyecto). Detalle de setup pendiente (montos reales de
+      precios + aprobación de templates en Meta) en `CLAUDE.md` → "Costos de WhatsApp y templates".
+- [ ] WhatsApp Business API: envío automático de mensajes de seguimiento (recordatorio/confirmación de
+      turno vía `sendTemplate` — hoy `/api/followup` solo sugiere texto para el inbox manual, no envía)
 - [ ] Configurar `WHATSAPP_VERIFY_TOKEN` en `.env.local` + webhook de prueba separado (vía ngrok) para poder testear localmente cambios en la lógica de recepción de mensajes (`src/lib/whatsapp-bot.ts`) sin tocar el webhook de producción. Sin esto, cualquier cambio en cómo el bot procesa mensajes entrantes solo se puede probar directo en producción. No es urgente mientras no se toque esa lógica.
 - [ ] Instagram Graph API: publicación directa desde la app del contenido aprobado
 - [ ] Automatización de flujos de seguimiento con n8n

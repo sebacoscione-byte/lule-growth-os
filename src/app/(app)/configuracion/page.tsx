@@ -4,10 +4,13 @@ import { useEffect, useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { Badge } from "@/components/ui/badge"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import {
   MapPin, Heart, Settings, Pencil, Check, X, Plus, Trash2,
-  Loader2, Clock, Link2, Phone, Stethoscope, Shield, Bot, Activity,
+  Loader2, Clock, Link2, Phone, Stethoscope, Shield, Bot, Activity, DollarSign, MessageSquareText,
 } from "lucide-react"
+import type { WhatsAppAiProvider, WhatsAppPricingRule, WhatsAppTemplate, TemplateStatus, WhatsAppSettings } from "@/types"
 
 type Doctor = {
   name: string
@@ -51,6 +54,38 @@ const DEFAULT_LOCATION: Omit<Location, "id" | "name"> = {
   notes: "",
 }
 
+const DEFAULT_WA_SETTINGS: WhatsAppSettings = {
+  cost_saving_mode: false,
+  enable_service_message_charging: false,
+  warning_message_threshold: 8,
+  handoff_message_threshold: 12,
+  monthly_cost_alert_ars: null,
+  ai_provider: "sin_ia",
+}
+
+const AI_PROVIDER_LABELS: Record<WhatsAppAiProvider, string> = {
+  sin_ia: "Sin IA (solo reglas)",
+  gemini: "Google Gemini",
+  anthropic: "Anthropic Claude",
+  openai: "OpenAI (no implementado)",
+  otro_llm: "Otro LLM (no implementado)",
+  meta_business_agent: "Meta Business Agent (no implementado)",
+}
+
+const TEMPLATE_STATUS_LABELS: Record<TemplateStatus, string> = {
+  borrador: "Borrador",
+  pendiente_meta: "Pendiente de Meta",
+  aprobado: "Aprobado",
+  rechazado: "Rechazado",
+}
+
+const TEMPLATE_STATUS_VARIANT: Record<TemplateStatus, "secondary" | "warning" | "success" | "destructive"> = {
+  borrador: "secondary",
+  pendiente_meta: "warning",
+  aprobado: "success",
+  rechazado: "destructive",
+}
+
 export default function ConfiguracionPage() {
   const [doctor, setDoctor] = useState<Doctor | null>(null)
   const [locations, setLocations] = useState<Location[]>([])
@@ -58,6 +93,9 @@ export default function ConfiguracionPage() {
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState<string | null>(null)
   const [aiStatus, setAiStatus] = useState<AiStatus | null>(null)
+  const [waSettings, setWaSettings] = useState<WhatsAppSettings>(DEFAULT_WA_SETTINGS)
+  const [pricingRules, setPricingRules] = useState<WhatsAppPricingRule[]>([])
+  const [templates, setTemplates] = useState<WhatsAppTemplate[]>([])
 
   const [editingDoctor, setEditingDoctor] = useState(false)
   const [doctorDraft, setDoctorDraft] = useState<Doctor | null>(null)
@@ -71,6 +109,7 @@ export default function ConfiguracionPage() {
       .then(data => {
         setDoctor(data.doctor ?? null)
         setLocations(data.locations ?? [])
+        setWaSettings({ ...DEFAULT_WA_SETTINGS, ...(data.whatsapp_settings ?? {}) })
         setLoading(false)
       })
   }, [])
@@ -82,6 +121,35 @@ export default function ConfiguracionPage() {
         if (!data.error) setAiStatus(data)
       })
   }, [])
+
+  useEffect(() => {
+    fetch("/api/whatsapp/pricing").then(r => r.json()).then(data => setPricingRules(Array.isArray(data) ? data : []))
+    fetch("/api/whatsapp/templates").then(r => r.json()).then(data => setTemplates(Array.isArray(data) ? data : []))
+  }, [])
+
+  async function saveWaSettings(patch: Partial<WhatsAppSettings>) {
+    const updated = { ...waSettings, ...patch }
+    setWaSettings(updated)
+    await saveConfig("whatsapp_settings", updated)
+  }
+
+  async function savePricingAmount(id: string, cost_amount: number | null) {
+    setPricingRules(prev => prev.map(r => r.id === id ? { ...r, cost_amount } : r))
+    await fetch(`/api/whatsapp/pricing/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ cost_amount }),
+    })
+  }
+
+  async function saveTemplateStatus(id: string, status: TemplateStatus) {
+    setTemplates(prev => prev.map(t => t.id === id ? { ...t, status } : t))
+    await fetch(`/api/whatsapp/templates/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status }),
+    })
+  }
 
   async function saveConfig(key: string, value: unknown) {
     setSaving(true)
@@ -183,6 +251,141 @@ export default function ConfiguracionPage() {
             Configura <code>AI_PROVIDER=gemini</code> y <code>GEMINI_API_KEY</code> en Vercel o en <code>.env.local</code>.
             Con <code>AI_PROVIDER=auto</code>, Gemini tiene prioridad cuando su clave esta disponible.
           </p>
+        </CardContent>
+      </Card>
+
+      {/* ── Bot de WhatsApp: costos y modo ahorro ────────────── */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base flex items-center gap-2">
+            <MessageSquareText className="h-4 w-4 text-green-600" /> Bot de WhatsApp
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4 text-sm">
+          <Field label="Proveedor de IA para clasificar intents (respaldo, no obligatorio)">
+            <Select value={waSettings.ai_provider} onValueChange={v => saveWaSettings({ ai_provider: v as WhatsAppAiProvider })}>
+              <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {(Object.keys(AI_PROVIDER_LABELS) as WhatsAppAiProvider[]).map(p => (
+                  <SelectItem key={p} value={p}>{AI_PROVIDER_LABELS[p]}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-gray-400 mt-1">
+              Las reglas determinísticas van primero siempre. Este proveedor solo entra si el mensaje no matchea
+              ninguna regla. &ldquo;Sin IA&rdquo; es el default: cero costo extra de IA en el bot.
+            </p>
+          </Field>
+
+          <label className="flex items-start gap-2 cursor-pointer">
+            <input type="checkbox" className="mt-1" checked={waSettings.cost_saving_mode}
+              onChange={e => saveWaSettings({ cost_saving_mode: e.target.checked })} />
+            <span>
+              <span className="font-medium text-gray-900">Modo ahorro (cost_saving_mode)</span>
+              <p className="text-xs text-gray-500">Respuestas más compactas, sin saludos repetidos, deriva antes a humano ante ambigüedad.</p>
+            </span>
+          </label>
+
+          <label className="flex items-start gap-2 cursor-pointer">
+            <input type="checkbox" className="mt-1" checked={waSettings.enable_service_message_charging}
+              onChange={e => saveWaSettings({ enable_service_message_charging: e.target.checked })} />
+            <span>
+              <span className="font-medium text-gray-900">Simular cobro de mensajes service (cambio de Meta del 1/10/2026)</span>
+              <p className="text-xs text-gray-500">Fuerza el modo ahorro y trata los mensajes service/utility dentro de ventana como facturables, para probar el sistema antes de la fecha real.</p>
+            </span>
+          </label>
+
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Aviso interno a los X mensajes">
+              <Input type="number" min={1} value={waSettings.warning_message_threshold}
+                onChange={e => saveWaSettings({ warning_message_threshold: Number(e.target.value) || 1 })} />
+            </Field>
+            <Field label="Derivar a humano a los X mensajes">
+              <Input type="number" min={1} value={waSettings.handoff_message_threshold}
+                onChange={e => saveWaSettings({ handoff_message_threshold: Number(e.target.value) || 1 })} />
+            </Field>
+          </div>
+          <Field label="Alertar si el gasto mensual proyectado supera (ARS, opcional)">
+            <Input type="number" min={0} value={waSettings.monthly_cost_alert_ars ?? ""}
+              onChange={e => saveWaSettings({ monthly_cost_alert_ars: e.target.value ? Number(e.target.value) : null })} />
+          </Field>
+          {saved === "whatsapp_settings" && <p className="text-xs text-green-600 font-medium">Guardado</p>}
+        </CardContent>
+      </Card>
+
+      {/* ── Precios de WhatsApp (Meta) ────────────────────────── */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base flex items-center gap-2">
+            <DollarSign className="h-4 w-4 text-emerald-600" /> Precios de WhatsApp (Meta)
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <p className="text-xs text-gray-500">
+            Estructura real de precios de Meta (categoría, ventana, vigencia). Los montos exactos no vienen
+            precargados porque dependen del tarifario de tu cuenta — completalos desde WhatsApp Manager → Facturación.
+          </p>
+          <div className="space-y-2">
+            {pricingRules.map(rule => (
+              <div key={rule.id} className="flex flex-wrap items-center gap-2 rounded-lg border border-gray-200 p-2.5 text-xs">
+                <Badge variant="secondary">{rule.category}</Badge>
+                <span className="text-gray-500">{rule.is_template ? "template" : "free-form"}</span>
+                <span className="text-gray-500">{rule.in_window ? "dentro de ventana" : "fuera de ventana"}</span>
+                <span className="text-gray-400">{rule.entry_point}</span>
+                <span className="text-gray-400">desde {rule.valid_from}{rule.valid_to ? ` hasta ${rule.valid_to}` : ""}</span>
+                <div className="ml-auto flex items-center gap-1">
+                  <span className="text-gray-500">{rule.currency}</span>
+                  <Input
+                    type="number" step="0.01" min={0} className="w-24 h-7 text-xs"
+                    defaultValue={rule.cost_amount ?? ""}
+                    placeholder="pendiente"
+                    onBlur={e => savePricingAmount(rule.id, e.target.value ? Number(e.target.value) : null)}
+                  />
+                </div>
+              </div>
+            ))}
+            {pricingRules.length === 0 && <p className="text-xs text-gray-400">Cargando reglas de precio…</p>}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* ── Templates de WhatsApp ─────────────────────────────── */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base flex items-center gap-2">
+            <MessageSquareText className="h-4 w-4 text-indigo-600" /> Templates de WhatsApp
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <p className="text-xs text-gray-500">
+            Enviá este texto a aprobación en WhatsApp Manager. Un template solo se puede usar para responder
+            fuera de la ventana de 24h una vez que Meta lo marca &ldquo;Aprobado&rdquo; acá.
+          </p>
+          <div className="space-y-2">
+            {templates.map(tpl => (
+              <div key={tpl.id} className="rounded-lg border border-gray-200 p-3 space-y-2">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="font-medium text-sm text-gray-900">{tpl.name}</span>
+                  <div className="flex items-center gap-2">
+                    <Badge variant="outline">{tpl.category}</Badge>
+                    <Select value={tpl.status} onValueChange={v => saveTemplateStatus(tpl.id, v as TemplateStatus)}>
+                      <SelectTrigger className="h-7 w-40 text-xs">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {(Object.keys(TEMPLATE_STATUS_LABELS) as TemplateStatus[]).map(s => (
+                          <SelectItem key={s} value={s}>{TEMPLATE_STATUS_LABELS[s]}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Badge variant={TEMPLATE_STATUS_VARIANT[tpl.status]}>{TEMPLATE_STATUS_LABELS[tpl.status]}</Badge>
+                  </div>
+                </div>
+                <p className="text-xs text-gray-600">{tpl.body_text}</p>
+              </div>
+            ))}
+            {templates.length === 0 && <p className="text-xs text-gray-400">Cargando templates…</p>}
+          </div>
         </CardContent>
       </Card>
 

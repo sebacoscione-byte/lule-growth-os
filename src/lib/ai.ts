@@ -2,12 +2,20 @@ import Anthropic from "@anthropic-ai/sdk"
 import { createHash } from "crypto"
 import { createClient as createSupabaseClient } from "@supabase/supabase-js"
 import { parseAiJson } from "@/lib/parse-ai-json"
-import type { ClassifyResult, ContentSource } from "@/types"
+import type { ClassifyResult, ContentSource, WhatsAppIntent } from "@/types"
 
 export type AiMode = "manual" | "gemini_api"
 
 type AiProvider = "anthropic" | "gemini"
 type AiMessage = { role: "user" | "assistant"; content: string }
+
+/**
+ * Proveedores seleccionables desde Configuración para el respaldo de clasificación de intents del
+ * bot de WhatsApp. Solo "gemini"/"anthropic" están implementados (reusan el proveedor global de
+ * arriba); el resto son opciones de interfaz — llamarlas lanza un error explícito, a propósito, en
+ * vez de sumar una dependencia/SDK nueva sin uso real todavía.
+ */
+export const UNIMPLEMENTED_AI_PROVIDERS = ["openai", "otro_llm", "meta_business_agent"] as const
 
 type GenerateOptions = {
   system: string
@@ -488,6 +496,33 @@ Analiza el mensaje del usuario y devolve SOLO un JSON valido con esta estructura
     messages: [{ role: "user", content: message }],
   })
   return parseJson<ClassifyResult>(text)
+}
+
+const WHATSAPP_INTENTS = [
+  "pedir_turno", "consultar_cobertura", "derivar_protocolo", "ubicacion_horarios",
+  "estudios_cardiologicos", "urgencia_medica", "cancelar_reprogramar", "hablar_con_humano", "otro_no_entendido",
+] as const
+
+/**
+ * Respaldo del clasificador determinístico del bot de WhatsApp (src/lib/whatsapp-intents.ts) cuando
+ * ningún patrón de reglas matchea. Devuelve siempre uno de los 9 intents cerrados, nunca texto libre.
+ */
+export async function classifyWhatsAppIntent(text: string): Promise<WhatsAppIntent> {
+  if (getAiMode() === "manual") return "otro_no_entendido"
+
+  const raw = await generateText({
+    maxTokens: 20,
+    json: true,
+    purpose: "whatsapp_intent",
+    cacheSystem: true,
+    system: `Clasificá el mensaje de un paciente de WhatsApp de una cardióloga en UNA sola de estas categorías exactas: ${WHATSAPP_INTENTS.join(", ")}.
+Devolvé SOLO un JSON: {"intent": "..."}. Si no estás seguro de a cuál corresponde, devolvé "otro_no_entendido". Nunca inventes una categoría fuera de la lista.`,
+    messages: [{ role: "user", content: text }],
+  })
+  const parsed = parseJson<{ intent: string }>(raw)
+  return (WHATSAPP_INTENTS as readonly string[]).includes(parsed.intent)
+    ? (parsed.intent as WhatsAppIntent)
+    : "otro_no_entendido"
 }
 
 export async function generateReply(

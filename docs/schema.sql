@@ -31,7 +31,7 @@ create table if not exists leads (
     check (status in (
       'nuevo','interesado','calificado','derivado_cimel','derivado_swiss',
       'seguimiento_pendiente','confirmo_que_pidio_turno','no_pudo_pedir_turno',
-      'requiere_humano','urgencia_derivada','descartado','spam'
+      'requiere_humano','urgencia_derivada','descartado','spam','elegible_protocolo'
     )),
   priority_score integer not null default 1,
   possible_emergency boolean not null default false,
@@ -51,7 +51,11 @@ create table if not exists leads (
   landing_page text,
   clicked_cimel_cta boolean not null default false,
   clicked_swiss_cta boolean not null default false,
-  booking_instruction_viewed boolean not null default false
+  booking_instruction_viewed boolean not null default false,
+  protocol_interest boolean not null default false,
+  protocol_name text,
+  patient_age integer,
+  prior_studies_or_symptoms text
 );
 
 -- ============================================================
@@ -62,7 +66,14 @@ create table if not exists messages (
   lead_id uuid not null references leads(id) on delete cascade,
   role text not null check (role in ('user','assistant')),
   content text not null,
-  created_at timestamptz not null default now()
+  created_at timestamptz not null default now(),
+  direction text check (direction in ('inbound', 'outbound')),
+  wa_message_id text,
+  category text check (category in ('marketing', 'utility', 'authentication', 'service')),
+  template_name text,
+  window_state text check (window_state in ('open', 'closed')),
+  flow_intent text,
+  cost_estimated numeric(12, 4)
 );
 
 -- ============================================================
@@ -140,6 +151,132 @@ create table if not exists landing_events (
   utm_campaign text,
   created_at timestamptz not null default now()
 );
+
+-- ============================================================
+-- WHATSAPP COST TRACKING (ver supabase/migrations/20260704_whatsapp_cost_tracking.sql
+-- para el detalle de por qué cost_amount queda null en varias filas)
+-- ============================================================
+create table if not exists whatsapp_pricing_rules (
+  id uuid default uuid_generate_v4() primary key,
+  country_code text not null,
+  currency text not null,
+  category text not null check (category in ('marketing', 'utility', 'authentication', 'service')),
+  is_template boolean not null default false,
+  in_window boolean not null default true,
+  entry_point text not null default 'any' check (entry_point in ('organic', 'ctwa', 'referral', 'any')),
+  provider text not null default 'cloud_api' check (provider in ('cloud_api', 'bsp', 'meta_business_agent')),
+  cost_amount numeric(12, 4),
+  valid_from date not null,
+  valid_to date,
+  source_note text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists whatsapp_cost_events (
+  id uuid default uuid_generate_v4() primary key,
+  phone_number_id text,
+  wa_id text not null,
+  lead_id uuid references leads(id) on delete set null,
+  direction text not null check (direction in ('inbound', 'outbound')),
+  message_type text not null,
+  category text not null check (category in ('marketing', 'utility', 'authentication', 'service')),
+  is_template boolean not null default false,
+  template_name text,
+  in_window boolean not null default true,
+  entry_point text not null default 'organic' check (entry_point in ('organic', 'ctwa', 'referral')),
+  char_count integer,
+  ai_tokens_estimated integer,
+  cost_estimated numeric(12, 4),
+  currency text,
+  flow_intent text,
+  window_state text check (window_state in ('open', 'closed')),
+  created_at timestamptz not null default now()
+);
+
+create table if not exists templates (
+  id uuid default uuid_generate_v4() primary key,
+  name text not null unique,
+  category text not null check (category in ('utility', 'marketing')),
+  language text not null default 'es_AR',
+  status text not null default 'borrador'
+    check (status in ('borrador', 'pendiente_meta', 'aprobado', 'rechazado')),
+  body_text text not null,
+  variables jsonb not null default '[]'::jsonb,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists consent_records (
+  id uuid default uuid_generate_v4() primary key,
+  wa_id text not null,
+  lead_id uuid references leads(id) on delete set null,
+  consented boolean not null,
+  consent_text text not null,
+  version text not null default 'v1',
+  source text not null default 'whatsapp_bot',
+  created_at timestamptz not null default now()
+);
+
+create table if not exists handoff_events (
+  id uuid default uuid_generate_v4() primary key,
+  lead_id uuid references leads(id) on delete cascade,
+  reason text not null
+    check (reason in ('urgencia_medica', 'solicitud_explicita', 'conversacion_larga', 'intent_no_entendido', 'sin_template_valido')),
+  summary jsonb not null default '{}'::jsonb,
+  messages_sent_count integer not null default 0,
+  cost_estimated_total numeric(12, 4),
+  created_at timestamptz not null default now(),
+  resolved_at timestamptz,
+  resolved_by text
+);
+
+alter table whatsapp_pricing_rules enable row level security;
+alter table whatsapp_cost_events enable row level security;
+alter table templates enable row level security;
+alter table consent_records enable row level security;
+alter table handoff_events enable row level security;
+
+create policy "service_role_all_whatsapp_pricing_rules" on whatsapp_pricing_rules for all to service_role using (true) with check (true);
+create policy "authenticated_read_whatsapp_pricing_rules" on whatsapp_pricing_rules for select to authenticated using (true);
+create policy "authenticated_write_whatsapp_pricing_rules" on whatsapp_pricing_rules for update to authenticated using (true) with check (true);
+
+create policy "service_role_all_whatsapp_cost_events" on whatsapp_cost_events for all to service_role using (true) with check (true);
+create policy "authenticated_read_whatsapp_cost_events" on whatsapp_cost_events for select to authenticated using (true);
+
+create policy "service_role_all_templates" on templates for all to service_role using (true) with check (true);
+create policy "authenticated_all_templates" on templates for all to authenticated using (true) with check (true);
+
+create policy "service_role_all_consent_records" on consent_records for all to service_role using (true) with check (true);
+create policy "authenticated_read_consent_records" on consent_records for select to authenticated using (true);
+
+create policy "service_role_all_handoff_events" on handoff_events for all to service_role using (true) with check (true);
+create policy "authenticated_read_handoff_events" on handoff_events for select to authenticated using (true);
+create policy "authenticated_update_handoff_events" on handoff_events for update to authenticated using (true) with check (true);
+
+insert into whatsapp_pricing_rules (country_code, currency, category, is_template, in_window, entry_point, provider, cost_amount, valid_from, valid_to, source_note) values
+  ('AR', 'ARS', 'marketing', true, false, 'organic', 'cloud_api', null, '2025-07-01', null, 'Template marketing fuera de ventana: pago por mensaje entregado desde 1/7/2025. Completar cost_amount con el tarifario real (WhatsApp Manager > Facturación).'),
+  ('AR', 'ARS', 'utility', true, false, 'organic', 'cloud_api', null, '2025-07-01', null, 'Template utility fuera de ventana: pago por mensaje entregado desde 1/7/2025. Completar cost_amount real.'),
+  ('AR', 'ARS', 'authentication', true, false, 'organic', 'cloud_api', null, '2025-07-01', null, 'Template authentication: pago por mensaje entregado desde 1/7/2025. Completar cost_amount real.'),
+  ('AR', 'ARS', 'utility', true, true, 'organic', 'cloud_api', 0, '2025-07-01', '2026-09-30', 'Template utility dentro de ventana de 24h: gratis hasta el 30/9/2026.'),
+  ('AR', 'ARS', 'utility', true, true, 'organic', 'cloud_api', null, '2026-10-01', null, 'A partir del 1/10/2026 Meta cobra tambien utility dentro de ventana. Completar cost_amount real antes de esa fecha.'),
+  ('AR', 'ARS', 'service', false, true, 'organic', 'cloud_api', 0, '2025-07-01', '2026-09-30', 'Mensajes service (free-form) dentro de ventana de 24h: gratis hasta el 30/9/2026.'),
+  ('AR', 'ARS', 'service', false, true, 'organic', 'cloud_api', null, '2026-10-01', null, 'A partir del 1/10/2026 Meta cobra tambien los mensajes service dentro de ventana. Completar cost_amount real antes de esa fecha.'),
+  ('AR', 'ARS', 'marketing', true, true, 'ctwa', 'cloud_api', 0, '2025-07-01', null, 'Free Entry Point (Click-to-WhatsApp/CTA de Pagina): ventana de 72h gratis para cualquier tipo de mensaje mientras este abierta.'),
+  ('AR', 'ARS', 'service', false, true, 'ctwa', 'cloud_api', 0, '2025-07-01', null, 'Free Entry Point (Click-to-WhatsApp/CTA de Pagina): ventana de 72h gratis para cualquier tipo de mensaje mientras este abierta.')
+on conflict do nothing;
+
+insert into templates (name, category, body_text, variables) values
+  ('confirmacion_turno', 'utility', 'Hola {{1}}, te confirmamos que gestionaste tu turno con la Dra. Lucía Chahin en {{2}} el día {{3}}. Ante cualquier cambio, contactate directamente con la institución.', '["nombre", "sede", "fecha"]'),
+  ('recordatorio_turno', 'utility', 'Hola {{1}}, te recordamos tu turno con la Dra. Lucía Chahin en {{2}} el día {{3}}. Si ya no podés asistir, gestioná el cambio directamente con la institución.', '["nombre", "sede", "fecha"]'),
+  ('preparacion_consulta_estudios', 'utility', 'Hola {{1}}, para tu turno de {{2}} con la Dra. Lucía Chahin te recomendamos: {{3}}. Cualquier duda, escribinos.', '["nombre", "practica", "indicaciones"]'),
+  ('solicitud_documentacion', 'utility', 'Hola {{1}}, para avanzar con tu consulta necesitamos que tengas a mano: {{2}}. Llevalo el día de tu turno.', '["nombre", "documentacion"]'),
+  ('seguimiento_post_consulta', 'utility', 'Hola {{1}}, ¿cómo seguís después de tu consulta con la Dra. Lucía Chahin? Cualquier duda sobre las indicaciones, consultá directamente con la institución donde te atendiste.', '["nombre"]'),
+  ('invitacion_protocolo', 'utility', 'Hola {{1}}, podrías ser compatible con el protocolo de investigación "{{2}}". Es voluntario y requiere tu consentimiento explícito. ¿Querés que te contactemos con el equipo para más información?', '["nombre", "protocolo"]'),
+  ('recontacto_incompleto', 'utility', 'Hola {{1}}, notamos que no pudiste terminar de coordinar tu turno con la Dra. Lucía Chahin. ¿Te ayudamos a retomarlo?', '["nombre"]'),
+  ('aviso_administrativo', 'utility', 'Hola {{1}}, te avisamos: {{2}}.', '["nombre", "aviso"]'),
+  ('derivacion_humano', 'utility', 'Hola {{1}}, tu consulta fue derivada a una persona del equipo de la Dra. Lucía Chahin, te va a contactar a la brevedad.', '["nombre"]')
+on conflict (name) do nothing;
 
 -- ============================================================
 -- INDEXES

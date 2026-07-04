@@ -1,4 +1,30 @@
+import { logWhatsAppMessage, incrementMessagesSentCount } from "@/lib/whatsapp-cost-tracking"
+import { getApprovedTemplate, fillTemplateBody } from "@/lib/whatsapp-templates"
+import type { WhatsAppCategory, WhatsAppEntryPoint, WhatsAppWindowState } from "@/types"
+
 const WA_API_BASE = "https://graph.facebook.com/v20.0"
+
+export interface SendContext {
+  windowState: WhatsAppWindowState
+  entryPoint: WhatsAppEntryPoint
+  leadId?: string | null
+  flowIntent?: string | null
+  serviceMessageChargingEnabled: boolean
+}
+
+export class WindowClosedError extends Error {
+  constructor(public phone: string) {
+    super(`No se puede enviar texto libre a ${phone}: la ventana de 24h esta cerrada. Hace falta un template aprobado.`)
+    this.name = "WindowClosedError"
+  }
+}
+
+export class TemplateNotApprovedError extends Error {
+  constructor(public templateName: string) {
+    super(`El template "${templateName}" no existe o todavía no está aprobado por Meta.`)
+    this.name = "TemplateNotApprovedError"
+  }
+}
 
 function getPhoneNumberId() {
   const id = process.env.WHATSAPP_PHONE_NUMBER_ID
@@ -28,21 +54,50 @@ async function postToApi(body: object) {
   return res.json()
 }
 
-export async function sendText(to: string, text: string) {
-  return postToApi({
+function assertWindowOpen(to: string, windowState: WhatsAppWindowState) {
+  if (windowState === "closed") throw new WindowClosedError(to)
+}
+
+/** Todos los mensajes free-form/interactive (texto, botones, listas) se logean como categoría "service". */
+async function logOutbound(to: string, messageType: string, category: WhatsAppCategory, isTemplate: boolean, templateName: string | null, content: string, ctx: SendContext) {
+  await logWhatsAppMessage({
+    phoneNumberId: process.env.WHATSAPP_PHONE_NUMBER_ID ?? null,
+    waId: to,
+    leadId: ctx.leadId ?? null,
+    direction: "outbound",
+    messageType,
+    category,
+    isTemplate,
+    templateName,
+    windowState: ctx.windowState,
+    entryPoint: ctx.entryPoint,
+    content,
+    flowIntent: ctx.flowIntent ?? null,
+    serviceMessageChargingEnabled: ctx.serviceMessageChargingEnabled,
+  })
+  await incrementMessagesSentCount(to)
+}
+
+export async function sendText(to: string, text: string, ctx: SendContext) {
+  assertWindowOpen(to, ctx.windowState)
+  const result = await postToApi({
     messaging_product: "whatsapp",
     to,
     type: "text",
     text: { body: text, preview_url: false },
   })
+  await logOutbound(to, "text", "service", false, null, text, ctx)
+  return result
 }
 
 export async function sendButtons(
   to: string,
   body: string,
-  buttons: Array<{ id: string; title: string }>
+  buttons: Array<{ id: string; title: string }>,
+  ctx: SendContext
 ) {
-  return postToApi({
+  assertWindowOpen(to, ctx.windowState)
+  const result = await postToApi({
     messaging_product: "whatsapp",
     to,
     type: "interactive",
@@ -57,15 +112,19 @@ export async function sendButtons(
       },
     },
   })
+  await logOutbound(to, "interactive_button", "service", false, null, body, ctx)
+  return result
 }
 
 export async function sendList(
   to: string,
   body: string,
   buttonLabel: string,
-  rows: Array<{ id: string; title: string }>
+  rows: Array<{ id: string; title: string }>,
+  ctx: SendContext
 ) {
-  return postToApi({
+  assertWindowOpen(to, ctx.windowState)
+  const result = await postToApi({
     messaging_product: "whatsapp",
     to,
     type: "interactive",
@@ -78,6 +137,35 @@ export async function sendList(
       },
     },
   })
+  await logOutbound(to, "interactive_list", "service", false, null, body, ctx)
+  return result
+}
+
+/** A diferencia de sendText/sendButtons/sendList, los templates funcionan aunque la ventana este cerrada — es su razon de ser. */
+export async function sendTemplate(
+  to: string,
+  templateName: string,
+  language: string,
+  params: string[],
+  ctx: SendContext
+) {
+  const template = await getApprovedTemplate(templateName)
+  if (!template) throw new TemplateNotApprovedError(templateName)
+
+  const result = await postToApi({
+    messaging_product: "whatsapp",
+    to,
+    type: "template",
+    template: {
+      name: templateName,
+      language: { code: language },
+      ...(params.length
+        ? { components: [{ type: "body", parameters: params.map(p => ({ type: "text", text: p })) }] }
+        : {}),
+    },
+  })
+  await logOutbound(to, "template", template.category, true, templateName, fillTemplateBody(template, params), ctx)
+  return result
 }
 
 export function markAsRead(messageId: string) {

@@ -37,13 +37,25 @@ src/
 │   │   ├── google-local/
 │   │   ├── landings/
 │   │   ├── experimentos/
+│   │   ├── costos/          # dashboard de costos del bot de WhatsApp
 │   │   └── configuracion/
 │   ├── (auth)/login/
 │   ├── api/
 │   └── landings/        # landing pages públicas SEO
 ├── lib/
 │   ├── supabase/
-│   └── ai.ts
+│   ├── ai.ts
+│   ├── whatsapp.ts              # envío (Cloud API) + logging de costo + gate de ventana/template
+│   ├── whatsapp-bot.ts          # flujo conversacional (máquina de estados)
+│   ├── whatsapp-pricing.ts      # motor de precios (whatsapp_pricing_rules)
+│   ├── whatsapp-window.ts       # ventana de 24h / Free Entry Point (Click-to-WhatsApp)
+│   ├── whatsapp-cost-tracking.ts
+│   ├── whatsapp-templates.ts    # templates aprobados por Meta
+│   ├── whatsapp-intents.ts      # intents cerrados (reglas primero, IA de respaldo opcional)
+│   ├── whatsapp-consent.ts
+│   ├── whatsapp-handoff.ts      # resumen + derivación a humano
+│   ├── whatsapp-settings.ts     # app_config.whatsapp_settings (modo ahorro, umbrales, flag oct 2026)
+│   └── medical-safety.ts        # detección de síntomas de alarma (determinística)
 ├── types/
 │   └── index.ts
 └── components/
@@ -75,6 +87,10 @@ INSTAGRAM_APP_ID=
 INSTAGRAM_APP_SECRET=
 # Opcional si el host publico no coincide con la request:
 INSTAGRAM_OAUTH_BASE_URL=https://tu-dominio.com
+# WhatsApp Business Platform (Cloud API) — bot conversacional
+WHATSAPP_PHONE_NUMBER_ID=     # Panel: developers.facebook.com → app → WhatsApp → API Setup
+WHATSAPP_ACCESS_TOKEN=        # Token permanente o de sistema (no el temporal de 24h)
+WHATSAPP_VERIFY_TOKEN=        # String secreto elegido por vos, para verificar el webhook
 ```
 
 ## Optimización de tokens / costos de IA
@@ -128,6 +144,38 @@ API key simple, no vence). Si no está configurada, se muestra el placeholder ho
    los términos de Google Maps Platform prohíben ocultar reseñas para dar una impresión distinta
    a la real. Se cachean 24h (`next: { revalidate: 86400 }` en `src/lib/google-places.ts`).
 
+## Costos de WhatsApp y templates — cómo completar
+
+El bot de WhatsApp (`src/lib/whatsapp-bot.ts`) usa WhatsApp Business Platform / Cloud API (no la app
+común de WhatsApp Business). Meta cobra por mensaje entregado desde el 1/7/2025 y va a empezar a cobrar
+también los mensajes `service`/`utility` dentro de la ventana de 24h a partir del **1/10/2026**. El
+sistema de costos está preparado para ese cambio, pero **no viene con montos reales cargados**:
+
+1. **Completar los precios reales**: `Configuración → Precios de WhatsApp` lista las reglas de
+   `whatsapp_pricing_rules` (categoría, ventana, vigencia). Los montos (`cost_amount`) quedan en blanco
+   a propósito — sacálos de WhatsApp Manager → Facturación (varían por cuenta y volumen, Meta no los
+   publica en una tabla estática) y cargalos ahí. Sin esto, el dashboard de costos (`/costos`) muestra
+   "sin tarifa" en vez de un monto.
+2. **Aprobar los 9 templates obligatorios**: `Configuración → Templates de WhatsApp` los lista con texto
+   listo para copiar. Enviálos a aprobación real en WhatsApp Manager → Administrador de cuenta →
+   Plantillas de mensajes, y una vez que Meta los aprueba, marcá el estado como "Aprobado" en esa misma
+   pantalla. **Sin un template aprobado, el bot no puede escribirle a un paciente fuera de la ventana de
+   24h** (`sendText`/`sendButtons`/`sendList` lanzan `WindowClosedError` a propósito; usar `sendTemplate`).
+3. **Modo ahorro y flag de octubre 2026**: en `Configuración → Bot de WhatsApp` se puede activar
+   `cost_saving_mode` (respuestas más compactas, deriva antes a humano) y simular el cobro de octubre
+   2026 (`enable_service_message_charging`) antes de que llegue la fecha real, para probar el impacto.
+4. **Proveedor de IA del bot**: es independiente del proveedor de IA usado para contenido/Instagram.
+   El bot resuelve intents con reglas determinísticas primero (`src/lib/whatsapp-intents.ts`); la IA
+   (Gemini/Claude, mismas keys de siempre) solo entra como respaldo opcional si `ai_provider` no es
+   "Sin IA". OpenAI / otro LLM / Meta Business Agent aparecen como opciones pero no están implementadas
+   todavía (lanzan un error explícito si se seleccionan) — no se agregó esa dependencia sin uso real.
+
+## Tests
+
+El proyecto usa **Jest** (`npm test`) para lógica pura sin UI: pricing, ventana de 24h, intents,
+consentimiento, guardrail médico, límites de conversación. Los tests viven junto a cada archivo de
+`src/lib/` (`*.test.ts`). No hay tests de UI/E2E todavía.
+
 ## Comandos útiles
 ```bash
 # Build
@@ -135,6 +183,9 @@ powershell.exe -NoProfile -Command "[System.Environment]::SetEnvironmentVariable
 
 # Dev
 powershell.exe -NoProfile -Command "[System.Environment]::SetEnvironmentVariable('Path', 'C:\Program Files\nodejs;' + [System.Environment]::GetEnvironmentVariable('Path', 'User'), 'Process'); npm run dev"
+
+# Tests (Jest)
+powershell.exe -NoProfile -Command "[System.Environment]::SetEnvironmentVariable('Path', 'C:\Program Files\nodejs;' + [System.Environment]::GetEnvironmentVariable('Path', 'User'), 'Process'); npm test"
 
 # Migraciones de Supabase (requiere SUPABASE_DB_PASSWORD en .env.local)
 powershell.exe -NoProfile -Command "[System.Environment]::SetEnvironmentVariable('Path', 'C:\Program Files\nodejs;' + [System.Environment]::GetEnvironmentVariable('Path', 'User'), 'Process'); npm run migrate"

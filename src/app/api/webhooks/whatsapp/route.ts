@@ -63,6 +63,7 @@ export async function POST(req: NextRequest) {
             button_reply?: { id: string; title: string }
             list_reply?: { id: string; title: string }
           }
+          referral?: { source_type?: string; source_id?: string; source_url?: string; ctwa_clid?: string }
         }
 
         const phone = msg.from
@@ -97,7 +98,15 @@ export async function POST(req: NextRequest) {
 
         try {
           await markAsRead(msg.id)
-          await handleIncomingMessage({ phone, text, waName, messageType, buttonId })
+          await handleIncomingMessage({
+            phone,
+            text,
+            waName,
+            messageType,
+            buttonId,
+            waMessageId: msg.id,
+            referral: msg.referral,
+          })
         } catch (err) {
           console.error(`Error procesando mensaje WhatsApp de ${phone}:`, err)
         }

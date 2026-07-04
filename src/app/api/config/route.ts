@@ -4,7 +4,7 @@ import { createClient } from "@/lib/supabase/server"
 // Únicas claves que este endpoint (usado por la pantalla de Configuración) puede leer/escribir.
 // El resto de app_config (tokens de Google/Instagram, pipeline de contenido, etc.) se maneja
 // por rutas dedicadas y nunca debe viajar al navegador de la doctora.
-const CONFIG_KEYS = ["doctor", "locations"] as const
+const CONFIG_KEYS = ["doctor", "locations", "whatsapp_settings"] as const
 
 export async function GET() {
   const supabase = await createClient()

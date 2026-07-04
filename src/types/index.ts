@@ -11,6 +11,7 @@ export type LeadStatus =
   | "urgencia_derivada"
   | "descartado"
   | "spam"
+  | "elegible_protocolo"
 
 export type OriginChannel =
   | "google_maps"
@@ -84,6 +85,10 @@ export interface Lead {
   clicked_cimel_cta: boolean
   clicked_swiss_cta: boolean
   booking_instruction_viewed: boolean
+  protocol_interest: boolean
+  protocol_name: string | null
+  patient_age: number | null
+  prior_studies_or_symptoms: string | null
 }
 
 export interface Message {
@@ -160,6 +165,71 @@ export interface ClassifyResult {
   next_action: NextAction
 }
 
+// ── WhatsApp: costos, ventana de 24h, intents, templates ────
+
+export type WhatsAppCategory = "marketing" | "utility" | "authentication" | "service"
+export type WhatsAppEntryPoint = "organic" | "ctwa" | "referral"
+export type WhatsAppWindowState = "open" | "closed"
+export type WhatsAppDirection = "inbound" | "outbound"
+export type WhatsAppProvider = "cloud_api" | "bsp" | "meta_business_agent"
+
+export interface WhatsAppPricingRule {
+  id: string
+  country_code: string
+  currency: string
+  category: WhatsAppCategory
+  is_template: boolean
+  in_window: boolean
+  entry_point: WhatsAppEntryPoint | "any"
+  provider: WhatsAppProvider
+  cost_amount: number | null
+  valid_from: string
+  valid_to: string | null
+  source_note: string | null
+}
+
+export type WhatsAppAiProvider = "sin_ia" | "gemini" | "anthropic" | "openai" | "otro_llm" | "meta_business_agent"
+
+export type WhatsAppIntent =
+  | "pedir_turno"
+  | "consultar_cobertura"
+  | "derivar_protocolo"
+  | "ubicacion_horarios"
+  | "estudios_cardiologicos"
+  | "urgencia_medica"
+  | "cancelar_reprogramar"
+  | "hablar_con_humano"
+  | "otro_no_entendido"
+
+export type TemplateStatus = "borrador" | "pendiente_meta" | "aprobado" | "rechazado"
+export type TemplateCategory = "utility" | "marketing"
+
+export interface WhatsAppTemplate {
+  id: string
+  name: string
+  category: TemplateCategory
+  language: string
+  status: TemplateStatus
+  body_text: string
+  variables: string[]
+}
+
+export interface WhatsAppSettings {
+  cost_saving_mode: boolean
+  enable_service_message_charging: boolean
+  warning_message_threshold: number
+  handoff_message_threshold: number
+  monthly_cost_alert_ars: number | null
+  ai_provider: WhatsAppAiProvider
+}
+
+export type HandoffReason =
+  | "urgencia_medica"
+  | "solicitud_explicita"
+  | "conversacion_larga"
+  | "intent_no_entendido"
+  | "sin_template_valido"
+
 export interface DashboardMetrics {
   total_leads: number
   leads_by_channel: Record<OriginChannel, number>
@@ -187,6 +257,7 @@ export const STATUS_LABELS: Record<LeadStatus, string> = {
   urgencia_derivada: "Urgencia derivada",
   descartado: "Descartado",
   spam: "Spam",
+  elegible_protocolo: "Elegible para protocolo",
 }
 
 export const STATUS_COLORS: Record<LeadStatus, string> = {
@@ -202,6 +273,7 @@ export const STATUS_COLORS: Record<LeadStatus, string> = {
   urgencia_derivada: "bg-red-200 text-red-900",
   descartado: "bg-gray-100 text-gray-600",
   spam: "bg-gray-100 text-gray-400",
+  elegible_protocolo: "bg-cyan-100 text-cyan-800",
 }
 
 export const CHANNEL_LABELS: Record<OriginChannel, string> = {

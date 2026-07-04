@@ -10,7 +10,7 @@ import { CheckCircle2, Clock, Loader2, XCircle } from "lucide-react"
 const ALL_STATUSES: LeadStatus[] = [
   "nuevo", "interesado", "calificado", "derivado_cimel", "derivado_swiss",
   "seguimiento_pendiente", "confirmo_que_pidio_turno", "no_pudo_pedir_turno",
-  "requiere_humano", "urgencia_derivada", "descartado", "spam",
+  "requiere_humano", "urgencia_derivada", "descartado", "spam", "elegible_protocolo",
 ]
 
 export function LeadStatusEditor({

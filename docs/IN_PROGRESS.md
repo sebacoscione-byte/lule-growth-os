@@ -1,3 +1,57 @@
+# Arquitectura de costos de WhatsApp Business Platform + reducción de mensajes
+
+## Objetivo
+
+Preparar el bot de WhatsApp (hoy en producción solo para testers, verificación de negocio de Meta
+en revisión) para el esquema de costos real de Meta: pricing por mensaje entregado desde 1/7/2025 y
+el fin de la gratuidad de mensajes service/utility dentro de ventana a partir del 1/10/2026. Reducir
+la cantidad de mensajes por conversación sin perder conversión, y agregar trazabilidad de costo,
+guardrails médicos, consentimiento y derivación a humano.
+
+## Hallazgo clave antes de empezar
+
+El bot real (`whatsapp-bot.ts`, máquina de estados sin IA) y el "inbox" simulado (`ai.ts` +
+tabla `messages`) eran dos sistemas desconectados — el inbox nunca se conecta al webhook real
+(confirmado: nadie lo usa hoy, `docs/BACKLOG.md` Etapa 2). El bot no trackeaba ventana de 24h, no
+usaba templates, no registraba costo ni mensajes en ninguna tabla. No había ningún framework de
+testing en el proyecto.
+
+## Cambios
+
+- [x] Jest (nuevo): `jest.config.js` con `next/jest`, `npm test`, tests junto a cada lib de `src/lib/`.
+- [x] Migraciones: `whatsapp_pricing_rules`, `whatsapp_cost_events`, `templates` (9 seed), `consent_records`,
+      `handoff_events`; extendidas `leads` (protocolo, edad, notas, status `elegible_protocolo`),
+      `whatsapp_sessions` (ventana, entry point, contador de mensajes), `messages` (ahora sí las
+      escribe el bot real: dirección, categoría, template, costo).
+- [x] `whatsapp-pricing.ts`: motor de precios por fecha de vigencia (sin montos hardcodeados — los
+      reales no están públicos, hay que completarlos a mano, ver `CLAUDE.md`).
+- [x] `whatsapp-window.ts`: ventana de 24h + Free Entry Point (72h, detecta `referral`/Click-to-WhatsApp
+      del webhook).
+- [x] `medical-safety.ts`: guardrail de emergencia extraído y ampliado con los síntomas pedidos.
+- [x] `whatsapp-cost-tracking.ts`, `whatsapp-consent.ts`, `whatsapp-handoff.ts`, `whatsapp-templates.ts`,
+      `whatsapp-intents.ts` (9 intents cerrados, reglas primero, IA de respaldo opcional),
+      `whatsapp-settings.ts` (modo ahorro, flag de octubre 2026, umbrales de conversación).
+- [x] `whatsapp.ts`: agrega `sendTemplate`, logging de costo, y bloquea texto libre fuera de ventana
+      (`WindowClosedError`) — antes no existía ningún gate.
+- [x] `whatsapp-bot.ts` reescrito: primer mensaje combina consentimiento + las 5 preguntas en bloque
+      (motivo/cobertura/edad/sede/síntomas), solo pregunta puntualmente lo que falta, ruta a protocolo,
+      límite de mensajes por conversación (aviso a los 8, deriva a los 12 salvo alto valor).
+- [x] Configuración: selector de proveedor de IA del bot (solo Gemini/Claude reales; OpenAI/otro LLM/
+      Meta Business Agent seleccionables pero no implementados a propósito), modo ahorro, editor de
+      precios, viewer de templates.
+- [x] Dashboard `/costos`: costo diario/semanal/mensual, costo por paciente/lead/turno/protocolo,
+      ranking de flows, alertas de conversación larga y de gasto proyectado.
+- [x] `npm run lint`, `npx tsc --noEmit` y `npm run build` finalizaron sin errores. `npm test`: 57 tests.
+
+## Pendiente (acciones externas — no las puede hacer el agente)
+
+- Completar los montos reales de `whatsapp_pricing_rules` desde WhatsApp Manager → Facturación
+  (no son públicos ni estáticos, dependen de la cuenta/volumen — ver `CLAUDE.md`).
+- Enviar los 9 templates a aprobación real en WhatsApp Manager y marcarlos "Aprobado" en Configuración.
+- Correr `npm run migrate` contra Supabase de producción (requiere `.env.local` con `SUPABASE_DB_PASSWORD`).
+
+---
+
 # Revisión integral de gestión + diagnóstico "no puedo conectarme con Google Maps"
 
 ## Objetivo
