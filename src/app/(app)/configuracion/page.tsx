@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import {
   MapPin, Heart, Settings, Pencil, Check, X, Plus, Trash2,
-  Loader2, Clock, Link2, Phone, Stethoscope, Shield, Bot, Activity, DollarSign, MessageSquareText,
+  Loader2, Clock, Link2, Phone, Stethoscope, Shield, Bot, Activity, DollarSign, MessageSquareText, Copy, ClipboardCheck,
 } from "lucide-react"
 import type { WhatsAppAiProvider, WhatsAppPricingRule, WhatsAppTemplate, TemplateStatus, WhatsAppSettings } from "@/types"
 
@@ -96,6 +96,9 @@ export default function ConfiguracionPage() {
   const [waSettings, setWaSettings] = useState<WhatsAppSettings>(DEFAULT_WA_SETTINGS)
   const [pricingRules, setPricingRules] = useState<WhatsAppPricingRule[]>([])
   const [templates, setTemplates] = useState<WhatsAppTemplate[]>([])
+  const [editingTemplateId, setEditingTemplateId] = useState<string | null>(null)
+  const [templateDraft, setTemplateDraft] = useState("")
+  const [copiedId, setCopiedId] = useState<string | null>(null)
 
   const [editingDoctor, setEditingDoctor] = useState(false)
   const [doctorDraft, setDoctorDraft] = useState<Doctor | null>(null)
@@ -149,6 +152,22 @@ export default function ConfiguracionPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ status }),
     })
+  }
+
+  async function saveTemplateBody(id: string, body_text: string) {
+    setTemplates(prev => prev.map(t => t.id === id ? { ...t, body_text } : t))
+    setEditingTemplateId(null)
+    await fetch(`/api/whatsapp/templates/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ body_text }),
+    })
+  }
+
+  async function copyToClipboard(id: string, text: string) {
+    await navigator.clipboard.writeText(text)
+    setCopiedId(id)
+    setTimeout(() => setCopiedId(null), 2000)
   }
 
   async function saveConfig(key: string, value: unknown) {
@@ -358,14 +377,23 @@ export default function ConfiguracionPage() {
         </CardHeader>
         <CardContent className="space-y-3">
           <p className="text-xs text-gray-500">
-            Enviá este texto a aprobación en WhatsApp Manager. Un template solo se puede usar para responder
-            fuera de la ventana de 24h una vez que Meta lo marca &ldquo;Aprobado&rdquo; acá.
+            Copiá el nombre y el cuerpo tal cual y pegalos en WhatsApp Manager → Plantillas de mensajes → Crear
+            plantilla (categoría Utilidad). Un template solo se puede usar para responder fuera de la ventana de
+            24h una vez que Meta lo marca &ldquo;Aprobado&rdquo; acá.
           </p>
           <div className="space-y-2">
             {templates.map(tpl => (
               <div key={tpl.id} className="rounded-lg border border-gray-200 p-3 space-y-2">
-                <div className="flex items-center justify-between gap-2">
-                  <span className="font-medium text-sm text-gray-900">{tpl.name}</span>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <button
+                    type="button"
+                    onClick={() => copyToClipboard(`${tpl.id}-name`, tpl.name)}
+                    className="flex items-center gap-1.5 font-medium text-sm text-gray-900 hover:text-blue-600"
+                    title="Copiar nombre del template"
+                  >
+                    {copiedId === `${tpl.id}-name` ? <ClipboardCheck className="h-3.5 w-3.5 text-green-600" /> : <Copy className="h-3.5 w-3.5 text-gray-400" />}
+                    {tpl.name}
+                  </button>
                   <div className="flex items-center gap-2">
                     <Badge variant="outline">{tpl.category}</Badge>
                     <Select value={tpl.status} onValueChange={v => saveTemplateStatus(tpl.id, v as TemplateStatus)}>
@@ -381,7 +409,45 @@ export default function ConfiguracionPage() {
                     <Badge variant={TEMPLATE_STATUS_VARIANT[tpl.status]}>{TEMPLATE_STATUS_LABELS[tpl.status]}</Badge>
                   </div>
                 </div>
-                <p className="text-xs text-gray-600">{tpl.body_text}</p>
+
+                {editingTemplateId === tpl.id ? (
+                  <div className="space-y-2">
+                    <textarea
+                      value={templateDraft}
+                      onChange={e => setTemplateDraft(e.target.value)}
+                      rows={3}
+                      className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-xs text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                    <div className="flex gap-2">
+                      <Button size="sm" onClick={() => saveTemplateBody(tpl.id, templateDraft)}>
+                        <Check className="h-3.5 w-3.5 mr-1" /> Guardar
+                      </Button>
+                      <Button size="sm" variant="ghost" onClick={() => setEditingTemplateId(null)}>
+                        <X className="h-3.5 w-3.5 mr-1" /> Cancelar
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="text-xs text-gray-600">{tpl.body_text}</p>
+                    <div className="flex shrink-0 gap-1">
+                      <Button
+                        size="sm" variant="ghost" className="h-6 px-2"
+                        onClick={() => copyToClipboard(tpl.id, tpl.body_text)}
+                        title="Copiar cuerpo del mensaje"
+                      >
+                        {copiedId === tpl.id ? <ClipboardCheck className="h-3.5 w-3.5 text-green-600" /> : <Copy className="h-3.5 w-3.5" />}
+                      </Button>
+                      <Button
+                        size="sm" variant="ghost" className="h-6 px-2"
+                        onClick={() => { setEditingTemplateId(tpl.id); setTemplateDraft(tpl.body_text) }}
+                        title="Editar cuerpo del mensaje"
+                      >
+                        <Pencil className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  </div>
+                )}
               </div>
             ))}
             {templates.length === 0 && <p className="text-xs text-gray-400">Cargando templates…</p>}
