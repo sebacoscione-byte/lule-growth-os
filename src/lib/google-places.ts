@@ -37,7 +37,8 @@ export async function getGooglePlaceReviews(): Promise<GooglePlaceReviews | null
   if (!apiKey || !placeId) return null
 
   try {
-    const res = await fetch(`https://places.googleapis.com/v1/places/${placeId}`, {
+    // languageCode=es evita que Google traduzca las reseñas al inglés por defecto.
+    const res = await fetch(`https://places.googleapis.com/v1/places/${placeId}?languageCode=es`, {
       headers: {
         "X-Goog-Api-Key": apiKey,
         "X-Goog-FieldMask": "rating,userRatingCount,reviews,googleMapsUri",
