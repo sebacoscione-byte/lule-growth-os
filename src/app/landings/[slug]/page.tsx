@@ -11,6 +11,7 @@ import {
   RELATED_LANDING_SLUGS, buildWhatsAppUrl, type PublicLandingLocation,
 } from "@/lib/public-landings"
 import { createServiceClient } from "@/lib/supabase/server"
+import { getGooglePlaceReviews } from "@/lib/google-places"
 import { LandingInteractions, type SedeAction } from "./landing-interactions"
 
 export const dynamic = "force-dynamic"
@@ -229,10 +230,14 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
   const data = LANDING_DATA[slug]
   if (!data) notFound()
 
-  const [configLocations, configDoctor] = await Promise.all([getConfigLocations(), getConfigDoctor()])
+  const isMain = slug === "dra-lucia-chahin"
+  const [configLocations, configDoctor, placeReviews] = await Promise.all([
+    getConfigLocations(),
+    getConfigDoctor(),
+    isMain ? getGooglePlaceReviews() : Promise.resolve(null),
+  ])
   const specializations = configDoctor.specializations ?? []
   const conditionsTreated = configDoctor.conditions_treated ?? []
-  const isMain = slug === "dra-lucia-chahin"
   const base = getBaseUrl()
 
   const sedeActions = buildSedeActions(data.locations, configLocations)
@@ -548,19 +553,67 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
         </section>
       )}
 
-      {/* Opiniones — sin testimonios inventados */}
+      {/* Opiniones — reseñas reales de Google, sin testimonios inventados */}
       {isMain && (
         <section className="py-12 px-4">
-          <div className="mx-auto max-w-2xl text-center">
-            <h2 className="mb-3 text-xl font-bold text-gray-900">Opiniones de pacientes</h2>
-            <div className="mx-auto flex max-w-md flex-col items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 p-6">
-              <Star className="h-6 w-6 text-amber-400" />
-              <p className="text-sm font-medium text-gray-700">Opiniones verificadas próximamente</p>
-              <p className="text-sm text-gray-500">
-                Estamos incorporando un módulo de reseñas verificadas para que puedas conocer la experiencia
-                de otros pacientes con la Dra. Lucía Chahin.
-              </p>
-            </div>
+          <div className="mx-auto max-w-2xl">
+            <h2 className="mb-3 text-center text-xl font-bold text-gray-900">Opiniones de pacientes</h2>
+            {placeReviews && placeReviews.reviews.length > 0 ? (
+              <>
+                {placeReviews.rating && (
+                  <div className="mb-6 flex items-center justify-center gap-2 text-sm text-gray-600">
+                    <span className="flex">
+                      {[1, 2, 3, 4, 5].map(i => (
+                        <Star
+                          key={i}
+                          className={`h-4 w-4 ${i <= Math.round(placeReviews.rating!) ? "fill-amber-400 text-amber-400" : "text-gray-200"}`}
+                        />
+                      ))}
+                    </span>
+                    <span className="font-semibold text-gray-900">{placeReviews.rating.toFixed(1)}</span>
+                    {placeReviews.reviewCount != null && (
+                      <span>· {placeReviews.reviewCount} reseñas en Google</span>
+                    )}
+                  </div>
+                )}
+                <div className="grid gap-4 sm:grid-cols-2">
+                  {placeReviews.reviews.map((review, i) => (
+                    <div key={i} className="rounded-lg border border-gray-200 bg-gray-50 p-5">
+                      <div className="mb-2 flex items-center justify-between gap-2">
+                        <p className="text-sm font-semibold text-gray-900">{review.authorName}</p>
+                        <span className="flex shrink-0">
+                          {[1, 2, 3, 4, 5].map(i => (
+                            <Star key={i} className={`h-3.5 w-3.5 ${i <= review.rating ? "fill-amber-400 text-amber-400" : "text-gray-200"}`} />
+                          ))}
+                        </span>
+                      </div>
+                      <p className="text-sm leading-relaxed text-gray-600">{review.text}</p>
+                      {review.relativeTime && <p className="mt-2 text-xs text-gray-400">{review.relativeTime}</p>}
+                    </div>
+                  ))}
+                </div>
+                <p className="mt-5 text-center text-xs text-gray-400">
+                  Reseñas de Google
+                  {placeReviews.mapsUrl && (
+                    <>
+                      {" · "}
+                      <a href={placeReviews.mapsUrl} target="_blank" rel="noopener noreferrer" className="font-medium text-blue-600 hover:underline">
+                        Ver todas en Google Maps
+                      </a>
+                    </>
+                  )}
+                </p>
+              </>
+            ) : (
+              <div className="mx-auto flex max-w-md flex-col items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 p-6 text-center">
+                <Star className="h-6 w-6 text-amber-400" />
+                <p className="text-sm font-medium text-gray-700">Opiniones verificadas próximamente</p>
+                <p className="text-sm text-gray-500">
+                  Estamos incorporando un módulo de reseñas verificadas para que puedas conocer la experiencia
+                  de otros pacientes con la Dra. Lucía Chahin.
+                </p>
+              </div>
+            )}
           </div>
         </section>
       )}

@@ -66,6 +66,10 @@ GOOGLE_CLIENT_ID=
 GOOGLE_CLIENT_SECRET=
 # Opcional si el host publico no coincide con la request:
 GOOGLE_OAUTH_BASE_URL=https://tu-dominio.com
+# Places API (New) — trae reseñas reales de Google Maps para la landing pública
+# (sección "Opiniones de pacientes"). Independiente del OAuth de arriba, no vence.
+GOOGLE_PLACES_API_KEY=
+GOOGLE_PLACE_ID=
 # Instagram API with Instagram Login (publicar posts/historias desde Estudio de contenido)
 INSTAGRAM_APP_ID=
 INSTAGRAM_APP_SECRET=
@@ -103,6 +107,26 @@ solo una cuenta de Instagram profesional (Business o Creator).
    - `https://TU-DOMINIO/api/google-business/callback`
 5. Copiar Client ID y Client Secret a .env.local
 6. En la app ir a Google Business → "Conectar con Google Business Profile" → autorizar
+7. **Nota**: mientras el OAuth consent screen esté en modo "Prueba" (no verificado), el refresh
+   token vence cada ~7 días y hay que repetir el paso 6. La app avisa esto en pantalla
+   (`google-local` muestra "Reconectá el perfil de Google" en vez del mensaje genérico).
+   Para que no vuelva a pasar, publicar/verificar el OAuth consent screen para el scope
+   `business.manage`.
+
+## Reseñas de Google en la landing pública — cómo configurar Places API
+La sección "Opiniones de pacientes" de `/dra-lucia-chahin` trae reseñas reales del perfil de
+Google de la doctora vía **Places API (New)**, independiente del OAuth de arriba (usa una
+API key simple, no vence). Si no está configurada, se muestra el placeholder honesto de siempre.
+1. En el mismo proyecto de Google Cloud (o uno nuevo) → habilitar "Places API (New)"
+2. Crear una API key restringida a "Places API (New)" (Credentials → Create credentials → API key → Restrict key)
+3. Conseguir el **Place ID** del perfil de Google Business de la Dra. Lucía Chahin (no confundir
+   con el `google_location_id` que usa la Business Profile API — son sistemas de ID distintos).
+   Se puede obtener con el [Place ID Finder de Google](https://developers.google.com/maps/documentation/places/web-service/place-id)
+   buscando "Dra. Lucía Chahin" + la dirección de CIMEL Lanús.
+4. Copiar ambos a `.env.local` / Vercel: `GOOGLE_PLACES_API_KEY`, `GOOGLE_PLACE_ID`
+5. Muestra hasta 5 reseñas (las que Google elige como "más relevantes") sin filtrar por rating —
+   los términos de Google Maps Platform prohíben ocultar reseñas para dar una impresión distinta
+   a la real. Se cachean 24h (`next: { revalidate: 86400 }` en `src/lib/google-places.ts`).
 
 ## Comandos útiles
 ```bash
