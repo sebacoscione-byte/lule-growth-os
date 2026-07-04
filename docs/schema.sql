@@ -274,7 +274,7 @@ insert into templates (name, category, body_text, variables) values
   ('seguimiento_post_consulta', 'utility', 'Hola {{1}}, ¿cómo seguís después de tu consulta con la Dra. Lucía Chahin? Cualquier duda sobre las indicaciones, consultá directamente con la institución donde te atendiste.', '["nombre"]'),
   ('invitacion_protocolo', 'utility', 'Hola {{1}}, podrías ser compatible con el protocolo de investigación "{{2}}". Es voluntario y requiere tu consentimiento explícito. ¿Querés que te contactemos con el equipo para más información?', '["nombre", "protocolo"]'),
   ('recontacto_incompleto', 'utility', 'Hola {{1}}, notamos que no pudiste terminar de coordinar tu turno con la Dra. Lucía Chahin. ¿Te ayudamos a retomarlo?', '["nombre"]'),
-  ('aviso_administrativo', 'utility', 'Hola {{1}}, te escribimos desde el consultorio de la Dra. Lucía Chahin para contarte lo siguiente: {{2}}. Ante cualquier duda, respondé este mensaje.', '["nombre", "aviso"]'),
+  ('aviso_administrativo', 'utility', 'Hola {{1}}, te escribimos desde el consultorio de la Dra. Lucía Chahin con una novedad sobre tu atención: {{2}}. Ante cualquier duda, respondé este mensaje.', '["nombre", "aviso"]'),
   ('derivacion_humano', 'utility', 'Hola {{1}}, tu consulta fue derivada a una persona del equipo de la Dra. Lucía Chahin, te va a contactar a la brevedad.', '["nombre"]')
 on conflict (name) do nothing;
 
