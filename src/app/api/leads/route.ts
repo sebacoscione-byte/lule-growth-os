@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server"
 import { NextResponse } from "next/server"
+import { sanitizePostgrestValue } from "@/lib/utils"
 
 export async function GET(request: Request) {
   const supabase = await createClient()
@@ -23,7 +24,10 @@ export async function GET(request: Request) {
   if (channel) query = query.eq("origin_channel", channel)
   if (service) query = query.eq("requested_service", service)
   if (requiresHuman === "true") query = query.eq("requires_human", true)
-  if (q) query = query.or(`name.ilike.%${q}%,phone.ilike.%${q}%,instagram_username.ilike.%${q}%`)
+  if (q) {
+    const safeQ = sanitizePostgrestValue(q)
+    if (safeQ) query = query.or(`name.ilike.%${safeQ}%,phone.ilike.%${safeQ}%,instagram_username.ilike.%${safeQ}%`)
+  }
 
   const { data, error } = await query
 

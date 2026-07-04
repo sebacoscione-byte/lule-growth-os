@@ -9,7 +9,9 @@ export async function GET() {
   if (!info) return NextResponse.json({ connected: false })
 
   const token = await getValidToken(supabase).catch(() => null)
-  if (!token) return NextResponse.json({ connected: false })
+  // Había una conexión guardada pero el refresh token ya no es válido — típico cuando
+  // el proyecto de Google Cloud sigue en modo "Prueba" (los refresh tokens expiran a los 7 días).
+  if (!token) return NextResponse.json({ connected: false, expired: true })
 
   // Connected but no location selected yet → ask user to pick
   if (!info.google_location_name) {

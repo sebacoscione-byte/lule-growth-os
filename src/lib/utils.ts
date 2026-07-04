@@ -5,6 +5,13 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
+// Sanea texto libre antes de interpolarlo en un filtro `.or()` de PostgREST:
+// coma y paréntesis delimitan condiciones, así que dejarlos pasar permite
+// inyectar filtros adicionales (ej: "x,status.eq.confirmo_que_pidio_turno").
+export function sanitizePostgrestValue(input: string) {
+  return input.replace(/[,()]/g, "").trim()
+}
+
 export function formatDate(date: string | null) {
   if (!date) return "—"
   return new Intl.DateTimeFormat("es-AR", {

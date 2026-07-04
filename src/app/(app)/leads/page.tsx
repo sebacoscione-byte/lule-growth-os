@@ -6,7 +6,7 @@ import {
   STATUS_LABELS, STATUS_COLORS, CHANNEL_LABELS, SERVICE_LABELS,
   type Lead,
 } from "@/types"
-import { timeAgo } from "@/lib/utils"
+import { timeAgo, sanitizePostgrestValue } from "@/lib/utils"
 
 export default async function LeadsPage({
   searchParams,
@@ -22,7 +22,10 @@ export default async function LeadsPage({
   if (sp.channel) query = query.eq("origin_channel", sp.channel)
   if (sp.service) query = query.eq("requested_service", sp.service)
   if (sp.requires_human === "true") query = query.eq("requires_human", true)
-  if (sp.q) query = query.or(`name.ilike.%${sp.q}%,phone.ilike.%${sp.q}%,instagram_username.ilike.%${sp.q}%`)
+  if (sp.q) {
+    const safeQ = sanitizePostgrestValue(sp.q)
+    if (safeQ) query = query.or(`name.ilike.%${safeQ}%,phone.ilike.%${safeQ}%,instagram_username.ilike.%${safeQ}%`)
+  }
 
   const { data: leads } = await query
   const all = (leads ?? []) as Lead[]

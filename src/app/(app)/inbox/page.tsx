@@ -24,16 +24,27 @@ export default function InboxPage() {
   const bottomRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    fetch("/api/leads")
-      .then(r => r.json())
-      .then(data => setLeads(Array.isArray(data) ? data : []))
+    function loadLeads() {
+      fetch("/api/leads")
+        .then(r => r.json())
+        .then(data => setLeads(Array.isArray(data) ? data : []))
+    }
+    loadLeads()
+    // Refresco periódico: nuevos leads o mensajes entrantes deben aparecer sin recargar la página.
+    const interval = setInterval(loadLeads, 20_000)
+    return () => clearInterval(interval)
   }, [])
 
   useEffect(() => {
     if (!selectedLeadId) return
-    fetch(`/api/messages?lead_id=${selectedLeadId}`)
-      .then(r => r.json())
-      .then(data => setMessages(Array.isArray(data) ? data : []))
+    function loadMessages() {
+      fetch(`/api/messages?lead_id=${selectedLeadId}`)
+        .then(r => r.json())
+        .then(data => setMessages(Array.isArray(data) ? data : []))
+    }
+    loadMessages()
+    const interval = setInterval(loadMessages, 8_000)
+    return () => clearInterval(interval)
   }, [selectedLeadId])
 
   useEffect(() => {

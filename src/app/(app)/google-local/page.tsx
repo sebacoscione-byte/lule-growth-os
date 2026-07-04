@@ -17,6 +17,7 @@ import { Badge } from "@/components/ui/badge"
 
 interface StatusData {
   connected: boolean
+  expired?: boolean
   needsLocationPick?: boolean
   accountId?: string
   locationId?: string
@@ -197,7 +198,7 @@ function getAuthErrorMessage(error: string | null) {
   return null
 }
 
-function ConnectView({ authError }: { authError: string | null }) {
+function ConnectView({ authError, expired }: { authError: string | null; expired?: boolean }) {
   const authErrorMessage = getAuthErrorMessage(authError)
 
   return (
@@ -206,11 +207,25 @@ function ConnectView({ authError }: { authError: string | null }) {
         <MapPin className="h-8 w-8 text-blue-500" />
       </div>
       <div>
-        <h2 className="text-xl font-semibold text-gray-900">Conectar perfil de Google</h2>
+        <h2 className="text-xl font-semibold text-gray-900">
+          {expired ? "Reconectá el perfil de Google" : "Conectar perfil de Google"}
+        </h2>
         <p className="text-sm text-gray-500 mt-2 max-w-sm">
-          Conectá la app con tu Google Business Profile para publicar posts, responder reseñas y editar el perfil sin salir de acá.
+          {expired
+            ? "La conexión anterior venció y hay que renovarla. La ficha (institución, checklist) queda guardada — no se pierde nada."
+            : "Conectá la app con tu Google Business Profile para publicar posts, responder reseñas y editar el perfil sin salir de acá."}
         </p>
       </div>
+      {expired && !authErrorMessage && (
+        <div className="max-w-md rounded-lg border border-amber-200 bg-amber-50 p-4 text-left text-sm text-amber-800">
+          <p className="font-medium">¿Por qué se desconecta solo?</p>
+          <p className="mt-1">
+            Mientras el proyecto de Google Cloud esté en modo &ldquo;Prueba&rdquo; (no verificado por Google),
+            la conexión vence cada ~7 días y hay que volver a autorizarla acá. Para que deje de pasar,
+            hay que publicar/verificar la app en Google Cloud Console (OAuth consent screen).
+          </p>
+        </div>
+      )}
       {authErrorMessage && (
         <div className="max-w-md rounded-lg border border-amber-200 bg-amber-50 p-4 text-left text-sm text-amber-800">
           <p className="font-medium">No se pudo completar la conexión</p>
@@ -1124,7 +1139,7 @@ export default function GoogleLocalPage() {
       </div>
 
       {!status?.connected ? (
-        <ConnectView authError={authError} />
+        <ConnectView authError={authError} expired={status?.expired} />
       ) : status?.needsLocationPick ? (
         <LocationPickerView onPicked={fetchStatus} />
       ) : (
