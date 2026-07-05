@@ -31,14 +31,16 @@ type ConfigLocation = {
 }
 
 type ConfigDoctor = {
+  bio?: string
   specializations?: string[]
   conditions_treated?: string[]
   matricula?: string
 }
 
-// Fallback: cargado desde la ficha profesional de la Dra. Lucía Chahin.
+// Fallback: cargado desde la ficha profesional (LinkedIn) de la Dra. Lucía Chahin.
 // Se usa solo si todavía no se cargó nada en Configuración > Datos de la doctora.
-const FALLBACK_SPECIALIZATIONS = ["Ecocardiografía", "Electrocardiografía", "Cardiología Adulto"]
+const FALLBACK_BIO = "Médica cardióloga con formación en ecocardiografía avanzada y especial interés en imágenes cardiovasculares, cardio-oncología e insuficiencia cardíaca. Combina la atención centrada en el paciente con la participación activa en investigación clínica y actividades académicas."
+const FALLBACK_SPECIALIZATIONS = ["Ecocardiografía", "Ecocardiografía Transesofágica", "Prueba de Estrés (Ergometría)", "Imágenes cardiovasculares", "Cardio-oncología", "Electrocardiografía", "Cardiología Adulto"]
 const FALLBACK_CONDITIONS_TREATED = [
   "Angina de pecho", "Arritmias", "Desmayo", "Embolismo pulmonar", "Endocarditis",
   "Enfermedad de Chagas", "Enfermedad coronaria", "Enfermedad valvular",
@@ -101,7 +103,7 @@ const MAIN_FAQ = [
   },
   {
     q: "¿Dónde se formó la Dra. Lucía Chahin?",
-    a: "Realizó su residencia de cardiología en el Hospital Británico de Buenos Aires y participó en presentaciones de la Sociedad Argentina de Cardiología (SAC).",
+    a: "Realizó su residencia de cardiología en el Hospital Británico de Buenos Aires (2020-2024), donde hoy continúa como cardióloga de planta. Tiene formación avanzada en ecocardiografía (Sociedad Argentina de Cardiología) y diplomaturas de posgrado en hipertensión arterial y cardiometabolismo (Pontificia Universidad Católica Argentina).",
   },
   {
     q: "¿Atienden urgencias?",
@@ -140,12 +142,13 @@ async function getConfigDoctor(): Promise<ConfigDoctor> {
     const { data } = await supabase.from("app_config").select("value").eq("key", "doctor").single()
     const value = (data?.value ?? {}) as ConfigDoctor
     return {
+      bio: value.bio || FALLBACK_BIO,
       specializations: value.specializations?.length ? value.specializations : FALLBACK_SPECIALIZATIONS,
       conditions_treated: value.conditions_treated?.length ? value.conditions_treated : FALLBACK_CONDITIONS_TREATED,
       matricula: value.matricula || undefined,
     }
   } catch {
-    return { specializations: FALLBACK_SPECIALIZATIONS, conditions_treated: FALLBACK_CONDITIONS_TREATED }
+    return { bio: FALLBACK_BIO, specializations: FALLBACK_SPECIALIZATIONS, conditions_treated: FALLBACK_CONDITIONS_TREATED }
   }
 }
 
@@ -250,14 +253,20 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
     "name": "Dra. Lucía Belén Chahin",
     "alternateName": "Lucía Chahin",
     "jobTitle": "Médica Cardióloga y Ecocardiografista",
-    "description": "Médica cardióloga y ecocardiografista egresada de la residencia de cardiología del Hospital Británico de Buenos Aires. Atiende en CIMEL Lanús los martes y en Swiss Medical Lomas de Zamora los viernes.",
+    "description": configDoctor.bio || "Médica cardióloga con formación en ecocardiografía avanzada, egresada de la residencia de cardiología del Hospital Británico de Buenos Aires. Atiende en CIMEL Lanús los martes y en Swiss Medical Lomas de Zamora los viernes.",
     "medicalSpecialty": "Cardiology",
     "image": `${base}/lucia-chahin.jpg`,
     ...(configDoctor.matricula ? { "identifier": configDoctor.matricula } : {}),
-    "alumniOf": {
-      "@type": "MedicalOrganization",
-      "name": "Hospital Británico de Buenos Aires"
-    },
+    "alumniOf": [
+      {
+        "@type": "MedicalOrganization",
+        "name": "Hospital Británico de Buenos Aires"
+      },
+      {
+        "@type": "CollegeOrUniversity",
+        "name": "Pontificia Universidad Católica Argentina"
+      }
+    ],
     "worksFor": [
       {
         "@type": "MedicalOrganization",
@@ -408,14 +417,19 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
           <div className="mx-auto max-w-2xl">
             <h2 className="mb-4 text-center text-xl font-bold text-gray-900">Sobre la Dra. Lucía Chahin</h2>
             <div className="rounded-lg border border-gray-200 bg-gray-50 p-6 text-sm leading-6 text-gray-700 space-y-3">
+              {configDoctor.bio && <p>{configDoctor.bio}</p>}
               <p>
-                La Dra. <strong>Lucía Belén Chahin</strong> es médica cardióloga y ecocardiografista egresada
-                de la residencia de cardiología del <strong>Hospital Británico de Buenos Aires</strong>, una de
-                las instituciones de mayor referencia en cardiología del país.
+                La Dra. <strong>Lucía Chahin</strong> es médica cardióloga con formación avanzada en
+                ecocardiografía. Realizó su residencia de cardiología en el <strong>Hospital Británico de
+                Buenos Aires</strong> (2020-2024) y hoy continúa allí como cardióloga de planta, además de
+                atender en <strong>Swiss Medical</strong> desde 2025.
               </p>
               <p>
-                Participó en presentaciones científicas en congresos de la <strong>Sociedad Argentina de
-                Cardiología (SAC)</strong> sobre compromiso cardíaco en enfermedades sistémicas.
+                Es subinvestigadora de ensayos clínicos en <strong>CIMEL Lanús</strong>, con trayectoria en
+                estudios sobre lípidos, cardiometabolismo, diabetes, obesidad e insuficiencia cardíaca. Cuenta
+                con diplomaturas de posgrado en hipertensión arterial y cardiometabolismo de la
+                <strong> Pontificia Universidad Católica Argentina</strong>, y formación continua en
+                ecocardiografía y Doppler cardíaco de la <strong>Sociedad Argentina de Cardiología</strong>.
               </p>
               <p>
                 Atiende pacientes en <strong>CIMEL Lanús</strong> — centro médico de larga trayectoria en

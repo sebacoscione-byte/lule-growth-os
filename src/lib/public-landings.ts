@@ -35,9 +35,9 @@ const SWISS = {
 export const LANDING_DATA: Record<string, PublicLandingData> = {
   "dra-lucia-chahin": {
     title: "Dra. Lucía Chahin — Cardióloga | CIMEL Lanús · Swiss Medical Lomas",
-    description: "Dra. Lucía Belén Chahin, médica cardióloga y ecocardiografista. Residencia de cardiología en el Hospital Británico de Buenos Aires. Atiende en CIMEL Lanús (martes) y Swiss Medical Lomas de Zamora (viernes).",
+    description: "Dra. Lucía Chahin, médica cardióloga con formación avanzada en ecocardiografía. Residencia de cardiología en el Hospital Británico de Buenos Aires. Atiende en CIMEL Lanús (martes) y Swiss Medical Lomas de Zamora (viernes).",
     h1: "Dra. Lucía Chahin — Cardióloga",
-    intro: "La Dra. Lucía Belén Chahin es médica cardióloga y ecocardiografista, formada en el Hospital Británico de Buenos Aires. Atiende consultas cardiológicas y ecocardiogramas en Lanús y Lomas de Zamora.",
+    intro: "La Dra. Lucía Chahin es médica cardióloga con formación avanzada en ecocardiografía, formada en el Hospital Británico de Buenos Aires. Atiende consultas cardiológicas y ecocardiogramas en Lanús y Lomas de Zamora.",
     services: ["Consulta cardiológica", "Ecocardiograma", "Control cardiológico", "Evaluación cardiovascular"],
     locations: [
       { ...CIMEL, instruction: "Llamá al 011 4249-3412, solicitá turno con la Dra. Lucía Chahin y mencioná que es para cardiología." },
