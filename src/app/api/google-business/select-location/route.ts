@@ -1,8 +1,12 @@
 import { NextRequest, NextResponse } from "next/server"
-import { createServiceClient } from "@/lib/supabase/server"
+import { createClient, createServiceClient } from "@/lib/supabase/server"
 import { getConnectionInfo } from "@/lib/google-business"
 
 export async function POST(req: NextRequest) {
+  const userClient = await createClient()
+  const { data: { user } } = await userClient.auth.getUser()
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+
   const { accountName, accountId, locationId } = await req.json()
   const normalizedLocationId = String(locationId ?? "").trim().split("/").pop()
   const normalizedAccountId = String(accountId ?? "").trim().split("/").pop()

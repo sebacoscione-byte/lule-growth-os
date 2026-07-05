@@ -1,12 +1,20 @@
 import { NextRequest, NextResponse } from "next/server"
-import { createServiceClient } from "@/lib/supabase/server"
+import { createClient, createServiceClient } from "@/lib/supabase/server"
 import {
   getValidToken, getConnectionInfo, getLocation,
   updateDescription, updateWebsite, updatePhone, updateHours,
   type HourPeriod
 } from "@/lib/google-business"
 
+async function requireAuth() {
+  const userClient = await createClient()
+  const { data: { user } } = await userClient.auth.getUser()
+  return user
+}
+
 export async function GET() {
+  if (!await requireAuth()) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+
   const supabase = await createServiceClient()
   const info = await getConnectionInfo(supabase)
   if (!info?.google_location_name) return NextResponse.json({ error: "Not connected" }, { status: 401 })
@@ -23,6 +31,8 @@ export async function GET() {
 }
 
 export async function PATCH(req: NextRequest) {
+  if (!await requireAuth()) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+
   const body = await req.json() as {
     description?: string
     websiteUri?: string

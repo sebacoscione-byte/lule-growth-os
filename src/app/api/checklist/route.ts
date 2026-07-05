@@ -3,6 +3,9 @@ import { NextResponse } from "next/server"
 
 export async function GET() {
   const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+
   const { data, error } = await supabase
     .from("google_local_checklist")
     .select("*")
@@ -13,6 +16,9 @@ export async function GET() {
 
 export async function PATCH(request: Request) {
   const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+
   const { item_key, completed, notes } = await request.json()
 
   const { data, error } = await supabase
