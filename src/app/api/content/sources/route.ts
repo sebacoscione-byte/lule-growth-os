@@ -40,7 +40,7 @@ export async function GET(request: NextRequest) {
     query: `${query} AND (PUB_TYPE:"review" OR PUB_TYPE:"meta-analysis") AND FIRST_PDATE:[2024-01-01 TO ${today}]`,
     format: "json",
     resultType: "core",
-    pageSize: "6",
+    pageSize: "20",
     sort: "FIRST_PDATE_D desc",
   })
 
