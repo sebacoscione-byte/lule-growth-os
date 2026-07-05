@@ -1,5 +1,5 @@
 # Backlog — Lule Growth OS
-**Actualizado:** 2026-07-04 | **Basado en:** PRD Estrategia de Captación v2.1
+**Actualizado:** 2026-07-05 | **Basado en:** PRD Estrategia de Captación v2.1
 
 ---
 
@@ -130,6 +130,17 @@ intención de turno: quien busca "cardióloga en Lanús" tiene alta probabilidad
 - [ ] Verificar el perfil ante Google
 - [ ] Evaluar si crear ficha separada para Swiss Medical Lomas (requiere dirección verificable)
 - [ ] Definir estrategia de reseñas: cómo y cuándo pedirlas a pacientes actuales
+
+### Pendiente: cuota 0 en la GBP API (bloquea Perfil/Publicaciones/Reseñas dentro de la app)
+Las pestañas **Perfil**, **Publicaciones** y **Reseñas** de Google Local muestran "cuota API = 0" /
+"Falta Account ID". Confirmado 2026-07-05: el proyecto de Google Cloud (`app-lule`) tiene cuota 0 por
+defecto en `mybusinessbusinessinformation.googleapis.com` y `mybusinessaccountmanagement.googleapis.com`
+(`RESOURCE_EXHAUSTED`, `quota_limit_value: "0"`) — es una restricción anti-abuso de Google en todos los
+proyectos nuevos, **no tiene costo**, solo requiere pedir el aumento de cuota.
+- [ ] Solicitar aumento de cuota en `https://cloud.google.com/docs/quotas/help/request_increase`
+      (proyecto `app-lule`) para `My Business Business Information API` y
+      `My Business Account Management API`. Mientras tanto, editar perfil/posts/reseñas desde el
+      panel oficial de Google Business directamente (los links "Ir a Google Business" en cada tab).
 
 ---
 
