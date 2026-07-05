@@ -215,6 +215,8 @@ REGLAS OBLIGATORIAS:
 - No afirmaciones médicas personalizadas ni promesas de resultados
 - No lenguaje alarmista ni que asuma condiciones del lector
 - Ante síntomas de alarma → siempre derivar a guardia
+- El cierre debe invitar a pedir turno CON LA DRA. LUCÍA CHAHIN, nunca con un "médico de confianza" genérico
+- NUNCA inventes teléfonos, direcciones web, nombres de apps ni otros canales de contacto que no te hayan sido provistos explícitamente
 
 ${IMAGE_PROMPT_RULES}
 
@@ -597,6 +599,11 @@ Resumen disponible: ${input.source.summary || "No disponible"}
 No inventes resultados que no esten en el resumen. Menciona la fuente de forma general, sin presentar el post como consejo medico.`
     : "No hay fuente reciente seleccionada. Trata el tema como contenido evergreen y no menciones novedades ni estudios recientes."
 
+  const appointmentContext = input.appointment_link
+    ? `Link de turnos: ${input.appointment_link}
+El caption debe cerrar invitando a pedir turno con la Dra. Lucia Chahin usando ese link. NO invitar a escribir mensajes directos ni a responder al post.`
+    : `No hay link de turnos disponible aun. Si el cierre menciona pedir turno, usa "link en la bio" como referencia, sin inventar telefonos, direcciones web ni otros canales de contacto.`
+
   const slidesSchema = input.format === "carrusel"
     ? `,
   "slides": [
@@ -613,6 +620,8 @@ No inventes resultados que no esten en el resumen. Menciona la fuente de forma g
 Categoria: ${input.category}
 Formato Instagram: ${input.format}
 CTA: ${input.cta}
+
+${appointmentContext}
 
 ${sourceContext}
 
@@ -642,8 +651,9 @@ Reglas:
 - No hagas afirmaciones medicas personalizadas ni promesas.
 - No uses mensajes alarmistas ni asumas que el lector tiene una condicion.
 - Ante sintomas de alarma, indica guardia o atencion medica inmediata.
-- El objetivo es educar y explicar como pedir turno por canales oficiales.
+- El objetivo es educar e invitar puntualmente a pedir turno CON LA DRA. LUCIA CHAHIN, nunca con un "medico de confianza" generico ni derivando a otro profesional.
 - Lucia atiende martes en CIMEL Lanus y viernes en Swiss Medical Lomas.
+- NUNCA inventes telefonos, direcciones web, nombres de apps ni otros canales de contacto que no te hayan sido provistos explicitamente en el pedido. Si no tenes un link de turnos, usa "link en la bio" nada mas.
 - Gemini resolvera despues la placa final e integrara el titular y subtitulo.
 ${IMAGE_PROMPT_RULES}
 ${PATIENT_ACQUISITION_RULES}
