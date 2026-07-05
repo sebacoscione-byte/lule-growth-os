@@ -63,6 +63,7 @@ export async function POST(req: NextRequest) {
             button_reply?: { id: string; title: string }
             list_reply?: { id: string; title: string }
           }
+          button?: { payload: string; text: string }
           referral?: { source_type?: string; source_id?: string; source_url?: string; ctwa_clid?: string }
         }
 
@@ -90,6 +91,11 @@ export async function POST(req: NextRequest) {
           messageType = "list_reply"
           buttonId = msg.interactive.list_reply?.id
           text = msg.interactive.list_reply?.title ?? ""
+        } else if (msg.type === "button") {
+          // Respuesta a un botón de respuesta rápida de un template (no de un interactive nuestro)
+          messageType = "button_reply"
+          buttonId = msg.button?.payload
+          text = msg.button?.text ?? ""
         } else {
           // Tipo no soportado (imagen, audio, etc.) — igualmente disparamos el bot
           // para que responda desde el estado actual de la sesión

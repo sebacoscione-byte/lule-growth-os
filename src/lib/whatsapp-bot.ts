@@ -1,7 +1,7 @@
 import { getServiceDb } from "@/lib/supabase/service"
 import { sendText, sendButtons, sendList, type SendContext } from "@/lib/whatsapp"
 import { getWindowState, detectEntryPoint, type WhatsAppReferral } from "@/lib/whatsapp-window"
-import { extractIntake, classifyIntent, INTENT_REPLIES, type IntakeExtraction } from "@/lib/whatsapp-intents"
+import { extractIntake, classifyIntent, classifyProtocolButtonReply, INTENT_REPLIES, type IntakeExtraction } from "@/lib/whatsapp-intents"
 import { isEmergencyMessage, EMERGENCY_REPLY } from "@/lib/medical-safety"
 import { CONSENT_TEXT, interpretConsentReply, recordConsent, hasConsented } from "@/lib/whatsapp-consent"
 import { buildHandoffSummary, escalateToHuman, type HandoffLeadInfo } from "@/lib/whatsapp-handoff"
@@ -74,6 +74,22 @@ async function getLead(leadId: string): Promise<Lead | null> {
   const db = getDb()
   const { data } = await db.from("leads").select("*").eq("id", leadId).maybeSingle()
   return (data as Lead | null) ?? null
+}
+
+/** Para respuestas a botones de templates enviados a numeros sin lead previo (ej. una invitacion a protocolo enviada en frio). */
+async function ensureLeadId(session: WhatsAppSession, phone: string): Promise<string> {
+  if (session.lead_id) return session.lead_id
+
+  const db = getDb()
+  const { data, error } = await db
+    .from("leads")
+    .insert({ phone, name: session.wa_name ?? null, origin_channel: "whatsapp", consent_to_contact: true, status: "interesado" })
+    .select("id")
+    .single()
+
+  if (error || !data?.id) throw new Error(`Error creando lead: ${error?.message}`)
+  await updateSession(phone, { lead_id: data.id })
+  return data.id as string
 }
 
 function toHandoffLead(lead: Lead | null): HandoffLeadInfo | null {
@@ -419,6 +435,31 @@ export async function handleIncomingMessage(params: {
       summary: buildHandoffSummary({ phone, lead: toHandoffLead(lead), messagesSentCount: session.messages_sent_count + 1, costEstimatedTotal: null, nextStepHint: "Retomar contacto — el paciente pidió hablar con una persona" }),
     })
     return
+  }
+
+  if (messageType === "button_reply") {
+    const protocolReply = classifyProtocolButtonReply(text)
+
+    if (protocolReply === "opt_out") {
+      const leadId = await ensureLeadId(session, phone)
+      const db = getDb()
+      await db.from("leads").update({ protocol_opt_out: true, protocol_interest: false }).eq("id", leadId)
+      await sendText(phone, "Listo, no te vamos a volver a contactar por protocolos de investigación.", { ...ctx, leadId, flowIntent: "derivar_protocolo" })
+      return
+    }
+
+    if (protocolReply === "opt_in") {
+      const leadId = await ensureLeadId(session, phone)
+      const db = getDb()
+      await db.from("leads").update({ protocol_interest: true, status: "elegible_protocolo" }).eq("id", leadId)
+      await sendText(phone, "Genial, el equipo de la Dra. Lucía Chahin te va a contactar para evaluar si sos compatible con el protocolo.", { ...ctx, leadId, flowIntent: "derivar_protocolo" })
+      const updatedLead = await getLead(leadId)
+      await escalateToHuman({
+        leadId, reason: "solicitud_explicita",
+        summary: buildHandoffSummary({ phone, lead: toHandoffLead(updatedLead), messagesSentCount: session.messages_sent_count + 1, costEstimatedTotal: null, nextStepHint: "Evaluar elegibilidad de protocolo y contactar" }),
+      })
+      return
+    }
   }
 
   switch (session.state) {

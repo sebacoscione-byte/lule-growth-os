@@ -90,3 +90,17 @@ export const INTENT_REPLIES: Partial<Record<WhatsAppIntent, string>> = {
   cancelar_reprogramar: "Para cancelar o reprogramar tu turno, comunicate directamente con la institución donde lo sacaste — nosotros no gestionamos la agenda.",
   otro_no_entendido: "No estoy seguro de haber entendido tu consulta. ¿Podés reformularla o preferís hablar con una persona del equipo?",
 }
+
+export type ProtocolButtonReply = "opt_in" | "opt_out"
+
+// Textos exactos de los botones del template invitacion_protocolo (WhatsApp Manager).
+// Son botones de respuesta rapida (tap, no texto libre), asi que el match exacto es seguro.
+const PROTOCOL_OPT_OUT_BUTTON_TEXT = "no, gracias"
+const PROTOCOL_OPT_IN_BUTTON_TEXT = "sí, quiero más información"
+
+export function classifyProtocolButtonReply(text: string): ProtocolButtonReply | null {
+  const lower = text.toLowerCase().trim()
+  if (lower === PROTOCOL_OPT_OUT_BUTTON_TEXT) return "opt_out"
+  if (lower === PROTOCOL_OPT_IN_BUTTON_TEXT) return "opt_in"
+  return null
+}

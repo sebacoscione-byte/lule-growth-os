@@ -53,6 +53,7 @@ create table if not exists leads (
   clicked_swiss_cta boolean not null default false,
   booking_instruction_viewed boolean not null default false,
   protocol_interest boolean not null default false,
+  protocol_opt_out boolean not null default false,
   protocol_name text,
   patient_age integer,
   prior_studies_or_symptoms text

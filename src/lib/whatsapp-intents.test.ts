@@ -1,4 +1,4 @@
-import { extractIntake, classifyIntentDeterministic, classifyIntent } from "@/lib/whatsapp-intents"
+import { extractIntake, classifyIntentDeterministic, classifyIntent, classifyProtocolButtonReply } from "@/lib/whatsapp-intents"
 
 describe("extractIntake", () => {
   it("extrae motivo, obra social, edad, sede y notas del mensaje combinado", () => {
@@ -66,5 +66,19 @@ describe("classifyIntent", () => {
   it("una regla deterministica gana incluso si el proveedor es no implementado", async () => {
     const result = await classifyIntent("tengo dolor de pecho", "meta_business_agent")
     expect(result).toBe("urgencia_medica")
+  })
+})
+
+describe("classifyProtocolButtonReply", () => {
+  it("reconoce el boton de opt-out del template invitacion_protocolo", () => {
+    expect(classifyProtocolButtonReply("No, gracias")).toBe("opt_out")
+  })
+
+  it("reconoce el boton de opt-in del template invitacion_protocolo", () => {
+    expect(classifyProtocolButtonReply("Sí, quiero más información")).toBe("opt_in")
+  })
+
+  it("no confunde un mensaje de texto libre parecido con el boton", () => {
+    expect(classifyProtocolButtonReply("no gracias, no me interesa por ahora")).toBeNull()
   })
 })

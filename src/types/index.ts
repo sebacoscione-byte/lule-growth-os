@@ -86,6 +86,7 @@ export interface Lead {
   clicked_swiss_cta: boolean
   booking_instruction_viewed: boolean
   protocol_interest: boolean
+  protocol_opt_out: boolean
   protocol_name: string | null
   patient_age: number | null
   prior_studies_or_symptoms: string | null
