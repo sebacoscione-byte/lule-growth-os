@@ -1037,13 +1037,15 @@ export default function ContentStudioPage() {
                       <Label>Fuente para fundamentar</Label>
                       <button type="button" onClick={() => setSelectedSource(null)} className="text-xs text-gray-500 hover:text-gray-900">Usar sin fuente</button>
                     </div>
-                    {sources.slice(0, 3).map(source => (
-                      <button type="button" key={source.url} onClick={() => setSelectedSource(source)}
-                        className={`w-full rounded-lg border p-3 text-left text-xs ${selectedSource?.url === source.url ? "border-blue-500 bg-blue-50" : "border-gray-200"}`}>
-                        <span className="font-medium text-gray-800 line-clamp-2">{source.title}</span>
-                        <span className="mt-1 block text-gray-500">{source.publication} · {source.published_at}</span>
-                      </button>
-                    ))}
+                    <div className="max-h-80 space-y-2 overflow-y-auto pr-1">
+                      {sources.map(source => (
+                        <button type="button" key={source.url} onClick={() => setSelectedSource(source)}
+                          className={`w-full rounded-lg border p-3 text-left text-xs ${selectedSource?.url === source.url ? "border-blue-500 bg-blue-50" : "border-gray-200"}`}>
+                          <span className="font-medium text-gray-800 line-clamp-2">{source.title}</span>
+                          <span className="mt-1 block text-gray-500">{source.publication} · {source.published_at}</span>
+                        </button>
+                      ))}
+                    </div>
                   </div>
                 )}
                 <Button onClick={generate} disabled={generating} className="w-full gap-2">
