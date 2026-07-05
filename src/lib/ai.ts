@@ -333,6 +333,7 @@ async function generateWithGemini(options: GenerateOptions): Promise<string> {
         })),
         generationConfig: {
           maxOutputTokens: options.maxTokens,
+          thinkingConfig: { thinkingBudget: 0 },
           ...(options.json ? { responseMimeType: "application/json" } : {}),
         },
       }),
