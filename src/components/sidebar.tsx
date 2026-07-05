@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import Link from "next/link"
-import { usePathname } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
 import {
   Camera,
   DollarSign,
@@ -10,6 +10,7 @@ import {
   FlaskConical,
   Heart,
   LayoutDashboard,
+  LogOut,
   MapPin,
   Menu,
   MessageSquare,
@@ -18,6 +19,7 @@ import {
   X,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { createClient } from "@/lib/supabase/client"
 
 const NAV_ITEMS = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -44,10 +46,20 @@ function isActive(pathname: string, href: string) {
 
 export function Sidebar() {
   const pathname = usePathname()
+  const router = useRouter()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [signingOut, setSigningOut] = useState(false)
   const secondaryActive = NAV_ITEMS
     .filter(item => !MOBILE_NAV_ITEMS.some(primary => primary.href === item.href))
     .some(item => isActive(pathname, item.href))
+
+  async function handleSignOut() {
+    setSigningOut(true)
+    const supabase = createClient()
+    await supabase.auth.signOut()
+    router.push("/login")
+    router.refresh()
+  }
 
   return (
     <>
@@ -82,7 +94,16 @@ export function Sidebar() {
         </nav>
 
         <div className="border-t border-gray-200 p-3">
-          <p className="px-3 text-xs text-gray-400">© 2026 Lule Growth OS</p>
+          <button
+            type="button"
+            onClick={handleSignOut}
+            disabled={signingOut}
+            className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-100 hover:text-gray-900 disabled:opacity-50"
+          >
+            <LogOut className="h-4 w-4 shrink-0" />
+            {signingOut ? "Cerrando sesión..." : "Cerrar sesión"}
+          </button>
+          <p className="px-3 pt-2 text-xs text-gray-400">© 2026 Lule Growth OS</p>
         </div>
       </aside>
 
@@ -155,6 +176,15 @@ export function Sidebar() {
                 </Link>
               ))}
             </nav>
+            <button
+              type="button"
+              onClick={handleSignOut}
+              disabled={signingOut}
+              className="mt-2 flex min-h-14 w-full items-center justify-center gap-2 rounded-xl border border-gray-200 p-3 text-sm font-medium text-gray-700 disabled:opacity-50"
+            >
+              <LogOut className="h-4 w-4 shrink-0" />
+              {signingOut ? "Cerrando sesión..." : "Cerrar sesión"}
+            </button>
           </div>
         </div>
       )}

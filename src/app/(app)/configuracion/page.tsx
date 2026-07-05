@@ -9,8 +9,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import {
   MapPin, Heart, Settings, Pencil, Check, X, Plus, Trash2,
   Loader2, Clock, Link2, Phone, Stethoscope, Shield, Bot, Activity, DollarSign, MessageSquareText, Copy, ClipboardCheck,
+  KeyRound, UserCircle,
 } from "lucide-react"
 import type { WhatsAppAiProvider, WhatsAppPricingRule, WhatsAppTemplate, TemplateStatus, WhatsAppSettings } from "@/types"
+import { createClient } from "@/lib/supabase/client"
 
 type Doctor = {
   name: string
@@ -105,6 +107,45 @@ export default function ConfiguracionPage() {
 
   const [editingLocationId, setEditingLocationId] = useState<string | null>(null)
   const [locationDraft, setLocationDraft] = useState<Location | null>(null)
+
+  const [userEmail, setUserEmail] = useState<string | null>(null)
+  const [newPassword, setNewPassword] = useState("")
+  const [confirmPassword, setConfirmPassword] = useState("")
+  const [changingPassword, setChangingPassword] = useState(false)
+  const [passwordMsg, setPasswordMsg] = useState<{ type: "success" | "error"; text: string } | null>(null)
+
+  useEffect(() => {
+    const supabase = createClient()
+    supabase.auth.getUser().then(({ data }) => setUserEmail(data.user?.email ?? null))
+  }, [])
+
+  async function handleChangePassword(e: React.FormEvent) {
+    e.preventDefault()
+    setPasswordMsg(null)
+
+    if (newPassword.length < 6) {
+      setPasswordMsg({ type: "error", text: "La contraseña debe tener al menos 6 caracteres" })
+      return
+    }
+    if (newPassword !== confirmPassword) {
+      setPasswordMsg({ type: "error", text: "Las contraseñas no coinciden" })
+      return
+    }
+
+    setChangingPassword(true)
+    const supabase = createClient()
+    const { error } = await supabase.auth.updateUser({ password: newPassword })
+    setChangingPassword(false)
+
+    if (error) {
+      setPasswordMsg({ type: "error", text: "No se pudo actualizar la contraseña. Probá de nuevo." })
+      return
+    }
+
+    setNewPassword("")
+    setConfirmPassword("")
+    setPasswordMsg({ type: "success", text: "Contraseña actualizada" })
+  }
 
   useEffect(() => {
     fetch("/api/config")
@@ -256,6 +297,52 @@ export default function ConfiguracionPage() {
           <p className="text-sm text-gray-500">Datos usados para publicaciones e información a pacientes</p>
         </div>
       </div>
+
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base flex items-center gap-2">
+            <UserCircle className="h-4 w-4 text-gray-700" /> Mi cuenta
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4 text-sm">
+          {userEmail && <Row label="Email" value={userEmail} />}
+          <form onSubmit={handleChangePassword} className="space-y-3 border-t pt-4">
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide flex items-center gap-1">
+              <KeyRound className="h-3 w-3" /> Cambiar contraseña
+            </p>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Field label="Nueva contraseña">
+                <Input
+                  type="password"
+                  value={newPassword}
+                  onChange={e => setNewPassword(e.target.value)}
+                  autoComplete="new-password"
+                  minLength={6}
+                  required
+                />
+              </Field>
+              <Field label="Confirmar contraseña">
+                <Input
+                  type="password"
+                  value={confirmPassword}
+                  onChange={e => setConfirmPassword(e.target.value)}
+                  autoComplete="new-password"
+                  minLength={6}
+                  required
+                />
+              </Field>
+            </div>
+            {passwordMsg && (
+              <p className={`text-xs ${passwordMsg.type === "success" ? "text-green-600" : "text-red-600"}`}>
+                {passwordMsg.text}
+              </p>
+            )}
+            <Button type="submit" size="sm" disabled={changingPassword}>
+              {changingPassword ? <Loader2 className="h-4 w-4 animate-spin" /> : "Actualizar contraseña"}
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader className="pb-3">
