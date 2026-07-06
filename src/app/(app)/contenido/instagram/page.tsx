@@ -272,9 +272,10 @@ interface CopyBlockProps {
   title: string
   subtitle?: string
   content: string
+  charLimit?: number
 }
 
-function CopyBlock({ title, subtitle, content }: CopyBlockProps) {
+function CopyBlock({ title, subtitle, content, charLimit }: CopyBlockProps) {
   const [copied, setCopied] = useState(false)
 
   function doCopy() {
@@ -297,6 +298,7 @@ function CopyBlock({ title, subtitle, content }: CopyBlockProps) {
           <div>
             <CardTitle className="text-sm font-semibold text-gray-900">{title}</CardTitle>
             {subtitle && <p className="text-xs text-gray-500 mt-0.5">{subtitle}</p>}
+            {charLimit !== undefined && <CharacterCount value={content} limit={charLimit} />}
           </div>
           <Button variant="outline" size="sm" onClick={doCopy} className="gap-1.5 shrink-0">
             {copied ? <Check className="h-3.5 w-3.5 text-green-600" /> : <Copy className="h-3.5 w-3.5" />}
@@ -313,12 +315,11 @@ function CopyBlock({ title, subtitle, content }: CopyBlockProps) {
   )
 }
 
-const BIO_TEMPLATE = `Dra. Lucía Chahin
-Cardióloga | Ecocardiogramas
-Martes: CIMEL Lanús
-Miércoles: Hospital Británico
-Viernes: Swiss Medical Lomas
-👇 Cómo pedir turno`
+// Nombre va en el campo "Nombre" del perfil (no en la bio); sedes abreviadas para entrar en el límite de 150 caracteres de Instagram con 3 sedes.
+const BIO_TEMPLATE = `🫀 Médica Cardióloga
+📍 CIMEL (mar) · Británico (mié) · Swiss (vie)
+Ecocardiografía y salud cardiovascular
+👇 Más info y contacto`
 
 const POST_FIJADO_1 = `📌 Cómo pedir turno con la Dra. Lucía Chahin
 
@@ -421,8 +422,9 @@ function BioYFijadosTab() {
         <h3 className="text-base font-semibold text-gray-900 mb-3">Bio de Instagram</h3>
         <CopyBlock
           title="Bio sugerida"
-          subtitle="Pegala en Editar perfil → Biografía"
+          subtitle="Pegala en Editar perfil → Biografía (reemplazá todo el texto actual)"
           content={BIO_TEMPLATE}
+          charLimit={150}
         />
       </div>
 
