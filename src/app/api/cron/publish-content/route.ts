@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import type { SupabaseClient } from "@supabase/supabase-js"
 import { getServiceDb } from "@/lib/supabase/service"
 import {
   readContentItems, writeContentItems, readAutoPublishSettings, writeAutoPublishSettings,
@@ -6,8 +7,9 @@ import {
 } from "@/lib/content-pipeline"
 import { generateContentVisual } from "@/lib/ai"
 import { publishApprovedItem } from "@/lib/content-publish"
+import type { AutoPublishTrackSettings, ContentChannel } from "@/types"
 
-export const maxDuration = 120
+export const maxDuration = 180
 
 function isAuthorized(request: Request): boolean {
   const secret = process.env.CRON_SECRET
@@ -15,38 +17,32 @@ function isAuthorized(request: Request): boolean {
   return request.headers.get("authorization") === `Bearer ${secret}`
 }
 
-export async function GET(request: Request) {
-  if (!isAuthorized(request)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-
-  const supabase = getServiceDb()
-  const now = new Date()
-  const settings = await readAutoPublishSettings(supabase)
-
-  if (!settings.enabled) {
-    await writeAutoPublishSettings(supabase, { ...settings, last_run_at: now.toISOString(), last_run_result: "skipped_disabled" })
-    return NextResponse.json({ result: "skipped_disabled" })
+async function runTrack(
+  supabase: SupabaseClient,
+  format: "post" | "historia",
+  track: AutoPublishTrackSettings,
+  channels: ContentChannel[],
+  now: Date
+): Promise<AutoPublishTrackSettings> {
+  if (!track.enabled) {
+    return { ...track, last_run_at: now.toISOString(), last_run_result: "skipped_disabled" }
   }
-  if (!shouldRunAutoPublish(settings, now)) {
-    await writeAutoPublishSettings(supabase, { ...settings, last_run_at: now.toISOString(), last_run_result: "skipped_interval" })
-    return NextResponse.json({ result: "skipped_interval" })
+  if (!shouldRunAutoPublish(track, now)) {
+    return { ...track, last_run_at: now.toISOString(), last_run_result: "skipped_interval" }
   }
 
   const items = await readContentItems(supabase)
-  const item = pickNextPublishableItem(items)
+  const item = pickNextPublishableItem(items, format)
   if (!item) {
-    await writeAutoPublishSettings(supabase, { ...settings, last_run_at: now.toISOString(), last_run_result: "skipped_no_item" })
-    return NextResponse.json({ result: "skipped_no_item" })
+    return { ...track, last_run_at: now.toISOString(), last_run_result: "skipped_no_item" }
   }
 
   // Si la doctora ya genero la placa a mano al revisar la pieza, la reusamos tal cual (ahorra
   // cupo diario de IA y evita generar una imagen distinta a la que ella aprobo visualmente).
   let imageDataUrl: string | undefined
-  const imageUrl: string | undefined = item.visual_url
-
-  if (!imageUrl) {
+  if (!item.visual_url) {
     if (!item.image_prompt) {
-      await writeAutoPublishSettings(supabase, { ...settings, last_run_at: now.toISOString(), last_run_result: `error: item ${item.id} sin image_prompt` })
-      return NextResponse.json({ result: "error", message: "El item elegido no tiene image_prompt, no se puede generar la placa" }, { status: 200 })
+      return { ...track, last_run_at: now.toISOString(), last_run_result: `error: item ${item.id} sin image_prompt` }
     }
     try {
       const visual = await generateContentVisual({
@@ -61,11 +57,9 @@ export async function GET(request: Request) {
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
       if (message.startsWith("DAILY_LIMIT_EXCEEDED")) {
-        await writeAutoPublishSettings(supabase, { ...settings, last_run_at: now.toISOString(), last_run_result: "quota_exceeded" })
-        return NextResponse.json({ result: "quota_exceeded" })
+        return { ...track, last_run_at: now.toISOString(), last_run_result: "quota_exceeded" }
       }
-      await writeAutoPublishSettings(supabase, { ...settings, last_run_at: now.toISOString(), last_run_result: `error: ${message}` })
-      return NextResponse.json({ result: "error", message }, { status: 200 })
+      return { ...track, last_run_at: now.toISOString(), last_run_result: `error: ${message}` }
     }
   }
 
@@ -73,21 +67,34 @@ export async function GET(request: Request) {
   const freshItems = await readContentItems(supabase)
   const current = freshItems.find(existing => existing.id === item.id)
   if (!current || current.status !== "approved") {
-    await writeAutoPublishSettings(supabase, { ...settings, last_run_at: now.toISOString(), last_run_result: "skipped_race" })
-    return NextResponse.json({ result: "skipped_race" })
+    return { ...track, last_run_at: now.toISOString(), last_run_result: "skipped_race" }
   }
 
-  const channelsToPublish = resolveChannelsToPublish(current, settings)
+  const channelsToPublish = resolveChannelsToPublish(current, channels)
   const { item: nextItem, allPublished } = await publishApprovedItem(
     supabase, current, channelsToPublish, { instagramImageDataUrl: imageDataUrl }
   )
   await writeContentItems(supabase, freshItems.map(existing => existing.id === current.id ? nextItem : existing))
-  await writeAutoPublishSettings(supabase, {
-    ...settings,
-    last_run_at: now.toISOString(),
-    last_published_at: allPublished ? now.toISOString() : settings.last_published_at,
-    last_run_result: allPublished ? "published" : "partial",
-  })
 
-  return NextResponse.json({ result: allPublished ? "published" : "partial", itemId: current.id, auto_publish_result: nextItem.auto_publish_result })
+  return {
+    ...track,
+    last_run_at: now.toISOString(),
+    last_published_at: allPublished ? now.toISOString() : track.last_published_at,
+    last_run_result: allPublished ? "published" : "partial",
+  }
+}
+
+export async function GET(request: Request) {
+  if (!isAuthorized(request)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+
+  const supabase = getServiceDb()
+  const now = new Date()
+  const settings = await readAutoPublishSettings(supabase)
+
+  const post = await runTrack(supabase, "post", settings.post, settings.channels, now)
+  const historia = await runTrack(supabase, "historia", settings.historia, settings.channels, now)
+
+  await writeAutoPublishSettings(supabase, { ...settings, post, historia })
+
+  return NextResponse.json({ post: post.last_run_result, historia: historia.last_run_result })
 }

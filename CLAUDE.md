@@ -176,21 +176,34 @@ sistema de costos está preparado para ese cambio, pero **no viene con montos re
 ## Publicación automática de contenido — cómo activarla
 
 El Estudio de contenido (`Estudio de contenido → pestaña Biblioteca`) tiene una tarjeta "Publicación
-automática" para que las piezas aprobadas (posts/historias) se publiquen solas cada N días, sin depender
-de que alguien entre a clickear "Publicar". Corre vía un **Vercel Cron** diario (`vercel.json`, 09:00 UTC)
-que pega a `/api/cron/publish-content`.
+automática" con **dos cronogramas independientes** — Posts de feed e Historias — para que las piezas
+aprobadas se publiquen solas cada tantas veces por semana, sin depender de que alguien entre a clickear
+"Publicar". Corre vía un **Vercel Cron** diario (`vercel.json`, 09:00 UTC) que pega a
+`/api/cron/publish-content` y evalúa ambos cronogramas en la misma corrida (cada uno con su propio
+enabled/frecuencia/última publicación).
 
 1. **Setear `CRON_SECRET`** en las env vars de Vercel (y en `.env.local` si querés probarlo local) — sin
    esto, el endpoint devuelve 401 y no hace nada (falla-cerrado a propósito).
 2. Conectar Instagram y Google Business normalmente (como ya se hacía para publicar a mano).
-3. Activar el toggle "Publicación automática" en la tarjeta, elegir cada cuántos días (por defecto 3,
-   alineado al ritmo mensual del PRD) y qué canales.
-4. Solo se auto-publican piezas `aprobadas` con formato **post** o **historia** — reels y carruseles
-   siguen requiriendo publicación manual (no soportado por la API de Meta sin video/multi-imagen).
-5. Si algo falla (token vencido, cuenta desconectada, etc.), la pieza queda con un aviso visible en su
-   card ("No se pudo auto-publicar en...") y los botones manuales de siempre sirven para reintentar. El
-   texto "Último intento: ..." de la tarjeta explica por qué no se publicó nada en la corrida más reciente.
-6. **No hay alerta proactiva (WhatsApp/email) si el cron falla** — queda anotado como mejora futura, no
+3. En la tarjeta, activar el track de **Posts** y/o **Historias** por separado, cada uno con su propio
+   "veces por semana" (default: posts 2/semana, historias 3/semana — según investigación de cadencia para
+   cuentas de salud: no conviene publicar todos los días, baja la calidad y la credibilidad). Los canales
+   (Instagram/Google Business) son compartidos, pero Google Business no tiene concepto de "historia", así
+   que ese track en la práctica solo publica a Instagram.
+4. Cada track solo auto-publica piezas `aprobadas` de su propio formato (**post** o **historia** según
+   corresponda) — reels y carruseles siguen requiriendo publicación manual (no soportado por la API de
+   Meta sin video/multi-imagen).
+5. Además del cron, cada card **aprobada** en Biblioteca tiene un botón **"Publicar ahora"** para publicar
+   esa pieza al instante en sus canales asignados, sin esperar al cronograma — útil para piezas puntuales
+   o para probar que todo funciona.
+6. Si algo falla (token vencido, cuenta desconectada, etc.), la pieza queda con un aviso visible en su
+   card ("No se pudo publicar en...") y "Publicar ahora" o los botones manuales del editor sirven para
+   reintentar. El texto "Último intento: ..." de cada track explica por qué no se publicó nada en la
+   corrida más reciente de ese track.
+7. **No hay rampa automática de cadencia** (ej. "3x el primer mes, después 2x") — es una decisión de
+   diseño a propósito, para no tener estado oculto difícil de razonar. Si se quiere arrancar más agresivo
+   el primer mes, subir el número a mano y bajarlo después.
+8. **No hay alerta proactiva (WhatsApp/email) si el cron falla** — queda anotado como mejora futura, no
    implementada todavía porque requeriría un template de WhatsApp aprobado por Meta. Revisar la tarjeta
    de vez en cuando, o los logs de función en Vercel, mientras tanto.
 

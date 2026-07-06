@@ -160,13 +160,18 @@ export interface ContentItem {
   auto_publish_result?: Partial<Record<ContentChannel, "published" | "error">>
 }
 
-export interface AutoPublishSettings {
+export interface AutoPublishTrackSettings {
   enabled: boolean
-  interval_days: number
-  channels: ContentChannel[]
+  times_per_week: number
   last_published_at: string | null
   last_run_at: string | null
   last_run_result: string | null
+}
+
+export interface AutoPublishSettings {
+  channels: ContentChannel[]
+  post: AutoPublishTrackSettings
+  historia: AutoPublishTrackSettings
 }
 
 export interface ClassifyResult {

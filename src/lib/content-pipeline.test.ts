@@ -1,5 +1,5 @@
 import { shouldRunAutoPublish, pickNextPublishableItem, resolveChannelsToPublish, DEFAULT_AUTO_PUBLISH_SETTINGS } from "@/lib/content-pipeline"
-import type { AutoPublishSettings, ContentItem } from "@/types"
+import type { AutoPublishTrackSettings, ContentItem } from "@/types"
 
 function item(overrides: Partial<ContentItem> = {}): ContentItem {
   return {
@@ -25,52 +25,62 @@ function item(overrides: Partial<ContentItem> = {}): ContentItem {
   }
 }
 
-function settings(overrides: Partial<AutoPublishSettings> = {}): AutoPublishSettings {
-  return { ...DEFAULT_AUTO_PUBLISH_SETTINGS, ...overrides }
+function track(overrides: Partial<AutoPublishTrackSettings> = {}): AutoPublishTrackSettings {
+  return { ...DEFAULT_AUTO_PUBLISH_SETTINGS.post, ...overrides }
 }
 
 describe("shouldRunAutoPublish", () => {
   it("no corre si esta deshabilitado", () => {
-    expect(shouldRunAutoPublish(settings({ enabled: false }), new Date())).toBe(false)
+    expect(shouldRunAutoPublish(track({ enabled: false }), new Date())).toBe(false)
   })
 
   it("corre si nunca publico antes", () => {
-    expect(shouldRunAutoPublish(settings({ enabled: true, last_published_at: null }), new Date())).toBe(true)
+    expect(shouldRunAutoPublish(track({ enabled: true, last_published_at: null }), new Date())).toBe(true)
   })
 
-  it("no corre si todavia no paso el intervalo", () => {
+  it("no corre si todavia no paso el intervalo (7 / veces_por_semana)", () => {
     const now = new Date("2026-07-10T09:00:00.000Z")
-    const s = settings({ enabled: true, interval_days: 3, last_published_at: "2026-07-09T09:00:00.000Z" })
-    expect(shouldRunAutoPublish(s, now)).toBe(false)
+    // 2 veces por semana = cada 3.5 dias; a 3 dias de la ultima publicacion, todavia no corresponde
+    const t = track({ enabled: true, times_per_week: 2, last_published_at: "2026-07-07T09:00:00.000Z" })
+    expect(shouldRunAutoPublish(t, now)).toBe(false)
   })
 
-  it("corre justo al cumplirse el intervalo", () => {
-    const now = new Date("2026-07-10T09:00:00.000Z")
-    const s = settings({ enabled: true, interval_days: 3, last_published_at: "2026-07-07T09:00:00.000Z" })
-    expect(shouldRunAutoPublish(s, now)).toBe(true)
+  it("corre al cumplirse el intervalo", () => {
+    const now = new Date("2026-07-11T09:00:00.000Z")
+    const t = track({ enabled: true, times_per_week: 2, last_published_at: "2026-07-07T09:00:00.000Z" })
+    expect(shouldRunAutoPublish(t, now)).toBe(true)
+  })
+
+  it("con mas veces por semana, el intervalo requerido es mas corto", () => {
+    const now = new Date("2026-07-09T09:00:00.000Z")
+    // 7 veces por semana = cada 1 dia
+    const t = track({ enabled: true, times_per_week: 7, last_published_at: "2026-07-08T09:00:00.000Z" })
+    expect(shouldRunAutoPublish(t, now)).toBe(true)
   })
 })
 
 describe("pickNextPublishableItem", () => {
-  it("devuelve null si no hay aprobados", () => {
-    expect(pickNextPublishableItem([item({ status: "draft" })])).toBeNull()
+  it("devuelve null si no hay aprobados del formato pedido", () => {
+    expect(pickNextPublishableItem([item({ status: "draft" })], "post")).toBeNull()
   })
 
-  it("saltea reels y carruseles, quedan pendientes de accion manual", () => {
+  it("ignora reels y carruseles, quedan pendientes de accion manual", () => {
     const reel = item({ id: "reel", format: "reel" })
     const carrusel = item({ id: "carrusel", format: "carrusel" })
-    expect(pickNextPublishableItem([reel, carrusel])).toBeNull()
+    expect(pickNextPublishableItem([reel, carrusel], "post")).toBeNull()
   })
 
-  it("elige el aprobado publicable mas antiguo por approved_at", () => {
-    const viejo = item({ id: "viejo", approved_at: "2026-07-01T00:00:00.000Z" })
-    const nuevo = item({ id: "nuevo", approved_at: "2026-07-05T00:00:00.000Z" })
-    expect(pickNextPublishableItem([nuevo, viejo])?.id).toBe("viejo")
+  it("elige el aprobado mas antiguo por approved_at, del formato pedido", () => {
+    const viejo = item({ id: "viejo", format: "post", approved_at: "2026-07-01T00:00:00.000Z" })
+    const nuevo = item({ id: "nuevo", format: "post", approved_at: "2026-07-05T00:00:00.000Z" })
+    expect(pickNextPublishableItem([nuevo, viejo], "post")?.id).toBe("viejo")
   })
 
-  it("permite formato historia ademas de post", () => {
+  it("un post aprobado no se elige para el track de historias, y viceversa", () => {
+    const post = item({ id: "post", format: "post" })
     const historia = item({ id: "historia", format: "historia" })
-    expect(pickNextPublishableItem([historia])?.id).toBe("historia")
+    expect(pickNextPublishableItem([post, historia], "historia")?.id).toBe("historia")
+    expect(pickNextPublishableItem([post, historia], "post")?.id).toBe("post")
   })
 })
 
@@ -78,7 +88,7 @@ describe("resolveChannelsToPublish", () => {
   it("intersecta los canales del item con los habilitados globalmente", () => {
     const result = resolveChannelsToPublish(
       item({ channels: ["instagram", "google_business"] }),
-      settings({ channels: ["instagram"] })
+      ["instagram"]
     )
     expect(result).toEqual(["instagram"])
   })
@@ -86,7 +96,7 @@ describe("resolveChannelsToPublish", () => {
   it("devuelve vacio si el item no pide ningun canal habilitado", () => {
     const result = resolveChannelsToPublish(
       item({ channels: ["google_business"] }),
-      settings({ channels: ["instagram"] })
+      ["instagram"]
     )
     expect(result).toEqual([])
   })

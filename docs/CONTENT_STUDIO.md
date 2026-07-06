@@ -69,23 +69,27 @@ La captacion no puede usar miedo, culpa, escasez, promesas ni asumir que el lect
 
 ## Publicacion automatica
 
-Ademas del boton manual "Publicar en Instagram"/"Publicar en Google", una pieza `approved` con formato
-`post` u `historia` puede publicarse sola via un Vercel Cron diario (`vercel.json` → `/api/cron/publish-content`,
-protegido por la env var `CRON_SECRET`, ver `CLAUDE.md`).
+Ademas del boton manual "Publicar en Instagram"/"Publicar en Google" y de "Publicar ahora" (publica una
+pieza aprobada al instante, sin esperar cronograma), las piezas `approved` con formato `post` u `historia`
+pueden publicarse solas via un Vercel Cron diario (`vercel.json` → `/api/cron/publish-content`, protegido
+por la env var `CRON_SECRET`, ver `CLAUDE.md`).
 
-- Configuracion en `app_config.auto_publish_settings`: `enabled`, `interval_days` (cada cuantos dias),
-  `channels` (que canales auto-publican), `last_published_at`/`last_run_at`/`last_run_result`. Se edita
-  desde la tarjeta "Publicacion automatica" en `Estudio de contenido → Biblioteca`.
-- El cron elige la pieza aprobada mas antigua (por `approved_at`) entre las publicables por API — reels y
-  carruseles quedan pendientes de accion manual, nunca bloquean la cola.
+- **Dos cronogramas independientes**: `app_config.auto_publish_settings` tiene `channels` (compartido) y
+  dos sub-objetos `post`/`historia`, cada uno con `enabled`, `times_per_week`, `last_published_at`,
+  `last_run_at`, `last_run_result`. Se editan por separado desde la tarjeta "Publicacion automatica" en
+  `Estudio de contenido → Biblioteca`. Motivo: no conviene mezclar la cadencia de posts de feed con la de
+  historias (referencia de investigacion sobre cadencia en cuentas de salud: no publicar todos los dias).
+- Cada cronograma elige, dentro de su propio formato, la pieza aprobada mas antigua (por `approved_at`) —
+  reels y carruseles quedan siempre pendientes de accion manual, nunca bloquean ninguna cola.
 - Publica por canal de forma independiente: si Instagram sale bien pero Google falla (o viceversa), la
   pieza queda en `approved` con `auto_publish_result` marcando que canal fallo, visible como aviso en su
-  card. Solo pasa a `published` cuando **todos** los canales pedidos salieron bien.
+  card. Solo pasa a `published` cuando **todos** los canales pedidos salieron bien. Google Business no
+  tiene concepto de "historia", asi que las piezas de ese formato solo se tagean con canal `instagram`.
 - Si se agota la cuota diaria de IA (`DAILY_AI_REQUEST_LIMIT`) antes de generar la placa, el cron lo trata
   como evento esperado (`quota_exceeded`) y reintenta al dia siguiente, sin marcar error en la pieza.
-- La logica de negocio (cuando corresponde correr, que pieza elegir, que canales resolver) vive en
-  `src/lib/content-pipeline.ts` como funciones puras testeadas (`content-pipeline.test.ts`), separadas del
-  I/O real a Supabase/Meta/Google.
+- La logica de negocio (cuando corresponde correr cada track, que pieza elegir, que canales resolver) vive
+  en `src/lib/content-pipeline.ts` como funciones puras testeadas (`content-pipeline.test.ts`); la
+  publicacion por canal compartida entre el cron y "Publicar ahora" vive en `src/lib/content-publish.ts`.
 
 ## Guardrails
 
