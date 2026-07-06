@@ -94,6 +94,7 @@ export default function ConfiguracionPage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState<string | null>(null)
+  const [configError, setConfigError] = useState<string | null>(null)
   const [aiStatus, setAiStatus] = useState<AiStatus | null>(null)
   const [waSettings, setWaSettings] = useState<WhatsAppSettings>(DEFAULT_WA_SETTINGS)
   const [pricingRules, setPricingRules] = useState<WhatsAppPricingRule[]>([])
@@ -213,14 +214,21 @@ export default function ConfiguracionPage() {
 
   async function saveConfig(key: string, value: unknown) {
     setSaving(true)
-    await fetch("/api/config", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ key, value }),
-    })
-    setSaving(false)
-    setSaved(key)
-    setTimeout(() => setSaved(null), 2500)
+    setConfigError(null)
+    try {
+      const res = await fetch("/api/config", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ key, value }),
+      })
+      if (!res.ok) throw new Error(`Error ${res.status}`)
+      setSaved(key)
+      setTimeout(() => setSaved(null), 2500)
+    } catch {
+      setConfigError(key)
+    } finally {
+      setSaving(false)
+    }
   }
 
   // ── Doctor ──────────────────────────────────────────────
@@ -416,6 +424,7 @@ export default function ConfiguracionPage() {
               onChange={e => saveWaSettings({ monthly_cost_alert_ars: e.target.value ? Number(e.target.value) : null })} />
           </Field>
           {saved === "whatsapp_settings" && <p className="text-xs text-green-600 font-medium">Guardado</p>}
+          {configError === "whatsapp_settings" && <p className="text-xs text-red-600 font-medium">No se pudo guardar. Probá de nuevo.</p>}
         </CardContent>
       </Card>
 
@@ -659,6 +668,7 @@ export default function ConfiguracionPage() {
                 </div>
               )}
               {saved === "doctor" && <p className="text-xs text-green-600 font-medium">Guardado</p>}
+              {configError === "doctor" && <p className="text-xs text-red-600 font-medium">No se pudo guardar. Probá de nuevo.</p>}
             </div>
           ) : (
             <p className="text-sm text-gray-400">Sin datos. Tocá el lápiz para cargar.</p>
@@ -861,6 +871,7 @@ export default function ConfiguracionPage() {
                     <p className="text-gray-500 text-xs italic">{loc.notes}</p>
                   )}
                   {saved === "locations" && <p className="text-xs text-green-600 font-medium">Guardado</p>}
+                  {configError === "locations" && <p className="text-xs text-red-600 font-medium">No se pudo guardar. Probá de nuevo.</p>}
                 </div>
               )}
             </CardContent>
