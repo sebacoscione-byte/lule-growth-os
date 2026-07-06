@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
-import { createClient, createServiceClient } from "@/lib/supabase/server"
+import { createClient } from "@/lib/supabase/server"
+import { getServiceDb } from "@/lib/supabase/service"
 import { getValidToken, getConnectionInfo, listPosts, createGoogleBusinessPost } from "@/lib/google-business"
 
 async function requireAuth() {
@@ -12,7 +13,7 @@ async function requireAuth() {
 export async function GET() {
   if (!await requireAuth()) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
-  const supabase = await createServiceClient()
+  const supabase = getServiceDb()
   const info = await getConnectionInfo(supabase)
   if (!info?.google_account_id || !info?.google_location_id) {
     return NextResponse.json({ error: "Falta Account ID. Google no lo expone en algunas cuentas; usa el panel oficial hasta que la API permita descubrirlo." }, { status: 400 })
@@ -35,7 +36,7 @@ export async function POST(req: NextRequest) {
   const { summary } = await req.json() as { summary: string }
   if (!summary?.trim()) return NextResponse.json({ error: "summary required" }, { status: 400 })
 
-  const supabase = await createServiceClient()
+  const supabase = getServiceDb()
   try {
     const data = await createGoogleBusinessPost(supabase, { summary })
     return NextResponse.json(data)

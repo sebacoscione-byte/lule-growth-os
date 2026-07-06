@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
-import { createClient, createServiceClient } from "@/lib/supabase/server"
+import { createClient } from "@/lib/supabase/server"
+import { getServiceDb } from "@/lib/supabase/service"
 import { readContentItems, writeContentItems } from "@/lib/content-pipeline"
 import { publishApprovedItem } from "@/lib/content-publish"
 
@@ -21,7 +22,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "La pieza no tiene ningun canal asignado (Instagram/Google)" }, { status: 400 })
   }
 
-  const service = await createServiceClient()
+  // getServiceDb() (service role puro), no createServiceClient(): ver nota en instagram-business/publish.
+  const service = getServiceDb()
   const { item: nextItem, allPublished } = await publishApprovedItem(service, item, item.channels)
   await writeContentItems(supabase, items.map(existing => existing.id === item.id ? nextItem : existing))
 

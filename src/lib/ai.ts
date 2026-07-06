@@ -154,7 +154,7 @@ const IMAGE_PROMPT_RULES = `DIRECCION VISUAL PARA GEMINI:
 - La escena debe activar curiosidad o identificacion en un paciente potencial: mostrar un momento cotidiano reconocible, una decision preventiva o el beneficio emocional de ocuparse de la salud.
 - Debe existir una tension visual suave entre "seguir postergando" y "ocuparse a tiempo", sin representar peligro, dolor, miedo ni urgencia.
 - La imagen debe sentirse cercana y confiable, no fria, hospitalaria ni publicitaria de stock.
-- Elegi una sola direccion creativa concreta: momento humano cotidiano, naturaleza muerta editorial u objeto usado como metafora visual. No mezcles conceptos.
+- Elegi una sola direccion creativa concreta. Preferi un momento humano cotidiano vinculado directamente al tema (ej: preparar una comida saludable para un tema de colesterol, tomarse la presion en casa para hipertension, salir a caminar para sedentarismo). Si en cambio elegis un objeto como metafora o una naturaleza muerta editorial, el objeto tiene que evocar el tema de forma inmediata sin necesitar el texto para entenderse (ej: un plato con alimentos altos en grasas para colesterol, una alarma de reloj para chequeos postergados) — evita metaforas abstractas o poeticas que solo se entienden leyendo el titular (ej: piedras acumulandose, arena cayendo, un nudo desatandose: no comunican "salud" ni "cardiologia" por si solas). No mezcles conceptos.
 - Describi sujeto, accion, encuadre, lente o perspectiva, iluminacion, profundidad, paleta, textura, estado de animo y ubicacion del espacio negativo.
 - Usa este orden dentro del prompt: objetivo y tema; escena principal; composicion; luz y color; acabado editorial; espacio negativo; restricciones.
 - Indica proporcion vertical 4:5 para feed; usa 9:16 solo si el formato es historia.
@@ -773,6 +773,33 @@ FINAL ART DIRECTION:
       error instanceof Error ? error.message : String(error))
     throw error
   }
+}
+
+export async function generateImageAltText(input: {
+  topic: string
+  visual_headline: string
+  visual_subtitle: string
+  image_prompt: string
+}): Promise<string> {
+  if (getAiMode() === "manual") {
+    throw new Error("Modo manual activo: la generación automática está deshabilitada.")
+  }
+  return generateText({
+    maxTokens: 200,
+    purpose: "image_alt_text",
+    cacheSystem: true,
+    system: `Escribis texto alternativo (alt text) de accesibilidad en español para una imagen de una cuenta de Instagram de cardiología.
+Reglas:
+- Describí objetivamente la escena visual (sujeto, acción, objetos), no el titular ni el mensaje de marketing.
+- Máximo 180 caracteres, una sola oración, sin punto final.
+- No repitas literalmente el titular ni el subtítulo.
+- No inventes texto visible en la imagen ni datos médicos.
+Devolvé solo el texto alternativo, sin comillas ni explicaciones.`,
+    messages: [{
+      role: "user",
+      content: `Tema del contenido: ${input.topic}\nTitular de la placa: "${input.visual_headline}"\nSubtítulo: "${input.visual_subtitle}"\nDescripción de la escena (dirección visual en inglés): ${input.image_prompt}`,
+    }],
+  })
 }
 
 export async function generateGooglePost(topic: string): Promise<string> {

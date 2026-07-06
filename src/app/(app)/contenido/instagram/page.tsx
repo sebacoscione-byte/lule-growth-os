@@ -1483,6 +1483,8 @@ function Editor({
   const [visualGenerating, setVisualGenerating] = useState(false)
   const [visualError, setVisualError] = useState<string | null>(null)
   const [visualHelpUrl, setVisualHelpUrl] = useState<string | null>(null)
+  const [altTextGenerating, setAltTextGenerating] = useState(false)
+  const [altTextError, setAltTextError] = useState<string | null>(null)
   const imagePrompt = item.image_prompt?.trim() || fallbackImagePrompt(item)
   const displayedVisualUrl = generatedVisual?.itemId === item.id ? generatedVisual.url : item.visual_url
   const approvalReady = Boolean(
@@ -1526,11 +1528,45 @@ function Editor({
         return
       }
       onGeneratedVisual({ itemId: item.id, url: `data:${data.mime_type};base64,${data.image_data}` })
-      if (data.visual_url) onSave({ visual_url: data.visual_url })
+      if (data.visual_url) {
+        onSave({ visual_url: data.visual_url })
+      } else {
+        setVisualError(
+          `La placa se generó pero no se pudo guardar (${data.visual_persist_error ?? "error desconocido"}). ` +
+          "Se va a perder si navegás a otra pestaña — descargala o publicá ahora antes de salir."
+        )
+      }
     } catch {
       setVisualError("No se pudo conectar con Gemini para generar la placa.")
     } finally {
       setVisualGenerating(false)
+    }
+  }
+
+  async function regenerateAltText() {
+    setAltTextGenerating(true)
+    setAltTextError(null)
+    try {
+      const response = await fetch("/api/content/alt-text", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          topic: item.topic,
+          visual_headline: item.visual_headline,
+          visual_subtitle: item.visual_subtitle,
+          image_prompt: imagePrompt,
+        }),
+      })
+      const data = await response.json()
+      if (!response.ok || data.error) {
+        setAltTextError(data.error ?? "No se pudo regenerar el texto alternativo.")
+        return
+      }
+      onChange({ ...item, image_alt_text: data.image_alt_text })
+    } catch {
+      setAltTextError("No se pudo conectar con la IA para regenerar el texto alternativo.")
+    } finally {
+      setAltTextGenerating(false)
     }
   }
 
@@ -1603,7 +1639,20 @@ function Editor({
               <p className="mt-2 whitespace-pre-wrap">{imagePrompt}</p>
             </details>
             <div className="space-y-1.5">
-              <Label className="text-gray-900">Texto alternativo de la imagen</Label>
+              <div className="flex items-center justify-between">
+                <Label className="text-gray-900">Texto alternativo de la imagen</Label>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={regenerateAltText}
+                  disabled={altTextGenerating}
+                  className="h-auto gap-1.5 px-2 py-1 text-xs text-violet-700 hover:text-violet-800"
+                >
+                  {altTextGenerating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <WandSparkles className="h-3.5 w-3.5" />}
+                  Regenerar
+                </Button>
+              </div>
               <Input
                 value={item.image_alt_text ?? ""}
                 maxLength={180}
@@ -1611,6 +1660,7 @@ function Editor({
                 placeholder="Descripción breve para accesibilidad"
                 className="bg-white text-gray-900"
               />
+              {altTextError && <p className="text-xs text-red-600">{altTextError}</p>}
             </div>
           </CardContent>
         </Card>

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { generateContentVisual, getPublicAiError } from "@/lib/ai"
-import { createClient, createServiceClient } from "@/lib/supabase/server"
+import { createClient } from "@/lib/supabase/server"
+import { getServiceDb } from "@/lib/supabase/service"
 
 const FORMATS = ["reel", "historia", "carrusel", "post"] as const
 
@@ -29,10 +30,15 @@ export async function POST(request: Request) {
     })
 
     // Persistimos la placa en Storage de una: si no se guarda ahora, se pierde al navegar
-    // (antes solo vivia en memoria del navegador hasta publicar).
+    // (antes solo vivia en memoria del navegador hasta publicar). Usa getServiceDb() (service role
+    // puro, sin cookies) y no createServiceClient(): ese cliente hidrata la sesion del usuario desde
+    // las cookies, y una vez que hay sesion el cliente de @supabase/ssr empieza a autenticar TODO
+    // (incluido Storage) como ese usuario en vez de como service_role — y la policy de Storage de
+    // content-media solo permite escribir a service_role real, asi que el upload fallaba en silencio.
     let visual_url: string | null = null
+    let visual_persist_error: string | null = null
     try {
-      const service = await createServiceClient()
+      const service = getServiceDb()
       const extension = visual.mime_type === "image/png" ? "png" : "jpg"
       const itemId = typeof body.itemId === "string" && body.itemId ? body.itemId : "sin-id"
       const path = `${itemId}-${Date.now()}.${extension}`
@@ -40,14 +46,19 @@ export async function POST(request: Request) {
       const { error: uploadError } = await service.storage
         .from("content-media")
         .upload(path, buffer, { contentType: visual.mime_type, upsert: true })
-      if (!uploadError) {
+      if (uploadError) {
+        console.error("No se pudo persistir la placa en content-media:", uploadError.message)
+        visual_persist_error = uploadError.message
+      } else {
         visual_url = service.storage.from("content-media").getPublicUrl(path).data.publicUrl
       }
-    } catch {
-      // Si falla la persistencia, igual devolvemos la imagen para mostrarla/publicarla en el momento.
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      console.error("No se pudo persistir la placa en content-media:", message)
+      visual_persist_error = message
     }
 
-    return NextResponse.json({ ...visual, visual_url })
+    return NextResponse.json({ ...visual, visual_url, visual_persist_error })
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
     const normalized = message.toLowerCase()
