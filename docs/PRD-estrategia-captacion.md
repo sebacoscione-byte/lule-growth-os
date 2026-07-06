@@ -140,7 +140,7 @@ Todas las páginas incluyen el aviso: **"No se otorgan turnos desde esta web. Pa
 Motivo: quien llega desde Google Maps tiene intención alta de turno. Hay que llevarlos a una página con instrucciones claras, no a Instagram.
 
 ### Swiss Medical Lomas
-Trabajar con landing SEO e Instagram primero. Crear ficha separada solo si es verificable con una dirección real de Swiss Medical Lomas.
+Dirección confirmada: Oliden 141, Lomas de Zamora (2026-07-05). Trabajar con landing SEO e Instagram primero. Evaluar ficha separada en Google Business si se justifica por volumen.
 
 ### Módulo Google Local en la app
 - **Checklist**: estado de configuración del perfil, con ítem prioritario "Link → /dra-lucia-chahin"

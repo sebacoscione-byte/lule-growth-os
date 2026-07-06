@@ -129,7 +129,7 @@ intención de turno: quien busca "cardióloga en Lanús" tiene alta probabilidad
 - [ ] Completar perfil: foto, servicios, horarios (martes CIMEL, miércoles Británico, viernes Swiss), descripción
 - [ ] Configurar sitio web del perfil → `/dra-lucia-chahin` (no Instagram)
 - [ ] Verificar el perfil ante Google
-- [ ] Evaluar si crear ficha separada para Swiss Medical Lomas (requiere dirección verificable)
+- [ ] Evaluar si crear ficha separada para Swiss Medical Lomas (dirección ya confirmada: Oliden 141, Lomas de Zamora)
 - [ ] Definir estrategia de reseñas: cómo y cuándo pedirlas a pacientes actuales
 
 ### Pendiente: cuota 0 en la GBP API (bloquea Perfil/Publicaciones/Reseñas dentro de la app)
