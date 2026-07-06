@@ -1251,6 +1251,7 @@ export default function ContentStudioPage() {
                 onCopy={() => copyInstagram(active)}
                 onPublishGoogle={() => publishGoogle(active)}
                 onPublishInstagram={() => publishInstagram(active)}
+                onPublishNow={() => publishNow(active)}
                 googleManualNeeded={googleManualNeeded === active.id}
                 onMarkGooglePublishedManually={() => markGooglePublishedManually(active)}
               />
@@ -1460,7 +1461,7 @@ export default function ContentStudioPage() {
 
 function Editor({
   item, working, copied, hasUnsavedChanges, igConnected, generatedVisual, onGeneratedVisual,
-  onChange, onSave, onCopy, onPublishGoogle, onPublishInstagram, googleManualNeeded, onMarkGooglePublishedManually,
+  onChange, onSave, onCopy, onPublishGoogle, onPublishInstagram, onPublishNow, googleManualNeeded, onMarkGooglePublishedManually,
 }: {
   item: ContentItem
   working: string | null
@@ -1474,6 +1475,7 @@ function Editor({
   onCopy: () => void
   onPublishGoogle: () => void
   onPublishInstagram: () => void
+  onPublishNow: () => void
   googleManualNeeded: boolean
   onMarkGooglePublishedManually: () => void
 }) {
@@ -1680,9 +1682,19 @@ function Editor({
                 <Check className="h-4 w-4" /> Aprobar
               </Button>
             )}
+            {item.status === "approved" && item.channels.length > 0 && (
+              <Button
+                onClick={onPublishNow}
+                disabled={busy}
+                className="gap-2"
+                title="Publica ya mismo en todos los canales asignados a esta pieza (Instagram y/o Google)"
+              >
+                {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />} Publicar ahora
+              </Button>
+            )}
             {item.status === "approved" && (
-              <Button onClick={onPublishGoogle} disabled={busy} className="gap-2">
-                <Send className="h-4 w-4" /> Publicar en Google
+              <Button variant="outline" onClick={onPublishGoogle} disabled={busy} className="gap-2">
+                <Send className="h-4 w-4" /> Publicar solo en Google
               </Button>
             )}
             {item.status === "approved" && igConnected && (() => {
@@ -1694,12 +1706,13 @@ function Editor({
                   : undefined
               return (
                 <Button
+                  variant="outline"
                   onClick={onPublishInstagram}
                   disabled={busy || !formatSupported || !displayedVisualUrl}
                   className="gap-2"
                   title={disabledReason}
                 >
-                  <Send className="h-4 w-4" /> Publicar en Instagram
+                  <Send className="h-4 w-4" /> Publicar solo en Instagram
                 </Button>
               )
             })()}
