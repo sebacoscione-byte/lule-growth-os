@@ -251,7 +251,7 @@ Usá exactamente estas claves:
   "hook": "frase gancho para la portada del carrusel",
   "caption": "caption completo (150-300 palabras). Estructurá con introducción + puntos clave de cada slide.",
   "google_text": "texto para Google Business, máximo 1500 caracteres",
-  "hashtags": "#hashtag1 #hashtag2 (10-15 hashtags)",
+  "hashtags": "#hashtag1 #hashtag2 (3-5 hashtags)",
   "visual_headline": "título de la portada, máximo 40 caracteres",
   "visual_subtitle": "subtítulo de la portada, máximo 60 caracteres",
   "visual_style": "rose",
@@ -269,7 +269,7 @@ Usá exactamente estas claves:
   "hook": "frase gancho de 1-2 líneas para captar atención en Instagram",
   "caption": "caption completo para Instagram con emojis y párrafos (150-300 palabras)",
   "google_text": "texto para publicación en Google Business, máximo 1500 caracteres",
-  "hashtags": "#hashtag1 #hashtag2 (10-15 hashtags relevantes al tema y cardiología)",
+  "hashtags": "#hashtag1 #hashtag2 (3-5 hashtags relevantes al tema y cardiología)",
   "visual_headline": "titular para la placa visual, máximo 60 caracteres",
   "visual_subtitle": "subtítulo para la placa visual, máximo 80 caracteres",
   "visual_style": "rose",
@@ -572,6 +572,11 @@ Devolve SOLO un JSON con: { "caption": "...", "hook": "...", "hashtags": "..." }
   return parseJson(text)
 }
 
+function capHashtags(raw: string, max = 5): string {
+  const tags = raw.match(/#[\p{L}0-9_]+/gu) ?? []
+  return tags.slice(0, max).join(" ")
+}
+
 export async function generateContentPlan(input: {
   topic: string
   category: string
@@ -632,7 +637,7 @@ ${input.format === "carrusel" ? "Es un CARRUSEL: generá 4-5 slides con headline
   "hook": "...",
   "caption": "...",
   "google_text": "...",
-  "hashtags": "...",
+  "hashtags": "3 a 5 hashtags relevantes, separados por espacio (ej: #hashtag1 #hashtag2 #hashtag3)",
   "visual_headline": "...",
   "visual_subtitle": "...",
   "image_prompt": "...",
@@ -661,6 +666,7 @@ Reglas:
 ${IMAGE_PROMPT_RULES}
 ${PATIENT_ACQUISITION_RULES}
 - El texto de Google debe tener maximo 1500 caracteres.
+- Los hashtags deben ser entre 3 y 5, los mas relevantes al tema y a cardiologia. Nunca mas de 5.
 - Si un texto necesita comillas, escapalas como \\\" o usa comillas simples para no romper el JSON.
 - Devolve SOLO JSON valido.`,
     messages: [{ role: "user", content: userContent }],
@@ -681,7 +687,7 @@ ${PATIENT_ACQUISITION_RULES}
     hook: parsed.hook as string,
     caption: parsed.caption as string,
     google_text: (parsed.google_text as string).slice(0, 1500),
-    hashtags: parsed.hashtags as string,
+    hashtags: capHashtags(parsed.hashtags as string),
     visual_headline: (parsed.visual_headline as string).slice(0, 90),
     visual_subtitle: (parsed.visual_subtitle as string).slice(0, 90),
     visual_style: ["rose", "blue", "teal"].includes(parsed.visual_style as string)

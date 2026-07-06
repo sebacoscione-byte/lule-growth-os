@@ -64,6 +64,11 @@ function editableContent(item: ContentItem) {
   return Object.fromEntries(EDITABLE_FIELDS.map(field => [field, item[field]])) as Partial<ContentItem>
 }
 
+function capHashtags(raw: string, max = 5): string {
+  const tags = raw.match(/#[\p{L}0-9_]+/gu) ?? []
+  return tags.slice(0, max).join(" ")
+}
+
 function CharacterCount({ value, limit }: { value: string; limit?: number }) {
   const overLimit = limit !== undefined && value.length > limit
   return (
@@ -482,7 +487,7 @@ export default function ContentStudioPage() {
   const [categorySuggestionsOpen, setCategorySuggestionsOpen] = useState(false)
   const [topic, setTopic] = useState("")
   const [briefErrors, setBriefErrors] = useState<{ category?: string; topic?: string }>({})
-  const [format, setFormat] = useState<ContentItem["format"]>("reel")
+  const [format, setFormat] = useState<ContentItem["format"]>("post")
   const [cta, setCta] = useState("none")
   const [appointmentLink, setAppointmentLink] = useState("")
   const [sources, setSources] = useState<ContentSource[]>([])
@@ -495,6 +500,7 @@ export default function ContentStudioPage() {
   const [working, setWorking] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
+  const [googleManualNeeded, setGoogleManualNeeded] = useState<string | null>(null)
   const [tab, setTab] = useState("crear")
   const [manualPrompt, setManualPrompt] = useState<string | null>(null)
   const [showDirectEntry, setShowDirectEntry] = useState(false)
@@ -724,7 +730,7 @@ export default function ContentStudioPage() {
       hook: generated.hook as string,
       caption: generated.caption as string,
       google_text: (generated.google_text as string).slice(0, 1500),
-      hashtags: generated.hashtags as string,
+      hashtags: capHashtags(generated.hashtags as string),
       visual_headline: (generated.visual_headline as string).slice(0, 90),
       visual_subtitle: (generated.visual_subtitle as string).slice(0, 90),
       visual_style: (["rose", "blue", "teal"].includes(generated.visual_style as string)
@@ -802,6 +808,7 @@ export default function ContentStudioPage() {
 
   async function publishGoogle(item: ContentItem) {
     setWorking(item.id)
+    setError(null)
     const response = await fetch("/api/google-business/posts", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -809,7 +816,24 @@ export default function ContentStudioPage() {
     })
     const data = await response.json()
     setWorking(null)
-    if (!response.ok || data.error) return setError(data.error ?? "Google no permitio publicar")
+    if (!response.ok || data.error) {
+      if (String(data.error ?? "").includes("Account ID")) {
+        setGoogleManualNeeded(item.id)
+        try {
+          await navigator.clipboard.writeText(item.google_text)
+        } catch {
+          // El usuario puede seleccionar y copiar el texto manualmente desde el campo.
+        }
+        return
+      }
+      setError(data.error ?? "Google no permitio publicar")
+      return
+    }
+    await updateItem(item, { status: "published" })
+  }
+
+  async function markGooglePublishedManually(item: ContentItem) {
+    setGoogleManualNeeded(null)
     await updateItem(item, { status: "published" })
   }
 
@@ -1011,6 +1035,9 @@ export default function ContentStudioPage() {
                       <SelectTrigger className="text-gray-900"><SelectValue /></SelectTrigger>
                       <SelectContent>{FORMATS.map(item => <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>)}</SelectContent>
                     </Select>
+                    {(format === "reel" || format === "carrusel") && (
+                      <p className="text-xs text-amber-700">Este formato no se puede publicar directo a Instagram desde acá (requiere video o varias imágenes). Vas a poder copiarlo para publicarlo manualmente. Elegí "Post estático" o "Historia" si querés publicar con un clic.</p>
+                    )}
                   </div>
                   <div className="space-y-1.5">
                     <Label className="text-gray-900">CTA <span className="text-gray-400 font-normal">(opcional)</span></Label>
@@ -1129,6 +1156,8 @@ export default function ContentStudioPage() {
                 onCopy={() => copyInstagram(active)}
                 onPublishGoogle={() => publishGoogle(active)}
                 onPublishInstagram={() => publishInstagram(active)}
+                googleManualNeeded={googleManualNeeded === active.id}
+                onMarkGooglePublishedManually={() => markGooglePublishedManually(active)}
               />
             ) : (
               <Card className="flex min-h-[420px] items-center justify-center">
@@ -1226,7 +1255,7 @@ export default function ContentStudioPage() {
 
 function Editor({
   item, working, copied, hasUnsavedChanges, igConnected, generatedVisual, onGeneratedVisual,
-  onChange, onSave, onCopy, onPublishGoogle, onPublishInstagram,
+  onChange, onSave, onCopy, onPublishGoogle, onPublishInstagram, googleManualNeeded, onMarkGooglePublishedManually,
 }: {
   item: ContentItem
   working: string | null
@@ -1240,6 +1269,8 @@ function Editor({
   onCopy: () => void
   onPublishGoogle: () => void
   onPublishInstagram: () => void
+  googleManualNeeded: boolean
+  onMarkGooglePublishedManually: () => void
 }) {
   const busy = working === item.id
   const [visualGenerating, setVisualGenerating] = useState(false)
@@ -1446,17 +1477,42 @@ function Editor({
                 <Send className="h-4 w-4" /> Publicar en Google
               </Button>
             )}
-            {item.status === "approved" && igConnected && (item.format === "post" || item.format === "historia") && (
-              <Button
-                onClick={onPublishInstagram}
-                disabled={busy || generatedVisual?.itemId !== item.id}
-                className="gap-2"
-                title={generatedVisual?.itemId !== item.id ? "Generá la placa final primero" : undefined}
-              >
-                <Send className="h-4 w-4" /> Publicar en Instagram
-              </Button>
-            )}
+            {item.status === "approved" && igConnected && (() => {
+              const formatSupported = item.format === "post" || item.format === "historia"
+              const disabledReason = !formatSupported
+                ? "Este formato no publica directo (requiere video o varias imágenes). Copiá el contenido y publicalo manualmente."
+                : generatedVisual?.itemId !== item.id
+                  ? "Generá la placa final primero"
+                  : undefined
+              return (
+                <Button
+                  onClick={onPublishInstagram}
+                  disabled={busy || !formatSupported || generatedVisual?.itemId !== item.id}
+                  className="gap-2"
+                  title={disabledReason}
+                >
+                  <Send className="h-4 w-4" /> Publicar en Instagram
+                </Button>
+              )
+            })()}
           </div>
+          {googleManualNeeded && (
+            <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900">
+              <p className="font-medium mb-1">Publicación manual en Google</p>
+              <p className="text-xs mb-3">
+                Esta cuenta no expone el Account ID por API, asi que copiamos el texto al portapapeles.
+                Pegalo en el panel oficial y despues marcá esta pieza como publicada.
+              </p>
+              <div className="flex flex-wrap items-center gap-3">
+                <a href="https://business.google.com/" target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-xs font-medium text-blue-700 underline">
+                  Ir a Google Business <ExternalLink className="h-3 w-3" />
+                </a>
+                <Button variant="outline" size="sm" onClick={onMarkGooglePublishedManually} className="gap-1.5">
+                  <Check className="h-3.5 w-3.5" /> Marcar como publicado
+                </Button>
+              </div>
+            </div>
+          )}
           {!approvalReady && item.status === "draft" && (
             <p className="text-xs text-amber-700">Para aprobar, completá hook, caption, texto de Google y titular visual.</p>
           )}
