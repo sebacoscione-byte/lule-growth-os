@@ -1036,7 +1036,7 @@ export default function ContentStudioPage() {
                       <SelectContent>{FORMATS.map(item => <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>)}</SelectContent>
                     </Select>
                     {(format === "reel" || format === "carrusel") && (
-                      <p className="text-xs text-amber-700">Este formato no se puede publicar directo a Instagram desde acá (requiere video o varias imágenes). Vas a poder copiarlo para publicarlo manualmente. Elegí "Post estático" o "Historia" si querés publicar con un clic.</p>
+                      <p className="text-xs text-amber-700">Este formato no se puede publicar directo a Instagram desde acá (requiere video o varias imágenes). Vas a poder copiarlo para publicarlo manualmente. Elegí &ldquo;Post estático&rdquo; o &ldquo;Historia&rdquo; si querés publicar con un clic.</p>
                     )}
                   </div>
                   <div className="space-y-1.5">
