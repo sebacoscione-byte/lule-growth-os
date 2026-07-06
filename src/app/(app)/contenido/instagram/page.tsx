@@ -899,7 +899,8 @@ export default function ContentStudioPage() {
   }
 
   async function publishInstagram(item: ContentItem) {
-    if (!generatedVisual || generatedVisual.itemId !== item.id) {
+    const freshVisualUrl = generatedVisual?.itemId === item.id ? generatedVisual.url : null
+    if (!freshVisualUrl && !item.visual_url) {
       setError("Generá la placa final antes de publicar en Instagram.")
       return
     }
@@ -911,7 +912,7 @@ export default function ContentStudioPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           itemId: item.id,
-          imageDataUrl: generatedVisual.url,
+          ...(freshVisualUrl ? { imageDataUrl: freshVisualUrl } : { imageUrl: item.visual_url }),
           caption: `${item.hook}\n\n${item.caption}\n\n${item.hashtags}`,
           format: item.format,
         }),
@@ -1396,6 +1397,7 @@ function Editor({
   const [visualError, setVisualError] = useState<string | null>(null)
   const [visualHelpUrl, setVisualHelpUrl] = useState<string | null>(null)
   const imagePrompt = item.image_prompt?.trim() || fallbackImagePrompt(item)
+  const displayedVisualUrl = generatedVisual?.itemId === item.id ? generatedVisual.url : item.visual_url
   const approvalReady = Boolean(
     item.hook.trim() &&
     item.caption.trim() &&
@@ -1421,6 +1423,7 @@ function Editor({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          itemId: item.id,
           category: item.category,
           topic: item.topic,
           format: item.format,
@@ -1436,6 +1439,7 @@ function Editor({
         return
       }
       onGeneratedVisual({ itemId: item.id, url: `data:${data.mime_type};base64,${data.image_data}` })
+      if (data.visual_url) onSave({ visual_url: data.visual_url })
     } catch {
       setVisualError("No se pudo conectar con Gemini para generar la placa.")
     } finally {
@@ -1465,9 +1469,9 @@ function Editor({
             </p>
           </CardHeader>
           <CardContent className="space-y-3">
-            {generatedVisual?.itemId === item.id ? (
+            {displayedVisualUrl ? (
               <Image
-                src={generatedVisual.url}
+                src={displayedVisualUrl}
                 alt={item.image_alt_text || `Placa visual sobre ${item.topic}`}
                 width={1024}
                 height={item.format === "historia" ? 1820 : 1280}
@@ -1498,7 +1502,7 @@ function Editor({
             <div className="grid gap-2 sm:flex">
               <Button onClick={generateVisual} disabled={visualGenerating} className="w-full flex-1 gap-2">
                 {visualGenerating ? <Loader2 className="h-4 w-4 animate-spin" /> : <WandSparkles className="h-4 w-4" />}
-                {generatedVisual?.itemId === item.id ? "Regenerar placa" : "Generar placa final"}
+                {displayedVisualUrl ? "Regenerar placa" : "Generar placa final"}
               </Button>
               {generatedVisual?.itemId === item.id && (
                 <Button variant="outline" onClick={downloadGeneratedVisual} className="w-full flex-1 gap-2">
@@ -1600,13 +1604,13 @@ function Editor({
               const formatSupported = item.format === "post" || item.format === "historia"
               const disabledReason = !formatSupported
                 ? "Este formato no publica directo (requiere video o varias imágenes). Copiá el contenido y publicalo manualmente."
-                : generatedVisual?.itemId !== item.id
+                : !displayedVisualUrl
                   ? "Generá la placa final primero"
                   : undefined
               return (
                 <Button
                   onClick={onPublishInstagram}
-                  disabled={busy || !formatSupported || generatedVisual?.itemId !== item.id}
+                  disabled={busy || !formatSupported || !displayedVisualUrl}
                   className="gap-2"
                   title={disabledReason}
                 >

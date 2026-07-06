@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 import { generateContentVisual, getPublicAiError } from "@/lib/ai"
-import { createClient } from "@/lib/supabase/server"
+import { createClient, createServiceClient } from "@/lib/supabase/server"
 
 const FORMATS = ["reel", "historia", "carrusel", "post"] as const
 
@@ -27,7 +27,27 @@ export async function POST(request: Request) {
       visual_subtitle: (body.visual_subtitle as string).slice(0, 90),
       image_prompt: (body.image_prompt as string).slice(0, 2400),
     })
-    return NextResponse.json(visual)
+
+    // Persistimos la placa en Storage de una: si no se guarda ahora, se pierde al navegar
+    // (antes solo vivia en memoria del navegador hasta publicar).
+    let visual_url: string | null = null
+    try {
+      const service = await createServiceClient()
+      const extension = visual.mime_type === "image/png" ? "png" : "jpg"
+      const itemId = typeof body.itemId === "string" && body.itemId ? body.itemId : "sin-id"
+      const path = `${itemId}-${Date.now()}.${extension}`
+      const buffer = Buffer.from(visual.image_data, "base64")
+      const { error: uploadError } = await service.storage
+        .from("content-media")
+        .upload(path, buffer, { contentType: visual.mime_type, upsert: true })
+      if (!uploadError) {
+        visual_url = service.storage.from("content-media").getPublicUrl(path).data.publicUrl
+      }
+    } catch {
+      // Si falla la persistencia, igual devolvemos la imagen para mostrarla/publicarla en el momento.
+    }
+
+    return NextResponse.json({ ...visual, visual_url })
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
     const normalized = message.toLowerCase()

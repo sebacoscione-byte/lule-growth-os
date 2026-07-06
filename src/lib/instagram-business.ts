@@ -170,7 +170,7 @@ function parseImageDataUrl(dataUrl: string): { buffer: Buffer; contentType: stri
  */
 export async function publishImageToInstagram(
   supabase: SupabaseClient,
-  input: { itemId: string; imageDataUrl: string; caption?: string; format: string }
+  input: { itemId: string; imageDataUrl?: string; imageUrl?: string; caption?: string; format: string }
 ): Promise<{ mediaId: string }> {
   if (!PUBLISHABLE_FORMATS.includes(input.format as typeof PUBLISHABLE_FORMATS[number])) {
     throw new Error("Instagram solo permite publicar posts o historias por API. Reels y carruseles requieren video o multiples imagenes; usa Copiar Instagram.")
@@ -179,15 +179,20 @@ export async function publishImageToInstagram(
   const token = await getValidToken(supabase)
   if (!token) throw new Error("Instagram no esta conectado. Conectá la cuenta primero.")
 
-  const { buffer, contentType, extension } = parseImageDataUrl(input.imageDataUrl)
-  const path = `${input.itemId}-${Date.now()}.${extension}`
-  const { error: uploadError } = await supabase.storage
-    .from("content-media")
-    .upload(path, buffer, { contentType, upsert: true })
-  if (uploadError) throw new Error(`No se pudo subir la imagen: ${uploadError.message}`)
+  // Si ya tenemos una placa persistida (subida al generarla), reusamos esa URL sin volver a subir nada.
+  let imageUrl = input.imageUrl
+  if (!imageUrl) {
+    if (!input.imageDataUrl) throw new Error("Falta la placa generada o el identificador del contenido.")
+    const { buffer, contentType, extension } = parseImageDataUrl(input.imageDataUrl)
+    const path = `${input.itemId}-${Date.now()}.${extension}`
+    const { error: uploadError } = await supabase.storage
+      .from("content-media")
+      .upload(path, buffer, { contentType, upsert: true })
+    if (uploadError) throw new Error(`No se pudo subir la imagen: ${uploadError.message}`)
 
-  const { data: publicUrlData } = supabase.storage.from("content-media").getPublicUrl(path)
-  const imageUrl = publicUrlData.publicUrl
+    const { data: publicUrlData } = supabase.storage.from("content-media").getPublicUrl(path)
+    imageUrl = publicUrlData.publicUrl
+  }
 
   const asStory = input.format === "historia"
   const containerId = await createImageContainer(token, imageUrl, {

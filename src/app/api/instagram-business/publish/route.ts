@@ -8,8 +8,8 @@ export async function POST(request: Request) {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
-    const body = await request.json() as { itemId?: string; imageDataUrl?: string; caption?: string; format?: string }
-    if (!body.itemId || !body.imageDataUrl || !body.format) {
+    const body = await request.json() as { itemId?: string; imageDataUrl?: string; imageUrl?: string; caption?: string; format?: string }
+    if (!body.itemId || !(body.imageDataUrl || body.imageUrl) || !body.format) {
       return NextResponse.json({ error: "Falta la placa generada o el identificador del contenido." }, { status: 400 })
     }
 
@@ -17,6 +17,7 @@ export async function POST(request: Request) {
     const { mediaId } = await publishImageToInstagram(service, {
       itemId: body.itemId,
       imageDataUrl: body.imageDataUrl,
+      imageUrl: body.imageUrl,
       caption: body.caption,
       format: body.format,
     })

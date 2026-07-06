@@ -152,6 +152,7 @@ export interface ContentItem {
   image_prompt?: string
   image_alt_text?: string
   slides?: ContentSlide[]
+  visual_url?: string
   source: ContentSource | null
   created_at: string
   updated_at: string

@@ -60,7 +60,7 @@ export async function PATCH(request: NextRequest) {
 
     const textFields: Array<keyof ContentItem> = [
       "hook", "caption", "google_text", "hashtags", "visual_headline", "visual_subtitle",
-      "image_prompt", "image_alt_text",
+      "image_prompt", "image_alt_text", "visual_url",
     ]
     if (textFields.some(field => body[field] !== undefined && typeof body[field] !== "string")) {
       return NextResponse.json({ error: "Hay campos de texto invalidos" }, { status: 400 })
@@ -96,13 +96,16 @@ export async function PATCH(request: NextRequest) {
       "image_prompt",
       "image_alt_text",
       "slides",
+      "visual_url",
     ]
     const changes = Object.fromEntries(
       editableFields
         .filter(field => body[field] !== undefined)
         .map(field => [field, body[field]])
     ) as Partial<ContentItem>
-    const hasContentChanges = editableFields.some(field => field !== "status" && body[field] !== undefined)
+    // visual_url no cuenta como "edicion de contenido": adjuntar la placa generada no debe
+    // resetear una pieza ya aprobada/publicada de vuelta a borrador.
+    const hasContentChanges = editableFields.some(field => field !== "status" && field !== "visual_url" && body[field] !== undefined)
     const resetApproval = hasContentChanges && !body.status && ["approved", "published"].includes(current.status)
     const nextItem = {
       ...current,

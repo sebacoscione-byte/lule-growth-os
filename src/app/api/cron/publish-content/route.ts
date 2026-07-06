@@ -40,30 +40,35 @@ export async function GET(request: Request) {
     return NextResponse.json({ result: "skipped_no_item" })
   }
 
-  if (!item.image_prompt) {
-    await writeAutoPublishSettings(supabase, { ...settings, last_run_at: now.toISOString(), last_run_result: `error: item ${item.id} sin image_prompt` })
-    return NextResponse.json({ result: "error", message: "El item elegido no tiene image_prompt, no se puede generar la placa" }, { status: 200 })
-  }
+  // Si la doctora ya genero la placa a mano al revisar la pieza, la reusamos tal cual (ahorra
+  // cupo diario de IA y evita generar una imagen distinta a la que ella aprobo visualmente).
+  let imageDataUrl: string | undefined
+  const imageUrl: string | undefined = item.visual_url
 
-  let imageDataUrl: string
-  try {
-    const visual = await generateContentVisual({
-      category: item.category,
-      topic: item.topic,
-      format: item.format,
-      visual_headline: item.visual_headline,
-      visual_subtitle: item.visual_subtitle,
-      image_prompt: item.image_prompt,
-    })
-    imageDataUrl = `data:${visual.mime_type};base64,${visual.image_data}`
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error)
-    if (message.startsWith("DAILY_LIMIT_EXCEEDED")) {
-      await writeAutoPublishSettings(supabase, { ...settings, last_run_at: now.toISOString(), last_run_result: "quota_exceeded" })
-      return NextResponse.json({ result: "quota_exceeded" })
+  if (!imageUrl) {
+    if (!item.image_prompt) {
+      await writeAutoPublishSettings(supabase, { ...settings, last_run_at: now.toISOString(), last_run_result: `error: item ${item.id} sin image_prompt` })
+      return NextResponse.json({ result: "error", message: "El item elegido no tiene image_prompt, no se puede generar la placa" }, { status: 200 })
     }
-    await writeAutoPublishSettings(supabase, { ...settings, last_run_at: now.toISOString(), last_run_result: `error: ${message}` })
-    return NextResponse.json({ result: "error", message }, { status: 200 })
+    try {
+      const visual = await generateContentVisual({
+        category: item.category,
+        topic: item.topic,
+        format: item.format,
+        visual_headline: item.visual_headline,
+        visual_subtitle: item.visual_subtitle,
+        image_prompt: item.image_prompt,
+      })
+      imageDataUrl = `data:${visual.mime_type};base64,${visual.image_data}`
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      if (message.startsWith("DAILY_LIMIT_EXCEEDED")) {
+        await writeAutoPublishSettings(supabase, { ...settings, last_run_at: now.toISOString(), last_run_result: "quota_exceeded" })
+        return NextResponse.json({ result: "quota_exceeded" })
+      }
+      await writeAutoPublishSettings(supabase, { ...settings, last_run_at: now.toISOString(), last_run_result: `error: ${message}` })
+      return NextResponse.json({ result: "error", message }, { status: 200 })
+    }
   }
 
   // Re-chequear el estado justo antes de publicar: mitiga la carrera con un click manual simultaneo.
@@ -80,7 +85,7 @@ export async function GET(request: Request) {
   if (channelsToPublish.includes("instagram")) {
     try {
       await publishImageToInstagram(supabase, {
-        itemId: current.id, imageDataUrl, caption: current.caption, format: current.format,
+        itemId: current.id, imageUrl, imageDataUrl, caption: current.caption, format: current.format,
       })
       result.instagram = "published"
     } catch {
