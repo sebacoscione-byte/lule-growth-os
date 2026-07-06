@@ -1485,6 +1485,8 @@ function Editor({
   const [visualHelpUrl, setVisualHelpUrl] = useState<string | null>(null)
   const [altTextGenerating, setAltTextGenerating] = useState(false)
   const [altTextError, setAltTextError] = useState<string | null>(null)
+  const [directionGenerating, setDirectionGenerating] = useState(false)
+  const [directionError, setDirectionError] = useState<string | null>(null)
   const imagePrompt = item.image_prompt?.trim() || fallbackImagePrompt(item)
   const displayedVisualUrl = generatedVisual?.itemId === item.id ? generatedVisual.url : item.visual_url
   const approvalReady = Boolean(
@@ -1540,6 +1542,35 @@ function Editor({
       setVisualError("No se pudo conectar con Gemini para generar la placa.")
     } finally {
       setVisualGenerating(false)
+    }
+  }
+
+  async function regenerateImageDirection() {
+    setDirectionGenerating(true)
+    setDirectionError(null)
+    try {
+      const response = await fetch("/api/content/image-direction", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          category: item.category,
+          topic: item.topic,
+          format: item.format,
+          visual_headline: item.visual_headline,
+          visual_subtitle: item.visual_subtitle,
+          previous_image_prompt: imagePrompt,
+        }),
+      })
+      const data = await response.json()
+      if (!response.ok || data.error) {
+        setDirectionError(data.error ?? "No se pudo regenerar la dirección visual.")
+        return
+      }
+      onChange({ ...item, image_prompt: data.image_prompt, image_alt_text: data.image_alt_text })
+    } catch {
+      setDirectionError("No se pudo conectar con la IA para regenerar la dirección visual.")
+    } finally {
+      setDirectionGenerating(false)
     }
   }
 
@@ -1634,9 +1665,26 @@ function Editor({
                 </Button>
               )}
             </div>
-            <details className="rounded-lg border border-violet-100 bg-white p-3 text-xs text-gray-600">
+            <details className="rounded-lg border border-violet-100 bg-white p-3 text-xs text-gray-600" open={Boolean(directionError)}>
               <summary className="cursor-pointer font-medium text-gray-800">Ver dirección visual decidida por la IA</summary>
-              <p className="mt-2 whitespace-pre-wrap">{imagePrompt}</p>
+              <div className="mt-2 space-y-2">
+                <p className="whitespace-pre-wrap">{imagePrompt}</p>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={regenerateImageDirection}
+                  disabled={directionGenerating}
+                  className="gap-1.5 text-xs"
+                >
+                  {directionGenerating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <WandSparkles className="h-3.5 w-3.5" />}
+                  Regenerar dirección visual (nuevo concepto)
+                </Button>
+                <p className="text-gray-400">
+                  Propone otro concepto (no solo otra redacción) — después usá &ldquo;{displayedVisualUrl ? "Regenerar placa" : "Generar placa final"}&rdquo; para renderizarlo.
+                </p>
+                {directionError && <p className="text-red-600">{directionError}</p>}
+              </div>
             </details>
             <div className="space-y-1.5">
               <div className="flex items-center justify-between">

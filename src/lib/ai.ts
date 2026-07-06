@@ -802,6 +802,47 @@ Devolvé solo el texto alternativo, sin comillas ni explicaciones.`,
   })
 }
 
+/**
+ * Pide una direccion visual nueva (image_prompt + image_alt_text) para una pieza ya existente, sin
+ * tocar hook/caption/hashtags. Reusa las mismas IMAGE_PROMPT_RULES (incluida la regla de que un objeto
+ * como metafora tiene que evocar el tema de inmediato) — sirve para descartar un concepto que no
+ * convence sin tener que recrear toda la pieza desde cero.
+ */
+export async function regenerateImageDirection(input: {
+  category: string
+  topic: string
+  format: "reel" | "historia" | "carrusel" | "post"
+  visual_headline: string
+  visual_subtitle: string
+  previous_image_prompt?: string
+}): Promise<{ image_prompt: string; image_alt_text: string }> {
+  if (getAiMode() === "manual") {
+    throw new Error("Modo manual activo: la generación automática está deshabilitada.")
+  }
+  const avoidPrevious = input.previous_image_prompt
+    ? `\nLa direccion anterior fue esta, DESCARTALA y proponé un concepto visual distinto (otro sujeto/escena, no una variacion menor): """${input.previous_image_prompt}"""`
+    : ""
+  const text = await generateText({
+    maxTokens: 700,
+    json: true,
+    purpose: "image_direction",
+    system: `${IMAGE_PROMPT_RULES}
+
+Te paso una pieza de contenido ya escrita (categoria, tema, titular y subtitulo de la placa). Tu unica
+tarea es proponer una direccion visual nueva para esa pieza puntual, siguiendo las reglas de arriba.
+Devolve SOLO un JSON con esta forma exacta: { "image_prompt": "...", "image_alt_text": "..." }`,
+    messages: [{
+      role: "user",
+      content: `Categoria: ${input.category}\nTema: ${input.topic}\nFormato: ${input.format}\nTitular: "${input.visual_headline}"\nSubtitulo: "${input.visual_subtitle}"${avoidPrevious}`,
+    }],
+  })
+  const parsed = parseJson<{ image_prompt: string; image_alt_text: string }>(text)
+  return {
+    image_prompt: parsed.image_prompt.slice(0, 2400),
+    image_alt_text: parsed.image_alt_text.slice(0, 180),
+  }
+}
+
 export async function generateGooglePost(topic: string): Promise<string> {
   if (getAiMode() === "manual") {
     throw new Error("Modo manual activo: la generación automática está deshabilitada.")
