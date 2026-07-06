@@ -16,7 +16,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
 import { parseAiJson } from "@/lib/parse-ai-json"
-import type { ContentItem, ContentSlide, ContentSource, ContentStatus } from "@/types"
+import { DEFAULT_AUTO_PUBLISH_SETTINGS } from "@/lib/content-pipeline"
+import type { AutoPublishSettings, ContentChannel, ContentItem, ContentSlide, ContentSource, ContentStatus } from "@/types"
 
 const IS_MANUAL_MODE = process.env.NEXT_PUBLIC_AI_MODE !== "gemini_api"
 
@@ -514,6 +515,10 @@ export default function ContentStudioPage() {
   const [igUsername, setIgUsername] = useState<string | null>(null)
   const [igLoading, setIgLoading] = useState(true)
   const [generatedVisual, setGeneratedVisual] = useState<{ itemId: string; url: string } | null>(null)
+  const [autoPublishSettings, setAutoPublishSettings] = useState<AutoPublishSettings>(DEFAULT_AUTO_PUBLISH_SETTINGS)
+  const [savingAutoPublish, setSavingAutoPublish] = useState(false)
+  const [autoPublishSaved, setAutoPublishSaved] = useState(false)
+  const [autoPublishError, setAutoPublishError] = useState<string | null>(null)
 
   const lastGenRef = useRef(0)
 
@@ -563,6 +568,62 @@ export default function ContentStudioPage() {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     loadItems()
   }, [loadItems])
+
+  useEffect(() => {
+    fetch("/api/config")
+      .then(r => r.json())
+      .then(data => {
+        if (data.auto_publish_settings) {
+          setAutoPublishSettings({ ...DEFAULT_AUTO_PUBLISH_SETTINGS, ...data.auto_publish_settings })
+        }
+      })
+      .catch(() => {})
+  }, [])
+
+  async function saveAutoPublishSettings(patch: Partial<AutoPublishSettings>) {
+    const updated = { ...autoPublishSettings, ...patch }
+    setAutoPublishSettings(updated)
+    setSavingAutoPublish(true)
+    setAutoPublishError(null)
+    try {
+      const res = await fetch("/api/config", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ key: "auto_publish_settings", value: updated }),
+      })
+      if (!res.ok) throw new Error(`Error ${res.status}`)
+      setAutoPublishSaved(true)
+      setTimeout(() => setAutoPublishSaved(false), 2500)
+    } catch {
+      setAutoPublishError("No se pudo guardar. Probá de nuevo.")
+    } finally {
+      setSavingAutoPublish(false)
+    }
+  }
+
+  function toggleAutoPublishChannel(channel: ContentChannel) {
+    const channels = autoPublishSettings.channels.includes(channel)
+      ? autoPublishSettings.channels.filter(c => c !== channel)
+      : [...autoPublishSettings.channels, channel]
+    saveAutoPublishSettings({ channels })
+  }
+
+  function describeLastAutoPublishRun(): string | null {
+    if (!autoPublishSettings.last_run_at) return null
+    const when = new Date(autoPublishSettings.last_run_at).toLocaleString("es-AR")
+    const reasonMap: Record<string, string> = {
+      skipped_disabled: "estaba apagada",
+      skipped_interval: "todavía no correspondía según el intervalo configurado",
+      skipped_no_item: "no había ningún post o historia aprobado listo para publicar",
+      skipped_race: "el contenido elegido cambió de estado justo antes de publicar (probablemente se publicó manualmente)",
+      quota_exceeded: "se alcanzó el límite diario de generación con IA, se reintenta al otro día",
+      published: "se publicó correctamente",
+      partial: "se publicó parcialmente (revisá el detalle en la pieza correspondiente)",
+    }
+    const result = autoPublishSettings.last_run_result ?? ""
+    const readable = reasonMap[result] ?? (result.startsWith("error") ? `hubo un error (${result.replace(/^error:\s*/, "")})` : result)
+    return `Último intento: ${when} — ${readable}`
+  }
 
   const counts = useMemo(() => ({
     draft: items.filter(item => item.status === "draft").length,
@@ -1179,6 +1240,59 @@ export default function ContentStudioPage() {
         <TabsContent value="biblioteca" className="mt-4">
           {loadingItems ? <Loader2 className="mx-auto mt-12 h-6 w-6 animate-spin text-gray-400" /> : (
             <div className="space-y-4">
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm font-semibold text-gray-900">Publicación automática</CardTitle>
+                  <p className="text-xs text-gray-500">
+                    Publica sola la pieza aprobada más antigua (posts o historias) cada tantos días, sin que tengas que entrar a clickear.
+                  </p>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="flex flex-wrap items-center gap-3">
+                    <Button
+                      variant={autoPublishSettings.enabled ? "default" : "outline"}
+                      size="sm"
+                      disabled={savingAutoPublish}
+                      onClick={() => saveAutoPublishSettings({ enabled: !autoPublishSettings.enabled })}
+                    >
+                      {autoPublishSettings.enabled ? "Activada" : "Desactivada"}
+                    </Button>
+                    <div className="flex items-center gap-2 text-sm text-gray-700">
+                      <span>Cada</span>
+                      <Input
+                        type="number"
+                        min={1}
+                        max={30}
+                        value={autoPublishSettings.interval_days}
+                        onChange={e => saveAutoPublishSettings({ interval_days: Math.max(1, Number(e.target.value) || 1) })}
+                        className="w-16 text-gray-900"
+                      />
+                      <span>días</span>
+                    </div>
+                    <label className="flex items-center gap-1.5 text-sm text-gray-700">
+                      <input
+                        type="checkbox"
+                        checked={autoPublishSettings.channels.includes("instagram")}
+                        onChange={() => toggleAutoPublishChannel("instagram")}
+                      />
+                      Instagram
+                    </label>
+                    <label className="flex items-center gap-1.5 text-sm text-gray-700">
+                      <input
+                        type="checkbox"
+                        checked={autoPublishSettings.channels.includes("google_business")}
+                        onChange={() => toggleAutoPublishChannel("google_business")}
+                      />
+                      Google Business
+                    </label>
+                    {autoPublishSaved && <span className="text-xs font-medium text-green-600">Guardado</span>}
+                    {autoPublishError && <span className="text-xs font-medium text-red-600">{autoPublishError}</span>}
+                  </div>
+                  {describeLastAutoPublishRun() && (
+                    <p className="text-xs text-gray-500">{describeLastAutoPublishRun()}</p>
+                  )}
+                </CardContent>
+              </Card>
               <div className="flex flex-col gap-3 rounded-lg border border-gray-200 bg-white p-3 md:flex-row">
                 <div className="relative flex-1">
                   <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
@@ -1223,6 +1337,11 @@ export default function ContentStudioPage() {
                       <div><p className="font-medium text-gray-900">{item.topic}</p><p className="text-xs text-gray-500">{item.format} · {new Date(item.created_at).toLocaleDateString("es-AR")}</p></div>
                       <Badge variant="outline">{STATUS_LABELS[item.status]}</Badge>
                     </div>
+                    {item.auto_publish_result && Object.values(item.auto_publish_result).includes("error") && (
+                      <p className="text-xs font-medium text-red-600">
+                        No se pudo auto-publicar en {Object.entries(item.auto_publish_result).filter(([, v]) => v === "error").map(([k]) => k === "instagram" ? "Instagram" : "Google Business").join(" ni ")}. Probá el botón manual.
+                      </p>
+                    )}
                     <div className="flex gap-2">
                       <Button variant="outline" size="sm" className="flex-1" onClick={() => { setActive(item); setManualPrompt(null); setTab("crear") }}>
                         <BookOpen className="h-4 w-4" /> Abrir

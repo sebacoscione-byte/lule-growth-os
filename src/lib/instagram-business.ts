@@ -144,7 +144,7 @@ export async function publishContainer(token: string, containerId: string): Prom
   return data.id
 }
 
-export async function waitForContainerReady(token: string, containerId: string, timeoutMs = 60_000): Promise<void> {
+export async function waitForContainerReady(token: string, containerId: string, timeoutMs = 40_000): Promise<void> {
   const start = Date.now()
   while (Date.now() - start < timeoutMs) {
     const status = await getContainerStatus(token, containerId)
@@ -153,4 +153,48 @@ export async function waitForContainerReady(token: string, containerId: string, 
     await new Promise(resolve => setTimeout(resolve, 2000))
   }
   throw new Error("Tiempo de espera agotado procesando la imagen en Instagram")
+}
+
+const PUBLISHABLE_FORMATS = ["post", "historia"] as const
+
+function parseImageDataUrl(dataUrl: string): { buffer: Buffer; contentType: string; extension: string } {
+  const match = /^data:(image\/(png|jpe?g));base64,(.+)$/.exec(dataUrl)
+  if (!match) throw new Error("La placa generada no tiene un formato de imagen valido (PNG o JPEG).")
+  const [, contentType, subtype, base64] = match
+  return { buffer: Buffer.from(base64, "base64"), contentType, extension: subtype === "jpeg" ? "jpg" : subtype }
+}
+
+/**
+ * Sube la placa a Storage y publica en Instagram (post o historia). Parametrizada por SupabaseClient
+ * para poder llamarse tanto desde una ruta con sesion de usuario como desde el cron (service role).
+ */
+export async function publishImageToInstagram(
+  supabase: SupabaseClient,
+  input: { itemId: string; imageDataUrl: string; caption?: string; format: string }
+): Promise<{ mediaId: string }> {
+  if (!PUBLISHABLE_FORMATS.includes(input.format as typeof PUBLISHABLE_FORMATS[number])) {
+    throw new Error("Instagram solo permite publicar posts o historias por API. Reels y carruseles requieren video o multiples imagenes; usa Copiar Instagram.")
+  }
+
+  const token = await getValidToken(supabase)
+  if (!token) throw new Error("Instagram no esta conectado. Conectá la cuenta primero.")
+
+  const { buffer, contentType, extension } = parseImageDataUrl(input.imageDataUrl)
+  const path = `${input.itemId}-${Date.now()}.${extension}`
+  const { error: uploadError } = await supabase.storage
+    .from("content-media")
+    .upload(path, buffer, { contentType, upsert: true })
+  if (uploadError) throw new Error(`No se pudo subir la imagen: ${uploadError.message}`)
+
+  const { data: publicUrlData } = supabase.storage.from("content-media").getPublicUrl(path)
+  const imageUrl = publicUrlData.publicUrl
+
+  const asStory = input.format === "historia"
+  const containerId = await createImageContainer(token, imageUrl, {
+    asStory,
+    caption: asStory ? undefined : (input.caption ?? "").slice(0, 2200),
+  })
+  await waitForContainerReady(token, containerId)
+  const mediaId = await publishContainer(token, containerId)
+  return { mediaId }
 }

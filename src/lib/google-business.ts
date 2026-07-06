@@ -204,6 +204,23 @@ export async function createPost(token: string, accountId: string, locationId: s
   return res.json()
 }
 
+/**
+ * Resuelve conexion/token y publica un post de texto en Google Business. Parametrizada por
+ * SupabaseClient para poder llamarse tanto desde una ruta con sesion de usuario como desde el cron
+ * (service role) — misma logica que ya usaba /api/google-business/posts, ahora reutilizable.
+ */
+export async function createGoogleBusinessPost(supabase: SupabaseClient, input: { summary: string }) {
+  const info = await getConnectionInfo(supabase)
+  if (!info?.google_account_id || !info?.google_location_id) {
+    throw new Error("Falta Account ID. Google no lo expone en algunas cuentas; publica desde el panel oficial hasta que la API permita descubrirlo.")
+  }
+
+  const token = await getValidToken(supabase)
+  if (!token) throw new Error("Token expired")
+
+  return createPost(token, info.google_account_id, info.google_location_id, input.summary)
+}
+
 export async function deletePost(token: string, accountId: string, locationId: string, postId: string) {
   const url = `${LEGACY_API}/accounts/${accountId}/locations/${locationId}/localPosts/${postId}`
   const res = await fetch(url, {

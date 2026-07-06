@@ -92,6 +92,8 @@ INSTAGRAM_OAUTH_BASE_URL=https://tu-dominio.com
 WHATSAPP_PHONE_NUMBER_ID=     # Panel: developers.facebook.com → app → WhatsApp → API Setup
 WHATSAPP_ACCESS_TOKEN=        # Token permanente o de sistema (no el temporal de 24h)
 WHATSAPP_VERIFY_TOKEN=        # String secreto elegido por vos, para verificar el webhook
+# Publicacion automatica de contenido (Vercel Cron → /api/cron/publish-content)
+CRON_SECRET=                  # String secreto elegido por vos. Sin esto seteado, el cron falla-cerrado (401) y no publica nada
 ```
 
 ## Optimización de tokens / costos de IA
@@ -170,6 +172,27 @@ sistema de costos está preparado para ese cambio, pero **no viene con montos re
    (Gemini/Claude, mismas keys de siempre) solo entra como respaldo opcional si `ai_provider` no es
    "Sin IA". OpenAI / otro LLM / Meta Business Agent aparecen como opciones pero no están implementadas
    todavía (lanzan un error explícito si se seleccionan) — no se agregó esa dependencia sin uso real.
+
+## Publicación automática de contenido — cómo activarla
+
+El Estudio de contenido (`Estudio de contenido → pestaña Biblioteca`) tiene una tarjeta "Publicación
+automática" para que las piezas aprobadas (posts/historias) se publiquen solas cada N días, sin depender
+de que alguien entre a clickear "Publicar". Corre vía un **Vercel Cron** diario (`vercel.json`, 09:00 UTC)
+que pega a `/api/cron/publish-content`.
+
+1. **Setear `CRON_SECRET`** en las env vars de Vercel (y en `.env.local` si querés probarlo local) — sin
+   esto, el endpoint devuelve 401 y no hace nada (falla-cerrado a propósito).
+2. Conectar Instagram y Google Business normalmente (como ya se hacía para publicar a mano).
+3. Activar el toggle "Publicación automática" en la tarjeta, elegir cada cuántos días (por defecto 3,
+   alineado al ritmo mensual del PRD) y qué canales.
+4. Solo se auto-publican piezas `aprobadas` con formato **post** o **historia** — reels y carruseles
+   siguen requiriendo publicación manual (no soportado por la API de Meta sin video/multi-imagen).
+5. Si algo falla (token vencido, cuenta desconectada, etc.), la pieza queda con un aviso visible en su
+   card ("No se pudo auto-publicar en...") y los botones manuales de siempre sirven para reintentar. El
+   texto "Último intento: ..." de la tarjeta explica por qué no se publicó nada en la corrida más reciente.
+6. **No hay alerta proactiva (WhatsApp/email) si el cron falla** — queda anotado como mejora futura, no
+   implementada todavía porque requeriría un template de WhatsApp aprobado por Meta. Revisar la tarjeta
+   de vez en cuando, o los logs de función en Vercel, mientras tanto.
 
 ## Tests
 

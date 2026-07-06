@@ -156,6 +156,16 @@ export interface ContentItem {
   created_at: string
   updated_at: string
   approved_at: string | null
+  auto_publish_result?: Partial<Record<ContentChannel, "published" | "error">>
+}
+
+export interface AutoPublishSettings {
+  enabled: boolean
+  interval_days: number
+  channels: ContentChannel[]
+  last_published_at: string | null
+  last_run_at: string | null
+  last_run_result: string | null
 }
 
 export interface ClassifyResult {

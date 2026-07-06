@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
+import { readContentItems, writeContentItems } from "@/lib/content-pipeline"
 import type { ContentItem } from "@/types"
-
-const CONFIG_KEY = "content_pipeline"
 
 function errorResponse(error: unknown) {
   const message = error instanceof Error ? error.message : String(error)
@@ -17,23 +16,11 @@ async function authenticatedClient() {
 }
 
 async function readItems() {
-  const supabase = await authenticatedClient()
-  const { data, error } = await supabase
-    .from("app_config")
-    .select("value")
-    .eq("key", CONFIG_KEY)
-    .maybeSingle()
-
-  if (error) throw error
-  return Array.isArray(data?.value) ? data.value as ContentItem[] : []
+  return readContentItems(await authenticatedClient())
 }
 
 async function writeItems(items: ContentItem[]) {
-  const supabase = await authenticatedClient()
-  const { error } = await supabase
-    .from("app_config")
-    .upsert({ key: CONFIG_KEY, value: items }, { onConflict: "key" })
-  if (error) throw error
+  await writeContentItems(await authenticatedClient(), items)
 }
 
 export async function GET() {

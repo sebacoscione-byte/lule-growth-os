@@ -8,7 +8,9 @@
 4. Generar una propuesta completa con IA.
 5. Revisar y editar hook, caption, hashtags, slides y texto de Google.
 6. Generar la placa final con Gemini desde el editor y descargarla.
-7. Aprobar el borrador y copiar el contenido a Instagram o publicar en Google Business.
+7. Aprobar el borrador. A partir de ahi, publicar a mano (copiar a Instagram o publicar en Google
+   Business) o dejar que la publicacion automatica lo haga sola cada N dias — ver seccion "Publicacion
+   automatica" mas abajo.
 
 El brief queda listo cuando tiene categoria. Si el tema o enfoque queda vacio, la IA elige de forma autonoma el angulo mas atractivo, util y concreto dentro de esa categoria. La biblioteca permite buscar por tema, categoria o hook y filtrar por estado y formato.
 
@@ -26,7 +28,7 @@ Estados:
 
 - `draft`: generado y pendiente de revision.
 - `approved`: revisado y aprobado por una persona.
-- `published`: enviado a Google Business.
+- `published`: publicado en todos los canales pedidos (Instagram y/o Google Business), a mano o automatico.
 - `archived`: retirado de la biblioteca activa.
 
 La revision humana guarda todos los campos editables de la pieza. Para aprobar se requieren hook, caption, texto de Google y titular visual. Si se edita una pieza aprobada o publicada, vuelve a borrador para requerir una nueva revision.
@@ -62,8 +64,28 @@ La captacion no puede usar miedo, culpa, escasez, promesas ni asumir que el lect
 
 ## Canales
 
-- Instagram: generacion y descarga de placa con Gemini y copia del texto listo para publicar. La publicacion automatica requiere Instagram Graph API.
-- Google Business: publicacion desde la app solo para contenido aprobado y cuando Google habilita la API para la cuenta.
+- Instagram: generacion y descarga de placa con Gemini y copia del texto listo para publicar. La publicacion directa por API (manual o automatica) solo soporta los formatos `post` e `historia` — reel y carrusel requieren video o multiples imagenes, no implementado.
+- Google Business: publicacion desde la app solo para contenido aprobado y cuando Google habilita la API para la cuenta. Solo texto (`google_text`), sin imagen.
+
+## Publicacion automatica
+
+Ademas del boton manual "Publicar en Instagram"/"Publicar en Google", una pieza `approved` con formato
+`post` u `historia` puede publicarse sola via un Vercel Cron diario (`vercel.json` → `/api/cron/publish-content`,
+protegido por la env var `CRON_SECRET`, ver `CLAUDE.md`).
+
+- Configuracion en `app_config.auto_publish_settings`: `enabled`, `interval_days` (cada cuantos dias),
+  `channels` (que canales auto-publican), `last_published_at`/`last_run_at`/`last_run_result`. Se edita
+  desde la tarjeta "Publicacion automatica" en `Estudio de contenido → Biblioteca`.
+- El cron elige la pieza aprobada mas antigua (por `approved_at`) entre las publicables por API — reels y
+  carruseles quedan pendientes de accion manual, nunca bloquean la cola.
+- Publica por canal de forma independiente: si Instagram sale bien pero Google falla (o viceversa), la
+  pieza queda en `approved` con `auto_publish_result` marcando que canal fallo, visible como aviso en su
+  card. Solo pasa a `published` cuando **todos** los canales pedidos salieron bien.
+- Si se agota la cuota diaria de IA (`DAILY_AI_REQUEST_LIMIT`) antes de generar la placa, el cron lo trata
+  como evento esperado (`quota_exceeded`) y reintenta al dia siguiente, sin marcar error en la pieza.
+- La logica de negocio (cuando corresponde correr, que pieza elegir, que canales resolver) vive en
+  `src/lib/content-pipeline.ts` como funciones puras testeadas (`content-pipeline.test.ts`), separadas del
+  I/O real a Supabase/Meta/Google.
 
 ## Guardrails
 

@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 
-// Únicas claves que este endpoint (usado por la pantalla de Configuración) puede leer/escribir.
-// El resto de app_config (tokens de Google/Instagram, pipeline de contenido, etc.) se maneja
-// por rutas dedicadas y nunca debe viajar al navegador de la doctora.
-const CONFIG_KEYS = ["doctor", "locations", "whatsapp_settings"] as const
+// Únicas claves que este endpoint (usado por la pantalla de Configuración y por el panel de
+// auto-publicación del Estudio de contenido) puede leer/escribir. El resto de app_config (tokens
+// de Google/Instagram, el array completo de content_pipeline, etc.) se maneja por rutas dedicadas
+// y nunca debe viajar al navegador de la doctora.
+const CONFIG_KEYS = ["doctor", "locations", "whatsapp_settings", "auto_publish_settings"] as const
 
 export async function GET() {
   const supabase = await createClient()

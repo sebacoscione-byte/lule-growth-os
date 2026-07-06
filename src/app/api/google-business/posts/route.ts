@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient, createServiceClient } from "@/lib/supabase/server"
-import { getValidToken, getConnectionInfo, listPosts, createPost } from "@/lib/google-business"
+import { getValidToken, getConnectionInfo, listPosts, createGoogleBusinessPost } from "@/lib/google-business"
 
 async function requireAuth() {
   const userClient = await createClient()
@@ -36,18 +36,11 @@ export async function POST(req: NextRequest) {
   if (!summary?.trim()) return NextResponse.json({ error: "summary required" }, { status: 400 })
 
   const supabase = await createServiceClient()
-  const info = await getConnectionInfo(supabase)
-  if (!info?.google_account_id || !info?.google_location_id) {
-    return NextResponse.json({ error: "Falta Account ID. Google no lo expone en algunas cuentas; publica desde el panel oficial hasta que la API permita descubrirlo." }, { status: 400 })
-  }
-
-  const token = await getValidToken(supabase)
-  if (!token) return NextResponse.json({ error: "Token expired" }, { status: 401 })
-
   try {
-    const data = await createPost(token, info.google_account_id, info.google_location_id, summary)
+    const data = await createGoogleBusinessPost(supabase, { summary })
     return NextResponse.json(data)
   } catch (e) {
-    return NextResponse.json({ error: String(e) }, { status: 500 })
+    const message = e instanceof Error ? e.message : String(e)
+    return NextResponse.json({ error: message }, { status: message.includes("Account ID") ? 400 : message === "Token expired" ? 401 : 500 })
   }
 }
