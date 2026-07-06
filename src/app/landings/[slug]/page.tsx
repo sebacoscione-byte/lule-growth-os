@@ -386,7 +386,7 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
                 )}
                 <p className="text-gray-600 mt-3 leading-relaxed">{data.intro}</p>
                 <p className="text-sm text-gray-500 mt-2">
-                  Consultas cardiológicas y ecocardiogramas · Lanús y Lomas de Zamora
+                  Consultas cardiológicas y ecocardiogramas · {isMain ? "Lanús, CABA y Lomas de Zamora" : "Lanús y Lomas de Zamora"}
                 </p>
 
                 <div className="mt-5 flex flex-wrap justify-center gap-3 sm:justify-start">
@@ -455,7 +455,8 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
               </p>
               <p>
                 Atiende pacientes en <strong>CIMEL Lanús</strong> — centro médico de larga trayectoria en
-                Lanús — y en <strong>Swiss Medical Lomas de Zamora</strong>. Realiza consultas cardiológicas,
+                Lanús —, en el <strong>Hospital Británico (Central)</strong> los miércoles y en{" "}
+                <strong>Swiss Medical Lomas de Zamora</strong>. Realiza consultas cardiológicas,
                 ecocardiogramas y controles cardiovasculares.
               </p>
               {configDoctor.matricula && (
