@@ -117,6 +117,27 @@ create table if not exists app_config (
   updated_at timestamptz not null default now()
 );
 
+-- Historial de app_config: guarda el valor anterior de cada fila antes de
+-- cualquier UPDATE (trigger), para poder recuperar datos si una migracion
+-- u otro bug pisa una config sin querer sin dejar rastro.
+create table if not exists app_config_history (
+  id uuid default uuid_generate_v4() primary key,
+  key text not null,
+  value jsonb not null,
+  changed_at timestamptz not null default now()
+);
+
+create or replace function log_app_config_change() returns trigger as $$
+begin
+  insert into app_config_history (key, value) values (old.key, old.value);
+  return new;
+end;
+$$ language plpgsql security definer;
+
+create trigger app_config_before_update
+  before update on app_config
+  for each row execute function log_app_config_change();
+
 -- ============================================================
 -- AI AUDIT + CACHE
 -- ============================================================
@@ -329,6 +350,7 @@ alter table messages enable row level security;
 alter table growth_experiments enable row level security;
 alter table google_local_checklist enable row level security;
 alter table app_config enable row level security;
+alter table app_config_history enable row level security;
 alter table ai_requests enable row level security;
 alter table ai_outputs enable row level security;
 
@@ -347,6 +369,9 @@ create policy "Authenticated users can do everything on checklist"
 
 create policy "Authenticated users can do everything on config"
   on app_config for all using (auth.role() = 'authenticated');
+
+create policy "authenticated_read_app_config_history"
+  on app_config_history for select to authenticated using (true);
 
 create policy "service_role_write_ai_requests"
   on ai_requests for all to service_role using (true) with check (true);

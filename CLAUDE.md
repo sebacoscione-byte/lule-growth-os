@@ -206,6 +206,26 @@ powershell.exe -NoProfile -Command "[System.Environment]::SetEnvironmentVariable
 4. **Commitear y pushear `docs/` automáticamente.**
 5. **Verificar en código que el bug fue realmente corregido** antes de marcarlo como resuelto.
 
+## Migraciones que tocan `app_config` — NUNCA reemplazar el `value` a ciegas
+`app_config.value` (jsonb) es la config que la doctora carga a mano en Configuración
+(`whatsapp` propio de cada sede, teléfono, horarios, obras sociales, notas, link de Google Maps, etc.).
+El 2026-07-05 una migración para sumar el Hospital Británico hizo
+`update app_config set value = '[...]' where key = 'locations'` con un array hardcodeado
+de solo 6 campos por sede, y **borró sin dejar rastro** todos los campos que ya estaban
+cargados en producción (WhatsApp de Swity en Swiss Medical, teléfonos, etc.) — no eran
+parte del array reescrito.
+- **Nunca** escribir una migración que haga `set value = '<json literal>'` sobre una fila
+  de `app_config` que la UI de Configuración pueda haber modificado en producción.
+- Para agregar un elemento a un array jsonb existente: usar `value = value || '[{...}]'::jsonb`
+  (concatenar), nunca reemplazar el array entero.
+- Para agregar/modificar una clave puntual de un objeto: usar `jsonb_set(value, '{clave}', ...)`.
+- Si hay que tocar múltiples campos de un elemento específico de un array, leer el valor actual
+  primero (`select value from app_config where key = '...'`) y armar el `UPDATE` a partir de eso,
+  no desde un array escrito de memoria en la migración.
+- Desde el 2026-07-07 existe `app_config_history` (trigger `before update`) que guarda el valor
+  anterior de cualquier fila de `app_config` antes de pisarla — sirve de red de seguridad, pero
+  no reemplaza escribir la migración con cuidado.
+
 ## Doctora y configuración
 - **Nombre**: Dra. Lucía Chahin
 - **Especialidad**: Cardiología
