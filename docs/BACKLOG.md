@@ -19,7 +19,8 @@ Herramientas internas de la app para gestionar leads, contenido y seguimiento.
 - [x] Dashboard: KPIs de conversión (total leads, confirmados, seguimiento pendiente, urgencias)
 - [x] Dashboard: leads por canal de origen (Google Maps, Instagram, Google Search, WhatsApp, manual)
 - [x] Dashboard: leads por servicio solicitado y por institución preferida
-- [x] Dashboard: métricas de landings (clicks CIMEL, clicks Swiss, formularios enviados)
+- [x] Dashboard: métricas de landings (clicks CIMEL, clicks Británico, clicks Swiss, formularios enviados)
+- [x] Sumado Hospital Británico como tercera sede de derivación (miércoles), junto a CIMEL Lanús (martes) y Swiss Medical Lomas (viernes) — tipos, prompts de IA, bot de WhatsApp, landings y dashboard
 - [x] Estudio de contenido: generador de posts/reels/carruseles con IA, fuentes y placas visuales
 - [x] Rate limiting por IP en APIs públicas (anti-spam básico)
 - [x] CI: lint + build automático en cada push a main (GitHub Actions)
@@ -35,9 +36,9 @@ Google Maps, Instagram, WhatsApp y búsqueda orgánica.
 - [x] Página pública en `/dra-lucia-chahin` accesible sin login
 - [x] Hero con nombre, especialidad e intro de la doctora
 - [x] Sección servicios: consulta cardiológica, ecocardiograma, control, evaluación cardiovascular
-- [x] Sección "Dónde atiende": CIMEL Lanús — martes / Swiss Medical Lomas — viernes
+- [x] Sección "Dónde atiende": CIMEL Lanús — martes / Hospital Británico — miércoles / Swiss Medical Lomas — viernes
 - [x] CTAs expandibles con instrucciones paso a paso para pedir turno en cada institución
-- [x] Captura de UTM source/medium/campaign/content (se usa en los eventos `cta_cimel`/`cta_swiss`)
+- [x] Captura de UTM source/medium/campaign/content (se usa en los eventos `cta_cimel`/`cta_britanico`/`cta_swiss`)
 - [x] Aviso médico visible: no reemplaza consulta, no apta para urgencias, llamar al 107
 - [x] Bloque "Sobre la doctora" (contenido básico)
 
@@ -45,7 +46,7 @@ Google Maps, Instagram, WhatsApp y búsqueda orgánica.
 - [x] Foto profesional de la Dra. Lucía Chahin en el hero — guardar como `public/lucia-chahin.jpg` *(foto recibida, pendiente de subir al servidor)*
 - [ ] Número de matrícula (MN o MP) visible junto al nombre — código ya listo (se muestra en hero, "Sobre la doctora", footer y JSON-LD apenas se cargue) *(requiere: número de matrícula de Lucía en Configuración > Datos de la doctora)*
 - [x] FAQ: preguntas frecuentes sobre turnos, servicios, cobertura y sedes — 11 preguntas en la landing principal + FAQ corta específica en cada landing SEO
-- [x] Links directos a Google Maps para CIMEL Lanús y Swiss Medical Lomas
+- [x] Links directos a Google Maps para CIMEL Lanús y Swiss Medical Lomas *(pendiente: link de Google Maps del Hospital Británico en Configuración)*
 - [x] Botón de WhatsApp con mensaje prearmado según sede (+5491178285006) — en cada card de sede (sección "Pedir turno") y en cada landing SEO
 - [x] Dominio propio — `draluciachahin.ar` registrado en NIC Argentina (1/7/2026)
 
@@ -58,7 +59,7 @@ Google Maps, Instagram, WhatsApp y búsqueda orgánica.
 - [x] Sección "Obras sociales y formas de atención" — muestra coberturas cargadas por sede en Configuración, o mensaje honesto invitando a consultar si todavía no hay datos cargados *(pendiente: cargar `obras_sociales` reales por sede en Configuración — hoy están vacías)*
 - [x] Sección "Opiniones de pacientes" — reseñas reales de Google vía Places API (New) desde el 2026-07-04 (`GOOGLE_PLACES_API_KEY` + `GOOGLE_PLACE_ID`, ver CLAUDE.md). Cae al placeholder honesto si la API no está disponible.
 - [x] JSON-LD: `Physician` + `FAQPage` en todas las landings, `BreadcrumbList` en landings SEO, `identifier` (matrícula) cuando esté cargada *(pendiente: `MedicalClinic` por sede)*
-- [ ] Eventos de analítica ampliados (click en booking/whatsapp/maps/call por separado) — hoy se sigue registrando `cta_cimel`/`cta_swiss` al primer engagement con cada sede; el catálogo completo de eventos sugerido en el brief queda para Etapa 6
+- [ ] Eventos de analítica ampliados (click en booking/whatsapp/maps/call por separado) — hoy se sigue registrando `cta_cimel`/`cta_britanico`/`cta_swiss` al primer engagement con cada sede; el catálogo completo de eventos sugerido en el brief queda para Etapa 6
 
 ### Revertido (2026-07-04)
 - [x] ~~Formulario "No pude pedir turno" en las landings~~ — se sacó de la web pública. Creaba un lead `seguimiento_pendiente` prometiendo "te ayudamos", pero **hoy nadie revisa el CRM/Inbox** para mandar ese seguimiento manual (`/api/followup` requiere que un usuario logueado lo dispare a mano). Mostrar el formulario sin nadie contestando es peor que no tenerlo. Quedan solo los canales que responden solos: llamar y el bot de WhatsApp. El backend (`/api/public/lead`, con el campo `insurance` ya soportado) queda intacto sin uso — reactivar cuando haya alguien asignado a hacer el seguimiento manual, o cuando se automatice la respuesta por WhatsApp (Etapa 7).
@@ -125,7 +126,7 @@ intención de turno: quien busca "cardióloga en Lanús" tiene alta probabilidad
 
 ### Acciones externas pendientes (las hace Lucía o el equipo)
 - [ ] Crear o reclamar el perfil "Dra. Lucía Chahin" en Google Business
-- [ ] Completar perfil: foto, servicios, horarios (martes CIMEL, viernes Swiss), descripción
+- [ ] Completar perfil: foto, servicios, horarios (martes CIMEL, miércoles Británico, viernes Swiss), descripción
 - [ ] Configurar sitio web del perfil → `/dra-lucia-chahin` (no Instagram)
 - [ ] Verificar el perfil ante Google
 - [ ] Evaluar si crear ficha separada para Swiss Medical Lomas (requiere dirección verificable)
@@ -157,7 +158,7 @@ público para pedir turno.
 - [ ] Actualizar bio de Instagram con el texto sugerido en la app
 - [ ] Cambiar el link de la bio a `/dra-lucia-chahin`
 - [ ] Publicar los 3 posts fijados (cómo pedir turno / servicios / dónde atiende)
-- [ ] Crear las 6 historias destacadas: Turnos · CIMEL · Swiss · Ecocardiograma · Cardiología · FAQ
+- [ ] Crear las 7 historias destacadas: Turnos · CIMEL · Hospital Británico · Swiss · Ecocardiograma · Cardiología · FAQ
 - [ ] Establecer ritmo de publicación mensual: 2-3 conversión + 4-6 educativo + 2-3 local
 
 ### Automatización (Etapa 7)

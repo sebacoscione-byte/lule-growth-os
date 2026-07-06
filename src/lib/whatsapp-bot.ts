@@ -11,7 +11,7 @@ import type { HandoffReason, Lead, WhatsAppEntryPoint } from "@/types"
 
 type BotState = "nuevo" | "intake_pendiente" | "esperando_obra_social" | "esperando_sede" | "derivado"
 type MessageType = "text" | "button_reply" | "list_reply"
-type Sede = "cimel_lanus" | "swiss_lomas"
+type Sede = "cimel_lanus" | "swiss_lomas" | "hospital_britanico"
 
 interface WhatsAppSession {
   id: string
@@ -149,10 +149,15 @@ async function upsertLeadFromIntake(session: WhatsAppSession, waName: string | u
   return data.id as string
 }
 
+const STATUS_BY_SEDE: Record<Sede, Lead["status"]> = {
+  cimel_lanus: "derivado_cimel",
+  swiss_lomas: "derivado_swiss",
+  hospital_britanico: "derivado_britanico",
+}
+
 async function updateLeadLocation(leadId: string, preferredLocation: Sede) {
   const db = getDb()
-  const status = preferredLocation === "cimel_lanus" ? "derivado_cimel" : "derivado_swiss"
-  await db.from("leads").update({ preferred_location: preferredLocation, status }).eq("id", leadId)
+  await db.from("leads").update({ preferred_location: preferredLocation, status: STATUS_BY_SEDE[preferredLocation] }).eq("id", leadId)
 }
 
 async function updateLeadInsurance(leadId: string, insurance: string) {
@@ -170,11 +175,13 @@ function wantsToChangeObraSocial(text: string): boolean {
 const SEDE_NAMES: Record<Sede, string> = {
   cimel_lanus: "CIMEL Lanús",
   swiss_lomas: "Swiss Medical Lomas",
+  hospital_britanico: "Hospital Británico",
 }
 
 const SEDE_DEFAULTS: Record<Sede, { address?: string; day: string }> = {
   cimel_lanus: { address: "Tucumán 1314, Lanús", day: "martes" },
   swiss_lomas: { day: "viernes" },
+  hospital_britanico: { address: "Perdriel 74, CABA", day: "miércoles" },
 }
 
 async function buildSedeInstructions(sede: Sede, intro: string): Promise<string> {
@@ -210,10 +217,14 @@ async function buildSedeInstructions(sede: Sede, intro: string): Promise<string>
 function parseSede(text: string, buttonId?: string): Sede | null {
   if (buttonId === "cimel_lanus") return "cimel_lanus"
   if (buttonId === "swiss_lomas") return "swiss_lomas"
+  if (buttonId === "hospital_britanico") return "hospital_britanico"
 
   const lower = text.toLowerCase()
   if (lower.includes("cimel") || lower.includes("lanús") || lower.includes("lanus") || lower === "1" || lower.includes("martes")) {
     return "cimel_lanus"
+  }
+  if (lower.includes("británico") || lower.includes("britanico") || lower === "3" || lower.includes("miércoles") || lower.includes("miercoles")) {
+    return "hospital_britanico"
   }
   if (lower.includes("swiss") || lower.includes("lomas") || lower === "2" || lower.includes("viernes")) {
     return "swiss_lomas"
@@ -271,10 +282,11 @@ async function forceHandoff(session: WhatsAppSession, phone: string, lead: Lead 
 }
 
 const SEDE_QUESTION =
-  "La Dra. Chahin atiende en dos sedes:\n\n🏥 *CIMEL Lanús* — Tucumán 1314 (martes)\n🏥 *Swiss Medical Lomas* (viernes)\n\n¿En cuál preferís atenderte?"
+  "La Dra. Chahin atiende en tres sedes:\n\n🏥 *CIMEL Lanús* — Tucumán 1314 (martes)\n🏥 *Hospital Británico* — Perdriel 74, CABA (miércoles)\n🏥 *Swiss Medical Lomas* (viernes)\n\n¿En cuál preferís atenderte?"
 
 const SEDE_BUTTONS = [
   { id: "cimel_lanus", title: "CIMEL Lanús" },
+  { id: "hospital_britanico", title: "Hospital Británico" },
   { id: "swiss_lomas", title: "Swiss Medical Lomas" },
 ]
 
@@ -326,7 +338,7 @@ async function getSessionPreferredLocation(session: WhatsAppSession): Promise<Se
   if (!session.lead_id) return null
   const lead = await getLead(session.lead_id)
   const loc = lead?.preferred_location
-  return loc === "cimel_lanus" || loc === "swiss_lomas" ? loc : null
+  return loc === "cimel_lanus" || loc === "swiss_lomas" || loc === "hospital_britanico" ? loc : null
 }
 
 // ── Preguntas frecuentes fuera del guion ────────────────────
@@ -467,8 +479,8 @@ export async function handleIncomingMessage(params: {
       const consented = await hasConsented(phone)
       const consentLine = consented ? "" : `\n\n${CONSENT_TEXT}`
       const questions = settings.cost_saving_mode
-        ? `\n\nRespondeme en un solo mensaje: 1) turno, estudio o protocolo 2) obra social/prepaga 3) edad 4) sede: CIMEL Lanús o Swiss Medical Lomas 5) síntomas o estudios previos, si tenés.`
-        : `\n\nPara ayudarte rápido, respondeme en un solo mensaje:\n1) ¿Buscás turno cardiológico, un estudio o consulta por protocolo de investigación?\n2) ¿Qué obra social o prepaga tenés? (o "particular" si no tenés)\n3) ¿Edad del paciente?\n4) ¿En qué sede preferís atenderte: *CIMEL Lanús* (martes) o *Swiss Medical Lomas* (viernes)?\n5) ¿Tenés algún síntoma o estudio previo que quieras contarnos?`
+        ? `\n\nRespondeme en un solo mensaje: 1) turno, estudio o protocolo 2) obra social/prepaga 3) edad 4) sede: CIMEL Lanús, Hospital Británico o Swiss Medical Lomas 5) síntomas o estudios previos, si tenés.`
+        : `\n\nPara ayudarte rápido, respondeme en un solo mensaje:\n1) ¿Buscás turno cardiológico, un estudio o consulta por protocolo de investigación?\n2) ¿Qué obra social o prepaga tenés? (o "particular" si no tenés)\n3) ¿Edad del paciente?\n4) ¿En qué sede preferís atenderte: *CIMEL Lanús* (martes), *Hospital Británico* (miércoles) o *Swiss Medical Lomas* (viernes)?\n5) ¿Tenés algún síntoma o estudio previo que quieras contarnos?`
       const intro = settings.cost_saving_mode
         ? "Hola, soy el asistente de la Dra. Lucía Chahin, cardióloga."
         : "¡Hola! 👋 Soy el asistente de la *Dra. Lucía Chahin*, cardióloga."
@@ -548,7 +560,7 @@ export async function handleIncomingMessage(params: {
       if (leadId) await updateLeadInsurance(leadId, obraSocial)
 
       const currentLead = leadId ? await getLead(leadId) : null
-      const alreadyDerivado = currentLead?.status === "derivado_cimel" || currentLead?.status === "derivado_swiss"
+      const alreadyDerivado = currentLead?.status === "derivado_cimel" || currentLead?.status === "derivado_swiss" || currentLead?.status === "derivado_britanico"
 
       if (alreadyDerivado) {
         await updateSession(phone, { obra_social: obraSocial, state: "derivado" })
@@ -556,7 +568,7 @@ export async function handleIncomingMessage(params: {
         return
       }
 
-      const sede = currentLead?.preferred_location === "cimel_lanus" || currentLead?.preferred_location === "swiss_lomas" ? currentLead.preferred_location : null
+      const sede = currentLead?.preferred_location === "cimel_lanus" || currentLead?.preferred_location === "swiss_lomas" || currentLead?.preferred_location === "hospital_britanico" ? currentLead.preferred_location : null
       await updateSession(phone, { obra_social: obraSocial, state: "derivado" })
       if (sede) {
         const body = await buildSedeInstructions(sede, "Perfecto.")

@@ -30,6 +30,7 @@ async function getDashboardData() {
     followup_pending,
     derivado_cimel,
     derivado_swiss,
+    derivado_britanico,
     gm, gs, ig, wa, manual,
     consulta, eco,
   ] = await Promise.all([
@@ -41,6 +42,7 @@ async function getDashboardData() {
     count(supabase, { status: "seguimiento_pendiente" }),
     count(supabase, { status: "derivado_cimel" }),
     count(supabase, { status: "derivado_swiss" }),
+    count(supabase, { status: "derivado_britanico" }),
     count(supabase, { origin_channel: "google_maps" }),
     count(supabase, { origin_channel: "google_search" }),
     count(supabase, { origin_channel: "instagram" }),
@@ -59,6 +61,7 @@ async function getDashboardData() {
     followup_pending,
     derivado_cimel,
     derivado_swiss,
+    derivado_britanico,
     by_channel: { google_maps: gm, google_search: gs, instagram: ig, whatsapp: wa, manual },
     consulta,
     eco,
@@ -74,15 +77,17 @@ async function getDashboardData() {
       const [
         { count: cimel },
         { count: swiss },
+        { count: britanico },
         { count: forms },
       ] = await Promise.all([
         supabase.from("landing_events").select("id", { count: "exact", head: true }).eq("event_type", "cta_cimel"),
         supabase.from("landing_events").select("id", { count: "exact", head: true }).eq("event_type", "cta_swiss"),
+        supabase.from("landing_events").select("id", { count: "exact", head: true }).eq("event_type", "cta_britanico"),
         supabase.from("landing_events").select("id", { count: "exact", head: true }).eq("event_type", "form_submitted"),
       ])
-      return { cimel: cimel ?? 0, swiss: swiss ?? 0, forms: forms ?? 0, available: true }
+      return { cimel: cimel ?? 0, swiss: swiss ?? 0, britanico: britanico ?? 0, forms: forms ?? 0, available: true }
     } catch {
-      return { cimel: 0, swiss: 0, forms: 0, available: false }
+      return { cimel: 0, swiss: 0, britanico: 0, forms: 0, available: false }
     }
   })()
 
@@ -194,6 +199,10 @@ export default async function DashboardPage() {
                   <span className="text-sm font-semibold text-indigo-600">{metrics.derivado_cimel}</span>
                 </div>
                 <div className="flex items-center justify-between">
+                  <span className="text-sm text-gray-700">Hospital Británico</span>
+                  <span className="text-sm font-semibold text-sky-600">{metrics.derivado_britanico}</span>
+                </div>
+                <div className="flex items-center justify-between">
                   <span className="text-sm text-gray-700">Swiss Medical Lomas</span>
                   <span className="text-sm font-semibold text-teal-600">{metrics.derivado_swiss}</span>
                 </div>
@@ -235,10 +244,14 @@ export default async function DashboardPage() {
             <CardTitle className="text-base">Métricas de landings</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-3 gap-4 text-center">
+            <div className="grid grid-cols-2 gap-4 text-center sm:grid-cols-4">
               <div>
                 <p className="text-2xl font-bold text-blue-600">{landingMetrics.cimel}</p>
                 <p className="text-xs text-gray-500 mt-1">Instrucciones CIMEL vistas</p>
+              </div>
+              <div>
+                <p className="text-2xl font-bold text-sky-600">{landingMetrics.britanico}</p>
+                <p className="text-xs text-gray-500 mt-1">Instrucciones Británico vistas</p>
               </div>
               <div>
                 <p className="text-2xl font-bold text-teal-600">{landingMetrics.swiss}</p>

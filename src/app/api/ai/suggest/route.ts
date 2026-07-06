@@ -19,7 +19,8 @@ export async function POST(request: Request) {
   const location =
     lead?.preferred_location === "cimel_lanus" ? "CIMEL Lanús (martes)" :
     lead?.preferred_location === "swiss_lomas" ? "Swiss Medical Lomas (viernes)" :
-    "CIMEL Lanús o Swiss Medical Lomas"
+    lead?.preferred_location === "hospital_britanico" ? "Hospital Británico (miércoles)" :
+    "CIMEL Lanús, Hospital Británico o Swiss Medical Lomas"
 
   const leadContext = `Lead: ${lead?.name ?? "anónimo"}. Teléfono: ${lead?.phone ?? "no registrado"}. Canal: ${lead?.origin_channel}. Servicio buscado: ${lead?.requested_service}. Sede preferida: ${location}. Estado actual: ${lead?.status}.`
   const conversationHistory = (history ?? []) as { role: "user" | "assistant"; content: string }[]

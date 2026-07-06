@@ -1,5 +1,5 @@
 # Lule Growth OS — PRD Estrategia de Captación de Pacientes
-**Versión:** 2.1 — 2026-06-20
+**Versión:** 2.2 — 2026-07-05 (agregado Hospital Británico como tercera sede)
 **Profesional:** Dra. Lucía Chahin — Médica Cardióloga  
 **App:** Lule Growth OS
 
@@ -7,10 +7,10 @@
 
 ## 1. Objetivo
 
-Captar pacientes reales que pidan turno con la Dra. Lucía Chahin en CIMEL Lanús o Swiss Medical Lomas.
+Captar pacientes reales que pidan turno con la Dra. Lucía Chahin en CIMEL Lanús, Hospital Británico o Swiss Medical Lomas.
 
 La app NO otorga turnos, NO reserva horarios y NO confirma disponibilidad.  
-Los turnos los dan CIMEL y Swiss Medical por sus canales oficiales.
+Los turnos los dan CIMEL, el Hospital Británico y Swiss Medical por sus canales oficiales.
 
 **Métrica de éxito principal:** personas que confirman haber pedido turno con la Dra. Lucía Chahin.
 
@@ -21,6 +21,7 @@ Los turnos los dan CIMEL y Swiss Medical por sus canales oficiales.
 | Sede | Dirección | Día |
 |---|---|---|
 | CIMEL Lanús | Tucumán 1314, Lanús | Martes |
+| Hospital Británico | Perdriel 74, CABA | Miércoles |
 | Swiss Medical Lomas | Lomas de Zamora | Viernes |
 
 **Servicios:** Consulta cardiológica · Ecocardiograma · Control cardiológico
@@ -38,7 +39,7 @@ Sitio web público de Lucía: /dra-lucia-chahin
         ↓
 Elegir servicio y sede
         ↓
-Ver instrucciones para pedir turno en CIMEL o Swiss
+Ver instrucciones para pedir turno en CIMEL, Hospital Británico o Swiss
         ↓
 Confirmación: ¿Logró pedir turno?
         ↓
@@ -62,8 +63,8 @@ Esta página es el activo público principal de captación. Debe funcionar para 
 1. Quién es la Dra. Lucía Chahin.
 2. Especialidad: cardiología.
 3. Servicios: consulta cardiológica, ecocardiograma, control cardiovascular y evaluación cardiovascular.
-4. Lugares de atención: CIMEL Lanús y Swiss Medical Lomas.
-5. Días de atención: martes en CIMEL Lanús y viernes en Swiss Medical Lomas.
+4. Lugares de atención: CIMEL Lanús, Hospital Británico y Swiss Medical Lomas.
+5. Días de atención: martes en CIMEL Lanús, miércoles en Hospital Británico y viernes en Swiss Medical Lomas.
 6. Cómo pedir turno en cada institución.
 7. Aviso claro: la web no da turnos, no reserva horarios y no confirma disponibilidad.
 8. Aviso médico y urgencias.
@@ -74,8 +75,9 @@ Esta página es el activo público principal de captación. Debe funcionar para 
 
 1. **Hero**: nombre, especialidad, intro breve
 2. **Servicios**: consulta cardiológica, ecocardiograma, control cardiológico, evaluación cardiovascular
-3. **Cómo pedir turno**: dos botones expandibles
+3. **Cómo pedir turno**: tres botones expandibles
    - Pedir turno en CIMEL Lanús (martes) → muestra 3 pasos
+   - Pedir turno en Hospital Británico (miércoles) → muestra los canales de contacto
    - Pedir turno en Swiss Medical Lomas (viernes) → muestra 3 pasos
 4. **¿No pudiste pedir turno?**: formulario de captura de lead
 5. **Aviso médico**: este sitio no reemplaza una consulta ni debe usarse para urgencias
@@ -83,6 +85,11 @@ Esta página es el activo público principal de captación. Debe funcionar para 
 ### Instrucciones CIMEL (sin reservar turno)
 1. Comunicate con CIMEL Lanús.
 2. Pedí turno con la Dra. Lucía Chahin.
+3. Indicá si buscás consulta cardiológica o ecocardiograma.
+
+### Instrucciones Hospital Británico (sin reservar turno)
+1. Llamá al 4309-6400 (atención telefónica 24hs) o a la Central de Turnos 0810-222-2748 / 11-3015-9749, o pedí turno desde la app del Hospital Británico.
+2. Solicitá turno con la Dra. Lucía Chahin en cardiología.
 3. Indicá si buscás consulta cardiológica o ecocardiograma.
 
 ### Instrucciones Swiss (sin reservar turno)
@@ -110,7 +117,7 @@ Este formulario crea un lead con `status: seguimiento_pendiente`, `followup_due_
 
 Cada landing SEO incluye: servicio, sede, día de atención, instrucciones para pedir turno, aviso de urgencias, y link a `/dra-lucia-chahin`.
 
-Todas las páginas incluyen el aviso: **"No se otorgan turnos desde esta web. Para pedir turno, comunicarse con CIMEL o Swiss Medical y solicitar a la Dra. Lucía Chahin."**
+Todas las páginas incluyen el aviso: **"No se otorgan turnos desde esta web. Para pedir turno, comunicarse con CIMEL, el Hospital Británico o Swiss Medical y solicitar a la Dra. Lucía Chahin."**
 
 ---
 
@@ -150,6 +157,7 @@ Trabajar con landing SEO e Instagram primero. Crear ficha separada solo si es ve
 Dra. Lucía Chahin
 Cardióloga | Ecocardiogramas
 Martes: CIMEL Lanús
+Miércoles: Hospital Británico
 Viernes: Swiss Medical Lomas
 👇 Cómo pedir turno
 ```
@@ -159,7 +167,7 @@ Viernes: Swiss Medical Lomas
 ### 3 publicaciones fijadas (obligatorias)
 
 **Post 1 — Cómo pedir turno**
-- Explica el proceso completo para CIMEL y Swiss
+- Explica el proceso completo para CIMEL, Hospital Británico y Swiss
 - CTA: link en bio
 
 **Post 2 — Servicios**
@@ -168,10 +176,11 @@ Viernes: Swiss Medical Lomas
 
 **Post 3 — Dónde atiende**
 - Martes en CIMEL Lanús
+- Miércoles en Hospital Británico
 - Viernes en Swiss Medical Lomas
 
 ### Historias destacadas
-`Turnos` · `CIMEL` · `Swiss` · `Ecocardiograma` · `Cardiología` · `FAQ`
+`Turnos` · `CIMEL` · `Hospital Británico` · `Swiss` · `Ecocardiograma` · `Cardiología` · `FAQ`
 
 La destacada "Turnos" explica el proceso de 4 pasos sin sonar alarmista.
 
@@ -198,7 +207,7 @@ La destacada "Turnos" explica el proceso de 4 pasos sin sonar alarmista.
 ### Usar
 - "Para solicitar turno con la Dra. Lucía Chahin, ingresá al link de la bio y elegí la sede donde querés atenderte."
 - "¿Buscás consulta cardiológica o ecocardiograma? En el link de la bio te explicamos cómo pedir turno."
-- "La Dra. Lucía Chahin atiende los martes en CIMEL Lanús y los viernes en Swiss Medical Lomas."
+- "La Dra. Lucía Chahin atiende los martes en CIMEL Lanús, los miércoles en el Hospital Británico y los viernes en Swiss Medical Lomas."
 - "Escribí CARDIO y te pasamos cómo solicitar turno."
 - "Escribí ECO si necesitás información sobre ecocardiograma."
 
@@ -232,6 +241,7 @@ utm_content        — variante del anuncio/post
 origin_url         — URL completa de llegada
 landing_page       — slug de landing visitada
 clicked_cimel_cta  — tocó el botón CIMEL
+clicked_britanico_cta — tocó el botón Hospital Británico
 clicked_swiss_cta  — tocó el botón Swiss
 booking_instruction_viewed — vio instrucciones de turno
 ```
@@ -239,8 +249,8 @@ booking_instruction_viewed — vio instrucciones de turno
 ### Métricas que mide la app
 1. Leads por canal de origen (Google Maps, Instagram, Google Search, landing)
 2. Servicio elegido (consulta, ecocardiograma)
-3. Sede elegida (CIMEL, Swiss)
-4. Clicks en CTA CIMEL vs Swiss
+3. Sede elegida (CIMEL, Hospital Británico, Swiss)
+4. Clicks en CTA CIMEL vs Hospital Británico vs Swiss
 5. Formularios completados
 6. Confirmaciones de turno pedido
 7. Leads que no pudieron pedir turno
@@ -254,7 +264,7 @@ Después de que un lead complete el formulario o vea instrucciones:
 - Marcar `status: seguimiento_pendiente` con `followup_due_at: +24h`
 - Mensaje sugerido de seguimiento:
 
-> "Hola, te escribo para saber si pudiste pedir turno con la Dra. Lucía Chahin. Si tuviste algún problema para ubicarla en CIMEL Lanús o Swiss Medical Lomas, avisame y te paso nuevamente las indicaciones."
+> "Hola, te escribo para saber si pudiste pedir turno con la Dra. Lucía Chahin. Si tuviste algún problema para ubicarla en CIMEL Lanús, Hospital Británico o Swiss Medical Lomas, avisame y te paso nuevamente las indicaciones."
 
 **Opciones de respuesta:**
 - Ya pedí turno → `confirmed_booked: true`, `status: confirmo_que_pidio_turno`
@@ -271,7 +281,7 @@ Después de que un lead complete el formulario o vea instrucciones:
 - No pedir información clínica sensible (DNI, estudios, ECG)
 - No prometer atención ni resultados
 - No reservar turnos ni confirmar disponibilidad
-- No hablar en nombre de CIMEL ni Swiss Medical
+- No hablar en nombre de CIMEL, del Hospital Británico ni de Swiss Medical
 - No usar lenguaje alarmista
 - Ante síntomas de alarma → derivar a guardia inmediatamente (107)
 - Si la consulta es sensible o urgente → escalar a humano
@@ -318,6 +328,7 @@ No mide solamente likes, seguidores ni impresiones.
 | Personas desde Instagram | `utm_source = instagram` |
 | Visitas a la landing | Registra `landing_page` en lead |
 | Eligen CIMEL | `clicked_cimel_cta = true` o `preferred_location = cimel_lanus` |
+| Eligen Hospital Británico | `clicked_britanico_cta = true` o `preferred_location = hospital_britanico` |
 | Eligen Swiss | `clicked_swiss_cta = true` o `preferred_location = swiss_lomas` |
 | Buscan consulta cardiológica | `requested_service = consulta_cardiologia` |
 | Buscan ecocardiograma | `requested_service = ecocardiograma` |

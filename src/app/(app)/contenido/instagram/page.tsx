@@ -23,13 +23,14 @@ const IS_MANUAL_MODE = process.env.NEXT_PUBLIC_AI_MODE !== "gemini_api"
 const CATEGORIES = [
   "Consulta cardiologica", "Ecocardiograma", "Presion arterial", "Colesterol",
   "Palpitaciones", "Chequeo cardiovascular", "Factores de riesgo",
-  "Atencion en Lanus", "Atencion en Lomas", "Como pedir turno",
+  "Atencion en Lanus", "Atencion en Lomas", "Atencion en Hospital Britanico", "Como pedir turno",
 ]
 
 const CTA_OPTIONS = [
   "",
   "Link en la bio para pedir turno",
   "Link en la bio → turnos en CIMEL Lanús (martes)",
+  "Link en la bio → turnos en Hospital Británico (miércoles)",
   "Link en la bio → turnos en Swiss Medical Lomas (viernes)",
   "Link en la bio para consulta o ecocardiograma",
 ]
@@ -88,7 +89,7 @@ function VisualCard({ item, compact = false }: { item: ContentItem; compact?: bo
         <p className={`${compact ? "text-xl" : "text-3xl"} font-bold leading-tight`}>{item.visual_headline}</p>
         <p className="mt-3 text-sm text-white/80">{item.visual_subtitle}</p>
       </div>
-      <p className="text-xs text-white/70">Martes en Lanus · Viernes en Lomas</p>
+      <p className="text-xs text-white/70">Martes en Lanus · Miércoles en Británico · Viernes en Lomas</p>
     </div>
   )
 }
@@ -315,6 +316,7 @@ function CopyBlock({ title, subtitle, content }: CopyBlockProps) {
 const BIO_TEMPLATE = `Dra. Lucía Chahin
 Cardióloga | Ecocardiogramas
 Martes: CIMEL Lanús
+Miércoles: Hospital Británico
 Viernes: Swiss Medical Lomas
 👇 Cómo pedir turno`
 
@@ -323,6 +325,7 @@ const POST_FIJADO_1 = `📌 Cómo pedir turno con la Dra. Lucía Chahin
 La Dra. Lucía Chahin atiende:
 
 📍 CIMEL Lanús — martes
+📍 Hospital Británico — miércoles
 📍 Swiss Medical Lomas — viernes
 
 Realiza:
@@ -339,6 +342,7 @@ La Dra. Lucía Chahin atiende consultas cardiológicas y realiza ecocardiogramas
 
 Podés solicitar turno en:
 • CIMEL Lanús
+• Hospital Británico
 • Swiss Medical Lomas
 
 En el link de la bio te explicamos cómo pedirlo.`
@@ -346,6 +350,7 @@ En el link de la bio te explicamos cómo pedirlo.`
 const POST_FIJADO_3 = `📍 Dónde atiende la Dra. Lucía Chahin
 
 Martes: CIMEL Lanús, Tucumán 1314, Lanús
+Miércoles: Hospital Británico, Perdriel 74, CABA
 Viernes: Swiss Medical Lomas
 
 Para pedir turno, ingresá al link de la bio y elegí la sede que prefieras.`
@@ -354,7 +359,7 @@ const DESTACADAS_TEMPLATE = `Historias destacadas sugeridas:
 
 1. 📅 Turnos
    → Cómo pedir turno paso a paso:
-   1. Elegí sede (CIMEL o Swiss Medical)
+   1. Elegí sede (CIMEL, Hospital Británico o Swiss Medical)
    2. Comunicate con la institución
    3. Pedí turno con la Dra. Lucía Chahin
    4. Indicá si buscás consulta cardiológica o ecocardiograma
@@ -364,21 +369,26 @@ const DESTACADAS_TEMPLATE = `Historias destacadas sugeridas:
    → Dirección y cómo llegar
    → Días de atención (martes)
 
-3. 🏥 Swiss
+3. 🏥 Hospital Británico
+   → Información sobre el Hospital Británico
+   → Dirección y cómo llegar
+   → Días de atención (miércoles)
+
+4. 🏥 Swiss
    → Información sobre Swiss Medical Lomas
    → Días de atención (viernes)
 
-4. ❤️ Ecocardiograma
+5. ❤️ Ecocardiograma
    → Qué es un ecocardiograma
    → Cómo solicitar turno
    → En qué sedes se realiza
 
-5. 🩺 Cardiología
+6. 🩺 Cardiología
    → Qué es una consulta cardiológica
    → Cuándo consultar
    → Cómo pedir turno
 
-6. ❓ FAQ
+7. ❓ FAQ
    → Preguntas frecuentes
    → ¿Cómo pedir turno? ¿Dónde atiende? ¿Qué días?`
 
@@ -387,7 +397,7 @@ const CTAS_TEMPLATE = `CTAs correctos para posts y stories:
 ✅ USAR:
 • "Para solicitar turno con la Dra. Lucía Chahin, ingresá al link de la bio y elegí la sede donde querés atenderte."
 • "¿Buscás consulta cardiológica o ecocardiograma? En el link de la bio te explicamos cómo pedir turno."
-• "La Dra. Lucía Chahin atiende los martes en CIMEL Lanús y los viernes en Swiss Medical Lomas."
+• "La Dra. Lucía Chahin atiende los martes en CIMEL Lanús, los miércoles en el Hospital Británico y los viernes en Swiss Medical Lomas."
 • "En el link de la bio te explicamos cómo pedir turno."
 • "Escribí CARDIO y te pasamos cómo solicitar turno."
 • "Escribí ECO si necesitás información sobre ecocardiograma."

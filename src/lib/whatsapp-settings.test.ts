@@ -12,6 +12,7 @@ describe("isHighValueLead", () => {
 
   it("un turno casi confirmado (derivado) es alto valor", () => {
     expect(isHighValueLead(lead({ status: "derivado_cimel" }))).toBe(true)
+    expect(isHighValueLead(lead({ status: "derivado_britanico" }))).toBe(true)
   })
 
   it("un interesado en protocolo es alto valor", () => {

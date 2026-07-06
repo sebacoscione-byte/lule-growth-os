@@ -46,7 +46,7 @@ async function getCostsData() {
     supabase.from("whatsapp_sessions").select("phone, state, messages_sent_count, updated_at, lead_id"),
     supabase.from("leads").select("id", { count: "exact", head: true }).eq("origin_channel", "whatsapp"),
     supabase.from("leads").select("id", { count: "exact", head: true }).eq("origin_channel", "whatsapp").not("status", "eq", "nuevo"),
-    supabase.from("leads").select("id", { count: "exact", head: true }).in("status", ["derivado_cimel", "derivado_swiss", "confirmo_que_pidio_turno"]),
+    supabase.from("leads").select("id", { count: "exact", head: true }).in("status", ["derivado_cimel", "derivado_swiss", "derivado_britanico", "confirmo_que_pidio_turno"]),
     supabase.from("leads").select("id", { count: "exact", head: true }).eq("protocol_interest", true),
     supabase.from("leads").select("id", { count: "exact", head: true }).eq("origin_channel", "whatsapp").eq("requires_human", true),
     supabase.from("handoff_events").select("id", { count: "exact", head: true }),

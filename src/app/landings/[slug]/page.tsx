@@ -48,13 +48,14 @@ const FALLBACK_CONDITIONS_TREATED = [
   "Insuficiencia cardiaca", "Soplo cardiaco", "Infarto",
 ]
 
-const PREFERRED_LOCATION_BY_KEY: Record<string, "cimel_lanus" | "swiss_lomas" | "sin_definir"> = {
+const PREFERRED_LOCATION_BY_KEY: Record<string, "cimel_lanus" | "swiss_lomas" | "hospital_britanico" | "sin_definir"> = {
   cimel: "cimel_lanus",
   swiss: "swiss_lomas",
+  britanico: "hospital_britanico",
   general: "sin_definir",
 }
 
-const SEDE_COLOR: Record<string, "blue" | "teal"> = { cimel: "blue", swiss: "teal", general: "blue" }
+const SEDE_COLOR: Record<string, "blue" | "teal" | "indigo"> = { cimel: "blue", swiss: "teal", britanico: "indigo", general: "blue" }
 
 const SERVICE_ICONS: Record<string, LucideIcon> = {
   "Consulta cardiológica": Stethoscope,
@@ -67,7 +68,7 @@ const SERVICE_ICONS: Record<string, LucideIcon> = {
 const MAIN_FAQ = [
   {
     q: "¿Dónde atiende la Dra. Lucía Chahin?",
-    a: "La Dra. Lucía Chahin atiende en dos sedes: CIMEL Lanús (Tucumán 1314, Lanús) los martes, y Swiss Medical Lomas de Zamora (Oliden 141) los viernes.",
+    a: "La Dra. Lucía Chahin atiende en tres sedes: CIMEL Lanús (Tucumán 1314, Lanús) los martes, Hospital Británico (Perdriel 74, CABA) los miércoles, y Swiss Medical Lomas de Zamora (Oliden 141) los viernes.",
   },
   {
     q: "¿Qué días atiende en CIMEL Lanús?",
@@ -76,6 +77,10 @@ const MAIN_FAQ = [
   {
     q: "¿Qué días atiende en Swiss Medical Lomas?",
     a: "Atiende los viernes en Swiss Medical Lomas de Zamora, Oliden 141.",
+  },
+  {
+    q: "¿Qué días atiende en el Hospital Británico?",
+    a: "Atiende los miércoles en el Hospital Británico, Perdriel 74, CABA.",
   },
   {
     q: "¿Qué estudios realiza la Dra. Lucía Chahin?",
@@ -88,6 +93,10 @@ const MAIN_FAQ = [
   {
     q: "¿Cómo pido turno en CIMEL Lanús?",
     a: "Comunicate directamente con CIMEL Lanús y solicitá turno con la Dra. Lucía Chahin para cardiología.",
+  },
+  {
+    q: "¿Cómo pido turno en el Hospital Británico?",
+    a: "Llamá al 4309-6400 (atención telefónica 24hs) o a la Central de Turnos 0810-222-2748 / 11-3015-9749, o pedí turno desde la app del Hospital Británico, y solicitá turno con la Dra. Lucía Chahin en cardiología.",
   },
   {
     q: "¿La Dra. Lucía Chahin atiende con obra social?",
@@ -158,6 +167,7 @@ function matchConfigLocation(locName: string, configLocations: ConfigLocation[])
     const cName = (c.name ?? "").toLowerCase()
     if (lower.includes("cimel") && cName.includes("cimel")) return true
     if (lower.includes("swiss") && cName.includes("swiss")) return true
+    if ((lower.includes("británico") || lower.includes("britanico")) && (cName.includes("británico") || cName.includes("britanico"))) return true
     return cName === lower
   })
 }
@@ -253,7 +263,7 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
     "name": "Dra. Lucía Belén Chahin",
     "alternateName": "Lucía Chahin",
     "jobTitle": "Médica Cardióloga y Ecocardiografista",
-    "description": configDoctor.bio || "Médica cardióloga con formación en ecocardiografía avanzada, egresada de la residencia de cardiología del Hospital Británico de Buenos Aires. Atiende en CIMEL Lanús los martes y en Swiss Medical Lomas de Zamora los viernes.",
+    "description": configDoctor.bio || "Médica cardióloga con formación en ecocardiografía avanzada, egresada de la residencia de cardiología del Hospital Británico de Buenos Aires, donde hoy continúa como cardióloga de planta. Atiende en CIMEL Lanús los martes, en el Hospital Británico los miércoles y en Swiss Medical Lomas de Zamora los viernes.",
     "medicalSpecialty": "Cardiology",
     "image": `${base}/lucia-chahin.jpg`,
     ...(configDoctor.matricula ? { "identifier": configDoctor.matricula } : {}),
@@ -276,6 +286,18 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
           "@type": "PostalAddress",
           "streetAddress": "Tucumán 1314",
           "addressLocality": "Lanús",
+          "addressRegion": "Buenos Aires",
+          "addressCountry": "AR"
+        }
+      },
+      {
+        "@type": "MedicalOrganization",
+        "name": "Hospital Británico de Buenos Aires",
+        "telephone": "4309-6400",
+        "address": {
+          "@type": "PostalAddress",
+          "streetAddress": "Perdriel 74",
+          "addressLocality": "Ciudad Autónoma de Buenos Aires",
           "addressRegion": "Buenos Aires",
           "addressCountry": "AR"
         }
@@ -421,8 +443,8 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
               <p>
                 La Dra. <strong>Lucía Chahin</strong> es médica cardióloga con formación avanzada en
                 ecocardiografía. Realizó su residencia de cardiología en el <strong>Hospital Británico de
-                Buenos Aires</strong> (2020-2024) y hoy continúa allí como cardióloga de planta, además de
-                atender en <strong>Swiss Medical</strong> desde 2025.
+                Buenos Aires</strong> (2020-2024) y hoy continúa allí como cardióloga de planta, atendiendo
+                los miércoles, además de atender en <strong>Swiss Medical</strong> desde 2025.
               </p>
               <p>
                 Es subinvestigadora de ensayos clínicos en <strong>CIMEL Lanús</strong>, con trayectoria en

@@ -4,6 +4,7 @@ export type LeadStatus =
   | "calificado"
   | "derivado_cimel"
   | "derivado_swiss"
+  | "derivado_britanico"
   | "seguimiento_pendiente"
   | "confirmo_que_pidio_turno"
   | "no_pudo_pedir_turno"
@@ -30,6 +31,7 @@ export type RequestedService =
 export type PreferredLocation =
   | "cimel_lanus"
   | "swiss_lomas"
+  | "hospital_britanico"
   | "sin_definir"
 
 export type LeadIntent =
@@ -48,6 +50,7 @@ export type NextAction =
   | "pedir_preferencia"
   | "derivar_cimel"
   | "derivar_swiss"
+  | "derivar_britanico"
   | "escalar"
   | "descartar"
 
@@ -61,7 +64,7 @@ export interface Lead {
   searched_keyword: string | null
   requested_service: RequestedService
   preferred_location: PreferredLocation
-  preferred_day: "martes" | "viernes" | "sin_definir"
+  preferred_day: "martes" | "viernes" | "miercoles" | "sin_definir"
   insurance: string | null
   general_reason: string | null
   consent_to_contact: boolean
@@ -84,6 +87,7 @@ export interface Lead {
   landing_page: string | null
   clicked_cimel_cta: boolean
   clicked_swiss_cta: boolean
+  clicked_britanico_cta: boolean
   booking_instruction_viewed: boolean
   protocol_interest: boolean
   protocol_opt_out: boolean
@@ -158,7 +162,7 @@ export interface ClassifyResult {
   intent: LeadIntent
   requested_service: RequestedService
   suggested_location: PreferredLocation | "preguntar"
-  suggested_day: "martes" | "viernes" | "preguntar"
+  suggested_day: "martes" | "viernes" | "miercoles" | "preguntar"
   priority_score: number
   requires_human: boolean
   possible_emergency: boolean
@@ -239,6 +243,7 @@ export interface DashboardMetrics {
   leads_by_location: Record<PreferredLocation, number>
   derivados_cimel: number
   derivados_swiss: number
+  derivados_britanico: number
   confirmed_booked: number
   no_pudo_pedir: number
   requires_human: number
@@ -252,6 +257,7 @@ export const STATUS_LABELS: Record<LeadStatus, string> = {
   calificado: "Calificado",
   derivado_cimel: "Derivado CIMEL",
   derivado_swiss: "Derivado Swiss",
+  derivado_britanico: "Derivado Británico",
   seguimiento_pendiente: "Seguimiento pendiente",
   confirmo_que_pidio_turno: "Confirmó turno",
   no_pudo_pedir_turno: "No pudo pedir",
@@ -268,6 +274,7 @@ export const STATUS_COLORS: Record<LeadStatus, string> = {
   calificado: "bg-purple-100 text-purple-800",
   derivado_cimel: "bg-indigo-100 text-indigo-800",
   derivado_swiss: "bg-teal-100 text-teal-800",
+  derivado_britanico: "bg-sky-100 text-sky-800",
   seguimiento_pendiente: "bg-orange-100 text-orange-800",
   confirmo_que_pidio_turno: "bg-green-100 text-green-800",
   no_pudo_pedir_turno: "bg-red-100 text-red-800",
@@ -297,6 +304,7 @@ export const SERVICE_LABELS: Record<RequestedService, string> = {
 export const LOCATION_LABELS: Record<string, string> = {
   cimel_lanus: "CIMEL Lanús",
   swiss_lomas: "Swiss Medical Lomas",
+  hospital_britanico: "Hospital Británico",
   sin_definir: "Sin definir",
   preguntar: "Por definir",
 }

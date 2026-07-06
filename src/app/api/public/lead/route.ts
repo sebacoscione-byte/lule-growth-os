@@ -27,6 +27,7 @@ export async function POST(request: Request) {
     landing_page,
     clicked_cimel_cta,
     clicked_swiss_cta,
+    clicked_britanico_cta,
   } = body
 
   if (!consent_to_contact || !phone?.trim()) {
@@ -46,7 +47,8 @@ export async function POST(request: Request) {
 
   const preferredDay =
     preferred_location === "cimel_lanus" ? "martes" :
-    preferred_location === "swiss_lomas" ? "viernes" : "sin_definir"
+    preferred_location === "swiss_lomas" ? "viernes" :
+    preferred_location === "hospital_britanico" ? "miercoles" : "sin_definir"
 
   const followupDueAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
 
@@ -79,7 +81,8 @@ export async function POST(request: Request) {
       landing_page: landing_page || null,
       clicked_cimel_cta: clicked_cimel_cta ?? false,
       clicked_swiss_cta: clicked_swiss_cta ?? false,
-      booking_instruction_viewed: (clicked_cimel_cta || clicked_swiss_cta) ?? false,
+      clicked_britanico_cta: clicked_britanico_cta ?? false,
+      booking_instruction_viewed: (clicked_cimel_cta || clicked_swiss_cta || clicked_britanico_cta) ?? false,
     }])
     .select("id")
     .single()

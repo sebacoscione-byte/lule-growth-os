@@ -6,7 +6,7 @@ export interface IntakeExtraction {
   motivo: "turno" | "estudio" | "protocolo" | null
   obraSocial: string | null
   edad: number | null
-  sede: "cimel_lanus" | "swiss_lomas" | null
+  sede: "cimel_lanus" | "swiss_lomas" | "hospital_britanico" | null
   notas: string | null
 }
 
@@ -40,6 +40,7 @@ export function extractIntake(text: string, knownObrasSociales: string[] = []): 
 
   let sede: IntakeExtraction["sede"] = null
   if (/cimel|lan[uú]s|martes/.test(lower)) sede = "cimel_lanus"
+  else if (/brit[aá]nico|miercoles|mi[eé]rcoles/.test(lower)) sede = "hospital_britanico"
   else if (/swiss|lomas|viernes/.test(lower)) sede = "swiss_lomas"
 
   return { motivo, obraSocial, edad, sede, notas: text.trim() || null }

@@ -21,15 +21,15 @@ create table if not exists leads (
   requested_service text not null default 'no_definido'
     check (requested_service in ('consulta_cardiologia','ecocardiograma','no_definido')),
   preferred_location text not null default 'sin_definir'
-    check (preferred_location in ('cimel_lanus','swiss_lomas','sin_definir')),
+    check (preferred_location in ('cimel_lanus','swiss_lomas','hospital_britanico','sin_definir')),
   preferred_day text not null default 'sin_definir'
-    check (preferred_day in ('martes','viernes','sin_definir')),
+    check (preferred_day in ('martes','viernes','miercoles','sin_definir')),
   insurance text,
   general_reason text,
   consent_to_contact boolean not null default false,
   status text not null default 'nuevo'
     check (status in (
-      'nuevo','interesado','calificado','derivado_cimel','derivado_swiss',
+      'nuevo','interesado','calificado','derivado_cimel','derivado_swiss','derivado_britanico',
       'seguimiento_pendiente','confirmo_que_pidio_turno','no_pudo_pedir_turno',
       'requiere_humano','urgencia_derivada','descartado','spam','elegible_protocolo'
     )),
@@ -51,6 +51,7 @@ create table if not exists leads (
   landing_page text,
   clicked_cimel_cta boolean not null default false,
   clicked_swiss_cta boolean not null default false,
+  clicked_britanico_cta boolean not null default false,
   booking_instruction_viewed boolean not null default false,
   protocol_interest boolean not null default false,
   protocol_opt_out boolean not null default false,
@@ -145,7 +146,7 @@ create table if not exists ai_outputs (
 create table if not exists landing_events (
   id uuid default uuid_generate_v4() primary key,
   event_type text not null
-    check (event_type in ('cta_cimel', 'cta_swiss', 'instructions_viewed', 'form_started', 'form_submitted')),
+    check (event_type in ('cta_cimel', 'cta_swiss', 'cta_britanico', 'instructions_viewed', 'form_started', 'form_submitted')),
   slug text not null,
   utm_source text,
   utm_medium text,
@@ -385,10 +386,11 @@ insert into app_config (key, value) values
   }'),
   ('locations', '[
     {"id": "cimel_lanus", "name": "CIMEL Lanús", "address": "Tucumán 1314, Lanús", "day": "martes", "services": ["Consulta cardiológica", "Ecocardiograma"], "booking_instruction": "Comunicate con CIMEL Lanús y solicitá turno con la Dra. Lucía Chahin."},
-    {"id": "swiss_lomas", "name": "Swiss Medical Lomas", "address": null, "day": "viernes", "services": ["Consulta cardiológica", "Ecocardiograma"], "booking_instruction": "Pedí turno por los canales oficiales de Swiss Medical Lomas solicitando a la Dra. Lucía Chahin."}
+    {"id": "swiss_lomas", "name": "Swiss Medical Lomas", "address": null, "day": "viernes", "services": ["Consulta cardiológica", "Ecocardiograma"], "booking_instruction": "Pedí turno por los canales oficiales de Swiss Medical Lomas solicitando a la Dra. Lucía Chahin."},
+    {"id": "hospital_britanico", "name": "Hospital Británico", "address": "Perdriel 74, CABA", "day": "miercoles", "services": ["Consulta cardiológica", "Ecocardiograma"], "booking_instruction": "Llamá al 4309-6400 (atención telefónica 24hs) o a la Central de Turnos 0810-222-2748 / 11-3015-9749, o pedí turno desde la app del Hospital Británico, y solicitá turno con la Dra. Lucía Chahin en cardiología."}
   ]'),
   ('messages', '{
-    "initial": "Hola, soy el asistente de la Dra. Lucía Chahin. Ella atiende consultas de cardiología y realiza ecocardiogramas.\n\nActualmente atiende:\n- Martes en CIMEL Lanús.\n- Viernes en Swiss Medical Lomas.\n\nPara orientarte, ¿buscás una consulta cardiológica o un ecocardiograma?",
+    "initial": "Hola, soy el asistente de la Dra. Lucía Chahin. Ella atiende consultas de cardiología y realiza ecocardiogramas.\n\nActualmente atiende:\n- Martes en CIMEL Lanús.\n- Miércoles en Hospital Británico.\n- Viernes en Swiss Medical Lomas.\n\n¿Buscás una consulta cardiológica o un ecocardiograma?",
     "followup": "Hola, te escribo para saber si pudiste pedir turno con la Dra. Lucía Chahin. Si tuviste algún problema, avisame y te paso nuevamente las indicaciones."
   }')
 on conflict (key) do nothing;

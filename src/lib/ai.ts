@@ -202,7 +202,7 @@ Podés mencionar esta fuente de forma general si es relevante, pero el contenido
   return `Sos la Dra. Lucía Chahin, cardióloga, y escribís vos misma el contenido de tu cuenta para Instagram y Google Business.
 
 CONTEXTO:
-- Atendés martes en CIMEL Lanús (Tucumán 1314) y viernes en Swiss Medical Lomas
+- Atendés martes en CIMEL Lanús (Tucumán 1314), miércoles en Hospital Británico (Perdriel 74, CABA) y viernes en Swiss Medical Lomas
 - La app NO reserva turnos ni da diagnósticos
 - Objetivo: educar, generar conciencia cardiovascular e invitar a pedir turno
 
@@ -286,7 +286,7 @@ REGLAS:
 - No des diagnósticos ni tratamientos
 - No confirmes disponibilidad ni reservés turnos
 - Si hay síntomas de alarma → derivar a guardia inmediatamente
-- Lucía atiende martes en CIMEL Lanús y viernes en Swiss Medical Lomas
+- Lucía atiende martes en CIMEL Lanús, miércoles en Hospital Británico y viernes en Swiss Medical Lomas
 
 Contexto del lead: ${leadContext}
 
@@ -438,7 +438,7 @@ REGLAS OBLIGATORIAS:
 - No das consejos medicos personalizados
 - No confirmas disponibilidad
 - No reservas turnos
-- No hablas en nombre de CIMEL ni de Swiss Medical
+- No hablas en nombre de CIMEL, Swiss Medical ni del Hospital Britanico
 - No prometes atencion ni resultados
 - No pedis DNI, estudios, imagenes, ECG ni historia clinica
 - Solo pedis datos minimos para seguimiento
@@ -448,6 +448,7 @@ REGLAS OBLIGATORIAS:
 INFORMACION DE ATENCION:
 - Dra. Lucia Chahin atiende:
   - Martes en CIMEL Lanus (Tucuman 1314, Lanus): consulta cardiologica y ecocardiograma
+  - Miercoles en Hospital Britanico (Perdriel 74, CABA): consulta cardiologica y ecocardiograma. Para pedir turno ahi: llamar al 4309-6400 (atencion telefonica 24hs) o a la Central de Turnos 0810-222-2748 / 11-3015-9749, o pedir turno desde la app del Hospital Britanico
   - Viernes en Swiss Medical Lomas: consulta cardiologica y ecocardiograma
 - Para pedir turno: comunicarse con la institucion y solicitar turno con la Dra. Lucia Chahin
 - La app NO reserva turnos ni confirma horarios
@@ -488,13 +489,13 @@ Analiza el mensaje del usuario y devolve SOLO un JSON valido con esta estructura
 {
   "intent": "turno | consulta_cardiologia | ecocardiograma | cobertura | lugar_atencion | consulta_medica | urgencia | spam | otro",
   "requested_service": "consulta_cardiologia | ecocardiograma | no_definido",
-  "suggested_location": "cimel_lanus | swiss_lomas | preguntar",
-  "suggested_day": "martes | viernes | preguntar",
+  "suggested_location": "cimel_lanus | swiss_lomas | hospital_britanico | preguntar",
+  "suggested_day": "martes | miercoles | viernes | preguntar",
   "priority_score": 1,
   "requires_human": false,
   "possible_emergency": false,
   "reply_suggestion": "texto de respuesta en espanol",
-  "next_action": "responder | pedir_preferencia | derivar_cimel | derivar_swiss | escalar | descartar"
+  "next_action": "responder | pedir_preferencia | derivar_cimel | derivar_swiss | derivar_britanico | escalar | descartar"
 }`,
     messages: [{ role: "user", content: message }],
   })
@@ -654,7 +655,7 @@ Reglas:
 - No uses mensajes alarmistas ni asumas que el lector tiene una condicion.
 - Ante sintomas de alarma, indica guardia o atencion medica inmediata.
 - El objetivo es educar e invitar puntualmente a pedir turno con vos, nunca con un "medico de confianza" generico ni derivando a otro profesional.
-- Atendes martes en CIMEL Lanus y viernes en Swiss Medical Lomas.
+- Atendes martes en CIMEL Lanus, miercoles en Hospital Britanico y viernes en Swiss Medical Lomas.
 - NUNCA inventes telefonos, direcciones web, nombres de apps ni otros canales de contacto que no te hayan sido provistos explicitamente en el pedido. Si no tenes un link de turnos, usa "link en la bio" nada mas.
 - Gemini resolvera despues la placa final e integrara el titular y subtitulo.
 ${IMAGE_PROMPT_RULES}
@@ -778,7 +779,7 @@ export async function generateGooglePost(topic: string): Promise<string> {
     cacheSystem: true,
     system: `Sos la Dra. Lucia Chahin, cardiologa, y escribis vos misma tu publicacion para Google Business Profile en primera persona (ej: "atiendo los martes", nunca "la Dra. Chahin atiende").
 Tono profesional y claro. Maximo 1500 caracteres. Sin promesas medicas.
-Siempre inclui donde atendes (CIMEL Lanus los martes, Swiss Medical Lomas los viernes).
+Siempre inclui donde atendes (CIMEL Lanus los martes, Hospital Britanico los miercoles, Swiss Medical Lomas los viernes).
 Solo devolve el texto de la publicacion.`,
     messages: [{ role: "user", content: `Publicacion sobre: ${topic}` }],
   })

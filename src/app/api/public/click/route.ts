@@ -3,7 +3,7 @@ import { NextResponse } from "next/server"
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit"
 
 const VALID_EVENT_TYPES = new Set([
-  "cta_cimel", "cta_swiss", "instructions_viewed", "form_started", "form_submitted",
+  "cta_cimel", "cta_swiss", "cta_britanico", "instructions_viewed", "form_started", "form_submitted",
 ])
 
 export async function POST(request: Request) {

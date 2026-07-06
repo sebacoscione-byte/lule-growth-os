@@ -48,6 +48,7 @@ export function isHighValueLead(lead: {
   return (
     lead.status === "derivado_cimel" ||
     lead.status === "derivado_swiss" ||
+    lead.status === "derivado_britanico" ||
     lead.status === "confirmo_que_pidio_turno" ||
     lead.protocol_interest ||
     lead.possible_emergency

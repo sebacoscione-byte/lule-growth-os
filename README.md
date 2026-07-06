@@ -6,7 +6,7 @@ Sistema de adquisición de pacientes para la **Dra. Lucía Chahin**, cardióloga
 
 - Captura leads desde Google Maps, Instagram, WhatsApp, landings y entrada manual
 - Clasifica la intención del paciente con Gemini o Claude (consulta cardiológica o ecocardiograma)
-- Deriva al canal correcto: CIMEL Lanús (martes) o Swiss Medical Lomas (viernes)
+- Deriva al canal correcto: CIMEL Lanús (martes), Hospital Británico (miércoles) o Swiss Medical Lomas (viernes)
 - Hace seguimiento hasta que el paciente confirme que pidió turno
 - Investiga fuentes recientes y genera contenido coordinado para Instagram y Google Business Profile
 - Crea placas visuales descargables, guarda borradores y exige aprobacion humana

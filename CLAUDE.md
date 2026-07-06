@@ -2,10 +2,11 @@
 
 ## Estado actual
 - 2026-06-11: Setup inicial del proyecto. MVP Fase 1 en construcción.
+- 2026-07-05: Se sumó el Hospital Británico como tercera sede de derivación (miércoles), junto a CIMEL Lanús (martes) y Swiss Medical Lomas (viernes).
 
 ## Qué es esta app
 Sistema de adquisición de pacientes para la Dra. Lucía Chahin, cardióloga.
-Ayuda a captar leads, clasificarlos con IA, derivarlos al canal correcto (CIMEL Lanús / Swiss Medical Lomas)
+Ayuda a captar leads, clasificarlos con IA, derivarlos al canal correcto (CIMEL Lanús / Hospital Británico / Swiss Medical Lomas)
 y hacer seguimiento hasta que el paciente confirme que pidió turno.
 **No da turnos, no reserva horarios, no confirma disponibilidad.**
 
@@ -211,6 +212,7 @@ powershell.exe -NoProfile -Command "[System.Environment]::SetEnvironmentVariable
 - **Servicios**: Consulta cardiológica, Ecocardiograma
 - **Ubicaciones**:
   - CIMEL Lanús — Tucumán 1314, Lanús — martes
+  - Hospital Británico — Perdriel 74, CABA — miércoles (turnos: 4309-6400 atención 24hs, Central de Turnos 0810-222-2748 / 11-3015-9749, o app del Hospital Británico)
   - Swiss Medical Lomas — viernes
 - **Regla crítica**: La app NUNCA da diagnósticos, no reserva turnos, no confirma disponibilidad.
 

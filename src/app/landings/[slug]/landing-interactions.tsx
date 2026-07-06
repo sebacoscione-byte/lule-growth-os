@@ -16,8 +16,8 @@ export interface SedeAction {
   instruction: string
   whatsappMessage: string
   whatsapp?: string
-  color: "blue" | "teal"
-  preferredLocationValue: "cimel_lanus" | "swiss_lomas" | "sin_definir"
+  color: "blue" | "teal" | "indigo"
+  preferredLocationValue: "cimel_lanus" | "swiss_lomas" | "hospital_britanico" | "sin_definir"
 }
 
 function useUtmParams() {
@@ -59,6 +59,13 @@ function CtaCard({ sede, expanded, onToggle, onEngage }: CtaCardProps) {
       icon: "bg-teal-600",
       primary: "bg-teal-600 hover:bg-teal-700 text-white",
       secondary: "border border-teal-300 text-teal-700 hover:bg-teal-50",
+    },
+    indigo: {
+      border: "border-indigo-200",
+      header: "bg-indigo-50",
+      icon: "bg-indigo-600",
+      primary: "bg-indigo-600 hover:bg-indigo-700 text-white",
+      secondary: "border border-indigo-300 text-indigo-700 hover:bg-indigo-50",
     },
   }[sede.color]
 
@@ -153,7 +160,7 @@ function CtaCard({ sede, expanded, onToggle, onEngage }: CtaCardProps) {
 
 // ─── Componente principal ─────────────────────────────────────────────────────
 
-const TRACKED_KEYS = new Set(["cimel", "swiss"])
+const TRACKED_KEYS = new Set(["cimel", "swiss", "britanico"])
 
 function fireEvent(
   event_type: string,

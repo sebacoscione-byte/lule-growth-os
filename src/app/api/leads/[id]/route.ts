@@ -25,7 +25,7 @@ const PATCHABLE_FIELDS = new Set([
   "priority_score", "requires_human", "possible_emergency", "confirmed_booked",
   "ai_summary", "last_message", "followup_due_at", "referred_at",
   "utm_source", "utm_medium", "utm_campaign", "utm_content",
-  "origin_url", "landing_page", "clicked_cimel_cta", "clicked_swiss_cta",
+  "origin_url", "landing_page", "clicked_cimel_cta", "clicked_swiss_cta", "clicked_britanico_cta",
   "booking_instruction_viewed",
 ])
 

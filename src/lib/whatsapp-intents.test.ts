@@ -13,6 +13,11 @@ describe("extractIntake", () => {
     expect(result.notas).toContain("dolor en el pecho")
   })
 
+  it("detecta la sede Hospital Británico por nombre o día", () => {
+    expect(extractIntake("prefiero el británico", []).sede).toBe("hospital_britanico")
+    expect(extractIntake("¿atiende los miércoles?", []).sede).toBe("hospital_britanico")
+  })
+
   it("detecta paciente sin cobertura", () => {
     const result = extractIntake("Quiero un turno, no tengo obra social, tengo 30 años", [])
     expect(result.obraSocial).toBe("Particular / sin cobertura")

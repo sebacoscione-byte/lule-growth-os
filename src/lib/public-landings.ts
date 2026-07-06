@@ -32,15 +32,23 @@ const SWISS = {
   mapsUrl: "https://maps.app.goo.gl/tzSVjSYm47UfNkLJ8",
 }
 
+const BRITANICO = {
+  name: "Hospital Británico",
+  address: "Perdriel 74, CABA",
+  day: "Miércoles",
+  phone: "4309-6400",
+}
+
 export const LANDING_DATA: Record<string, PublicLandingData> = {
   "dra-lucia-chahin": {
-    title: "Dra. Lucía Chahin — Cardióloga | CIMEL Lanús · Swiss Medical Lomas",
-    description: "Dra. Lucía Chahin, médica cardióloga con formación avanzada en ecocardiografía. Residencia de cardiología en el Hospital Británico de Buenos Aires. Atiende en CIMEL Lanús (martes) y Swiss Medical Lomas de Zamora (viernes).",
+    title: "Dra. Lucía Chahin — Cardióloga | CIMEL Lanús · Hospital Británico · Swiss Medical Lomas",
+    description: "Dra. Lucía Chahin, médica cardióloga con formación avanzada en ecocardiografía. Residencia de cardiología en el Hospital Británico de Buenos Aires, donde hoy continúa como cardióloga de planta. Atiende en CIMEL Lanús (martes), Hospital Británico (miércoles) y Swiss Medical Lomas de Zamora (viernes).",
     h1: "Dra. Lucía Chahin — Cardióloga",
-    intro: "La Dra. Lucía Chahin es médica cardióloga con formación avanzada en ecocardiografía, formada en el Hospital Británico de Buenos Aires. Atiende consultas cardiológicas y ecocardiogramas en Lanús y Lomas de Zamora.",
+    intro: "La Dra. Lucía Chahin es médica cardióloga con formación avanzada en ecocardiografía, formada en el Hospital Británico de Buenos Aires. Atiende consultas cardiológicas y ecocardiogramas en Lanús, en el Hospital Británico y en Lomas de Zamora.",
     services: ["Consulta cardiológica", "Ecocardiograma", "Control cardiológico", "Evaluación cardiovascular"],
     locations: [
       { ...CIMEL, instruction: "Llamá al 011 4249-3412, solicitá turno con la Dra. Lucía Chahin y mencioná que es para cardiología." },
+      { ...BRITANICO, instruction: "Llamá al 4309-6400 (atención telefónica 24hs) o a la Central de Turnos 0810-222-2748 / 11-3015-9749, o pedí turno desde la app del Hospital Británico, y solicitá turno con la Dra. Lucía Chahin en cardiología." },
       { ...SWISS, instruction: "Llamá al 0810-333-8876 o usá la app de Swiss Medical, pedí turno con la Dra. Lucía Chahin y mencioná que es para cardiología." },
     ],
   },
@@ -128,6 +136,7 @@ export const WHATSAPP_MESSAGES = {
   general: "Hola, me gustaría consultar cómo pedir turno con la Dra. Lucía Chahin.",
   cimel: "Hola, me gustaría pedir turno con la Dra. Lucía Chahin en CIMEL Lanús (martes). ¿Me pueden ayudar?",
   swiss: "Hola, me gustaría pedir turno con la Dra. Lucía Chahin en Swiss Medical Lomas (viernes). ¿Me pueden ayudar?",
+  britanico: "Hola, me gustaría pedir turno con la Dra. Lucía Chahin en el Hospital Británico (miércoles). ¿Me pueden ayudar?",
 }
 
 // Microcopy por servicio: ayuda al paciente a autoidentificarse antes de pedir turno.
@@ -144,6 +153,7 @@ export function whatsAppKeyForLocation(name: string): keyof typeof WHATSAPP_MESS
   const lower = name.toLowerCase()
   if (lower.includes("cimel")) return "cimel"
   if (lower.includes("swiss")) return "swiss"
+  if (lower.includes("británico") || lower.includes("britanico")) return "britanico"
   return "general"
 }
 

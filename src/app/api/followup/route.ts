@@ -14,7 +14,7 @@ export async function GET() {
     .from("leads")
     .select("*")
     .lte("followup_due_at", now)
-    .in("status", ["derivado_cimel", "derivado_swiss", "seguimiento_pendiente"])
+    .in("status", ["derivado_cimel", "derivado_swiss", "derivado_britanico", "seguimiento_pendiente"])
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json(data)
