@@ -33,7 +33,7 @@ const SWISS = {
 }
 
 const BRITANICO = {
-  name: "Hospital Británico",
+  name: "Hospital Británico (Central)",
   address: "Perdriel 74, CABA",
   day: "Miércoles",
   phone: "4309-6400",
@@ -42,10 +42,10 @@ const BRITANICO = {
 
 export const LANDING_DATA: Record<string, PublicLandingData> = {
   "dra-lucia-chahin": {
-    title: "Dra. Lucía Chahin — Cardióloga | CIMEL Lanús · Hospital Británico · Swiss Medical Lomas",
-    description: "Dra. Lucía Chahin, médica cardióloga con formación avanzada en ecocardiografía. Residencia de cardiología en el Hospital Británico de Buenos Aires, donde hoy continúa como cardióloga de planta. Atiende en CIMEL Lanús (martes), Hospital Británico (miércoles) y Swiss Medical Lomas de Zamora (viernes).",
+    title: "Dra. Lucía Chahin — Cardióloga | CIMEL Lanús · Hospital Británico (Central) · Swiss Medical Lomas",
+    description: "Dra. Lucía Chahin, médica cardióloga con formación avanzada en ecocardiografía. Residencia de cardiología en el Hospital Británico de Buenos Aires, donde hoy continúa como cardióloga de planta. Atiende en CIMEL Lanús (martes), Hospital Británico (Central) (miércoles) y Swiss Medical Lomas de Zamora (viernes).",
     h1: "Dra. Lucía Chahin — Cardióloga",
-    intro: "La Dra. Lucía Chahin es médica cardióloga con formación avanzada en ecocardiografía, formada en el Hospital Británico de Buenos Aires. Atiende consultas cardiológicas y ecocardiogramas en Lanús, en el Hospital Británico y en Lomas de Zamora.",
+    intro: "La Dra. Lucía Chahin es médica cardióloga con formación avanzada en ecocardiografía, formada en el Hospital Británico de Buenos Aires. Atiende consultas cardiológicas y ecocardiogramas en Lanús, en el Hospital Británico (Central) y en Lomas de Zamora.",
     services: ["Consulta cardiológica", "Ecocardiograma", "Control cardiológico", "Evaluación cardiovascular"],
     locations: [
       { ...CIMEL, instruction: "Llamá al 011 4249-3412, solicitá turno con la Dra. Lucía Chahin y mencioná que es para cardiología." },
