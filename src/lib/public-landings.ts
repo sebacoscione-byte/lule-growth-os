@@ -37,6 +37,7 @@ const BRITANICO = {
   address: "Perdriel 74, CABA",
   day: "Miércoles",
   phone: "4309-6400",
+  mapsUrl: "https://maps.app.goo.gl/ZPbUhv7PAtUnS6D79",
 }
 
 export const LANDING_DATA: Record<string, PublicLandingData> = {
