@@ -898,6 +898,29 @@ export default function ContentStudioPage() {
     await updateItem(item, { status: "published" })
   }
 
+  async function publishNow(item: ContentItem) {
+    setWorking(item.id)
+    setError(null)
+    try {
+      const response = await fetch("/api/content/publish-now", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ itemId: item.id }),
+      })
+      const data = await response.json()
+      if (!response.ok || data.error) {
+        setError(data.error ?? "No se pudo publicar la pieza")
+        return
+      }
+      setItems(previous => previous.map(existing => existing.id === item.id ? data.item : existing))
+      if (active?.id === item.id) setActive(data.item)
+    } catch {
+      setError("No se pudo publicar la pieza. Revisá tu conexión e intentá nuevamente.")
+    } finally {
+      setWorking(null)
+    }
+  }
+
   async function publishInstagram(item: ContentItem) {
     const freshVisualUrl = generatedVisual?.itemId === item.id ? generatedVisual.url : null
     if (!freshVisualUrl && !item.visual_url) {
@@ -1245,7 +1268,9 @@ export default function ContentStudioPage() {
                 <CardHeader className="pb-3">
                   <CardTitle className="text-sm font-semibold text-gray-900">Publicación automática</CardTitle>
                   <p className="text-xs text-gray-500">
-                    Publica sola la pieza aprobada más antigua (posts o historias) cada tantos días, sin que tengas que entrar a clickear.
+                    Publica de a <strong>una pieza por vez</strong> — la aprobada más antigua primero (orden de aprobación) —
+                    cada tantos días, para que no salgan todas juntas. Con {counts.approved} pieza{counts.approved === 1 ? "" : "s"} aprobada{counts.approved === 1 ? "" : "s"} en cola
+                    {counts.approved > 0 && ` y publicando cada ${autoPublishSettings.interval_days} días, la última saldría en unos ${counts.approved * autoPublishSettings.interval_days} días`}.
                   </p>
                 </CardHeader>
                 <CardContent className="space-y-3">
@@ -1340,13 +1365,25 @@ export default function ContentStudioPage() {
                     </div>
                     {item.auto_publish_result && Object.values(item.auto_publish_result).includes("error") && (
                       <p className="text-xs font-medium text-red-600">
-                        No se pudo auto-publicar en {Object.entries(item.auto_publish_result).filter(([, v]) => v === "error").map(([k]) => k === "instagram" ? "Instagram" : "Google Business").join(" ni ")}. Probá el botón manual.
+                        No se pudo publicar en {Object.entries(item.auto_publish_result).filter(([, v]) => v === "error").map(([k]) => k === "instagram" ? "Instagram" : "Google Business").join(" ni ")}. Probá de nuevo con &ldquo;Publicar ahora&rdquo;.
                       </p>
                     )}
                     <div className="flex gap-2">
                       <Button variant="outline" size="sm" className="flex-1" onClick={() => { setActive(item); setManualPrompt(null); setTab("crear") }}>
                         <BookOpen className="h-4 w-4" /> Abrir
                       </Button>
+                      {item.status === "approved" && (
+                        <Button
+                          size="sm"
+                          className="flex-1 gap-1.5"
+                          disabled={working === item.id}
+                          onClick={() => publishNow(item)}
+                          title="Publica ya mismo en los canales asignados a esta pieza, sin esperar a la publicación automática"
+                        >
+                          {working === item.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                          Publicar ahora
+                        </Button>
+                      )}
                       <Button
                         variant="ghost"
                         size="icon"

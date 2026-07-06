@@ -5,9 +5,7 @@ import {
   shouldRunAutoPublish, pickNextPublishableItem, resolveChannelsToPublish,
 } from "@/lib/content-pipeline"
 import { generateContentVisual } from "@/lib/ai"
-import { publishImageToInstagram } from "@/lib/instagram-business"
-import { createGoogleBusinessPost } from "@/lib/google-business"
-import type { ContentItem } from "@/types"
+import { publishApprovedItem } from "@/lib/content-publish"
 
 export const maxDuration = 120
 
@@ -80,34 +78,9 @@ export async function GET(request: Request) {
   }
 
   const channelsToPublish = resolveChannelsToPublish(current, settings)
-  const result: NonNullable<ContentItem["auto_publish_result"]> = { ...current.auto_publish_result }
-
-  if (channelsToPublish.includes("instagram")) {
-    try {
-      await publishImageToInstagram(supabase, {
-        itemId: current.id, imageUrl, imageDataUrl, caption: current.caption, format: current.format,
-      })
-      result.instagram = "published"
-    } catch {
-      result.instagram = "error"
-    }
-  }
-  if (channelsToPublish.includes("google_business")) {
-    try {
-      await createGoogleBusinessPost(supabase, { summary: current.google_text })
-      result.google_business = "published"
-    } catch {
-      result.google_business = "error"
-    }
-  }
-
-  const allPublished = channelsToPublish.every(channel => result[channel] === "published")
-  const nextItem: ContentItem = {
-    ...current,
-    auto_publish_result: result,
-    status: allPublished ? "published" : current.status,
-    updated_at: now.toISOString(),
-  }
+  const { item: nextItem, allPublished } = await publishApprovedItem(
+    supabase, current, channelsToPublish, { instagramImageDataUrl: imageDataUrl }
+  )
   await writeContentItems(supabase, freshItems.map(existing => existing.id === current.id ? nextItem : existing))
   await writeAutoPublishSettings(supabase, {
     ...settings,
@@ -116,5 +89,5 @@ export async function GET(request: Request) {
     last_run_result: allPublished ? "published" : "partial",
   })
 
-  return NextResponse.json({ result: allPublished ? "published" : "partial", itemId: current.id, auto_publish_result: result })
+  return NextResponse.json({ result: allPublished ? "published" : "partial", itemId: current.id, auto_publish_result: nextItem.auto_publish_result })
 }
