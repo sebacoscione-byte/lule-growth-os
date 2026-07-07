@@ -85,6 +85,10 @@ GOOGLE_OAUTH_BASE_URL=https://tu-dominio.com
 # (sección "Opiniones de pacientes"). Independiente del OAuth de arriba, no vence.
 GOOGLE_PLACES_API_KEY=
 GOOGLE_PLACE_ID=
+# Google Analytics (GA4) — mide visitas/sesiones de las páginas públicas (landing principal +
+# landings SEO). NEXT_PUBLIC_ porque se carga en el navegador. Sin esto, no se inyecta ningún script
+# (no bloquea nada, mismo patrón honesto que Places API arriba).
+NEXT_PUBLIC_GA_MEASUREMENT_ID=
 # Instagram API with Instagram Login (publicar posts/historias desde Estudio de contenido)
 INSTAGRAM_APP_ID=
 INSTAGRAM_APP_SECRET=
@@ -148,6 +152,16 @@ API key simple, no vence). Si no está configurada, se muestra el placeholder ho
 5. Muestra hasta 5 reseñas (las que Google elige como "más relevantes") sin filtrar por rating —
    los términos de Google Maps Platform prohíben ocultar reseñas para dar una impresión distinta
    a la real. Se cachean 24h (`next: { revalidate: 86400 }` en `src/lib/google-places.ts`).
+
+## Google Analytics — cómo activarlo (2026-07-07)
+`src/components/google-analytics.tsx` inyecta el script de GA4 solo en las páginas públicas
+(landing principal `/dra-lucia-chahin` y las 6 landings SEO, vía `src/app/landings/[slug]/page.tsx`
+que ambas comparten) — no en el CRM interno detrás de login, para no mezclar el uso de Lucía/equipo
+con las visitas reales de pacientes.
+1. Crear una cuenta y propiedad GA4 en https://analytics.google.com/ para `draluciachahin.ar`
+2. Copiar el **Measurement ID** (formato `G-XXXXXXXXXX`, en Administrador → Flujos de datos → tu flujo web)
+3. Cargarlo en `.env.local` / Vercel como `NEXT_PUBLIC_GA_MEASUREMENT_ID` y redesplegar
+4. Sin esta variable no se inyecta ningún script — no bloquea nada mientras no se cree la cuenta.
 
 ## Costos de WhatsApp y templates — cómo completar
 

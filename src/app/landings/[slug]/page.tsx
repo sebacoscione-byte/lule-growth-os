@@ -12,6 +12,7 @@ import {
 } from "@/lib/public-landings"
 import { getServiceDb } from "@/lib/supabase/service"
 import { getGooglePlaceReviews } from "@/lib/google-places"
+import { GoogleAnalytics } from "@/components/google-analytics"
 import { LandingInteractions, type SedeAction } from "./landing-interactions"
 
 export const dynamic = "force-dynamic"
@@ -331,6 +332,7 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
 
   return (
     <main className="min-h-screen bg-white pb-20 sm:pb-0">
+      <GoogleAnalytics />
       {isMain && (
         <>
           <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(personJsonLd) }} />

@@ -185,7 +185,11 @@ público para pedir turno.
 - [x] Ranking de landings por efectividad — mismo tablero, ordenado por tasa de interacción.
 
 ### Pendiente
-- [ ] Google Analytics: integración para visitas y sesiones por página
+- [x] Google Analytics: integración para visitas y sesiones por página (2026-07-07) — script GA4
+      (`src/components/google-analytics.tsx`) inyectado en la landing principal y las 6 landings SEO,
+      no en el CRM interno. *Falta la acción externa: crear la cuenta/propiedad GA4 y cargar
+      `NEXT_PUBLIC_GA_MEASUREMENT_ID` (ver CLAUDE.md → "Google Analytics — cómo activarlo"). Sin eso
+      no se inyecta ningún script, no bloquea nada.*
 - [x] Métricas por campaña UTM: vincular contenido generado con leads captados — cada pieza del
       Estudio de contenido tiene un "Link de seguimiento" (`/api/content/track/[itemId]`) que redirige
       a `/dra-lucia-chahin` con `utm_content=<id>`; Biblioteca y el editor muestran visitas/interacciones
