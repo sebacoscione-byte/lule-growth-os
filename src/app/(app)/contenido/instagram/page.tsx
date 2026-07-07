@@ -5,7 +5,7 @@ import Image from "next/image"
 import Link from "next/link"
 import {
   Archive, ArchiveRestore, BookOpen, Check, ChevronDown, ChevronUp, Copy, Download, ExternalLink, Link2, Loader2,
-  ImageIcon, Plus, Save, Search, Send, ShieldCheck, Sparkles, Pin, Unlink, WandSparkles, X,
+  ImageIcon, Plus, Save, Search, Send, ShieldCheck, Sparkles, Pin, Undo2, Unlink, WandSparkles, X,
 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -85,6 +85,22 @@ function fallbackImagePrompt(item: ContentItem) {
 }
 
 function VisualCard({ item, compact = false }: { item: ContentItem; compact?: boolean }) {
+  if (item.visual_url) {
+    return (
+      <div className="relative aspect-square overflow-hidden rounded-2xl border border-gray-200 shadow-sm">
+        <Image
+          src={item.visual_url}
+          alt={item.image_alt_text || `Placa visual sobre ${item.topic}`}
+          fill
+          unoptimized
+          className="object-cover"
+        />
+        <span className="absolute left-2 top-2 rounded-full bg-black/60 px-2 py-0.5 text-[10px] uppercase tracking-wide text-white/90">
+          Placa generada
+        </span>
+      </div>
+    )
+  }
   return (
     <div className={`aspect-square rounded-2xl bg-gradient-to-br ${STYLE_CLASSES[item.visual_style]} p-6 text-white flex flex-col justify-between shadow-sm`}>
       <div className="flex items-center justify-between text-xs uppercase tracking-[0.2em] text-white/75">
@@ -1433,6 +1449,18 @@ export default function ContentStudioPage() {
                           Publicar ahora
                         </Button>
                       )}
+                      {item.status === "approved" && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          aria-label="Volver a borrador"
+                          title="Vuelve a borrador para editarla, sin riesgo de que se publique sola mientras tanto"
+                          disabled={working === item.id}
+                          onClick={() => updateItem(item, { status: "draft" })}
+                        >
+                          <Undo2 className="h-4 w-4" />
+                        </Button>
+                      )}
                       <Button
                         variant="ghost"
                         size="icon"
@@ -1779,6 +1807,17 @@ function Editor({
             {item.status === "draft" && (
               <Button onClick={() => onSave({ ...editableContent(item), status: "approved" })} disabled={busy || !approvalReady} className="gap-2">
                 <Check className="h-4 w-4" /> Aprobar
+              </Button>
+            )}
+            {item.status === "approved" && (
+              <Button
+                variant="outline"
+                onClick={() => onSave({ status: "draft" })}
+                disabled={busy}
+                className="gap-2"
+                title="Vuelve a borrador para poder editarla sin que se publique sola mientras tanto"
+              >
+                <Undo2 className="h-4 w-4" /> Volver a borrador
               </Button>
             )}
             {item.status === "approved" && item.channels.length > 0 && (
