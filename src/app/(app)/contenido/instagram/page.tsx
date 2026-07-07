@@ -1337,6 +1337,13 @@ export default function ContentStudioPage() {
 
                   {showDirectEntry && (
                     <div className="mt-3 space-y-3">
+                      <div className="space-y-1.5">
+                        <Label className="text-gray-900">Formato de la pieza en blanco</Label>
+                        <Select value={format} onValueChange={value => setFormat(value as ContentItem["format"])}>
+                          <SelectTrigger className="text-gray-900"><SelectValue /></SelectTrigger>
+                          <SelectContent>{FORMATS.map(item => <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>)}</SelectContent>
+                        </Select>
+                      </div>
                       <Button
                         type="button"
                         variant="outline"
@@ -1348,9 +1355,9 @@ export default function ContentStudioPage() {
                         Crear pieza en blanco (completar todo a mano)
                       </Button>
                       <p className="text-xs text-gray-400">
-                        Se abre en el editor con todos los campos vacíos. Completalos, subí ahí mismo
-                        una imagen propia ya lista (sin pasar por Gemini) y aprobala cuando quieras
-                        para que entre a la cola de publicación.
+                        {format === "historia"
+                          ? "Se abre en el editor. En historias, Instagram no muestra caption ni hashtags: solo subí una imagen propia y aprobala, no hace falta escribir nada."
+                          : "Se abre en el editor con todos los campos vacíos. Completalos, subí ahí mismo una imagen propia ya lista (sin pasar por Gemini) y aprobala cuando quieras para que entre a la cola de publicación."}
                       </p>
                       <div className="border-t pt-3 space-y-2">
                         <p className="text-xs text-gray-500">O pegá la respuesta JSON de una IA (ChatGPT, Gemini, Claude):</p>
