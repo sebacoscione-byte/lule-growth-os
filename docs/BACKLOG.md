@@ -162,7 +162,8 @@ público para pedir turno.
 - [ ] Establecer ritmo de publicación mensual: 2-3 conversión + 4-6 educativo + 2-3 local
 
 ### Automatización (Etapa 7)
-- [ ] Publicar contenido aprobado directamente desde la app vía Instagram Graph API
+- [x] Publicar contenido aprobado directamente desde la app vía Instagram Graph API — primer post real
+      confirmado en producción 2026-07-07 (@draluciachahin).
 
 ---
 
@@ -250,6 +251,23 @@ pública `src/app/landings/[slug]/page.tsx`) a `getServiceDb()`. Como ya no qued
 **eliminó por completo** la función `createServiceClient()` de `src/lib/supabase/server.ts` para que no
 se pueda volver a usar por error. Regla documentada en `CLAUDE.md` → "Cliente de Supabase con
 service_role — usar siempre `getServiceDb()`, nunca un cliente con cookies".
+
+### [TECH] ✅ Resuelto (2026-07-07): reintentar publicación duplicaba posts en el canal que ya había salido bien
+`resolveChannelsToPublish` intersectaba canales pedidos vs. habilitados pero no miraba
+`auto_publish_result`, así que reintentar tras una publicación parcial (ej. Instagram OK, Google
+Business falló) volvía a publicar también en el canal ya exitoso. Afectaba al cron y a "Publicar
+ahora" (este último ni siquiera llamaba a la función). Se corrigió para excluir canales con resultado
+`"published"` — ver `src/lib/content-pipeline.ts`.
+
+### [DECISIÓN] Google Business: descartado del front de Estudio de contenido (2026-07-07)
+La API de Google (`accounts.list`) nunca devolvió `account_id` para la sede conectada, así que
+publicar posts ahí siempre iba a requerir el paso manual de copiar/pegar (la cuenta probablemente es
+Manager, no Owner directo del perfil). El usuario decidió no mantener trabajo manual recurrente por
+un canal de bajo impacto: se sacó del front (checkbox de canal, textarea, botones de publicación,
+banner manual), pero el backend (`google-business.ts`, `content-publish.ts`,
+`resolveChannelsToPublish`) sigue siendo genérico multi-canal para reactivarlo más adelante sin
+reconstruir nada. El pendiente de aumento de cuota en Etapa 4 sigue vigente para Perfil/Reseñas (no
+relacionado a este tema).
 
 ### [FEATURE] Alerta proactiva si falla el cron de auto-publicación
 Ya anotado como "fuera de alcance a propósito" en `CLAUDE.md` — el cron de `/api/cron/publish-content`
