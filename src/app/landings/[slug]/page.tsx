@@ -389,11 +389,12 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
           <div className="mx-auto max-w-3xl">
             <div className="flex flex-col gap-10 sm:flex-row sm:items-center">
               <div className="shrink-0 self-center">
-                <div className="relative h-56 w-48 overflow-hidden rounded-2xl shadow-[0_18px_40px_-16px_rgba(22,36,44,0.35)] sm:h-64 sm:w-56">
+                <div className="relative h-56 w-56 overflow-hidden rounded-full shadow-[0_18px_40px_-16px_rgba(22,36,44,0.35)] ring-1 ring-ink/10 sm:h-72 sm:w-72">
                   <Image
                     src="/lucia-chahin.jpg"
                     alt="Dra. Lucía Chahin — Cardióloga"
                     fill
+                    sizes="(min-width: 640px) 288px, 224px"
                     className="object-cover object-top"
                     priority
                   />
