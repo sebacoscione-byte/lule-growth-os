@@ -17,16 +17,20 @@ y hacer seguimiento hasta que el paciente confirme que pidió turno.
 - **Nunca** exponer tokens, API keys, Supabase `service_role`, ni credenciales de Meta,
   Google, Anthropic o Gemini — ni en código, ni en logs, ni en commits, ni en output.
 - **Nunca** pushear directo a `main`. Trabajar siempre en rama + Pull Request (Vercel genera
-  una URL de preview por PR). El usuario (Seba) hace vibe coding y no revisa código — el
-  agente es responsable de verificar que el build compile y el preview cargue bien antes
-  de mergear.
-- **Mergear el PR sin pedir aprobación** si el build/tests pasan y el cambio NO toca lógica
-  médica, webhooks de WhatsApp, cron jobs, RLS/auth, ni implica riesgo legal, de privacidad
-  o de producción sensible. Mergear a `main` dispara el deploy automático de Vercel.
-- **Si el cambio sí toca algo de lo anterior, o el resultado es ambiguo/riesgoso**: avisar
-  con el link de preview y esperar el "dale" del usuario antes de mergear — no asumir.
-- **No modificar lógica médica sin avisar antes** (clasificación de síntomas de alarma,
-  guardrails, mensajes al paciente).
+  una URL de preview por PR). El usuario (Seba) hace vibe coding, no revisa código y **no
+  quiere que se le pida confirmación para mergear** — es responsabilidad del agente verificar
+  que el build/tests pasen y el preview cargue bien, y mergear directamente.
+- **Mergear el PR sin pedir aprobación, siempre que build/tests pasen** — incluye webhooks de
+  WhatsApp, cron jobs, RLS/auth y cualquier otro riesgo legal/privacidad/producción. No
+  esperar un "dale": mergear y listo. Mergear a `main` dispara el deploy automático de Vercel.
+- **Única excepción: cambios a lógica médica** (clasificación de síntomas de alarma en
+  `medical-safety.ts`, guardrails, qué le dice el bot a un paciente sobre su salud). Ahí sí
+  avisar con el link de preview y esperar el "dale" del usuario antes de mergear — es la
+  única categoría con riesgo directo sobre una persona real, y el usuario decidió mantener
+  la pausa específicamente para esto (2026-07-07).
+- **"Avisar" en cualquier otro caso significa informar en el resumen de la tarea, no
+  preguntar ni esperar respuesta.** Si el cambio tocó webhooks, cron o RLS/auth, contarlo
+  igual de claro en el resumen técnico — pero después de haber mergeado, no antes.
 - Priorizar siempre: seguridad, privacidad, Supabase RLS, integridad de los webhooks de
   WhatsApp, y los límites del plan Vercel Hobby (2 cron jobs máximo, ver `vercel.json`).
 - Antes de tocar webhooks de WhatsApp: revisar los tests existentes o proponer tests nuevos.
@@ -34,8 +38,8 @@ y hacer seguimiento hasta que el paciente confirme que pidió turno.
   (`publish-content`, `weekly-report`).
 - Toda mejora de growth/marketing debe mantener un tono médico responsable.
 - Todo cambio debe cerrar con: resumen técnico de qué se hizo + lista de archivos modificados.
-- Si una tarea implica riesgo legal, médico, de privacidad o de producción: explicar los
-  riesgos primero y pedir aprobación antes de ejecutar.
+- Si una tarea implica riesgo legal, de privacidad o de producción (no médico): explicarlo
+  claramente en el resumen — pero seguir adelante, sin pausar a esperar aprobación.
 
 Ver también `AGENTS.md` para las instrucciones equivalentes orientadas a Codex.
 
@@ -328,16 +332,19 @@ powershell.exe -NoProfile -Command "[System.Environment]::SetEnvironmentVariable
 ```
 
 ## Preferencias de interacción
-- **No pedir confirmación antes de actuar** para pasos normales de bajo riesgo.
-- **Antes de modificar archivos importantes** (lógica médica, webhooks de WhatsApp, cron
-  jobs, RLS, auth, configuración de producción), explicar el plan primero.
-- **Nunca pushear directo a `main`.** Trabajar siempre en rama + Pull Request.
-- **Mergear (y por lo tanto deployar) sin pedir aprobación** cuando el build/tests pasan y
-  el cambio no toca lo listado en "Reglas obligatorias" más arriba. El usuario no lee
-  código — es responsabilidad del agente verificar el preview antes de mergear, no suya.
-- **Pedir aprobación explícita antes de mergear** solo cuando el cambio toca lógica médica,
-  webhooks, cron, RLS/auth, o implica riesgo legal/privacidad/producción.
-- **Solo preguntar cuando hay una decisión real entre múltiples opciones** con consecuencias distintas.
+- **No pedir confirmación antes de actuar** — ni para pasos de bajo riesgo ni para mergear un
+  PR. El usuario lo pidió explícitamente (2026-07-07): "no quiero tener que confirmarte".
+  Explicar el plan/riesgos como información, no como pregunta que espera respuesta.
+- **Excepción**: cambios a lógica médica (guardrails, síntomas de alarma, mensajes al
+  paciente) — ahí sí esperar confirmación antes de mergear, ver "Reglas obligatorias" arriba.
+- **Nunca pushear directo a `main`.** Trabajar siempre en rama + Pull Request (la rama+PR es
+  para tener preview de Vercel como red de seguridad, no para pedir aprobación humana).
+- **Mergear (y por lo tanto deployar) sin pedir aprobación siempre que build/tests pasen**,
+  salvo la excepción de lógica médica de arriba. Es responsabilidad del agente verificar el
+  preview antes de mergear, no del usuario.
+- **Solo preguntar cuando hay una decisión real entre múltiples opciones** con consecuencias
+  distintas que no se pueden inferir del contexto — no para pedir permiso de ejecutar algo que
+  ya se decidió hacer.
 - **Auto-continuar tras compresión de contexto**: Al iniciar una tarea multi-paso (3+ pasos), creá `docs/IN_PROGRESS.md`.
 - **Cerrar tareas con documentación al día**.
 
@@ -407,15 +414,17 @@ plano, sin cookies, que siempre autentica como `service_role` real.
 - Si la consulta es sensible → escalar a humano
 
 ## Instrucciones específicas para Claude Code
-- Antes de modificar archivos importantes (lógica médica, webhooks, cron, RLS, auth,
-  config de producción), explicar el plan y esperar confirmación si la tarea implica
-  riesgo legal, médico, de privacidad o de producción.
+- El usuario (Seba) hace vibe coding, no revisa diffs de código y pidió explícitamente no
+  tener que confirmar nada para mergear — con una sola excepción: cambios a lógica médica
+  (guardrails, síntomas de alarma, mensajes al paciente). Para todo lo demás (webhooks, cron,
+  RLS/auth, producción en general), verificar vos mismo que el build/tests pasen y el preview
+  cargue bien, y **mergear directamente, sin esperar un "dale"** (mergear a `main` = deploy
+  automático a producción). Si el cambio toca lógica médica, avisar con el link de preview y
+  esperar confirmación antes de mergear ese caso puntual.
 - Nunca tocar `.env`/`.env.local`/secrets, ni exponerlos en output, commits o logs.
 - Nunca pushear directo a `main` — usar rama + PR, incluso si el usuario no lo pide
-  explícitamente en el mensaje. El PR genera un preview en Vercel.
-- El usuario (Seba) hace vibe coding y no revisa diffs de código. Verificar vos mismo que
-  el build compile y el preview cargue bien, y **mergear sin pedir aprobación** si el
-  cambio no toca lógica médica/webhooks/cron/RLS/auth y no hay riesgo legal, de privacidad
-  o de producción. Si lo toca, avisar con el link de preview y esperar el "dale" antes de
-  mergear (mergear a `main` = deploy automático a producción).
+  explícitamente en el mensaje. El PR genera un preview en Vercel; es la red de seguridad
+  (poder ver que compiló y cargó bien antes de mergear), no un gate de aprobación humana.
+- El resumen técnico final es donde va la transparencia: si el cambio tocó algo sensible,
+  contarlo ahí con claridad — pero eso pasa después de mergear, no antes.
 - Para comandos de build/test/lint y detalles de stack, ver también `AGENTS.md`.
