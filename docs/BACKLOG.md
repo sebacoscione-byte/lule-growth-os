@@ -1,5 +1,5 @@
 # Backlog — Lule Growth OS
-**Actualizado:** 2026-07-05 | **Basado en:** PRD Estrategia de Captación v2.1
+**Actualizado:** 2026-07-06 | **Basado en:** PRD Estrategia de Captación v2.1
 
 ---
 
@@ -44,7 +44,7 @@ Google Maps, Instagram, WhatsApp y búsqueda orgánica.
 
 ### Profesionalización pendiente ⏳
 - [x] Foto profesional de la Dra. Lucía Chahin en el hero — guardar como `public/lucia-chahin.jpg` *(foto recibida, pendiente de subir al servidor)*
-- [ ] Número de matrícula (MN o MP) visible junto al nombre — código ya listo (se muestra en hero, "Sobre la doctora", footer y JSON-LD apenas se cargue) *(requiere: número de matrícula de Lucía en Configuración > Datos de la doctora)*
+- [x] Número de matrícula (MN o MP) visible junto al nombre — cargada por Lucía en Configuración > Datos de la doctora el 2026-07-05 (MN 176700), visible en hero, "Sobre la doctora", footer y JSON-LD
 - [x] FAQ: preguntas frecuentes sobre turnos, servicios, cobertura y sedes — 11 preguntas en la landing principal + FAQ corta específica en cada landing SEO
 - [x] Links directos a Google Maps para CIMEL Lanús y Swiss Medical Lomas *(pendiente: link de Google Maps del Hospital Británico en Configuración)*
 - [x] Botón de WhatsApp con mensaje prearmado según sede (+5491178285006) — en cada card de sede (sección "Pedir turno") y en cada landing SEO

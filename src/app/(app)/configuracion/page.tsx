@@ -173,9 +173,11 @@ export default function ConfiguracionPage() {
   }, [])
 
   async function saveWaSettings(patch: Partial<WhatsAppSettings>) {
+    const previous = waSettings
     const updated = { ...waSettings, ...patch }
     setWaSettings(updated)
-    await saveConfig("whatsapp_settings", updated)
+    const ok = await saveConfig("whatsapp_settings", updated)
+    if (!ok) setWaSettings(previous)
   }
 
   async function savePricingAmount(id: string, cost_amount: number | null) {
@@ -212,7 +214,7 @@ export default function ConfiguracionPage() {
     setTimeout(() => setCopiedId(null), 2000)
   }
 
-  async function saveConfig(key: string, value: unknown) {
+  async function saveConfig(key: string, value: unknown): Promise<boolean> {
     setSaving(true)
     setConfigError(null)
     try {
@@ -224,8 +226,10 @@ export default function ConfiguracionPage() {
       if (!res.ok) throw new Error(`Error ${res.status}`)
       setSaved(key)
       setTimeout(() => setSaved(null), 2500)
+      return true
     } catch {
       setConfigError(key)
+      return false
     } finally {
       setSaving(false)
     }
@@ -246,9 +250,11 @@ export default function ConfiguracionPage() {
 
   async function saveDoctor() {
     if (!doctorDraft) return
-    setDoctor(doctorDraft)
-    setEditingDoctor(false)
-    await saveConfig("doctor", doctorDraft)
+    const ok = await saveConfig("doctor", doctorDraft)
+    if (ok) {
+      setDoctor(doctorDraft)
+      setEditingDoctor(false)
+    }
   }
 
   // ── Locations ───────────────────────────────────────────
@@ -265,9 +271,11 @@ export default function ConfiguracionPage() {
   async function saveLocation() {
     if (!locationDraft) return
     const updated = locations.map(l => l.id === locationDraft.id ? locationDraft : l)
-    setLocations(updated)
-    setEditingLocationId(null)
-    await saveConfig("locations", updated)
+    const ok = await saveConfig("locations", updated)
+    if (ok) {
+      setLocations(updated)
+      setEditingLocationId(null)
+    }
   }
 
   function addLocation() {
@@ -282,10 +290,12 @@ export default function ConfiguracionPage() {
   }
 
   async function deleteLocation(id: string) {
+    const previous = locations
     const updated = locations.filter(l => l.id !== id)
     setLocations(updated)
     if (editingLocationId === id) setEditingLocationId(null)
-    await saveConfig("locations", updated)
+    const ok = await saveConfig("locations", updated)
+    if (!ok) setLocations(previous)
   }
 
   if (loading) {
@@ -628,7 +638,12 @@ export default function ConfiguracionPage() {
                   addLabel="Agregar enfermedad tratada"
                 />
               </div>
-              <SaveCancel saving={saving} onSave={saveDoctor} onCancel={() => setEditingDoctor(false)} />
+              <SaveCancel
+                saving={saving}
+                onSave={saveDoctor}
+                onCancel={() => setEditingDoctor(false)}
+                error={configError === "doctor" ? "No se pudo guardar. Probá de nuevo." : null}
+              />
             </>
           ) : doctor ? (
             <div className="space-y-2">
@@ -668,7 +683,6 @@ export default function ConfiguracionPage() {
                 </div>
               )}
               {saved === "doctor" && <p className="text-xs text-green-600 font-medium">Guardado</p>}
-              {configError === "doctor" && <p className="text-xs text-red-600 font-medium">No se pudo guardar. Probá de nuevo.</p>}
             </div>
           ) : (
             <p className="text-sm text-gray-400">Sin datos. Tocá el lápiz para cargar.</p>
@@ -798,7 +812,12 @@ export default function ConfiguracionPage() {
                     </Field>
                   </div>
 
-                  <SaveCancel saving={saving} onSave={saveLocation} onCancel={() => setEditingLocationId(null)} />
+                  <SaveCancel
+                    saving={saving}
+                    onSave={saveLocation}
+                    onCancel={() => setEditingLocationId(null)}
+                    error={configError === "locations" ? "No se pudo guardar. Probá de nuevo." : null}
+                  />
                 </div>
               ) : (
                 <div className="space-y-3 text-sm">
@@ -947,16 +966,19 @@ function StringList({
   )
 }
 
-function SaveCancel({ saving, onSave, onCancel }: { saving: boolean; onSave: () => void; onCancel: () => void }) {
+function SaveCancel({ saving, onSave, onCancel, error }: { saving: boolean; onSave: () => void; onCancel: () => void; error?: string | null }) {
   return (
-    <div className="grid gap-2 pt-2 sm:flex">
-      <Button size="sm" onClick={onSave} disabled={saving} className="w-full sm:w-auto">
-        {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4 mr-1" />}
-        Guardar
-      </Button>
-      <Button variant="ghost" size="sm" onClick={onCancel} className="w-full sm:w-auto">
-        <X className="h-4 w-4 mr-1" /> Cancelar
-      </Button>
+    <div className="space-y-2 pt-2">
+      {error && <p className="text-xs font-medium text-red-600">{error}</p>}
+      <div className="grid gap-2 sm:flex">
+        <Button size="sm" onClick={onSave} disabled={saving} className="w-full sm:w-auto">
+          {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4 mr-1" />}
+          Guardar
+        </Button>
+        <Button variant="ghost" size="sm" onClick={onCancel} className="w-full sm:w-auto">
+          <X className="h-4 w-4 mr-1" /> Cancelar
+        </Button>
+      </div>
     </div>
   )
 }
