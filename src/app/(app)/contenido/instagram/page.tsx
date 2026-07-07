@@ -1661,6 +1661,7 @@ function Editor({
   const [directionError, setDirectionError] = useState<string | null>(null)
   const [imageUploading, setImageUploading] = useState(false)
   const [imageUploadError, setImageUploadError] = useState<string | null>(null)
+  const [showHistoriaText, setShowHistoriaText] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const imagePrompt = item.image_prompt?.trim() || fallbackImagePrompt(item)
   const displayedVisualUrl = generatedVisual?.itemId === item.id ? generatedVisual.url : item.visual_url
@@ -1967,23 +1968,35 @@ function Editor({
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
-          {isHistoria && (
-            <p className="text-xs text-gray-500 rounded-md bg-gray-50 border border-gray-200 p-2">
-              Instagram no muestra caption ni hashtags en historias (solo la imagen) — completar estos campos es opcional, quedan como referencia interna.
-            </p>
+          {isHistoria && !showHistoriaText && (
+            <div className="text-xs text-gray-500 rounded-md bg-gray-50 border border-gray-200 p-2 space-y-1.5">
+              <p>Instagram no muestra caption ni hashtags en historias (solo la imagen) — no hace falta escribir nada acá, subí la imagen y aprobá.</p>
+              <button type="button" onClick={() => setShowHistoriaText(true)} className="font-medium text-gray-700 hover:text-gray-900 underline">
+                Agregar texto de referencia interna (opcional)
+              </button>
+            </div>
           )}
-          <div className="space-y-1.5">
-            <div className="flex items-center justify-between"><Label className="text-gray-900">Hook{isHistoria ? " (referencia interna)" : " de Instagram"}</Label><CharacterCount value={item.hook} /></div>
-            <Textarea rows={2} value={item.hook} onChange={event => onChange({ ...item, hook: event.target.value })} className="text-gray-900" />
-          </div>
-          <div className="space-y-1.5">
-            <div className="flex items-center justify-between"><Label className="text-gray-900">Caption{isHistoria ? " (referencia interna)" : " de Instagram"}</Label><CharacterCount value={item.caption} /></div>
-            <Textarea rows={9} value={item.caption} onChange={event => onChange({ ...item, caption: event.target.value })} className="text-gray-900" />
-          </div>
-          <div className="space-y-1.5">
-            <div className="flex items-center justify-between"><Label className="text-gray-900">Hashtags{isHistoria ? " (referencia interna)" : ""}</Label><CharacterCount value={item.hashtags} /></div>
-            <Textarea rows={3} value={item.hashtags} onChange={event => onChange({ ...item, hashtags: event.target.value })} className="text-gray-900" />
-          </div>
+          {(!isHistoria || showHistoriaText) && (
+            <>
+              {isHistoria && (
+                <p className="text-xs text-gray-500 rounded-md bg-gray-50 border border-gray-200 p-2">
+                  Instagram no muestra caption ni hashtags en historias (solo la imagen) — completar estos campos es opcional, quedan como referencia interna.
+                </p>
+              )}
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between"><Label className="text-gray-900">Hook{isHistoria ? " (referencia interna)" : " de Instagram"}</Label><CharacterCount value={item.hook} /></div>
+                <Textarea rows={2} value={item.hook} onChange={event => onChange({ ...item, hook: event.target.value })} className="text-gray-900" />
+              </div>
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between"><Label className="text-gray-900">Caption{isHistoria ? " (referencia interna)" : " de Instagram"}</Label><CharacterCount value={item.caption} /></div>
+                <Textarea rows={9} value={item.caption} onChange={event => onChange({ ...item, caption: event.target.value })} className="text-gray-900" />
+              </div>
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between"><Label className="text-gray-900">Hashtags{isHistoria ? " (referencia interna)" : ""}</Label><CharacterCount value={item.hashtags} /></div>
+                <Textarea rows={3} value={item.hashtags} onChange={event => onChange({ ...item, hashtags: event.target.value })} className="text-gray-900" />
+              </div>
+            </>
+          )}
           {item.slides && item.slides.length > 0 && (
             <div className="space-y-3 rounded-lg border border-gray-200 p-3">
               <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Slides del carrusel</p>
