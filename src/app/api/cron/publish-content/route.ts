@@ -8,6 +8,7 @@ import {
 import { generateContentVisual } from "@/lib/ai"
 import { publishApprovedItem } from "@/lib/content-publish"
 import { runWhatsAppFollowup } from "@/lib/whatsapp-followup"
+import { sendCronFailureAlert } from "@/lib/alert-email"
 import type { AutoPublishTrackSettings, ContentChannel } from "@/types"
 
 export const maxDuration = 180
@@ -91,18 +92,35 @@ async function runTrack(
 export async function GET(request: Request) {
   if (!isAuthorized(request)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
-  const supabase = getServiceDb()
-  const now = new Date()
-  const settings = await readAutoPublishSettings(supabase)
+  try {
+    const supabase = getServiceDb()
+    const now = new Date()
+    const settings = await readAutoPublishSettings(supabase)
 
-  const post = await runTrack(supabase, "post", settings.post, settings.channels, now)
-  const historia = await runTrack(supabase, "historia", settings.historia, settings.channels, now)
+    const post = await runTrack(supabase, "post", settings.post, settings.channels, now)
+    const historia = await runTrack(supabase, "historia", settings.historia, settings.channels, now)
 
-  await writeAutoPublishSettings(supabase, { ...settings, post, historia })
+    await writeAutoPublishSettings(supabase, { ...settings, post, historia })
 
-  // El seguimiento de WhatsApp corre acá adentro (en vez de tener su propio Vercel Cron) para no
-  // sumar un tercer cron job -- el plan Hobby de Vercel limita a 2. Ver src/lib/whatsapp-followup.ts.
-  const whatsappFollowup = await runWhatsAppFollowup(supabase, now)
+    // El seguimiento de WhatsApp corre acá adentro (en vez de tener su propio Vercel Cron) para no
+    // sumar un tercer cron job -- el plan Hobby de Vercel limita a 2. Ver src/lib/whatsapp-followup.ts.
+    const whatsappFollowup = await runWhatsAppFollowup(supabase, now)
 
-  return NextResponse.json({ post: post.last_run_result, historia: historia.last_run_result, whatsappFollowup })
+    // Alerta por email (ver src/lib/alert-email.ts) solo ante fallos reales -- no ante estados
+    // esperados (skipped_*, quota_exceeded) ni ante el aviso ya conocido de template sin aprobar.
+    const failures: string[] = []
+    if (post.last_run_result?.startsWith("error:")) failures.push(`Posts: ${post.last_run_result}`)
+    if (historia.last_run_result?.startsWith("error:")) failures.push(`Historias: ${historia.last_run_result}`)
+    const realWhatsappErrors = whatsappFollowup.errors.filter(e => !e.includes("todavía no está aprobado"))
+    if (realWhatsappErrors.length > 0) failures.push(`Seguimiento WhatsApp: ${realWhatsappErrors.join("; ")}`)
+    if (failures.length > 0) {
+      await sendCronFailureAlert("publish-content", failures.join("\n"))
+    }
+
+    return NextResponse.json({ post: post.last_run_result, historia: historia.last_run_result, whatsappFollowup })
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    await sendCronFailureAlert("publish-content", `Excepción no controlada: ${message}`)
+    return NextResponse.json({ error: message }, { status: 500 })
+  }
 }
