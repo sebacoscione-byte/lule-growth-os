@@ -217,7 +217,7 @@ enabled/frecuencia/última publicación).
 
 ## Reportes semanales y link de seguimiento por pieza — cómo funcionan (2026-07-06)
 
-Un segundo **Vercel Cron** (`vercel.json`, lunes 08:00 UTC, mismo `CRON_SECRET`) pega a
+Un segundo **Vercel Cron** (`vercel.json`, domingo 08:00 UTC = 05:00 ART, mismo `CRON_SECRET`) pega a
 `/api/cron/weekly-report`: calcula leads nuevos, confirmados, tasa de conversión, canales y
 visitas/interacciones de landing de los últimos 7 días, y guarda un snapshot en `weekly_reports`
 (un registro por semana, se pisa si se re-corre la misma semana). Se ve en `/dashboard` → "Reportes

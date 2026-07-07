@@ -213,8 +213,9 @@ público para pedir turno.
       "veces por semana"). Ver `src/lib/content-publish.ts`, `src/app/api/cron/publish-content/`,
       `docs/CONTENT_STUDIO.md` → "Publicacion automatica".
 - [ ] Automatización de flujos de seguimiento con n8n
-- [x] Reportes automáticos semanales (2026-07-06) — cron semanal (`/api/cron/weekly-report`, lunes
-      08:00 UTC) calcula leads nuevos, confirmados, tasa de conversión, canales y visitas/interacciones
+- [x] Reportes automáticos semanales (2026-07-06, movido a domingo 2026-07-07) — cron semanal
+      (`/api/cron/weekly-report`, domingo 08:00 UTC = 05:00 ART) calcula leads nuevos, confirmados,
+      tasa de conversión, canales y visitas/interacciones
       de landing de los últimos 7 días y los guarda en `weekly_reports`; se ven en `/dashboard` →
       "Reportes semanales". *No se envía por WhatsApp/email de forma proactiva — ese canal no existe
       todavía (requeriría un template de WhatsApp aprobado por Meta), así que queda para consultar en
