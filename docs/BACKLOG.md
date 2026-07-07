@@ -291,12 +291,14 @@ banner manual), pero el backend (`google-business.ts`, `content-publish.ts`,
 reconstruir nada. El pendiente de aumento de cuota en Etapa 4 sigue vigente para Perfil/Reseñas (no
 relacionado a este tema).
 
-### [FEATURE] Alerta proactiva si falla el cron de auto-publicación
-Ya anotado como "fuera de alcance a propósito" en `CLAUDE.md` — el cron de `/api/cron/publish-content`
-no avisa por WhatsApp/email si falla (token vencido, cuenta desconectada, etc.), solo queda visible en
-la tarjeta de Estudio de contenido si alguien entra a mirarla. Requeriría un template de WhatsApp
-aprobado por Meta para poder mandar un mensaje proactivo fuera de la ventana de 24hs. Formalizado acá
-para que no se pierda como idea suelta.
+### [FEATURE] ✅ Resuelto (2026-07-07): Alerta proactiva si falla el cron de auto-publicación
+Se evaluó automatizar esto con n8n, pero no había ninguna necesidad real que justificara sumar una
+herramienta nueva (self-hosteada o paga) — los flujos repetitivos del proyecto ya corren directo en
+crons de Vercel. Se resolvió más simple: `/api/cron/publish-content` y `/api/cron/weekly-report` ahora
+mandan un email de alerta (vía Resend, `src/lib/alert-email.ts`) ante una excepción no controlada o un
+error real (no ante estados esperados como `skipped_*`). Por WhatsApp seguiría requiriendo un template
+aprobado por Meta, así que se optó por email. Fail-open a propósito: sin `RESEND_API_KEY`/`ALERT_EMAIL_TO`
+configuradas, no manda nada y no bloquea el cron — ver `CLAUDE.md` → "Alertas de cron por email".
 
 ### [SECURITY] ✅ Resuelto (2026-07-07): OAuth de Google Business/Instagram sin auth + webhook de WhatsApp sin firma
 Auditoría de seguridad completa encontró y corrigió 3 vulnerabilidades reales: `/api/google-business/auth`,

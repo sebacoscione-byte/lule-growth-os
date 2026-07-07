@@ -137,6 +137,10 @@ WHATSAPP_APP_SECRET=          # App Secret de la app de Meta (Configuración bá
                                # 2026-07-07 en auditoría de seguridad) — agregarlo cuanto antes.
 # Cron jobs de Vercel (publicacion automatica de contenido + reporte semanal). Mismo secreto para ambos.
 CRON_SECRET=                  # String secreto elegido por vos. Sin esto seteado, los crons fallan-cerrado (401) y no corren nada
+# Alerta por email si falla un cron (publish-content o weekly-report) — ver "Alertas de cron por email"
+RESEND_API_KEY=                # API key de resend.com. Sin esto, no se manda ninguna alerta (fail-open, no bloquea el cron)
+ALERT_EMAIL_TO=                # Email que recibe la alerta (ej. el tuyo)
+ALERT_EMAIL_FROM=               # Opcional. Sin esto usa "onboarding@resend.dev" (funciona sin verificar dominio propio)
 ```
 
 ## Optimización de tokens / costos de IA
@@ -262,9 +266,27 @@ enabled/frecuencia/última publicación).
 7. **No hay rampa automática de cadencia** (ej. "3x el primer mes, después 2x") — es una decisión de
    diseño a propósito, para no tener estado oculto difícil de razonar. Si se quiere arrancar más agresivo
    el primer mes, subir el número a mano y bajarlo después.
-8. **No hay alerta proactiva (WhatsApp/email) si el cron falla** — queda anotado como mejora futura, no
-   implementada todavía porque requeriría un template de WhatsApp aprobado por Meta. Revisar la tarjeta
-   de vez en cuando, o los logs de función en Vercel, mientras tanto.
+8. **Alerta por email si el cron falla** (2026-07-07) — `/api/cron/publish-content` y
+   `/api/cron/weekly-report` mandan un email (vía Resend, ver "Alertas de cron por email" abajo) ante
+   una excepción no controlada o un error real (no ante estados esperados como `skipped_*` o
+   `quota_exceeded`). Por WhatsApp seguiría requiriendo un template aprobado por Meta, así que se
+   resolvió por email en su lugar — sin eso configurado, sigue sin avisar nada y hay que revisar la
+   tarjeta de Estudio de contenido o los logs de función en Vercel a mano.
+
+## Alertas de cron por email — cómo activarlas (2026-07-07)
+
+Si `/api/cron/publish-content` o `/api/cron/weekly-report` fallan (excepción no controlada, error real
+de Supabase, etc.), `src/lib/alert-email.ts` manda un email vía la API de Resend con el detalle del
+error. Es **fail-open a propósito**, mismo patrón que Google Analytics/Places API: sin las env vars
+cargadas, no manda nada y no bloquea el cron.
+1. Crear una cuenta en [resend.com](https://resend.com) (tiene plan gratis, alcanza de sobra para esto)
+2. Copiar la API key a `.env.local` / Vercel como `RESEND_API_KEY`
+3. Cargar `ALERT_EMAIL_TO` con el email que tiene que recibir la alerta (ej. el tuyo)
+4. Opcional: verificar tu propio dominio en Resend y cargar `ALERT_EMAIL_FROM` con una dirección de ese
+   dominio (ej. `Lule Growth OS <alertas@draluciachahin.ar>`). Sin esto, usa
+   `onboarding@resend.dev` — funciona igual, sin verificar nada, pero como remitente es genérico de Resend.
+5. No hay reintentos ni cola: si Resend está caído en el momento exacto de la falla, se pierde esa
+   alerta puntual (no vuelve a intentarse), pero nunca hace fallar al cron por esto.
 
 ## Seguimiento automático de leads por WhatsApp — cómo funciona (2026-07-07)
 

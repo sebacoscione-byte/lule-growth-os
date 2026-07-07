@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { getServiceDb } from "@/lib/supabase/service"
+import { sendCronFailureAlert } from "@/lib/alert-email"
 
 export const maxDuration = 60
 
@@ -28,12 +29,23 @@ async function countEvents(supabase: SupabaseClient, from: string, to: string, e
 }
 
 // Genera un snapshot semanal (leads nuevos, conversion, canales, sedes, visitas de landing) y lo
-// guarda en weekly_reports para verlo en el Dashboard. No manda nada por WhatsApp/email de forma
-// proactiva -- ese canal no existe todavia (requeriria un template de WhatsApp aprobado por Meta,
-// ver CLAUDE.md), asi que el reporte queda disponible en la app en vez de enviarse solo.
+// guarda en weekly_reports para verlo en el Dashboard. El contenido del reporte no se manda por
+// WhatsApp/email de forma proactiva -- ese canal no existe todavia para WhatsApp (requeriria un
+// template aprobado por Meta, ver CLAUDE.md), asi que el reporte queda disponible en la app en vez
+// de enviarse solo. Si el cron en si falla, sí manda un email de alerta (ver alert-email.ts).
 export async function GET(request: Request) {
   if (!isAuthorized(request)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
+  try {
+    return await buildAndSaveWeeklyReport()
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    await sendCronFailureAlert("weekly-report", `Excepción no controlada: ${message}`)
+    return NextResponse.json({ error: message }, { status: 500 })
+  }
+}
+
+async function buildAndSaveWeeklyReport() {
   const supabase = getServiceDb()
   const now = new Date()
   const weekStart = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
@@ -80,6 +92,9 @@ export async function GET(request: Request) {
     metrics,
   }, { onConflict: "week_start" })
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) {
+    await sendCronFailureAlert("weekly-report", error.message)
+    return NextResponse.json({ error: error.message }, { status: 500 })
+  }
   return NextResponse.json({ ok: true, metrics })
 }
