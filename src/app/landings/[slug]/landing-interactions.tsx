@@ -16,7 +16,7 @@ export interface SedeAction {
   instruction: string
   whatsappMessage: string
   whatsapp?: string
-  color: "blue" | "teal" | "indigo"
+  color: "blue" | "teal" | "britanico"
   preferredLocationValue: "cimel_lanus" | "swiss_lomas" | "hospital_britanico" | "sin_definir"
 }
 
@@ -65,12 +65,12 @@ function CtaCard({ sede, expanded, onToggle, onEngage, onClickAction }: CtaCardP
       primary: "bg-teal-600 hover:bg-teal-700 text-white",
       secondary: "border border-teal-300 text-teal-700 hover:bg-teal-50",
     },
-    indigo: {
-      border: "border-indigo-200",
-      header: "bg-indigo-50",
-      icon: "bg-indigo-600",
-      primary: "bg-indigo-600 hover:bg-indigo-700 text-white",
-      secondary: "border border-indigo-300 text-indigo-700 hover:bg-indigo-50",
+    britanico: {
+      border: "border-britanico-soft",
+      header: "bg-britanico-soft",
+      icon: "bg-britanico",
+      primary: "bg-britanico hover:opacity-90 text-white",
+      secondary: "border border-britanico-soft text-britanico hover:bg-britanico-soft",
     },
   }[sede.color]
 
@@ -84,13 +84,13 @@ function CtaCard({ sede, expanded, onToggle, onEngage, onClickAction }: CtaCardP
           <MapPin className="h-5 w-5 text-white" />
         </div>
         <div>
-          <p className="font-semibold text-gray-900">{sede.name}</p>
-          <div className="flex flex-wrap items-center gap-1 text-sm text-gray-500 mt-0.5">
+          <p className="font-semibold text-ink">{sede.name}</p>
+          <div className="flex flex-wrap items-center gap-1 text-sm text-ink-soft mt-0.5">
             <Clock className="h-3.5 w-3.5" />
             <span>{sede.hours || `Atención los ${sede.day}`}</span>
             {sede.address && (
               <>
-                <span className="text-gray-300">·</span>
+                <span className="text-line">·</span>
                 <span>{sede.address}</span>
               </>
             )}
@@ -139,7 +139,7 @@ function CtaCard({ sede, expanded, onToggle, onEngage, onClickAction }: CtaCardP
             target="_blank"
             rel="noopener noreferrer"
             onClick={() => { onEngage(); onClickAction("maps") }}
-            className="inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium text-gray-500 hover:text-gray-700 transition-colors"
+            className="inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium text-ink-soft hover:text-ink transition-colors"
           >
             <Map className="h-4 w-4" />
             Cómo llegar
@@ -149,7 +149,7 @@ function CtaCard({ sede, expanded, onToggle, onEngage, onClickAction }: CtaCardP
 
       <button
         onClick={() => { onToggle(); onEngage() }}
-        className="w-full flex items-center justify-between border-t border-gray-100 px-5 py-3 text-left text-sm text-gray-500 hover:text-gray-700"
+        className="w-full flex items-center justify-between border-t border-line px-5 py-3 text-left text-sm text-ink-soft hover:text-ink"
       >
         Ver instrucciones detalladas para pedir turno
         {expanded
@@ -158,8 +158,8 @@ function CtaCard({ sede, expanded, onToggle, onEngage, onClickAction }: CtaCardP
       </button>
 
       {expanded && (
-        <div className="border-t border-gray-100 bg-gray-50 p-5">
-          <p className="whitespace-pre-line text-sm leading-relaxed text-gray-700">{sede.instruction}</p>
+        <div className="border-t border-line bg-paper p-5">
+          <p className="whitespace-pre-line text-sm leading-relaxed text-ink-soft">{sede.instruction}</p>
         </div>
       )}
     </div>
@@ -201,8 +201,8 @@ export function LandingInteractions({ slug, locations }: { slug: string; locatio
   return (
     <section id="pedir-turno" className="scroll-mt-20 py-12 px-4">
       <div className="max-w-2xl mx-auto space-y-4">
-        <h2 className="mb-2 text-center text-xl font-bold text-gray-900">Pedir turno</h2>
-        <p className="mb-4 text-center text-sm text-gray-500">
+        <h2 className="font-display mb-2 text-center text-2xl font-semibold text-ink">Pedir turno</h2>
+        <p className="mb-4 text-center text-sm text-ink-soft">
           Elegí la sede y reservá por el canal que prefieras. No se otorgan turnos desde esta web.
         </p>
 

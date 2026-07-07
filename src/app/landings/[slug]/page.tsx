@@ -13,6 +13,7 @@ import {
 import { getServiceDb } from "@/lib/supabase/service"
 import { getGooglePlaceReviews } from "@/lib/google-places"
 import { GoogleAnalytics } from "@/components/google-analytics"
+import { EcgDivider } from "@/components/ecg-divider"
 import { LandingInteractions, type SedeAction } from "./landing-interactions"
 
 export const dynamic = "force-dynamic"
@@ -56,7 +57,25 @@ const PREFERRED_LOCATION_BY_KEY: Record<string, "cimel_lanus" | "swiss_lomas" | 
   general: "sin_definir",
 }
 
-const SEDE_COLOR: Record<string, "blue" | "teal" | "indigo"> = { cimel: "blue", swiss: "teal", britanico: "indigo", general: "blue" }
+const SEDE_COLOR: Record<string, "blue" | "teal" | "britanico"> = { cimel: "blue", swiss: "teal", britanico: "britanico", general: "blue" }
+
+const SEDE_ACCENT_TEXT: Record<"blue" | "teal" | "britanico", string> = {
+  blue: "text-blue-600",
+  teal: "text-teal-600",
+  britanico: "text-britanico",
+}
+const SEDE_ACCENT_BG: Record<"blue" | "teal" | "britanico", string> = {
+  blue: "bg-blue-600",
+  teal: "bg-teal-600",
+  britanico: "bg-britanico",
+}
+// Nombres de clase completos y literales a propósito: Tailwind no genera CSS para
+// clases armadas con template strings en runtime (necesita verlas enteras en el código fuente).
+const SEDE_ACCENT_HOVER_TEXT: Record<"blue" | "teal" | "britanico", string> = {
+  blue: "hover:text-blue-600",
+  teal: "hover:text-teal-600",
+  britanico: "hover:text-britanico",
+}
 
 const SERVICE_ICONS: Record<string, LucideIcon> = {
   "Consulta cardiológica": Stethoscope,
@@ -348,15 +367,15 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
 
       {/* Nav de anclas — solo en la landing principal, solo desktop */}
       {isMain && (
-        <nav className="sticky top-0 z-40 hidden border-b border-gray-100 bg-white/90 backdrop-blur sm:block">
+        <nav className="sticky top-0 z-40 hidden border-b border-line bg-paper/90 backdrop-blur sm:block">
           <div className="mx-auto flex max-w-2xl items-center justify-between px-4 py-3 text-sm">
-            <span className="font-semibold text-gray-900">Dra. Lucía Chahin</span>
-            <div className="flex items-center gap-5 text-gray-500">
-              <a href="#servicios" className="hover:text-blue-600">Servicios</a>
-              <a href="#sedes" className="hover:text-blue-600">Sedes</a>
-              <a href="#obras-sociales" className="hover:text-blue-600">Obras sociales</a>
-              <a href="#faq" className="hover:text-blue-600">FAQ</a>
-              <a href="#pedir-turno" className="rounded-full bg-blue-600 px-4 py-1.5 font-medium text-white hover:bg-blue-700">
+            <span className="font-display text-base font-semibold text-ink">Dra. Lucía Chahin</span>
+            <div className="flex items-center gap-5 text-ink-soft">
+              <a href="#servicios" className="hover:text-cardiac">Servicios</a>
+              <a href="#sedes" className="hover:text-cardiac">Sedes</a>
+              <a href="#obras-sociales" className="hover:text-cardiac">Obras sociales</a>
+              <a href="#faq" className="hover:text-cardiac">FAQ</a>
+              <a href="#pedir-turno" className="rounded-full bg-ink px-4 py-1.5 font-medium text-paper hover:bg-ink-soft">
                 Pedir turno
               </a>
             </div>
@@ -366,11 +385,11 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
 
       {/* Hero */}
       {isMain ? (
-        <section className="bg-gradient-to-b from-blue-50 to-white py-12 px-4">
-          <div className="max-w-2xl mx-auto">
-            <div className="flex flex-col sm:flex-row items-center gap-8">
-              <div className="shrink-0">
-                <div className="relative h-44 w-44 rounded-full overflow-hidden border-4 border-white shadow-lg">
+        <section className="bg-paper px-4 pb-2 pt-14">
+          <div className="mx-auto max-w-3xl">
+            <div className="flex flex-col gap-10 sm:flex-row sm:items-center">
+              <div className="shrink-0 self-center">
+                <div className="relative h-56 w-48 overflow-hidden rounded-2xl shadow-[0_18px_40px_-16px_rgba(22,36,44,0.35)] sm:h-64 sm:w-56">
                   <Image
                     src="/lucia-chahin.jpg"
                     alt="Dra. Lucía Chahin — Cardióloga"
@@ -380,36 +399,36 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
                   />
                 </div>
               </div>
-              <div className="text-center sm:text-left">
-                <h1 className="text-3xl font-bold text-gray-900">{data.h1}</h1>
-                <p className="text-blue-600 font-medium mt-1">Cardióloga y Ecocardiografista</p>
+              <div className="w-full min-w-0 text-center sm:text-left">
+                <p className="font-display text-sm font-medium italic text-cardiac">Cardióloga y Ecocardiografista</p>
+                <h1 className="font-display mt-1 text-4xl font-semibold leading-[1.1] text-ink sm:text-5xl">{data.h1.replace(" — Cardióloga", "")}</h1>
                 {configDoctor.matricula && (
-                  <p className="text-xs text-gray-500 mt-1">Matrícula {configDoctor.matricula}</p>
+                  <p className="mt-2 text-xs text-ink-soft">Matrícula {configDoctor.matricula}</p>
                 )}
-                <p className="text-gray-600 mt-3 leading-relaxed">{data.intro}</p>
-                <p className="text-sm text-gray-500 mt-2">
+                <p className="mt-4 leading-relaxed text-ink-soft sm:max-w-md">{data.intro}</p>
+                <p className="mt-2 text-sm text-ink-soft/80">
                   Consultas cardiológicas y ecocardiogramas · {isMain ? "Lanús, CABA y Lomas de Zamora" : "Lanús y Lomas de Zamora"}
                 </p>
 
-                <div className="mt-5 flex flex-wrap justify-center gap-3 sm:justify-start">
+                <div className="mt-6 flex flex-wrap justify-center gap-3 sm:justify-start">
                   <a
                     href="#pedir-turno"
-                    className="inline-flex items-center gap-2 rounded-full bg-blue-600 px-6 py-3 text-sm font-semibold text-white hover:bg-blue-700 transition-colors"
+                    className="inline-flex items-center gap-2 rounded-full bg-ink px-6 py-3 text-sm font-semibold text-paper transition-colors hover:bg-ink-soft"
                   >
                     <CalendarCheck className="h-4 w-4" />
                     Pedir turno
                   </a>
                   <a
                     href="#sedes"
-                    className="inline-flex items-center gap-2 rounded-full border border-blue-300 px-6 py-3 text-sm font-semibold text-blue-700 hover:bg-blue-50 transition-colors"
+                    className="inline-flex items-center gap-2 rounded-full border border-line px-6 py-3 text-sm font-semibold text-ink transition-colors hover:bg-paper-dim"
                   >
                     Ver sedes y horarios
                   </a>
                 </div>
 
-                <div className="mt-4 flex flex-wrap justify-center gap-2 sm:justify-start">
+                <div className="mt-5 flex flex-wrap justify-center gap-2 sm:justify-start">
                   {["Hospital Británico", "CIMEL Lanús", "Swiss Medical Lomas", "Ecocardiograma"].map(chip => (
-                    <span key={chip} className="rounded-full border border-blue-200 bg-white px-3 py-1 text-xs font-medium text-blue-700 shadow-sm">
+                    <span key={chip} className="rounded-full border border-line bg-white px-3 py-1 text-xs font-medium text-ink-soft">
                       {chip}
                     </span>
                   ))}
@@ -417,30 +436,32 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
               </div>
             </div>
           </div>
+          <EcgDivider animated className="mx-auto mt-10 max-w-3xl" />
         </section>
       ) : (
-        <section className="bg-gradient-to-b from-blue-50 to-white py-16 px-4">
-          <div className="max-w-2xl mx-auto text-center">
-            <h1 className="text-3xl font-bold text-gray-900 mb-4">{data.h1}</h1>
-            <p className="text-lg text-gray-600 mb-6">{data.intro}</p>
+        <section className="bg-paper px-4 pb-2 pt-16">
+          <div className="mx-auto max-w-2xl text-center">
+            <h1 className="font-display text-3xl font-semibold text-ink mb-4">{data.h1}</h1>
+            <p className="text-lg text-ink-soft mb-6">{data.intro}</p>
             <div className="flex flex-wrap justify-center gap-3">
               <a
                 href="#pedir-turno"
-                className="inline-flex items-center gap-2 rounded-full bg-blue-600 px-6 py-3 text-sm font-semibold text-white hover:bg-blue-700 transition-colors"
+                className="inline-flex items-center gap-2 rounded-full bg-ink px-6 py-3 text-sm font-semibold text-paper transition-colors hover:bg-ink-soft"
               >
                 <CalendarCheck className="h-4 w-4" />
                 Pedir turno
               </a>
             </div>
           </div>
+          <EcgDivider animated className="mx-auto mt-8 max-w-2xl" />
         </section>
       )}
 
       {isMain && (
         <section className="px-4 py-12">
           <div className="mx-auto max-w-2xl">
-            <h2 className="mb-4 text-center text-xl font-bold text-gray-900">Sobre la Dra. Lucía Chahin</h2>
-            <div className="rounded-lg border border-gray-200 bg-gray-50 p-6 text-sm leading-6 text-gray-700 space-y-3">
+            <h2 className="font-display mb-4 text-center text-2xl font-semibold text-ink">Sobre la Dra. Lucía Chahin</h2>
+            <div className="rounded-2xl border border-line bg-paper p-6 text-sm leading-6 text-ink-soft space-y-3">
               {configDoctor.bio && <p>{configDoctor.bio}</p>}
               <p>
                 La Dra. <strong>Lucía Chahin</strong> es médica cardióloga con formación avanzada en
@@ -462,9 +483,9 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
                 ecocardiogramas y controles cardiovasculares.
               </p>
               {configDoctor.matricula && (
-                <p className="text-xs text-gray-500">Matrícula profesional: {configDoctor.matricula}</p>
+                <p className="text-xs text-ink-soft/80">Matrícula profesional: {configDoctor.matricula}</p>
               )}
-              <p className="text-xs text-gray-500">
+              <p className="text-xs text-ink-soft/80">
                 Esta web reúne la información para elegir sede, conocer los días de atención y pedir turno por
                 los canales oficiales de cada institución.
               </p>
@@ -474,34 +495,34 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
       )}
 
       {/* Dónde atiende — cards comparables */}
-      <section id="sedes" className="scroll-mt-16 bg-gray-50 px-4 py-12">
+      <section id="sedes" className="scroll-mt-16 bg-paper-dim px-4 py-12">
         <div className="mx-auto max-w-2xl">
-          <h2 className="mb-6 text-center text-xl font-bold text-gray-900">Dónde atiende</h2>
+          <h2 className="font-display mb-6 text-center text-2xl font-semibold text-ink">Dónde atiende</h2>
           <div className={`grid gap-4 ${sedeActions.length > 1 ? "sm:grid-cols-2" : ""}`}>
             {sedeActions.map((sede) => (
-              <div key={sede.key} className="rounded-lg border border-gray-200 bg-white p-5">
+              <div key={sede.key} className="rounded-2xl border border-line bg-white p-5">
                 <div className="mb-3 flex items-center gap-2">
-                  <MapPin className="h-5 w-5 text-blue-600" />
-                  <h3 className="font-semibold text-gray-900">{sede.name}</h3>
+                  <MapPin className={`h-5 w-5 ${SEDE_ACCENT_TEXT[sede.color]}`} />
+                  <h3 className="font-semibold text-ink">{sede.name}</h3>
                 </div>
 
                 {sede.hours ? (
-                  <div className="mb-3 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white whitespace-pre-line">
+                  <div className={`mb-3 rounded-md px-3 py-2 text-sm font-semibold text-white whitespace-pre-line ${SEDE_ACCENT_BG[sede.color]}`}>
                     <Clock className="mb-0.5 inline h-3.5 w-3.5 mr-1" />
                     {sede.hours}
                   </div>
                 ) : (
-                  <div className="mb-3 flex items-center gap-2 text-sm text-gray-500">
+                  <div className="mb-3 flex items-center gap-2 text-sm text-ink-soft">
                     <Clock className="h-4 w-4" />
                     <span>Atención los {sede.day}</span>
                   </div>
                 )}
 
-                {sede.address && <p className="text-sm text-gray-500">{sede.address}</p>}
+                {sede.address && <p className="text-sm text-ink-soft">{sede.address}</p>}
                 {sede.phone && (
                   <a
                     href={`tel:${sede.phone.replace(/[\s-]/g, "")}`}
-                    className="mt-1 flex items-center gap-1.5 text-sm text-gray-700 hover:text-blue-600"
+                    className={`mt-1 flex items-center gap-1.5 text-sm text-ink-soft ${SEDE_ACCENT_HOVER_TEXT[sede.color]}`}
                   >
                     <Phone className="h-3.5 w-3.5" />
                     {sede.phone}
@@ -511,7 +532,7 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
                 <div className="mt-3 flex flex-wrap items-center gap-3">
                   <a
                     href={`#sede-${sede.key}`}
-                    className="inline-flex items-center gap-1.5 text-sm font-medium text-blue-600 hover:text-blue-700"
+                    className={`inline-flex items-center gap-1.5 text-sm font-medium ${SEDE_ACCENT_TEXT[sede.color]} hover:opacity-80`}
                   >
                     <CalendarCheck className="h-4 w-4" />
                     Pedir turno en esta sede →
@@ -521,7 +542,7 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
                       href={sede.mapsUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1.5 text-sm font-medium text-gray-500 hover:text-gray-700"
+                      className="inline-flex items-center gap-1.5 text-sm font-medium text-ink-soft hover:text-ink"
                     >
                       <Map className="h-4 w-4" />
                       Ver en Google Maps
@@ -537,20 +558,20 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
       {/* Servicios */}
       <section id="servicios" className="scroll-mt-16 py-12 px-4">
         <div className="max-w-2xl mx-auto">
-          <h2 className="text-xl font-bold text-gray-900 mb-6 text-center">Servicios</h2>
+          <h2 className="font-display text-2xl font-semibold text-ink mb-6 text-center">Servicios</h2>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             {data.services.map((service) => {
               const Icon = SERVICE_ICONS[service] ?? Heart
               return (
-                <div key={service} className="p-4 rounded-lg border border-gray-200 bg-gray-50">
+                <div key={service} className="p-4 rounded-2xl border border-line bg-paper">
                   <div className="flex items-center gap-2.5">
-                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-blue-100">
-                      <Icon className="h-4 w-4 text-blue-600" />
+                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-cardiac-soft">
+                      <Icon className="h-4 w-4 text-cardiac" />
                     </div>
-                    <span className="text-sm font-semibold text-gray-800">{service}</span>
+                    <span className="text-sm font-semibold text-ink">{service}</span>
                   </div>
                   {SERVICE_MICROCOPY[service] && (
-                    <p className="mt-2 text-xs leading-relaxed text-gray-500">{SERVICE_MICROCOPY[service]}</p>
+                    <p className="mt-2 text-xs leading-relaxed text-ink-soft">{SERVICE_MICROCOPY[service]}</p>
                   )}
                 </div>
               )
@@ -559,30 +580,32 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
         </div>
       </section>
 
+      <EcgDivider className="mx-auto max-w-2xl px-4" />
+
       {/* Especialidad y enfermedades tratadas */}
       {(specializations.length > 0 || conditionsTreated.length > 0) && (
-        <section className="py-12 px-4 bg-gray-50">
+        <section className="py-12 px-4 bg-paper-dim">
           <div className="mx-auto max-w-2xl">
-            <h2 className="mb-4 text-center text-xl font-bold text-gray-900">Especialidad y enfermedades que trata</h2>
-            <div className="space-y-6 rounded-lg border border-gray-200 bg-white p-6">
+            <h2 className="font-display mb-4 text-center text-2xl font-semibold text-ink">Especialidad y enfermedades que trata</h2>
+            <div className="space-y-6 rounded-2xl border border-line bg-white p-6">
               {specializations.length > 0 && (
                 <div>
-                  <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-gray-400">Especialista en</p>
+                  <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-ink-soft/70">Especialista en</p>
                   <div className="flex flex-wrap gap-2">
                     {specializations.map((s) => (
-                      <span key={s} className="bg-blue-50 text-blue-700 text-xs font-medium px-3 py-1 rounded-full">{s}</span>
+                      <span key={s} className="bg-cardiac-soft text-cardiac text-xs font-medium px-3 py-1 rounded-full">{s}</span>
                     ))}
                   </div>
                 </div>
               )}
               {conditionsTreated.length > 0 && (
                 <div>
-                  <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-gray-400">
+                  <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-ink-soft/70">
                     Enfermedades y condiciones que trata
                   </p>
                   <div className="flex flex-wrap gap-1.5">
                     {conditionsTreated.map((c) => (
-                      <span key={c} className="bg-gray-100 text-gray-600 text-xs px-2.5 py-1 rounded-full">{c}</span>
+                      <span key={c} className="bg-paper-dim text-ink-soft text-xs px-2.5 py-1 rounded-full">{c}</span>
                     ))}
                   </div>
                 </div>
@@ -596,20 +619,20 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
       {isMain && (
         <section className="py-12 px-4">
           <div className="mx-auto max-w-2xl">
-            <h2 className="mb-3 text-center text-xl font-bold text-gray-900">Opiniones de pacientes</h2>
+            <h2 className="font-display mb-3 text-center text-2xl font-semibold text-ink">Opiniones de pacientes</h2>
             {placeReviews && placeReviews.reviews.length > 0 ? (
               <>
                 {placeReviews.rating && (
-                  <div className="mb-6 flex items-center justify-center gap-2 text-sm text-gray-600">
+                  <div className="mb-6 flex items-center justify-center gap-2 text-sm text-ink-soft">
                     <span className="flex">
                       {[1, 2, 3, 4, 5].map(i => (
                         <Star
                           key={i}
-                          className={`h-4 w-4 ${i <= Math.round(placeReviews.rating!) ? "fill-amber-400 text-amber-400" : "text-gray-200"}`}
+                          className={`h-4 w-4 ${i <= Math.round(placeReviews.rating!) ? "fill-amber-400 text-amber-400" : "text-line"}`}
                         />
                       ))}
                     </span>
-                    <span className="font-semibold text-gray-900">{placeReviews.rating.toFixed(1)}</span>
+                    <span className="font-semibold text-ink">{placeReviews.rating.toFixed(1)}</span>
                     {placeReviews.reviewCount != null && (
                       <span>· {placeReviews.reviewCount} reseñas en Google</span>
                     )}
@@ -617,26 +640,26 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
                 )}
                 <div className="grid gap-4 sm:grid-cols-2">
                   {placeReviews.reviews.map((review, i) => (
-                    <div key={i} className="rounded-lg border border-gray-200 bg-gray-50 p-5">
+                    <div key={i} className="rounded-2xl border border-line bg-paper p-5">
                       <div className="mb-2 flex items-center justify-between gap-2">
-                        <p className="text-sm font-semibold text-gray-900">{review.authorName}</p>
+                        <p className="text-sm font-semibold text-ink">{review.authorName}</p>
                         <span className="flex shrink-0">
                           {[1, 2, 3, 4, 5].map(i => (
-                            <Star key={i} className={`h-3.5 w-3.5 ${i <= review.rating ? "fill-amber-400 text-amber-400" : "text-gray-200"}`} />
+                            <Star key={i} className={`h-3.5 w-3.5 ${i <= review.rating ? "fill-amber-400 text-amber-400" : "text-line"}`} />
                           ))}
                         </span>
                       </div>
-                      <p className="text-sm leading-relaxed text-gray-600">{review.text}</p>
-                      {review.relativeTime && <p className="mt-2 text-xs text-gray-400">{review.relativeTime}</p>}
+                      <p className="text-sm leading-relaxed text-ink-soft">{review.text}</p>
+                      {review.relativeTime && <p className="mt-2 text-xs text-ink-soft/70">{review.relativeTime}</p>}
                     </div>
                   ))}
                 </div>
-                <p className="mt-5 text-center text-xs text-gray-400">
+                <p className="mt-5 text-center text-xs text-ink-soft/70">
                   Reseñas de Google
                   {placeReviews.mapsUrl && (
                     <>
                       {" · "}
-                      <a href={placeReviews.mapsUrl} target="_blank" rel="noopener noreferrer" className="font-medium text-blue-600 hover:underline">
+                      <a href={placeReviews.mapsUrl} target="_blank" rel="noopener noreferrer" className="font-medium text-cardiac hover:underline">
                         Ver todas en Google Maps
                       </a>
                     </>
@@ -644,10 +667,10 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
                 </p>
               </>
             ) : (
-              <div className="mx-auto flex max-w-md flex-col items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 p-6 text-center">
+              <div className="mx-auto flex max-w-md flex-col items-center gap-2 rounded-2xl border border-line bg-paper p-6 text-center">
                 <Star className="h-6 w-6 text-amber-400" />
-                <p className="text-sm font-medium text-gray-700">Opiniones verificadas próximamente</p>
-                <p className="text-sm text-gray-500">
+                <p className="text-sm font-medium text-ink">Opiniones verificadas próximamente</p>
+                <p className="text-sm text-ink-soft">
                   Estamos incorporando un módulo de reseñas verificadas para que puedas conocer la experiencia
                   de otros pacientes con la Dra. Lucía Chahin.
                 </p>
@@ -668,15 +691,15 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
           .filter(s => s.obras.length > 0)
 
         return (
-          <section id="obras-sociales" className="scroll-mt-16 bg-gray-50 px-4 py-12">
+          <section id="obras-sociales" className="scroll-mt-16 bg-paper-dim px-4 py-12">
             <div className="mx-auto max-w-2xl">
-              <h2 className="mb-6 text-center text-xl font-bold text-gray-900">Obras sociales y formas de atención</h2>
+              <h2 className="font-display mb-6 text-center text-2xl font-semibold text-ink">Obras sociales y formas de atención</h2>
               {withCoverage.length > 0 ? (
                 <div className="space-y-4">
                   {withCoverage.map(s => (
-                    <div key={s.name} className="rounded-lg border border-gray-200 bg-white p-4">
-                      <p className="mb-2 flex items-center gap-2 text-sm font-semibold text-gray-900">
-                        <Shield className="h-4 w-4 text-blue-600" />
+                    <div key={s.name} className="rounded-2xl border border-line bg-white p-4">
+                      <p className="mb-2 flex items-center gap-2 text-sm font-semibold text-ink">
+                        <Shield className="h-4 w-4 text-cardiac" />
                         {s.name}
                       </p>
                       <div className="flex flex-wrap gap-2">
@@ -688,14 +711,14 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
                   ))}
                 </div>
               ) : (
-                <p className="mx-auto max-w-md text-center text-sm text-gray-600">
+                <p className="mx-auto max-w-md text-center text-sm text-ink-soft">
                   Cada sede acepta distintas coberturas médicas. Para confirmar si tu obra social o prepaga tiene
                   convenio, comunicate directamente con la sede elegida o{" "}
                   <a
                     href={buildWhatsAppUrl(WHATSAPP_MESSAGES.general)}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="font-medium text-blue-600 hover:underline"
+                    className="font-medium text-cardiac hover:underline"
                   >
                     consultanos por WhatsApp
                   </a>.
@@ -714,29 +737,31 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
         <section className="px-4 pb-10">
           <div className="mx-auto flex max-w-2xl flex-wrap items-center justify-center gap-x-6 gap-y-2 text-sm">
             {relatedSlugs.map(relSlug => LANDING_DATA[relSlug] && (
-              <Link key={relSlug} href={`/${relSlug}`} className="font-medium text-blue-600 hover:underline">
+              <Link key={relSlug} href={`/${relSlug}`} className="font-medium text-cardiac hover:underline">
                 {LANDING_DATA[relSlug].h1} →
               </Link>
             ))}
-            <Link href="/dra-lucia-chahin" className="font-medium text-blue-600 hover:underline">
+            <Link href="/dra-lucia-chahin" className="font-medium text-cardiac hover:underline">
               Ver perfil completo de la Dra. Lucía Chahin →
             </Link>
           </div>
         </section>
       )}
 
+      <EcgDivider className="mx-auto max-w-2xl px-4" />
+
       {/* FAQ */}
-      <section id="faq" className="scroll-mt-16 py-12 px-4 bg-gray-50">
+      <section id="faq" className="scroll-mt-16 py-12 px-4 bg-paper-dim">
         <div className="max-w-2xl mx-auto">
-          <h2 className="text-xl font-bold text-gray-900 mb-6 text-center">Preguntas frecuentes</h2>
+          <h2 className="font-display text-2xl font-semibold text-ink mb-6 text-center">Preguntas frecuentes</h2>
           <div className="space-y-4">
             {faq.map(({ q, a }) => (
-              <details key={q} className="group rounded-lg border border-gray-200 bg-white">
-                <summary className="flex cursor-pointer items-center justify-between px-5 py-4 text-sm font-medium text-gray-900 marker:hidden list-none">
+              <details key={q} className="group rounded-2xl border border-line bg-white">
+                <summary className="flex cursor-pointer items-center justify-between px-5 py-4 text-sm font-medium text-ink marker:hidden list-none">
                   {q}
-                  <span className="ml-4 shrink-0 text-gray-400 group-open:rotate-180 transition-transform">▾</span>
+                  <span className="ml-4 shrink-0 text-ink-soft/70 group-open:rotate-180 transition-transform">▾</span>
                 </summary>
-                <p className="px-5 pb-4 text-sm text-gray-600 leading-relaxed">{a}</p>
+                <p className="px-5 pb-4 text-sm text-ink-soft leading-relaxed">{a}</p>
               </details>
             ))}
           </div>
@@ -746,7 +771,7 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
       {/* Aviso */}
       <section className="py-8 px-4">
         <div className="max-w-2xl mx-auto">
-          <div className="flex items-start gap-3 rounded-lg border border-orange-200 bg-orange-50 p-4">
+          <div className="flex items-start gap-3 rounded-2xl border border-orange-200 bg-orange-50 p-4">
             <AlertTriangle className="h-5 w-5 text-orange-500 shrink-0 mt-0.5" />
             <div className="text-sm text-orange-800">
               <p className="font-medium mb-1">Aviso importante</p>
@@ -759,7 +784,7 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
         </div>
       </section>
 
-      <footer className="py-6 px-4 text-center text-xs text-gray-400 border-t border-gray-100">
+      <footer className="py-6 px-4 text-center text-xs text-ink-soft/70 border-t border-line">
         <p>
           Dra. Lucía Chahin — Médica Cardióloga y Ecocardiografista
           {configDoctor.matricula && ` · Matrícula ${configDoctor.matricula}`}
@@ -768,10 +793,10 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
       </footer>
 
       {/* CTA sticky mobile */}
-      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-gray-200 bg-white p-3 shadow-[0_-4px_12px_rgba(0,0,0,0.06)] sm:hidden">
+      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-white p-3 shadow-[0_-4px_12px_rgba(0,0,0,0.06)] sm:hidden">
         <a
           href="#pedir-turno"
-          className="flex w-full items-center justify-center gap-2 rounded-full bg-blue-600 py-3 text-sm font-semibold text-white"
+          className="flex w-full items-center justify-center gap-2 rounded-full bg-ink py-3 text-sm font-semibold text-paper"
         >
           <CalendarCheck className="h-4 w-4" />
           Pedir turno con la Dra. Chahin

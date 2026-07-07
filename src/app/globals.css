@@ -8,8 +8,23 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
+  --font-sans: var(--font-inter);
+  --font-display: var(--font-fraunces);
   --font-mono: var(--font-geist-mono);
+
+  /* Paleta de la landing pública — ver docs/DESIGN.md.
+     "ink" y "paper" reemplazan blue-600/white/gray-50 genéricos;
+     "cardiac" es el acento (uso puntual: línea de ECG, detalles, nunca fondos grandes);
+     "britanico" da a esa sede su propio color de marca, distinto de cimel (azul) y swiss (verde azulado real de Swiss Medical). */
+  --color-ink: #16242c;
+  --color-ink-soft: #3d505c;
+  --color-paper: #f6f4ee;
+  --color-paper-dim: #eeeadf;
+  --color-cardiac: #b23b34;
+  --color-cardiac-soft: #f1e2df;
+  --color-line: #ded7c6;
+  --color-britanico: #2f3d78;
+  --color-britanico-soft: #e6e7f1;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -22,7 +37,7 @@
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans), Arial, Helvetica, sans-serif;
 }
 
 button,
@@ -38,5 +53,34 @@ textarea,
   textarea,
   select {
     font-size: 16px !important;
+  }
+}
+
+/* Trazo de ECG — elemento de firma de la landing pública, ver EcgDivider.
+   Se "dibuja" una sola vez en el hero; el resto de las apariciones quedan estáticas
+   a propósito (un solo momento orquestado, no una animación repetida en cada sección). */
+.ecg-draw {
+  stroke-dasharray: 1400;
+  stroke-dashoffset: 1400;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .ecg-draw {
+    animation: ecg-draw 1.6s ease-out 0.15s forwards;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ecg-draw {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes ecg-draw {
+  from {
+    stroke-dashoffset: 1400;
+  }
+  to {
+    stroke-dashoffset: 0;
   }
 }
