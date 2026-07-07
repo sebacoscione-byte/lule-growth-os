@@ -1048,6 +1048,16 @@ export default function ContentStudioPage() {
     }
   }
 
+  function nextAutoPublishResult(item: ContentItem, channel: ContentChannel, outcome: "published" | "error") {
+    return { ...item.auto_publish_result, [channel]: outcome }
+  }
+
+  function withChannelOutcome(item: ContentItem, channel: ContentChannel, outcome: "published" | "error") {
+    const result = nextAutoPublishResult(item, channel, outcome)
+    const allPublished = item.channels.length > 0 && item.channels.every(ch => result[ch] === "published")
+    return { auto_publish_result: result, status: allPublished ? ("published" as const) : item.status }
+  }
+
   async function publishGoogle(item: ContentItem) {
     setWorking(item.id)
     setError(null)
@@ -1069,14 +1079,15 @@ export default function ContentStudioPage() {
         return
       }
       setError(data.error ?? "Google no permitio publicar")
+      await updateItem(item, withChannelOutcome(item, "google_business", "error"))
       return
     }
-    await updateItem(item, { status: "published" })
+    await updateItem(item, withChannelOutcome(item, "google_business", "published"))
   }
 
   async function markGooglePublishedManually(item: ContentItem) {
     setGoogleManualNeeded(null)
-    await updateItem(item, { status: "published" })
+    await updateItem(item, withChannelOutcome(item, "google_business", "published"))
   }
 
   async function publishNow(item: ContentItem) {
@@ -1124,9 +1135,10 @@ export default function ContentStudioPage() {
       const data = await response.json()
       if (!response.ok || data.error) {
         setError(data.error ?? "Instagram no permitio publicar")
+        await updateItem(item, withChannelOutcome(item, "instagram", "error"))
         return
       }
-      await updateItem(item, { status: "published" })
+      await updateItem(item, withChannelOutcome(item, "instagram", "published"))
     } catch {
       setError("No se pudo conectar con Instagram. Revisá tu conexión e intentá nuevamente.")
     } finally {
@@ -1571,7 +1583,7 @@ export default function ContentStudioPage() {
                     </div>
                     {item.auto_publish_result && Object.values(item.auto_publish_result).includes("error") && (
                       <p className="text-xs font-medium text-red-600">
-                        No se pudo publicar en {Object.entries(item.auto_publish_result).filter(([, v]) => v === "error").map(([k]) => k === "instagram" ? "Instagram" : "Google Business").join(" ni ")}. Probá de nuevo con &ldquo;Publicar ahora&rdquo;.
+                        No se pudo publicar en {Object.entries(item.auto_publish_result).filter(([, v]) => v === "error").map(([k]) => k === "instagram" ? "Instagram" : "Google Business").join(" ni ")}. Reintentá con los botones de abajo.
                       </p>
                     )}
                     {((item.tracked_visits ?? 0) > 0 || (item.tracked_interactions ?? 0) > 0) && (
@@ -1606,6 +1618,49 @@ export default function ContentStudioPage() {
                         >
                           <Undo2 className="h-4 w-4" />
                         </Button>
+                      )}
+                    </div>
+                    {item.status === "approved" && item.channels.length > 1 && (
+                      <div className="flex gap-2">
+                        {item.channels.includes("instagram") && item.auto_publish_result?.instagram !== "published" && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="flex-1"
+                            disabled={working === item.id}
+                            onClick={() => publishInstagram(item)}
+                            title="Publica solo en Instagram, sin tocar Google Business"
+                          >
+                            Solo Instagram
+                          </Button>
+                        )}
+                        {item.channels.includes("google_business") && item.auto_publish_result?.google_business !== "published" && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="flex-1"
+                            disabled={working === item.id}
+                            onClick={() => publishGoogle(item)}
+                            title="Publica solo en Google Business, sin tocar Instagram"
+                          >
+                            Solo Google
+                          </Button>
+                        )}
+                      </div>
+                    )}
+                    <div className="flex gap-2">
+                      {googleManualNeeded === item.id && (
+                        <div className="w-full rounded-lg border border-blue-200 bg-blue-50 p-2.5 text-xs text-blue-900">
+                          <p className="mb-1.5">Copiamos el texto. Pegalo en el panel oficial y marcá como publicado.</p>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <a href="https://business.google.com/" target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 font-medium text-blue-700 underline">
+                              Ir a Google Business <ExternalLink className="h-3 w-3" />
+                            </a>
+                            <Button variant="outline" size="sm" onClick={() => markGooglePublishedManually(item)} className="gap-1.5">
+                              <Check className="h-3.5 w-3.5" /> Marcar como publicado
+                            </Button>
+                          </div>
+                        </div>
                       )}
                       {item.status === "published" && (
                         <Button
