@@ -2,12 +2,28 @@ import { createClient } from "@/lib/supabase/server"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import {
   Users, CheckCircle2, AlertTriangle, Clock,
-  MapPin, Camera, Search, MessageSquare
+  MapPin, Camera, Search, MessageSquare, Globe, Lightbulb
 } from "lucide-react"
 import { STATUS_LABELS, STATUS_COLORS, type Lead } from "@/types"
 import { timeAgo } from "@/lib/utils"
 import { LANDING_DATA, PUBLIC_LANDING_SLUGS } from "@/lib/public-landings"
+import { readAutoPublishSettings } from "@/lib/content-pipeline"
+import { getGooglePlaceReviews } from "@/lib/google-places"
+import { getWhatsAppSettings } from "@/lib/whatsapp-settings"
+import { buildGrowthRecommendations, type GrowthRecommendation, type RecommendationChannel } from "@/lib/growth-recommendations"
 import Link from "next/link"
+
+const CHANNEL_ICON: Record<RecommendationChannel, typeof Globe> = {
+  web: Globe, whatsapp: MessageSquare, instagram: Camera, google: MapPin,
+}
+const CHANNEL_LABEL: Record<RecommendationChannel, string> = {
+  web: "Web", whatsapp: "WhatsApp", instagram: "Instagram", google: "Google Maps",
+}
+const SEVERITY_BADGE: Record<GrowthRecommendation["severity"], string> = {
+  critical: "bg-red-100 text-red-700",
+  warning: "bg-orange-100 text-orange-700",
+  info: "bg-blue-100 text-blue-700",
+}
 
 const INTERACTION_EVENT_TYPES = ["click_booking", "click_call", "click_whatsapp", "click_maps"]
 
@@ -115,6 +131,81 @@ async function getHeroVariantResults(
     return { rows, available: true }
   } catch {
     return { rows: [], available: false }
+  }
+}
+
+// Sistema de recomendaciones de crecimiento (2026-07-07) — motor de reglas simples (sin ML) sobre
+// datos que la app ya junta hoy en 4 canales (web/landings, WhatsApp, Instagram, Google Maps).
+// La logica de cada regla vive en growth-recommendations.ts (testeada por separado); esta funcion
+// solo hace el fetch minimo de cada canal y arma el input. Ver CLAUDE.md.
+async function getGrowthRecommendationsData(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  landingRanking: LandingRankingRow[],
+  heroVariantRows: HeroVariantRow[]
+): Promise<{ recommendations: GrowthRecommendation[]; available: boolean }> {
+  try {
+    const now = new Date()
+    const since1d = new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString()
+    const staleCutoff = new Date(now.getTime() - 2 * 60 * 60 * 1000).toISOString()
+
+    const [
+      { data: locationsConfig },
+      { data: cost1dEvents },
+      whatsappSettings,
+      { count: unapprovedTemplatesCount },
+      { data: sessions },
+      { data: instagramConn },
+      { data: googleConn },
+      autoPublishSettings,
+      placesReviews,
+    ] = await Promise.all([
+      supabase.from("app_config").select("value").eq("key", "locations").maybeSingle(),
+      supabase.from("whatsapp_cost_events").select("cost_estimated").eq("direction", "outbound").gte("created_at", since1d),
+      getWhatsAppSettings(),
+      supabase.from("templates").select("id", { count: "exact", head: true }).neq("status", "aprobado"),
+      supabase.from("whatsapp_sessions").select("state, updated_at"),
+      supabase.from("app_config").select("value").eq("key", "instagram_access_token").maybeSingle(),
+      supabase.from("app_config").select("value").eq("key", "google_refresh_token").maybeSingle(),
+      readAutoPublishSettings(supabase),
+      getGooglePlaceReviews(),
+    ])
+
+    const locations = Array.isArray(locationsConfig?.value)
+      ? (locationsConfig.value as { name: string; obras_sociales?: string[] }[]).map(l => ({
+          name: l.name, obrasSociales: l.obras_sociales ?? [],
+        }))
+      : []
+
+    const cost1dTotal = (cost1dEvents ?? []).reduce((sum, r) => sum + (r.cost_estimated ?? 0), 0)
+    const abandonedConversations = (sessions ?? []).filter(
+      s => s.state !== "derivado" && s.updated_at < staleCutoff
+    ).length
+
+    const recommendations = buildGrowthRecommendations({
+      now,
+      landingRanking: landingRanking.map(r => ({ slug: r.slug, label: r.label, visits: r.visits, rate: r.rate })),
+      heroVariantResults: heroVariantRows.map(r => ({ variant: r.variant, visits: r.visits, interactionRate: r.interactionRate })),
+      locations,
+      whatsapp: {
+        projectedMonthlyCost: cost1dTotal * 30,
+        monthlyCostAlertArs: whatsappSettings.monthly_cost_alert_ars,
+        unapprovedTemplatesCount: unapprovedTemplatesCount ?? 0,
+        abandonedConversations,
+      },
+      instagram: {
+        connected: Boolean(instagramConn?.value),
+        post: autoPublishSettings.post,
+        historia: autoPublishSettings.historia,
+      },
+      google: {
+        businessConnected: Boolean(googleConn?.value),
+        placesReviews,
+      },
+    })
+
+    return { recommendations, available: true }
+  } catch {
+    return { recommendations: [], available: false }
   }
 }
 
@@ -233,13 +324,20 @@ async function getDashboardData() {
 
   const landingRanking = await getLandingRanking(supabase)
   const heroVariantResults = await getHeroVariantResults(supabase)
+  const growthRecommendations = await getGrowthRecommendationsData(supabase, landingRanking.rows, heroVariantResults.rows)
   const weeklyReports = await getWeeklyReports(supabase)
 
-  return { metrics, conversionRate, recentLeads: (recentLeads ?? []) as Lead[], landingMetrics, landingRanking, heroVariantResults, weeklyReports }
+  return {
+    metrics, conversionRate, recentLeads: (recentLeads ?? []) as Lead[], landingMetrics,
+    landingRanking, heroVariantResults, growthRecommendations, weeklyReports,
+  }
 }
 
 export default async function DashboardPage() {
-  const { metrics, conversionRate, recentLeads, landingMetrics, landingRanking, heroVariantResults, weeklyReports } = await getDashboardData()
+  const {
+    metrics, conversionRate, recentLeads, landingMetrics, landingRanking,
+    heroVariantResults, growthRecommendations, weeklyReports,
+  } = await getDashboardData()
 
   return (
     <div className="p-4 md:p-6 space-y-4 md:space-y-6">
@@ -295,6 +393,46 @@ export default async function DashboardPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Recomendaciones de crecimiento */}
+      {growthRecommendations.available && growthRecommendations.recommendations.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2">
+              <Lightbulb className="h-4 w-4 text-amber-500" />
+              Recomendaciones de crecimiento
+            </CardTitle>
+            <p className="text-xs text-gray-500">
+              Reglas simples sobre los datos que ya se juntan en web, WhatsApp, Instagram y Google Maps
+              — no hay acción automática, cada una es para que decidas vos.
+            </p>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {growthRecommendations.recommendations.map(rec => {
+              const Icon = CHANNEL_ICON[rec.channel]
+              const content = (
+                <div className="flex items-start gap-3 rounded-lg border border-gray-100 p-3 hover:bg-gray-50">
+                  <Icon className="mt-0.5 h-4 w-4 shrink-0 text-gray-400" />
+                  <div className="min-w-0 flex-1">
+                    <div className="mb-1 flex items-center gap-2">
+                      <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${SEVERITY_BADGE[rec.severity]}`}>
+                        {rec.severity === "critical" ? "Crítico" : rec.severity === "warning" ? "Atención" : "Info"}
+                      </span>
+                      <span className="text-[11px] font-medium text-gray-400">{CHANNEL_LABEL[rec.channel]}</span>
+                    </div>
+                    <p className="text-sm text-gray-700">{rec.message}</p>
+                  </div>
+                </div>
+              )
+              return rec.href ? (
+                <Link key={rec.id} href={rec.href} className="block">{content}</Link>
+              ) : (
+                <div key={rec.id}>{content}</div>
+              )
+            })}
+          </CardContent>
+        </Card>
+      )}
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         {/* Por canal */}
