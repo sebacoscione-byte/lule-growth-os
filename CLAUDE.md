@@ -12,8 +12,35 @@ Ayuda a captar leads, clasificarlos con IA, derivarlos al canal correcto (CIMEL 
 y hacer seguimiento hasta que el paciente confirme que pidió turno.
 **No da turnos, no reserva horarios, no confirma disponibilidad.**
 
+## Reglas obligatorias (todo agente: Claude Code, Codex, cualquier otro)
+- **Nunca** modificar `.env`, `.env.local` ni ningún archivo con secrets.
+- **Nunca** exponer tokens, API keys, Supabase `service_role`, ni credenciales de Meta,
+  Google, Anthropic o Gemini — ni en código, ni en logs, ni en commits, ni en output.
+- **Nunca** pushear directo a `main`. Trabajar siempre en rama + Pull Request (Vercel genera
+  una URL de preview por PR). El usuario (Seba) hace vibe coding y no revisa código — el
+  agente es responsable de verificar que el build compile y el preview cargue bien antes
+  de mergear.
+- **Mergear el PR sin pedir aprobación** si el build/tests pasan y el cambio NO toca lógica
+  médica, webhooks de WhatsApp, cron jobs, RLS/auth, ni implica riesgo legal, de privacidad
+  o de producción sensible. Mergear a `main` dispara el deploy automático de Vercel.
+- **Si el cambio sí toca algo de lo anterior, o el resultado es ambiguo/riesgoso**: avisar
+  con el link de preview y esperar el "dale" del usuario antes de mergear — no asumir.
+- **No modificar lógica médica sin avisar antes** (clasificación de síntomas de alarma,
+  guardrails, mensajes al paciente).
+- Priorizar siempre: seguridad, privacidad, Supabase RLS, integridad de los webhooks de
+  WhatsApp, y los límites del plan Vercel Hobby (2 cron jobs máximo, ver `vercel.json`).
+- Antes de tocar webhooks de WhatsApp: revisar los tests existentes o proponer tests nuevos.
+- Antes de tocar cron jobs de Vercel: revisar el impacto en los 2 cron jobs existentes
+  (`publish-content`, `weekly-report`).
+- Toda mejora de growth/marketing debe mantener un tono médico responsable.
+- Todo cambio debe cerrar con: resumen técnico de qué se hizo + lista de archivos modificados.
+- Si una tarea implica riesgo legal, médico, de privacidad o de producción: explicar los
+  riesgos primero y pedir aprobación antes de ejecutar.
+
+Ver también `AGENTS.md` para las instrucciones equivalentes orientadas a Codex.
+
 ## Stack
-- Next.js 14.2 (App Router) — usar `next.config.mjs`, NO `.ts`
+- Next.js 16.2 (App Router) — usar `next.config.mjs`, NO `.ts`
 - TypeScript + Tailwind CSS + shadcn/ui (instalado manualmente, sin CLI)
 - Supabase (Auth + PostgreSQL) — NO usar generic `createBrowserClient<Database>`
 - Google Gemini o Claude mediante `src/lib/ai.ts` para clasificación, respuestas y generación de contenido
@@ -98,6 +125,12 @@ INSTAGRAM_OAUTH_BASE_URL=https://tu-dominio.com
 WHATSAPP_PHONE_NUMBER_ID=     # Panel: developers.facebook.com → app → WhatsApp → API Setup
 WHATSAPP_ACCESS_TOKEN=        # Token permanente o de sistema (no el temporal de 24h)
 WHATSAPP_VERIFY_TOKEN=        # String secreto elegido por vos, para verificar el webhook
+WHATSAPP_APP_SECRET=          # App Secret de la app de Meta (Configuración básica → App Secret).
+                               # Verifica la firma X-Hub-Signature-256 de cada POST entrante al
+                               # webhook, para descartar mensajes forjados por alguien que
+                               # descubra la URL. Sin esto seteado, el webhook sigue funcionando
+                               # pero SIN esa verificación (fail-open a propósito, agregado
+                               # 2026-07-07 en auditoría de seguridad) — agregarlo cuanto antes.
 # Cron jobs de Vercel (publicacion automatica de contenido + reporte semanal). Mismo secreto para ambos.
 CRON_SECRET=                  # String secreto elegido por vos. Sin esto seteado, los crons fallan-cerrado (401) y no corren nada
 ```
@@ -295,8 +328,15 @@ powershell.exe -NoProfile -Command "[System.Environment]::SetEnvironmentVariable
 ```
 
 ## Preferencias de interacción
-- **No pedir confirmación antes de actuar.** Ejecutá directamente lo que el usuario pide.
-- **Si una tarea deja cambios, cerrar siempre con commit y push.**
+- **No pedir confirmación antes de actuar** para pasos normales de bajo riesgo.
+- **Antes de modificar archivos importantes** (lógica médica, webhooks de WhatsApp, cron
+  jobs, RLS, auth, configuración de producción), explicar el plan primero.
+- **Nunca pushear directo a `main`.** Trabajar siempre en rama + Pull Request.
+- **Mergear (y por lo tanto deployar) sin pedir aprobación** cuando el build/tests pasan y
+  el cambio no toca lo listado en "Reglas obligatorias" más arriba. El usuario no lee
+  código — es responsabilidad del agente verificar el preview antes de mergear, no suya.
+- **Pedir aprobación explícita antes de mergear** solo cuando el cambio toca lógica médica,
+  webhooks, cron, RLS/auth, o implica riesgo legal/privacidad/producción.
 - **Solo preguntar cuando hay una decisión real entre múltiples opciones** con consecuencias distintas.
 - **Auto-continuar tras compresión de contexto**: Al iniciar una tarea multi-paso (3+ pasos), creá `docs/IN_PROGRESS.md`.
 - **Cerrar tareas con documentación al día**.
@@ -307,6 +347,8 @@ powershell.exe -NoProfile -Command "[System.Environment]::SetEnvironmentVariable
 3. **Verificar `git status` antes del push.**
 4. **Commitear y pushear `docs/` automáticamente.**
 5. **Verificar en código que el bug fue realmente corregido** antes de marcarlo como resuelto.
+6. **Trabajar en rama propia y abrir Pull Request hacia `main`** — nunca commit/push directo
+   a `main`. El PR debe incluir resumen técnico + lista de archivos modificados.
 
 ## Migraciones que tocan `app_config` — NUNCA reemplazar el `value` a ciegas
 `app_config.value` (jsonb) es la config que la doctora carga a mano en Configuración
@@ -363,3 +405,17 @@ plano, sin cookies, que siempre autentica como `service_role` real.
 - No hablar en nombre de CIMEL ni Swiss Medical
 - Ante síntomas de alarma → derivar a guardia inmediatamente
 - Si la consulta es sensible → escalar a humano
+
+## Instrucciones específicas para Claude Code
+- Antes de modificar archivos importantes (lógica médica, webhooks, cron, RLS, auth,
+  config de producción), explicar el plan y esperar confirmación si la tarea implica
+  riesgo legal, médico, de privacidad o de producción.
+- Nunca tocar `.env`/`.env.local`/secrets, ni exponerlos en output, commits o logs.
+- Nunca pushear directo a `main` — usar rama + PR, incluso si el usuario no lo pide
+  explícitamente en el mensaje. El PR genera un preview en Vercel.
+- El usuario (Seba) hace vibe coding y no revisa diffs de código. Verificar vos mismo que
+  el build compile y el preview cargue bien, y **mergear sin pedir aprobación** si el
+  cambio no toca lógica médica/webhooks/cron/RLS/auth y no hay riesgo legal, de privacidad
+  o de producción. Si lo toca, avisar con el link de preview y esperar el "dale" antes de
+  mergear (mergear a `main` = deploy automático a producción).
+- Para comandos de build/test/lint y detalles de stack, ver también `AGENTS.md`.
