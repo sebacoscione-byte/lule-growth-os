@@ -286,3 +286,25 @@ no avisa por WhatsApp/email si falla (token vencido, cuenta desconectada, etc.),
 la tarjeta de Estudio de contenido si alguien entra a mirarla. Requeriría un template de WhatsApp
 aprobado por Meta para poder mandar un mensaje proactivo fuera de la ventana de 24hs. Formalizado acá
 para que no se pierda como idea suelta.
+
+### [SECURITY] ✅ Resuelto (2026-07-07): OAuth de Google Business/Instagram sin auth + webhook de WhatsApp sin firma
+Auditoría de seguridad completa encontró y corrigió 3 vulnerabilidades reales: `/api/google-business/auth`,
+`/api/instagram-business/auth` y sus `/callback` no requerían sesión (cualquiera con la URL podía
+secuestrar la conexión con su propia cuenta de Google/Instagram); los `/status` de ambas integraciones
+filtraban datos sin auth; y el webhook de WhatsApp no verificaba `X-Hub-Signature-256`, permitiendo
+mensajes "entrantes" forjados. Los tres quedaron corregidos y mergeados — `WHATSAPP_APP_SECRET` ya está
+cargado en Vercel y confirmado activo con una prueba real. Detalle completo en memory
+`project_security_audit_2026-07-07`.
+
+### [SECURITY] Verificar que el alta de usuarios (signup) esté cerrada en Supabase Auth
+Las políticas RLS de `leads`, `messages`, `app_config`, etc. dan acceso total de lectura/escritura a
+"cualquier usuario autenticado" (`to authenticated using (true)`) — es un patrón razonable para un
+equipo chico, pero solo es seguro si el registro de cuentas nuevas por email está deshabilitado o
+restringido a invitación en el dashboard de Supabase (Authentication → Providers → Email). No se puede
+verificar desde el código del repo — pendiente de chequeo manual.
+
+### [TECH] `npm audit`: vuln moderada transitiva en `postcss` (vía `next`)
+XSS en el stringify de CSS de `postcss` (`GHSA-qx2v-qp2m-jg93`), dependencia interna de `next`. El fix
+automático (`npm audit fix --force`) bajaría Next a una versión canary vieja — no conviene. Bajo riesgo
+real (no hay contenido de usuario que fluya a valores CSS en esta app). Esperar a que Next libere un
+patch que actualice su propia dependencia de `postcss`.
