@@ -155,8 +155,8 @@ público para pedir turno.
 - [x] Tab "Bio y Fijados": plantillas de bio, 3 posts fijados, historias destacadas y CTAs correctos
 
 ### Acciones externas pendientes (las hace Lucía)
-- [ ] Actualizar bio de Instagram con el texto sugerido en la app
-- [ ] Cambiar el link de la bio a `/dra-lucia-chahin`
+- [x] Actualizar bio de Instagram con el texto sugerido en la app — confirmado en producción (@draluciachahin) 2026-07-07
+- [x] Cambiar el link de la bio a `/dra-lucia-chahin` — usa el dominio propio `draluciachahin.ar`
 - [ ] Publicar los 3 posts fijados (cómo pedir turno / servicios / dónde atiende)
 - [ ] Crear las 7 historias destacadas: Turnos · CIMEL · Hospital Británico · Swiss · Ecocardiograma · Cardiología · FAQ
 - [ ] Establecer ritmo de publicación mensual: 2-3 conversión + 4-6 educativo + 2-3 local

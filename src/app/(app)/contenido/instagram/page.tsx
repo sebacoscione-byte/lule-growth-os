@@ -1657,9 +1657,9 @@ function Editor({
   const fileInputRef = useRef<HTMLInputElement>(null)
   const imagePrompt = item.image_prompt?.trim() || fallbackImagePrompt(item)
   const displayedVisualUrl = generatedVisual?.itemId === item.id ? generatedVisual.url : item.visual_url
+  const isHistoria = item.format === "historia"
   const approvalReady = Boolean(
-    item.hook.trim() &&
-    item.caption.trim() &&
+    (isHistoria || (item.hook.trim() && item.caption.trim())) &&
     (item.visual_headline.trim() || item.visual_url)
   )
 
@@ -1960,16 +1960,21 @@ function Editor({
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
+          {isHistoria && (
+            <p className="text-xs text-gray-500 rounded-md bg-gray-50 border border-gray-200 p-2">
+              Instagram no muestra caption ni hashtags en historias (solo la imagen) — completar estos campos es opcional, quedan como referencia interna.
+            </p>
+          )}
           <div className="space-y-1.5">
-            <div className="flex items-center justify-between"><Label className="text-gray-900">Hook de Instagram</Label><CharacterCount value={item.hook} /></div>
+            <div className="flex items-center justify-between"><Label className="text-gray-900">Hook{isHistoria ? " (referencia interna)" : " de Instagram"}</Label><CharacterCount value={item.hook} /></div>
             <Textarea rows={2} value={item.hook} onChange={event => onChange({ ...item, hook: event.target.value })} className="text-gray-900" />
           </div>
           <div className="space-y-1.5">
-            <div className="flex items-center justify-between"><Label className="text-gray-900">Caption de Instagram</Label><CharacterCount value={item.caption} /></div>
+            <div className="flex items-center justify-between"><Label className="text-gray-900">Caption{isHistoria ? " (referencia interna)" : " de Instagram"}</Label><CharacterCount value={item.caption} /></div>
             <Textarea rows={9} value={item.caption} onChange={event => onChange({ ...item, caption: event.target.value })} className="text-gray-900" />
           </div>
           <div className="space-y-1.5">
-            <div className="flex items-center justify-between"><Label className="text-gray-900">Hashtags</Label><CharacterCount value={item.hashtags} /></div>
+            <div className="flex items-center justify-between"><Label className="text-gray-900">Hashtags{isHistoria ? " (referencia interna)" : ""}</Label><CharacterCount value={item.hashtags} /></div>
             <Textarea rows={3} value={item.hashtags} onChange={event => onChange({ ...item, hashtags: event.target.value })} className="text-gray-900" />
           </div>
           {item.slides && item.slides.length > 0 && (
@@ -2049,7 +2054,11 @@ function Editor({
             )}
           </div>
           {!approvalReady && item.status === "draft" && (
-            <p className="text-xs text-amber-700">Para aprobar, completá hook y caption, y agregá un titular visual o subí una imagen propia.</p>
+            <p className="text-xs text-amber-700">
+              {isHistoria
+                ? "Para aprobar, agregá un titular visual o subí una imagen propia."
+                : "Para aprobar, completá hook y caption, y agregá un titular visual o subí una imagen propia."}
+            </p>
           )}
           <p className="text-xs text-gray-500">
             {igConnected

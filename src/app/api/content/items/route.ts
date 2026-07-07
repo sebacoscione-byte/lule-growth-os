@@ -152,11 +152,16 @@ export async function PATCH(request: NextRequest) {
       updated_at: now,
       approved_at: body.status === "approved" ? now : resetApproval ? null : current.approved_at,
     }
+    // Instagram no soporta caption en historias (asStory descarta el texto en publishImageToInstagram),
+    // asi que hook/caption no son obligatorios para ese formato.
     if (nextItem.status === "approved" && (
-      [nextItem.hook, nextItem.caption].some(value => !value.trim()) ||
+      (nextItem.format !== "historia" && [nextItem.hook, nextItem.caption].some(value => !value.trim())) ||
       (!nextItem.visual_headline.trim() && !nextItem.visual_url)
     )) {
-      return NextResponse.json({ error: "Completá hook y caption, y agregá un titular visual o subí una imagen propia antes de aprobar" }, { status: 400 })
+      const message = nextItem.format === "historia"
+        ? "Agregá un titular visual o subí una imagen propia antes de aprobar"
+        : "Completá hook y caption, y agregá un titular visual o subí una imagen propia antes de aprobar"
+      return NextResponse.json({ error: message }, { status: 400 })
     }
 
     const updated = items.map(item => item.id === body.id ? nextItem : item)
