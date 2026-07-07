@@ -57,6 +57,67 @@ async function getLandingRanking(
   }
 }
 
+const HERO_VARIANT_EVENT_TYPES = ["page_view", "click_hero_primary", "click_hero_secondary", ...INTERACTION_EVENT_TYPES]
+
+type HeroVariantRow = {
+  variant: "a" | "b"
+  visits: number
+  pedirTurnoClicks: number
+  verSedesClicks: number
+  interactions: number
+  interactionRate: number
+}
+
+// Test A/B del hero de /dra-lucia-chahin (2026-07-07) — variante "b" invierte cual boton es
+// primario ("Pedir turno" vs "Ver sedes y horarios"). Ver src/app/landings/[slug]/page.tsx.
+async function getHeroVariantResults(
+  supabase: Awaited<ReturnType<typeof createClient>>
+): Promise<{ rows: HeroVariantRow[]; available: boolean }> {
+  try {
+    const ninetyDaysAgo = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString()
+    const { data, error } = await supabase
+      .from("landing_events")
+      .select("event_type, variant")
+      .eq("slug", "dra-lucia-chahin")
+      .in("variant", ["a", "b"])
+      .in("event_type", HERO_VARIANT_EVENT_TYPES)
+      .gte("created_at", ninetyDaysAgo)
+      .limit(20000)
+    if (error) throw error
+
+    const byVariant = new Map<"a" | "b", { visits: number; heroPrimaryClicks: number; heroSecondaryClicks: number; interactions: number }>()
+    for (const row of data ?? []) {
+      const variant = row.variant as "a" | "b"
+      const entry = byVariant.get(variant) ?? { visits: 0, heroPrimaryClicks: 0, heroSecondaryClicks: 0, interactions: 0 }
+      if (row.event_type === "page_view") entry.visits += 1
+      else if (row.event_type === "click_hero_primary") entry.heroPrimaryClicks += 1
+      else if (row.event_type === "click_hero_secondary") entry.heroSecondaryClicks += 1
+      else entry.interactions += 1
+      byVariant.set(variant, entry)
+    }
+
+    const rows: HeroVariantRow[] = (["a", "b"] as const).map(variant => {
+      const entry = byVariant.get(variant) ?? { visits: 0, heroPrimaryClicks: 0, heroSecondaryClicks: 0, interactions: 0 }
+      // La variante "b" invierte cual boton es primario, asi que hay que reasignar antes de
+      // mostrar: "primary" en A es "Pedir turno", pero en B es "Ver sedes y horarios".
+      const pedirTurnoClicks = variant === "a" ? entry.heroPrimaryClicks : entry.heroSecondaryClicks
+      const verSedesClicks = variant === "a" ? entry.heroSecondaryClicks : entry.heroPrimaryClicks
+      return {
+        variant,
+        visits: entry.visits,
+        pedirTurnoClicks,
+        verSedesClicks,
+        interactions: entry.interactions,
+        interactionRate: entry.visits > 0 ? Math.round((entry.interactions / entry.visits) * 100) : 0,
+      }
+    })
+
+    return { rows, available: true }
+  } catch {
+    return { rows: [], available: false }
+  }
+}
+
 type WeeklyReportMetrics = {
   leads_total: number
   leads_confirmed: number
@@ -171,13 +232,14 @@ async function getDashboardData() {
   })()
 
   const landingRanking = await getLandingRanking(supabase)
+  const heroVariantResults = await getHeroVariantResults(supabase)
   const weeklyReports = await getWeeklyReports(supabase)
 
-  return { metrics, conversionRate, recentLeads: (recentLeads ?? []) as Lead[], landingMetrics, landingRanking, weeklyReports }
+  return { metrics, conversionRate, recentLeads: (recentLeads ?? []) as Lead[], landingMetrics, landingRanking, heroVariantResults, weeklyReports }
 }
 
 export default async function DashboardPage() {
-  const { metrics, conversionRate, recentLeads, landingMetrics, landingRanking, weeklyReports } = await getDashboardData()
+  const { metrics, conversionRate, recentLeads, landingMetrics, landingRanking, heroVariantResults, weeklyReports } = await getDashboardData()
 
   return (
     <div className="p-4 md:p-6 space-y-4 md:space-y-6">
@@ -387,6 +449,55 @@ export default async function DashboardPage() {
                         <td className="py-2 text-right text-gray-700">{row.visits}</td>
                         <td className="py-2 text-right text-gray-700">{row.interactions}</td>
                         <td className="py-2 text-right font-semibold text-gray-900">{row.rate}%</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Test A/B del hero principal */}
+      {heroVariantResults.available && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Test A/B: hero de la landing principal</CardTitle>
+            <p className="text-xs text-gray-500">
+              La variante B invierte cuál botón del hero es primario (&quot;Pedir turno&quot; vs
+              &quot;Ver sedes y horarios&quot;), asignada automáticamente 50/50 por cookie (últimos 90
+              días). No hay ganador automático — mirá la tasa de interacción y decidí manualmente
+              cuándo cortar el test.
+            </p>
+          </CardHeader>
+          <CardContent>
+            {heroVariantResults.rows.every(row => row.visits === 0) ? (
+              <p className="text-sm text-gray-400">Todavía no hay visitas con variante asignada.</p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b text-left text-xs text-gray-500">
+                      <th className="pb-2 font-medium">Variante</th>
+                      <th className="pb-2 font-medium text-right">Visitas</th>
+                      <th className="pb-2 font-medium text-right">Click &quot;Pedir turno&quot;</th>
+                      <th className="pb-2 font-medium text-right">Click &quot;Ver sedes&quot;</th>
+                      <th className="pb-2 font-medium text-right">Interacciones</th>
+                      <th className="pb-2 font-medium text-right">Tasa</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {heroVariantResults.rows.map(row => (
+                      <tr key={row.variant} className="border-b border-gray-50 last:border-0">
+                        <td className="py-2 pr-2 font-medium text-gray-900">
+                          {row.variant === "a" ? "A — Pedir turno primero" : "B — Ver sedes primero"}
+                        </td>
+                        <td className="py-2 text-right text-gray-700">{row.visits}</td>
+                        <td className="py-2 text-right text-gray-700">{row.pedirTurnoClicks}</td>
+                        <td className="py-2 text-right text-gray-700">{row.verSedesClicks}</td>
+                        <td className="py-2 text-right text-gray-700">{row.interactions}</td>
+                        <td className="py-2 text-right font-semibold text-gray-900">{row.interactionRate}%</td>
                       </tr>
                     ))}
                   </tbody>

@@ -2,6 +2,7 @@ import type { Metadata } from "next"
 import Image from "next/image"
 import Link from "next/link"
 import { notFound } from "next/navigation"
+import { cookies } from "next/headers"
 import {
   MapPin, Clock, AlertTriangle, Phone, Map, CalendarCheck, Shield, Star,
   Stethoscope, HeartPulse, ClipboardCheck, Heart, type LucideIcon,
@@ -12,9 +13,11 @@ import {
 } from "@/lib/public-landings"
 import { getServiceDb } from "@/lib/supabase/service"
 import { getGooglePlaceReviews } from "@/lib/google-places"
+import { HERO_VARIANT_COOKIE } from "@/lib/landing-track"
 import { GoogleAnalytics } from "@/components/google-analytics"
 import { EcgDivider } from "@/components/ecg-divider"
 import { LandingInteractions, type SedeAction } from "./landing-interactions"
+import { HeroCtaLink } from "./hero-cta-link"
 
 export const dynamic = "force-dynamic"
 
@@ -155,6 +158,14 @@ function buildSubpageFaq(data: (typeof LANDING_DATA)[string]) {
   ]
 }
 
+// Test A/B del hero (2026-07-07): variante "b" invierte el orden/enfasis de los dos botones
+// del hero principal (Pedir turno / Ver sedes y horarios), asignada 50/50 por cookie en
+// middleware.ts. Solo aplica a la landing principal, que es la unica con ambos botones.
+async function getHeroVariant(): Promise<"a" | "b"> {
+  const cookieStore = await cookies()
+  return cookieStore.get(HERO_VARIANT_COOKIE)?.value === "b" ? "b" : "a"
+}
+
 async function getConfigLocations(): Promise<ConfigLocation[]> {
   try {
     const supabase = getServiceDb()
@@ -264,6 +275,7 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
   if (!data) notFound()
 
   const isMain = slug === "dra-lucia-chahin"
+  const heroVariant = isMain ? await getHeroVariant() : undefined
   const [configLocations, configDoctor, placeReviews] = await Promise.all([
     getConfigLocations(),
     getConfigDoctor(),
@@ -412,19 +424,38 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
                 </p>
 
                 <div className="mt-6 flex flex-wrap justify-center gap-3 sm:justify-start">
-                  <a
-                    href="#pedir-turno"
-                    className="inline-flex items-center gap-2 rounded-full bg-ink px-6 py-3 text-sm font-semibold text-paper transition-colors hover:bg-ink-soft"
-                  >
-                    <CalendarCheck className="h-4 w-4" />
-                    Pedir turno
-                  </a>
-                  <a
-                    href="#sedes"
-                    className="inline-flex items-center gap-2 rounded-full border border-line px-6 py-3 text-sm font-semibold text-ink transition-colors hover:bg-paper-dim"
-                  >
-                    Ver sedes y horarios
-                  </a>
+                  {/* Test A/B del hero: variante "b" invierte cual boton es primario. Ver getHeroVariant arriba. */}
+                  {(() => {
+                    const variant = heroVariant ?? "a"
+                    const primaryClass = "inline-flex items-center gap-2 rounded-full bg-ink px-6 py-3 text-sm font-semibold text-paper transition-colors hover:bg-ink-soft"
+                    const secondaryClass = "inline-flex items-center gap-2 rounded-full border border-line px-6 py-3 text-sm font-semibold text-ink transition-colors hover:bg-paper-dim"
+                    const pedirTurno = (
+                      <HeroCtaLink
+                        key="pedir-turno"
+                        href="#pedir-turno"
+                        slug={slug}
+                        variant={variant}
+                        position={variant === "b" ? "secondary" : "primary"}
+                        className={variant === "b" ? secondaryClass : primaryClass}
+                      >
+                        <CalendarCheck className="h-4 w-4" />
+                        Pedir turno
+                      </HeroCtaLink>
+                    )
+                    const verSedes = (
+                      <HeroCtaLink
+                        key="ver-sedes"
+                        href="#sedes"
+                        slug={slug}
+                        variant={variant}
+                        position={variant === "b" ? "primary" : "secondary"}
+                        className={variant === "b" ? primaryClass : secondaryClass}
+                      >
+                        Ver sedes y horarios
+                      </HeroCtaLink>
+                    )
+                    return variant === "b" ? <>{verSedes}{pedirTurno}</> : <>{pedirTurno}{verSedes}</>
+                  })()}
                 </div>
 
                 <div className="mt-5 flex flex-wrap justify-center gap-2 sm:justify-start">
@@ -731,7 +762,7 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
       })()}
 
       {/* Pedir turno + formulario */}
-      <LandingInteractions slug={slug} locations={sedeActions} />
+      <LandingInteractions slug={slug} locations={sedeActions} heroVariant={heroVariant} />
 
       {/* Enlaces relacionados */}
       {!isMain && (

@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react"
 import { MapPin, Clock, ChevronDown, ChevronUp, Phone, Map, MessageCircle, CalendarCheck } from "lucide-react"
 import { buildWhatsAppUrl } from "@/lib/public-landings"
+import { trackLandingEvent } from "@/lib/landing-track"
 
 export interface SedeAction {
   key: string
@@ -168,34 +169,38 @@ function CtaCard({ sede, expanded, onToggle, onEngage, onClickAction }: CtaCardP
 
 // ─── Componente principal ─────────────────────────────────────────────────────
 
-const TRACKED_KEYS = new Set(["cimel", "swiss", "britanico"])
-
-function fireEvent(
-  event_type: string,
-  slug: string,
-  utms: Record<string, string>,
-  location_key?: string
-) {
-  fetch("/api/public/click", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ event_type, slug, location_key, ...utms }),
-  }).catch(() => {})
+type TrackedSedeKey = "cimel" | "swiss" | "britanico"
+const TRACKED_KEYS = new Set<TrackedSedeKey>(["cimel", "swiss", "britanico"])
+function isTrackedKey(key: string): key is TrackedSedeKey {
+  return TRACKED_KEYS.has(key as TrackedSedeKey)
 }
 
-export function LandingInteractions({ slug, locations }: { slug: string; locations: SedeAction[] }) {
+export function LandingInteractions({
+  slug,
+  locations,
+  heroVariant,
+}: {
+  slug: string
+  locations: SedeAction[]
+  heroVariant?: "a" | "b"
+}) {
   const [expandedKey, setExpandedKey] = useState<string | null>(null)
   const [engagedKeys, setEngagedKeys] = useState<Set<string>>(new Set())
-  const utms = useUtmParams(freshUtms => fireEvent("page_view", slug, freshUtms))
+  const variantExtra = heroVariant ? { variant: heroVariant } : undefined
+  const utms = useUtmParams(freshUtms =>
+    trackLandingEvent("page_view", slug, { ...variantExtra, ...freshUtms })
+  )
 
   function engage(key: string) {
     if (engagedKeys.has(key)) return
     setEngagedKeys(prev => new Set(prev).add(key))
-    if (TRACKED_KEYS.has(key)) fireEvent(`cta_${key}`, slug, utms)
+    if (isTrackedKey(key)) trackLandingEvent(`cta_${key}`, slug, { ...utms, ...variantExtra })
   }
 
   function trackClick(key: string, action: CtaClickAction) {
-    if (TRACKED_KEYS.has(key)) fireEvent(`click_${action}`, slug, utms, key)
+    if (isTrackedKey(key)) {
+      trackLandingEvent(`click_${action}`, slug, { ...utms, ...variantExtra, location_key: key })
+    }
   }
 
   return (
