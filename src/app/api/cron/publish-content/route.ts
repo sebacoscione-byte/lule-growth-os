@@ -7,6 +7,7 @@ import {
 } from "@/lib/content-pipeline"
 import { generateContentVisual } from "@/lib/ai"
 import { publishApprovedItem } from "@/lib/content-publish"
+import { runWhatsAppFollowup } from "@/lib/whatsapp-followup"
 import type { AutoPublishTrackSettings, ContentChannel } from "@/types"
 
 export const maxDuration = 180
@@ -99,5 +100,9 @@ export async function GET(request: Request) {
 
   await writeAutoPublishSettings(supabase, { ...settings, post, historia })
 
-  return NextResponse.json({ post: post.last_run_result, historia: historia.last_run_result })
+  // El seguimiento de WhatsApp corre acá adentro (en vez de tener su propio Vercel Cron) para no
+  // sumar un tercer cron job -- el plan Hobby de Vercel limita a 2. Ver src/lib/whatsapp-followup.ts.
+  const whatsappFollowup = await runWhatsAppFollowup(supabase, now)
+
+  return NextResponse.json({ post: post.last_run_result, historia: historia.last_run_result, whatsappFollowup })
 }

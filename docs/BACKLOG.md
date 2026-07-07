@@ -204,8 +204,14 @@ público para pedir turno.
       opcional, modo ahorro y flag de simulación del cobro de octubre 2026, dashboard `/costos`,
       suite de tests con Jest (nueva en el proyecto). Detalle de setup pendiente (montos reales de
       precios + aprobación de templates en Meta) en `CLAUDE.md` → "Costos de WhatsApp y templates".
-- [ ] WhatsApp Business API: envío automático de mensajes de seguimiento (recordatorio/confirmación de
-      turno vía `sendTemplate` — hoy `/api/followup` solo sugiere texto para el inbox manual, no envía)
+- [x] WhatsApp Business API: envío automático de mensajes de seguimiento (2026-07-07) — leads sin
+      confirmar turno reciben el template `recontacto_incompleto` vía `sendTemplate`, corriendo dentro
+      del cron de `publish-content` (sin cron propio, para no superar el límite de 2 crons del plan
+      Hobby de Vercel). Ver `src/lib/whatsapp-followup.ts` y `CLAUDE.md` → "Seguimiento automático de
+      leads por WhatsApp". *Requiere aprobar el template `recontacto_incompleto` en Meta antes de que
+      mande algo real — mientras tanto el cron lo reporta como pendiente sin hacer nada.* Los demás
+      templates (`recordatorio_turno`, `seguimiento_post_consulta`, etc.) siguen sin automatizar porque
+      necesitan una fecha de turno real que la app no gestiona.
 - [ ] Configurar `WHATSAPP_VERIFY_TOKEN` en `.env.local` + webhook de prueba separado (vía ngrok) para poder testear localmente cambios en la lógica de recepción de mensajes (`src/lib/whatsapp-bot.ts`) sin tocar el webhook de producción. Sin esto, cualquier cambio en cómo el bot procesa mensajes entrantes solo se puede probar directo en producción. No es urgente mientras no se toque esa lógica.
 - [x] Instagram Graph API: publicación directa desde la app del contenido aprobado (2026-07-06/07) —
       manual ("Publicar ahora" y botones por canal en el editor) y automática (Vercel Cron diario,

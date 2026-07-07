@@ -215,6 +215,33 @@ enabled/frecuencia/última publicación).
    implementada todavía porque requeriría un template de WhatsApp aprobado por Meta. Revisar la tarjeta
    de vez en cuando, o los logs de función en Vercel, mientras tanto.
 
+## Seguimiento automático de leads por WhatsApp — cómo funciona (2026-07-07)
+
+Los leads que quedan sin confirmar turno (`derivado_cimel`/`derivado_swiss`/`derivado_britanico`/
+`seguimiento_pendiente` con `followup_due_at` vencido) reciben un reintento de contacto automático
+vía WhatsApp, usando el template `recontacto_incompleto` ("¿Te ayudamos a retomarlo?"). La lógica
+vive en `src/lib/whatsapp-followup.ts` y corre **dentro del mismo Vercel Cron de `publish-content`**
+(no tiene un cron propio en `vercel.json` a propósito, para no sumar un tercer cron job — el plan
+Hobby de Vercel limita a 2). También existe `/api/cron/whatsapp-followup` como endpoint standalone
+(mismo `CRON_SECRET`) por si querés dispararlo a mano con `curl` para probar el template sin esperar
+a la corrida diaria.
+- **Requiere que el template `recontacto_incompleto` esté aprobado por Meta** (`Configuración →
+  Templates de WhatsApp`, marcarlo "Aprobado" ahí una vez que Meta lo apruebe). Sin eso, la función
+  no manda nada y lo reporta en el resultado del cron (`whatsappFollowup.errors`).
+- Solo contacta leads con `consent_to_contact = true` (los que vinieron por el bot de WhatsApp; leads
+  cargados a mano u originados en la landing no tienen consentimiento registrado, así que no se les
+  manda nada automático).
+- Usa siempre `sendTemplate`, nunca texto libre — es un mensaje iniciado por el negocio, no una
+  respuesta dentro de una conversación activa, así que corresponde template sin importar si la
+  ventana de 24h está abierta o cerrada.
+- Al enviar, el mensaje queda logueado en el Inbox de ese lead (`messages`), se limpia
+  `followup_due_at` y el estado pasa a `seguimiento_pendiente` — igual que hace hoy el botón manual
+  "Sugerir mensaje de seguimiento", que sigue existiendo para cuando alguien prefiere revisar y
+  mandar el texto a mano en vez de esperar al cron.
+- Solo cubre el caso "no confirmó turno". Los otros templates obligatorios
+  (`recordatorio_turno`, `seguimiento_post_consulta`, etc.) no se automatizaron porque necesitan una
+  fecha de turno real o un momento del journey que esta app no gestiona (no reserva turnos).
+
 ## Reportes semanales y link de seguimiento por pieza — cómo funcionan (2026-07-06)
 
 Un segundo **Vercel Cron** (`vercel.json`, domingo 08:00 UTC = 05:00 ART, mismo `CRON_SECRET`) pega a
