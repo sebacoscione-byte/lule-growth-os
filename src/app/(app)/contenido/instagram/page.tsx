@@ -629,7 +629,6 @@ export default function ContentStudioPage() {
   const [working, setWorking] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
-  const [googleManualNeeded, setGoogleManualNeeded] = useState<string | null>(null)
   const [tab, setTab] = useState("crear")
   const [manualPrompt, setManualPrompt] = useState<string | null>(null)
   const [showDirectEntry, setShowDirectEntry] = useState(false)
@@ -730,13 +729,6 @@ export default function ContentStudioPage() {
 
   function updateTrackSettings(track: "post" | "historia", patch: Partial<AutoPublishTrackSettings>) {
     updateAutoPublishSettings({ ...autoPublishSettings, [track]: { ...autoPublishSettings[track], ...patch } })
-  }
-
-  function toggleAutoPublishChannel(channel: ContentChannel) {
-    const channels = autoPublishSettings.channels.includes(channel)
-      ? autoPublishSettings.channels.filter(c => c !== channel)
-      : [...autoPublishSettings.channels, channel]
-    updateAutoPublishSettings({ ...autoPublishSettings, channels })
   }
 
   async function persistAutoPublishSettings() {
@@ -919,7 +911,7 @@ export default function ContentStudioPage() {
       format,
       goal: "Captar consultas y explicar como pedir turno",
       status: "draft",
-      channels: format === "historia" ? ["instagram"] : ["instagram", "google_business"],
+      channels: ["instagram"],
       source: selectedSource,
       created_at: now,
       updated_at: now,
@@ -963,7 +955,7 @@ export default function ContentStudioPage() {
       format,
       goal: "Captar consultas y explicar como pedir turno",
       status: "draft",
-      channels: format === "historia" ? ["instagram"] : ["instagram", "google_business"],
+      channels: ["instagram"],
       source: null,
       created_at: now,
       updated_at: now,
@@ -1048,48 +1040,6 @@ export default function ContentStudioPage() {
     }
   }
 
-  function nextAutoPublishResult(item: ContentItem, channel: ContentChannel, outcome: "published" | "error") {
-    return { ...item.auto_publish_result, [channel]: outcome }
-  }
-
-  function withChannelOutcome(item: ContentItem, channel: ContentChannel, outcome: "published" | "error") {
-    const result = nextAutoPublishResult(item, channel, outcome)
-    const allPublished = item.channels.length > 0 && item.channels.every(ch => result[ch] === "published")
-    return { auto_publish_result: result, status: allPublished ? ("published" as const) : item.status }
-  }
-
-  async function publishGoogle(item: ContentItem) {
-    setWorking(item.id)
-    setError(null)
-    const response = await fetch("/api/google-business/posts", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ summary: item.google_text }),
-    })
-    const data = await response.json()
-    setWorking(null)
-    if (!response.ok || data.error) {
-      if (String(data.error ?? "").includes("Account ID")) {
-        setGoogleManualNeeded(item.id)
-        try {
-          await navigator.clipboard.writeText(item.google_text)
-        } catch {
-          // El usuario puede seleccionar y copiar el texto manualmente desde el campo.
-        }
-        return
-      }
-      setError(data.error ?? "Google no permitio publicar")
-      await updateItem(item, withChannelOutcome(item, "google_business", "error"))
-      return
-    }
-    await updateItem(item, withChannelOutcome(item, "google_business", "published"))
-  }
-
-  async function markGooglePublishedManually(item: ContentItem) {
-    setGoogleManualNeeded(null)
-    await updateItem(item, withChannelOutcome(item, "google_business", "published"))
-  }
-
   async function publishNow(item: ContentItem) {
     setWorking(item.id)
     setError(null)
@@ -1135,10 +1085,9 @@ export default function ContentStudioPage() {
       const data = await response.json()
       if (!response.ok || data.error) {
         setError(data.error ?? "Instagram no permitio publicar")
-        await updateItem(item, withChannelOutcome(item, "instagram", "error"))
         return
       }
-      await updateItem(item, withChannelOutcome(item, "instagram", "published"))
+      await updateItem(item, { status: "published" })
     } catch {
       setError("No se pudo conectar con Instagram. Revisá tu conexión e intentá nuevamente.")
     } finally {
@@ -1160,7 +1109,7 @@ export default function ContentStudioPage() {
           <p className="text-sm text-gray-500">
             {IS_MANUAL_MODE
               ? "Generá prompts listos para ChatGPT, Gemini o Claude. Sin costo."
-              : "Investigá, generá, revisá y aprobá contenido para Instagram y Google."}
+              : "Investigá, generá, revisá y aprobá contenido para Instagram."}
           </p>
         </div>
         <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
@@ -1450,11 +1399,8 @@ export default function ContentStudioPage() {
                 onChange={setActive}
                 onSave={changes => updateItem(active, changes)}
                 onCopy={() => copyInstagram(active)}
-                onPublishGoogle={() => publishGoogle(active)}
                 onPublishInstagram={() => publishInstagram(active)}
                 onPublishNow={() => publishNow(active)}
-                googleManualNeeded={googleManualNeeded === active.id}
-                onMarkGooglePublishedManually={() => markGooglePublishedManually(active)}
               />
             ) : (
               <Card className="flex min-h-[420px] items-center justify-center">
@@ -1480,27 +1426,9 @@ export default function ContentStudioPage() {
                 <CardHeader className="pb-3">
                   <CardTitle className="text-sm font-semibold text-gray-900">Publicación automática</CardTitle>
                   <p className="text-xs text-gray-500">
-                    Publica de a <strong>una pieza por vez</strong> — la aprobada más antigua primero — con un cronograma
-                    propio para posts de feed y otro para historias, para que no salgan todas juntas. Canales:
+                    Publica en Instagram de a <strong>una pieza por vez</strong> — la aprobada más antigua primero — con un
+                    cronograma propio para posts de feed y otro para historias, para que no salgan todas juntas.
                   </p>
-                  <div className="flex flex-wrap items-center gap-3 pt-1">
-                    <label className="flex items-center gap-1.5 text-sm text-gray-700">
-                      <input
-                        type="checkbox"
-                        checked={autoPublishSettings.channels.includes("instagram")}
-                        onChange={() => toggleAutoPublishChannel("instagram")}
-                      />
-                      Instagram
-                    </label>
-                    <label className="flex items-center gap-1.5 text-sm text-gray-700">
-                      <input
-                        type="checkbox"
-                        checked={autoPublishSettings.channels.includes("google_business")}
-                        onChange={() => toggleAutoPublishChannel("google_business")}
-                      />
-                      Google Business <span className="text-gray-400">(solo aplica a posts, no a historias)</span>
-                    </label>
-                  </div>
                   <div className="flex flex-wrap items-center gap-3 pt-1">
                     <Button
                       size="sm"
@@ -1620,57 +1548,16 @@ export default function ContentStudioPage() {
                         </Button>
                       )}
                     </div>
-                    {item.status === "approved" && item.channels.length > 1 && (
-                      <div className="flex gap-2">
-                        {item.channels.includes("instagram") && item.auto_publish_result?.instagram !== "published" && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="flex-1"
-                            disabled={working === item.id}
-                            onClick={() => publishInstagram(item)}
-                            title="Publica solo en Instagram, sin tocar Google Business"
-                          >
-                            Solo Instagram
-                          </Button>
-                        )}
-                        {item.channels.includes("google_business") && item.auto_publish_result?.google_business !== "published" && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="flex-1"
-                            disabled={working === item.id}
-                            onClick={() => publishGoogle(item)}
-                            title="Publica solo en Google Business, sin tocar Instagram"
-                          >
-                            Solo Google
-                          </Button>
-                        )}
-                      </div>
-                    )}
                     <div className="flex gap-2">
-                      {googleManualNeeded === item.id && (
-                        <div className="w-full rounded-lg border border-blue-200 bg-blue-50 p-2.5 text-xs text-blue-900">
-                          <p className="mb-1.5">Copiamos el texto. Pegalo en el panel oficial y marcá como publicado.</p>
-                          <div className="flex flex-wrap items-center gap-2">
-                            <a href="https://business.google.com/" target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 font-medium text-blue-700 underline">
-                              Ir a Google Business <ExternalLink className="h-3 w-3" />
-                            </a>
-                            <Button variant="outline" size="sm" onClick={() => markGooglePublishedManually(item)} className="gap-1.5">
-                              <Check className="h-3.5 w-3.5" /> Marcar como publicado
-                            </Button>
-                          </div>
-                        </div>
-                      )}
                       {item.status === "published" && (
                         <Button
                           variant="ghost"
                           size="icon"
                           aria-label="Deshacer publicación"
-                          title="Vuelve la pieza a 'aprobada' para corregirla. OJO: no borra la publicación real en Instagram/Google — eso se hace a mano desde la app si hizo falta."
+                          title="Vuelve la pieza a 'aprobada' para corregirla. OJO: no borra la publicación real en Instagram — eso se hace a mano desde la app si hizo falta."
                           disabled={working === item.id}
                           onClick={() => {
-                            if (!window.confirm("Esto NO borra la publicación real en Instagram/Google — solo devuelve esta pieza a \"aprobada\" acá en el sistema para poder corregirla y volver a publicar. Si necesitás borrar el posteo real, hacelo a mano desde la app. ¿Continuar?")) return
+                            if (!window.confirm("Esto NO borra la publicación real en Instagram — solo devuelve esta pieza a \"aprobada\" acá en el sistema para poder corregirla y volver a publicar. Si necesitás borrar el posteo real, hacelo a mano desde la app. ¿Continuar?")) return
                             updateItem(item, { status: "approved", auto_publish_result: {} })
                           }}
                         >
@@ -1742,7 +1629,7 @@ function TrackedLinkField({ itemId, visits, interactions }: { itemId: string; vi
 
 function Editor({
   item, working, copied, hasUnsavedChanges, igConnected, generatedVisual, onGeneratedVisual,
-  onChange, onSave, onCopy, onPublishGoogle, onPublishInstagram, onPublishNow, googleManualNeeded, onMarkGooglePublishedManually,
+  onChange, onSave, onCopy, onPublishInstagram, onPublishNow,
 }: {
   item: ContentItem
   working: string | null
@@ -1754,11 +1641,8 @@ function Editor({
   onChange: (item: ContentItem) => void
   onSave: (changes: Partial<ContentItem>) => void
   onCopy: () => void
-  onPublishGoogle: () => void
   onPublishInstagram: () => void
   onPublishNow: () => void
-  googleManualNeeded: boolean
-  onMarkGooglePublishedManually: () => void
 }) {
   const busy = working === item.id
   const [visualGenerating, setVisualGenerating] = useState(false)
@@ -1776,9 +1660,7 @@ function Editor({
   const approvalReady = Boolean(
     item.hook.trim() &&
     item.caption.trim() &&
-    item.google_text.trim() &&
-    (item.visual_headline.trim() || item.visual_url) &&
-    item.google_text.length <= 1500
+    (item.visual_headline.trim() || item.visual_url)
   )
 
   function updateSlide(index: number, changes: Partial<ContentSlide>) {
@@ -2102,10 +1984,6 @@ function Editor({
               ))}
             </div>
           )}
-          <div className="space-y-1.5">
-            <div className="flex items-center justify-between"><Label className="text-gray-900">Google Business</Label><CharacterCount value={item.google_text} limit={1500} /></div>
-            <Textarea rows={6} value={item.google_text} maxLength={1500} onChange={event => onChange({ ...item, google_text: event.target.value })} className="text-gray-900" />
-          </div>
           <div className="grid gap-2 sm:flex sm:flex-wrap">
             <Button variant="outline" onClick={() => onSave(editableContent(item))} disabled={busy || !hasUnsavedChanges} className="gap-2">
               {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Guardar cambios
@@ -2131,14 +2009,9 @@ function Editor({
                 onClick={onPublishNow}
                 disabled={busy}
                 className="gap-2"
-                title="Publica ya mismo en todos los canales asignados a esta pieza (Instagram y/o Google)"
+                title="Publica ya mismo en Instagram"
               >
                 {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />} Publicar ahora
-              </Button>
-            )}
-            {item.status === "approved" && (
-              <Button variant="outline" onClick={onPublishGoogle} disabled={busy} className="gap-2">
-                <Send className="h-4 w-4" /> Publicar solo en Google
               </Button>
             )}
             {item.status === "approved" && igConnected && (() => {
@@ -2164,41 +2037,24 @@ function Editor({
               <Button
                 variant="outline"
                 onClick={() => {
-                  if (!window.confirm("Esto NO borra la publicación real en Instagram/Google — solo devuelve esta pieza a \"aprobada\" acá en el sistema para poder corregirla y volver a publicar. Si necesitás borrar el posteo real, hacelo a mano desde la app. ¿Continuar?")) return
+                  if (!window.confirm("Esto NO borra la publicación real en Instagram — solo devuelve esta pieza a \"aprobada\" acá en el sistema para poder corregirla y volver a publicar. Si necesitás borrar el posteo real, hacelo a mano desde la app. ¿Continuar?")) return
                   onSave({ status: "approved", auto_publish_result: {} })
                 }}
                 disabled={busy}
                 className="gap-2"
-                title="Vuelve la pieza a 'aprobada' para corregirla. No borra la publicación real en Instagram/Google — eso se hace a mano desde la app."
+                title="Vuelve la pieza a 'aprobada' para corregirla. No borra la publicación real en Instagram — eso se hace a mano desde la app."
               >
                 <Undo2 className="h-4 w-4" /> Deshacer publicación
               </Button>
             )}
           </div>
-          {googleManualNeeded && (
-            <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900">
-              <p className="font-medium mb-1">Publicación manual en Google</p>
-              <p className="text-xs mb-3">
-                Esta cuenta no expone el Account ID por API, asi que copiamos el texto al portapapeles.
-                Pegalo en el panel oficial y despues marcá esta pieza como publicada.
-              </p>
-              <div className="flex flex-wrap items-center gap-3">
-                <a href="https://business.google.com/" target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-xs font-medium text-blue-700 underline">
-                  Ir a Google Business <ExternalLink className="h-3 w-3" />
-                </a>
-                <Button variant="outline" size="sm" onClick={onMarkGooglePublishedManually} className="gap-1.5">
-                  <Check className="h-3.5 w-3.5" /> Marcar como publicado
-                </Button>
-              </div>
-            </div>
-          )}
           {!approvalReady && item.status === "draft" && (
-            <p className="text-xs text-amber-700">Para aprobar, completá hook, caption y texto de Google, y agregá un titular visual o subí una imagen propia.</p>
+            <p className="text-xs text-amber-700">Para aprobar, completá hook y caption, y agregá un titular visual o subí una imagen propia.</p>
           )}
           <p className="text-xs text-gray-500">
             {igConnected
               ? "Instagram publica posts e historias con la placa generada (conectá y generá la placa final antes). Reels y carruseles todavia requieren copiar/publicar manualmente."
-              : "Conectá Instagram arriba para publicar posts e historias directamente. Google publica solo despues de aprobar y si la API de la cuenta lo permite."}
+              : "Conectá Instagram arriba para publicar posts e historias directamente."}
           </p>
         </CardContent>
       </Card>

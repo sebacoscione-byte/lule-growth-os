@@ -153,10 +153,10 @@ export async function PATCH(request: NextRequest) {
       approved_at: body.status === "approved" ? now : resetApproval ? null : current.approved_at,
     }
     if (nextItem.status === "approved" && (
-      [nextItem.hook, nextItem.caption, nextItem.google_text].some(value => !value.trim()) ||
+      [nextItem.hook, nextItem.caption].some(value => !value.trim()) ||
       (!nextItem.visual_headline.trim() && !nextItem.visual_url)
     )) {
-      return NextResponse.json({ error: "Completá hook, caption y texto de Google, y agregá un titular visual o subí una imagen propia antes de aprobar" }, { status: 400 })
+      return NextResponse.json({ error: "Completá hook y caption, y agregá un titular visual o subí una imagen propia antes de aprobar" }, { status: 400 })
     }
 
     const updated = items.map(item => item.id === body.id ? nextItem : item)

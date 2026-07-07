@@ -14,7 +14,7 @@ const DEFAULT_TRACK: AutoPublishTrackSettings = {
 }
 
 export const DEFAULT_AUTO_PUBLISH_SETTINGS: AutoPublishSettings = {
-  channels: ["instagram", "google_business"],
+  channels: ["instagram"],
   post: { ...DEFAULT_TRACK, times_per_week: 2 },
   historia: { ...DEFAULT_TRACK, times_per_week: 3 },
 }
