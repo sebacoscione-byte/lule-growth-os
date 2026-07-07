@@ -1607,6 +1607,21 @@ export default function ContentStudioPage() {
                           <Undo2 className="h-4 w-4" />
                         </Button>
                       )}
+                      {item.status === "published" && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          aria-label="Deshacer publicación"
+                          title="Vuelve la pieza a 'aprobada' para corregirla. OJO: no borra la publicación real en Instagram/Google — eso se hace a mano desde la app si hizo falta."
+                          disabled={working === item.id}
+                          onClick={() => {
+                            if (!window.confirm("Esto NO borra la publicación real en Instagram/Google — solo devuelve esta pieza a \"aprobada\" acá en el sistema para poder corregirla y volver a publicar. Si necesitás borrar el posteo real, hacelo a mano desde la app. ¿Continuar?")) return
+                            updateItem(item, { status: "approved", auto_publish_result: {} })
+                          }}
+                        >
+                          <Undo2 className="h-4 w-4" />
+                        </Button>
+                      )}
                       <Button
                         variant="ghost"
                         size="icon"
@@ -2090,6 +2105,20 @@ function Editor({
                 </Button>
               )
             })()}
+            {item.status === "published" && (
+              <Button
+                variant="outline"
+                onClick={() => {
+                  if (!window.confirm("Esto NO borra la publicación real en Instagram/Google — solo devuelve esta pieza a \"aprobada\" acá en el sistema para poder corregirla y volver a publicar. Si necesitás borrar el posteo real, hacelo a mano desde la app. ¿Continuar?")) return
+                  onSave({ status: "approved", auto_publish_result: {} })
+                }}
+                disabled={busy}
+                className="gap-2"
+                title="Vuelve la pieza a 'aprobada' para corregirla. No borra la publicación real en Instagram/Google — eso se hace a mano desde la app."
+              >
+                <Undo2 className="h-4 w-4" /> Deshacer publicación
+              </Button>
+            )}
           </div>
           {googleManualNeeded && (
             <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900">

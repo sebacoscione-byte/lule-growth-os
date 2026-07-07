@@ -110,6 +110,13 @@ export async function PATCH(request: NextRequest) {
     ))) {
       return NextResponse.json({ error: "Slides invalidos" }, { status: 400 })
     }
+    if (body.auto_publish_result !== undefined) {
+      const validKeys = ["instagram", "google_business"]
+      const validValues = ["published", "error"]
+      const valid = typeof body.auto_publish_result === "object" && body.auto_publish_result !== null &&
+        Object.entries(body.auto_publish_result).every(([key, value]) => validKeys.includes(key) && validValues.includes(value as string))
+      if (!valid) return NextResponse.json({ error: "Resultado de publicacion invalido" }, { status: 400 })
+    }
 
     const now = new Date().toISOString()
     const editableFields: Array<keyof ContentItem> = [
@@ -125,15 +132,18 @@ export async function PATCH(request: NextRequest) {
       "image_alt_text",
       "slides",
       "visual_url",
+      "auto_publish_result",
     ]
     const changes = Object.fromEntries(
       editableFields
         .filter(field => body[field] !== undefined)
         .map(field => [field, body[field]])
     ) as Partial<ContentItem>
-    // visual_url no cuenta como "edicion de contenido": adjuntar la placa generada no debe
-    // resetear una pieza ya aprobada/publicada de vuelta a borrador.
-    const hasContentChanges = editableFields.some(field => field !== "status" && field !== "visual_url" && body[field] !== undefined)
+    // visual_url y auto_publish_result no cuentan como "edicion de contenido": adjuntar la placa
+    // generada o limpiar el resultado de publicacion (deshacer) no debe resetear a borrador.
+    const hasContentChanges = editableFields.some(field =>
+      field !== "status" && field !== "visual_url" && field !== "auto_publish_result" && body[field] !== undefined
+    )
     const resetApproval = hasContentChanges && !body.status && ["approved", "published"].includes(current.status)
     const nextItem = {
       ...current,
