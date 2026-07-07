@@ -645,6 +645,7 @@ export default function ContentStudioPage() {
   const [igLoading, setIgLoading] = useState(true)
   const [generatedVisual, setGeneratedVisual] = useState<{ itemId: string; url: string } | null>(null)
   const [autoPublishSettings, setAutoPublishSettings] = useState<AutoPublishSettings>(DEFAULT_AUTO_PUBLISH_SETTINGS)
+  const [savedAutoPublishSettings, setSavedAutoPublishSettings] = useState<AutoPublishSettings>(DEFAULT_AUTO_PUBLISH_SETTINGS)
   const [savingAutoPublish, setSavingAutoPublish] = useState(false)
   const [autoPublishSaved, setAutoPublishSaved] = useState(false)
   const [autoPublishError, setAutoPublishError] = useState<string | null>(null)
@@ -704,27 +705,51 @@ export default function ContentStudioPage() {
       .then(data => {
         const stored = data.auto_publish_settings
         if (stored?.post && stored?.historia) {
-          setAutoPublishSettings({
+          const loaded = {
             channels: stored.channels ?? DEFAULT_AUTO_PUBLISH_SETTINGS.channels,
             post: { ...DEFAULT_AUTO_PUBLISH_SETTINGS.post, ...stored.post },
             historia: { ...DEFAULT_AUTO_PUBLISH_SETTINGS.historia, ...stored.historia },
-          })
+          }
+          setAutoPublishSettings(loaded)
+          setSavedAutoPublishSettings(loaded)
         }
       })
       .catch(() => {})
   }, [])
 
-  async function saveAutoPublishSettings(updated: AutoPublishSettings) {
+  const autoPublishDirty = useMemo(
+    () => JSON.stringify(autoPublishSettings) !== JSON.stringify(savedAutoPublishSettings),
+    [autoPublishSettings, savedAutoPublishSettings]
+  )
+
+  function updateAutoPublishSettings(updated: AutoPublishSettings) {
     setAutoPublishSettings(updated)
+    setAutoPublishError(null)
+    setAutoPublishSaved(false)
+  }
+
+  function updateTrackSettings(track: "post" | "historia", patch: Partial<AutoPublishTrackSettings>) {
+    updateAutoPublishSettings({ ...autoPublishSettings, [track]: { ...autoPublishSettings[track], ...patch } })
+  }
+
+  function toggleAutoPublishChannel(channel: ContentChannel) {
+    const channels = autoPublishSettings.channels.includes(channel)
+      ? autoPublishSettings.channels.filter(c => c !== channel)
+      : [...autoPublishSettings.channels, channel]
+    updateAutoPublishSettings({ ...autoPublishSettings, channels })
+  }
+
+  async function persistAutoPublishSettings() {
     setSavingAutoPublish(true)
     setAutoPublishError(null)
     try {
       const res = await fetch("/api/config", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ key: "auto_publish_settings", value: updated }),
+        body: JSON.stringify({ key: "auto_publish_settings", value: autoPublishSettings }),
       })
       if (!res.ok) throw new Error(`Error ${res.status}`)
+      setSavedAutoPublishSettings(autoPublishSettings)
       setAutoPublishSaved(true)
       setTimeout(() => setAutoPublishSaved(false), 2500)
     } catch {
@@ -732,17 +757,6 @@ export default function ContentStudioPage() {
     } finally {
       setSavingAutoPublish(false)
     }
-  }
-
-  function saveTrackSettings(track: "post" | "historia", patch: Partial<AutoPublishTrackSettings>) {
-    saveAutoPublishSettings({ ...autoPublishSettings, [track]: { ...autoPublishSettings[track], ...patch } })
-  }
-
-  function toggleAutoPublishChannel(channel: ContentChannel) {
-    const channels = autoPublishSettings.channels.includes(channel)
-      ? autoPublishSettings.channels.filter(c => c !== channel)
-      : [...autoPublishSettings.channels, channel]
-    saveAutoPublishSettings({ ...autoPublishSettings, channels })
   }
 
   const counts = useMemo(() => ({
@@ -1474,6 +1488,18 @@ export default function ContentStudioPage() {
                       />
                       Google Business <span className="text-gray-400">(solo aplica a posts, no a historias)</span>
                     </label>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-3 pt-1">
+                    <Button
+                      size="sm"
+                      onClick={persistAutoPublishSettings}
+                      disabled={!autoPublishDirty || savingAutoPublish}
+                    >
+                      {savingAutoPublish ? "Guardando..." : "Guardar cambios"}
+                    </Button>
+                    {autoPublishDirty && !savingAutoPublish && (
+                      <span className="text-xs font-medium text-amber-600">Cambios sin guardar</span>
+                    )}
                     {autoPublishSaved && <span className="text-xs font-medium text-green-600">Guardado</span>}
                     {autoPublishError && <span className="text-xs font-medium text-red-600">{autoPublishError}</span>}
                   </div>
@@ -1484,18 +1510,18 @@ export default function ContentStudioPage() {
                     track={autoPublishSettings.post}
                     queueText={describeAutoPublishQueue("post", counts.approvedPost, autoPublishSettings.post.times_per_week)}
                     saving={savingAutoPublish}
-                    onToggleEnabled={() => saveTrackSettings("post", { enabled: !autoPublishSettings.post.enabled })}
-                    onChangeTimesPerWeek={value => saveTrackSettings("post", { times_per_week: value })}
-                    onChangeStartsAt={iso => saveTrackSettings("post", { starts_at: iso })}
+                    onToggleEnabled={() => updateTrackSettings("post", { enabled: !autoPublishSettings.post.enabled })}
+                    onChangeTimesPerWeek={value => updateTrackSettings("post", { times_per_week: value })}
+                    onChangeStartsAt={iso => updateTrackSettings("post", { starts_at: iso })}
                   />
                   <AutoPublishTrackCard
                     title="Historias"
                     track={autoPublishSettings.historia}
                     queueText={describeAutoPublishQueue("historia", counts.approvedHistoria, autoPublishSettings.historia.times_per_week)}
                     saving={savingAutoPublish}
-                    onToggleEnabled={() => saveTrackSettings("historia", { enabled: !autoPublishSettings.historia.enabled })}
-                    onChangeTimesPerWeek={value => saveTrackSettings("historia", { times_per_week: value })}
-                    onChangeStartsAt={iso => saveTrackSettings("historia", { starts_at: iso })}
+                    onToggleEnabled={() => updateTrackSettings("historia", { enabled: !autoPublishSettings.historia.enabled })}
+                    onChangeTimesPerWeek={value => updateTrackSettings("historia", { times_per_week: value })}
+                    onChangeStartsAt={iso => updateTrackSettings("historia", { starts_at: iso })}
                   />
                 </CardContent>
               </Card>
