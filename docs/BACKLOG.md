@@ -195,7 +195,11 @@ público para pedir turno.
 - [ ] WhatsApp Business API: envío automático de mensajes de seguimiento (recordatorio/confirmación de
       turno vía `sendTemplate` — hoy `/api/followup` solo sugiere texto para el inbox manual, no envía)
 - [ ] Configurar `WHATSAPP_VERIFY_TOKEN` en `.env.local` + webhook de prueba separado (vía ngrok) para poder testear localmente cambios en la lógica de recepción de mensajes (`src/lib/whatsapp-bot.ts`) sin tocar el webhook de producción. Sin esto, cualquier cambio en cómo el bot procesa mensajes entrantes solo se puede probar directo en producción. No es urgente mientras no se toque esa lógica.
-- [ ] Instagram Graph API: publicación directa desde la app del contenido aprobado
+- [x] Instagram Graph API: publicación directa desde la app del contenido aprobado (2026-07-06/07) —
+      manual ("Publicar ahora" y botones por canal en el editor) y automática (Vercel Cron diario,
+      dos cronogramas independientes: posts de feed y historias, cada uno con su propia frecuencia
+      "veces por semana"). Ver `src/lib/content-publish.ts`, `src/app/api/cron/publish-content/`,
+      `docs/CONTENT_STUDIO.md` → "Publicacion automatica".
 - [ ] Automatización de flujos de seguimiento con n8n
 - [ ] Reportes automáticos semanales (leads nuevos, conversión, canales)
 - [ ] Vincular campañas UTM con el contenido del estudio para saber qué pieza genera leads
@@ -209,3 +213,28 @@ público para pedir turno.
 - [ ] Google Ads: campañas de búsqueda pagada para Lanús y Lomas de Zamora
 - [ ] A/B testing de landings: variantes de hero, CTA y formulario
 - [ ] Sistema de recomendaciones de crecimiento basado en métricas acumuladas
+
+---
+
+## Pendientes — sin sesión asignada
+
+### [TECH] Documentar en CLAUDE.md el bug de `createServiceClient()` vs `getServiceDb()`
+`src/lib/supabase/server.ts` — `createServiceClient()` (usa `createServerClient` de `@supabase/ssr`
++ cookies) deja de operar como `service_role` real apenas hay una sesión de usuario activa: el cliente
+hidrata la sesión desde las cookies y autentica todo (incluido Storage) como ese usuario. La policy de
+Storage de `content-media` solo permite escribir a `service_role` real, así que cualquier ruta que use
+`createServiceClient()` para subir archivos falla en silencio. Ya se corrigió en las 4 rutas que tocan
+Storage/publicación (`/api/content/visual`, `/api/instagram-business/publish`, `/api/content/publish-now`,
+`/api/google-business/posts` — todas migradas a `getServiceDb()`), pero falta: (1) agregar esta regla a
+CLAUDE.md para que no se repita en rutas nuevas, (2) auditar las ~14 rutas restantes que todavía usan
+`createServiceClient()` (`google-business/callback|disconnect|locations|profile|reviews|select-location|status`,
+`instagram-business/callback|disconnect|status`, `public/click`, `public/lead`) — hoy "funcionan" solo
+porque `app_config` tiene RLS permisivo para `authenticated`, no porque el cliente sea realmente
+service_role; si alguna en el futuro necesita tocar una tabla/bucket más restrictivo, va a fallar igual.
+
+### [FEATURE] Alerta proactiva si falla el cron de auto-publicación
+Ya anotado como "fuera de alcance a propósito" en `CLAUDE.md` — el cron de `/api/cron/publish-content`
+no avisa por WhatsApp/email si falla (token vencido, cuenta desconectada, etc.), solo queda visible en
+la tarjeta de Estudio de contenido si alguien entra a mirarla. Requeriría un template de WhatsApp
+aprobado por Meta para poder mandar un mensaje proactivo fuera de la ventana de 24hs. Formalizado acá
+para que no se pierda como idea suelta.
