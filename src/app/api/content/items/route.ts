@@ -68,8 +68,8 @@ export async function POST(request: NextRequest) {
       ? incoming.category.trim()
       : "Contenido generado"
     const item = { ...incoming, topic: topic.slice(0, 200), category: category.slice(0, 160) }
-    if (!item.id || typeof item.caption !== "string" || !item.caption.trim()) {
-      return NextResponse.json({ error: "El borrador no tiene caption y no se puede guardar." }, { status: 400 })
+    if (!item.id || typeof item.caption !== "string") {
+      return NextResponse.json({ error: "Falta el id de la pieza." }, { status: 400 })
     }
     const items = await readItems()
     await writeItems([item, ...items.filter(existing => existing.id !== item.id)].slice(0, 100))
@@ -142,10 +142,11 @@ export async function PATCH(request: NextRequest) {
       updated_at: now,
       approved_at: body.status === "approved" ? now : resetApproval ? null : current.approved_at,
     }
-    if (nextItem.status === "approved" && [
-      nextItem.hook, nextItem.caption, nextItem.google_text, nextItem.visual_headline,
-    ].some(value => !value.trim())) {
-      return NextResponse.json({ error: "Completá hook, caption, texto de Google y titular visual antes de aprobar" }, { status: 400 })
+    if (nextItem.status === "approved" && (
+      [nextItem.hook, nextItem.caption, nextItem.google_text].some(value => !value.trim()) ||
+      (!nextItem.visual_headline.trim() && !nextItem.visual_url)
+    )) {
+      return NextResponse.json({ error: "Completá hook, caption y texto de Google, y agregá un titular visual o subí una imagen propia antes de aprobar" }, { status: 400 })
     }
 
     const updated = items.map(item => item.id === body.id ? nextItem : item)

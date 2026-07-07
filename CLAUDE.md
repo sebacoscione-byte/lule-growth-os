@@ -4,6 +4,7 @@
 - 2026-06-11: Setup inicial del proyecto. MVP Fase 1 en construcción.
 - 2026-07-05: Se sumó el Hospital Británico como tercera sede de derivación (miércoles), junto a CIMEL Lanús (martes) y Swiss Medical Lomas (viernes).
 - 2026-07-06: Se eliminó `createServiceClient()` (bug de sesión pisando service_role, ver más abajo) migrando todas las rutas a `getServiceDb()`. Se ampliaron los eventos de landing (visitas + clicks por acción/sede), se agregó ranking de landings, link de seguimiento por pieza de contenido (utm_content) y reportes semanales automáticos en `/dashboard`.
+- 2026-07-07: Estudio de contenido — Biblioteca ahora permite crear una pieza en blanco y completarla 100% a mano (sin pasar por generación con IA), incluyendo subir una imagen propia (`/api/content/upload-image`, guarda en `content-media` igual que las placas de Gemini). Cada track de "Publicación automática" (Posts/Historias) tiene su propia fecha de inicio opcional (`starts_at`): mientras no llegue, el cron no publica nada de ese track aunque esté activado, aunque no haya publicado nunca antes.
 
 ## Qué es esta app
 Sistema de adquisición de pacientes para la Dra. Lucía Chahin, cardióloga.
@@ -191,6 +192,11 @@ enabled/frecuencia/última publicación).
    cuentas de salud: no conviene publicar todos los días, baja la calidad y la credibilidad). Los canales
    (Instagram/Google Business) son compartidos, pero Google Business no tiene concepto de "historia", así
    que ese track en la práctica solo publica a Instagram.
+3.1. Cada track tiene además un control **"Empezar: Ahora / fecha programada"** (`starts_at`). Si se deja
+   en "Ahora" (`null`), el comportamiento es el de siempre: en cuanto se activa, publica la primera pieza
+   aprobada en la próxima corrida del cron. Si se elige una fecha futura, el cron no publica nada de ese
+   track hasta que llegue esa fecha (aunque esté activado y ya haya piezas aprobadas esperando) — recién
+   ahí arranca a contar el intervalo de "veces por semana" desde la primera publicación real.
 4. Cada track solo auto-publica piezas `aprobadas` de su propio formato (**post** o **historia** según
    corresponda) — reels y carruseles siguen requiriendo publicación manual (no soportado por la API de
    Meta sin video/multi-imagen).

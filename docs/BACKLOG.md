@@ -220,6 +220,14 @@ público para pedir turno.
       la app en vez de mandarse solo.*
 - [x] Vincular campañas UTM con el contenido del estudio para saber qué pieza genera leads — ver nota
       en Etapa 6 (link de seguimiento por pieza)
+- [x] Carga manual de piezas en Estudio de contenido (2026-07-07) — botón "Crear pieza en blanco" en
+      Biblioteca abre el editor con todos los campos vacíos para completar 100% a mano, sin generar con
+      IA; se puede subir una imagen propia (`/api/content/upload-image`, mismo bucket `content-media` que
+      las placas de Gemini) y aprobar directamente para que entre a la cola de publicación.
+- [x] Fecha de inicio programable por track de "Publicación automática" (2026-07-07) — Posts de feed e
+      Historias tienen cada uno un control "Empezar: Ahora / fecha programada" (`starts_at` en
+      `AutoPublishTrackSettings`); si se elige una fecha futura, el cron no publica nada de ese track
+      hasta llegar a esa fecha, aunque ya haya piezas aprobadas en cola.
 
 ---
 

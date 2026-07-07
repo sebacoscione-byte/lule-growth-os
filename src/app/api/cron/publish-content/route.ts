@@ -3,7 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js"
 import { getServiceDb } from "@/lib/supabase/service"
 import {
   readContentItems, writeContentItems, readAutoPublishSettings, writeAutoPublishSettings,
-  shouldRunAutoPublish, pickNextPublishableItem, resolveChannelsToPublish,
+  shouldRunAutoPublish, isScheduledForFuture, pickNextPublishableItem, resolveChannelsToPublish,
 } from "@/lib/content-pipeline"
 import { generateContentVisual } from "@/lib/ai"
 import { publishApprovedItem } from "@/lib/content-publish"
@@ -26,6 +26,9 @@ async function runTrack(
 ): Promise<AutoPublishTrackSettings> {
   if (!track.enabled) {
     return { ...track, last_run_at: now.toISOString(), last_run_result: "skipped_disabled" }
+  }
+  if (isScheduledForFuture(track, now)) {
+    return { ...track, last_run_at: now.toISOString(), last_run_result: "skipped_scheduled" }
   }
   if (!shouldRunAutoPublish(track, now)) {
     return { ...track, last_run_at: now.toISOString(), last_run_result: "skipped_interval" }

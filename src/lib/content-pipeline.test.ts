@@ -1,4 +1,4 @@
-import { shouldRunAutoPublish, pickNextPublishableItem, resolveChannelsToPublish, DEFAULT_AUTO_PUBLISH_SETTINGS } from "@/lib/content-pipeline"
+import { shouldRunAutoPublish, isScheduledForFuture, pickNextPublishableItem, resolveChannelsToPublish, DEFAULT_AUTO_PUBLISH_SETTINGS } from "@/lib/content-pipeline"
 import type { AutoPublishTrackSettings, ContentItem } from "@/types"
 
 function item(overrides: Partial<ContentItem> = {}): ContentItem {
@@ -56,6 +56,34 @@ describe("shouldRunAutoPublish", () => {
     // 7 veces por semana = cada 1 dia
     const t = track({ enabled: true, times_per_week: 7, last_published_at: "2026-07-08T09:00:00.000Z" })
     expect(shouldRunAutoPublish(t, now)).toBe(true)
+  })
+
+  it("no corre si tiene una fecha de inicio programada que todavia no llego, aunque nunca haya publicado", () => {
+    const now = new Date("2026-07-10T09:00:00.000Z")
+    const t = track({ enabled: true, last_published_at: null, starts_at: "2026-07-15T00:00:00.000Z" })
+    expect(shouldRunAutoPublish(t, now)).toBe(false)
+  })
+
+  it("corre una vez que se cumple la fecha de inicio programada", () => {
+    const now = new Date("2026-07-15T00:00:01.000Z")
+    const t = track({ enabled: true, last_published_at: null, starts_at: "2026-07-15T00:00:00.000Z" })
+    expect(shouldRunAutoPublish(t, now)).toBe(true)
+  })
+})
+
+describe("isScheduledForFuture", () => {
+  it("false si no tiene starts_at", () => {
+    expect(isScheduledForFuture(track({ starts_at: null }), new Date())).toBe(false)
+  })
+
+  it("true si starts_at todavia no llego", () => {
+    const now = new Date("2026-07-10T09:00:00.000Z")
+    expect(isScheduledForFuture(track({ starts_at: "2026-07-15T00:00:00.000Z" }), now)).toBe(true)
+  })
+
+  it("false si starts_at ya paso", () => {
+    const now = new Date("2026-07-20T09:00:00.000Z")
+    expect(isScheduledForFuture(track({ starts_at: "2026-07-15T00:00:00.000Z" }), now)).toBe(false)
   })
 })
 

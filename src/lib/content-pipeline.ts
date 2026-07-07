@@ -7,6 +7,7 @@ const SETTINGS_KEY = "auto_publish_settings"
 const DEFAULT_TRACK: AutoPublishTrackSettings = {
   enabled: false,
   times_per_week: 2,
+  starts_at: null,
   last_published_at: null,
   last_run_at: null,
   last_run_result: null,
@@ -61,9 +62,15 @@ export async function writeAutoPublishSettings(supabase: SupabaseClient, setting
   if (error) throw error
 }
 
-/** Pura, sin I/O: false si el track esta apagado o si todavia no paso el intervalo (7 / veces_por_semana) desde la ultima publicacion. */
+/** Pura, sin I/O: true si el track tiene una fecha de inicio programada que todavia no llego. */
+export function isScheduledForFuture(track: AutoPublishTrackSettings, now: Date): boolean {
+  return Boolean(track.starts_at) && now.getTime() < new Date(track.starts_at as string).getTime()
+}
+
+/** Pura, sin I/O: false si el track esta apagado, si la fecha de inicio programada no llego, o si todavia no paso el intervalo (7 / veces_por_semana) desde la ultima publicacion. */
 export function shouldRunAutoPublish(track: AutoPublishTrackSettings, now: Date): boolean {
   if (!track.enabled) return false
+  if (isScheduledForFuture(track, now)) return false
   if (!track.last_published_at) return true
   const elapsedMs = now.getTime() - new Date(track.last_published_at).getTime()
   const intervalDays = 7 / track.times_per_week

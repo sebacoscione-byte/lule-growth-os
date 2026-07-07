@@ -1,6 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import type { ChangeEvent } from "react"
 import Image from "next/image"
 import Link from "next/link"
 import {
@@ -496,6 +497,117 @@ function BioYFijadosTab() {
 }
 
 // ---------------------------------------------------------------------------
+// Publicacion automatica: tarjeta por cronograma (posts / historias)
+// ---------------------------------------------------------------------------
+
+function isFutureStart(track: AutoPublishTrackSettings): boolean {
+  return Boolean(track.starts_at) && new Date(track.starts_at as string).getTime() > Date.now()
+}
+
+function toLocalInputValue(iso: string): string {
+  const d = new Date(iso)
+  const pad = (n: number) => String(n).padStart(2, "0")
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
+
+function fromLocalInputValue(value: string): string {
+  return new Date(value).toISOString()
+}
+
+function describeAutoPublishQueue(kind: "post" | "historia", count: number, timesPerWeek: number): string {
+  const label = kind === "post"
+    ? `${count} post${count === 1 ? "" : "s"} aprobado${count === 1 ? "" : "s"} en cola`
+    : `${count} historia${count === 1 ? "" : "s"} aprobada${count === 1 ? "" : "s"} en cola`
+  if (count === 0) return `${label}.`
+  const days = Math.ceil(count * (7 / timesPerWeek))
+  const article = kind === "post" ? "el último saldría" : "la última saldría"
+  return `${label} — a este ritmo, ${article} en unos ${days} días.`
+}
+
+function describeLastAutoPublishRun(track: AutoPublishTrackSettings): string | null {
+  if (!track.last_run_at) return null
+  const when = new Date(track.last_run_at).toLocaleString("es-AR")
+  const reasonMap: Record<string, string> = {
+    skipped_disabled: "estaba apagada",
+    skipped_scheduled: "todavía no llegó la fecha de inicio programada",
+    skipped_interval: "todavía no correspondía según la frecuencia configurada",
+    skipped_no_item: "no había ninguna pieza aprobada lista para publicar",
+    skipped_race: "el contenido elegido cambió de estado justo antes de publicar (probablemente se publicó manualmente)",
+    quota_exceeded: "se alcanzó el límite diario de generación con IA, se reintenta al otro día",
+    published: "se publicó correctamente",
+    partial: "se publicó parcialmente (revisá el detalle en la pieza correspondiente)",
+  }
+  const result = track.last_run_result ?? ""
+  const readable = reasonMap[result] ?? (result.startsWith("error") ? `hubo un error (${result.replace(/^error:\s*/, "")})` : result)
+  return `Último intento: ${when} — ${readable}`
+}
+
+function AutoPublishTrackCard({
+  title, track, queueText, saving, onToggleEnabled, onChangeTimesPerWeek, onChangeStartsAt,
+}: {
+  title: string
+  track: AutoPublishTrackSettings
+  queueText: string
+  saving: boolean
+  onToggleEnabled: () => void
+  onChangeTimesPerWeek: (value: number) => void
+  onChangeStartsAt: (iso: string | null) => void
+}) {
+  const scheduled = isFutureStart(track)
+  const lastRun = describeLastAutoPublishRun(track)
+  return (
+    <div className="rounded-lg border border-gray-100 p-3 space-y-2">
+      <p className="text-sm font-medium text-gray-900">{title}</p>
+      <div className="flex flex-wrap items-center gap-3">
+        <Button
+          variant={track.enabled ? "default" : "outline"}
+          size="sm"
+          disabled={saving}
+          onClick={onToggleEnabled}
+        >
+          {track.enabled ? "Activada" : "Desactivada"}
+        </Button>
+        <div className="flex items-center gap-2 text-sm text-gray-700">
+          <Input
+            type="number"
+            min={1}
+            max={7}
+            value={track.times_per_week}
+            onChange={e => onChangeTimesPerWeek(Math.min(7, Math.max(1, Number(e.target.value) || 1)))}
+            className="w-16 text-gray-900"
+          />
+          <span>veces por semana</span>
+        </div>
+      </div>
+      <div className="flex flex-wrap items-center gap-2 text-sm text-gray-700">
+        <span className="text-gray-500 shrink-0">Empezar:</span>
+        <Button
+          variant={!track.starts_at ? "default" : "outline"}
+          size="sm"
+          disabled={saving}
+          onClick={() => onChangeStartsAt(null)}
+        >
+          Ahora
+        </Button>
+        <Input
+          type="datetime-local"
+          value={track.starts_at ? toLocalInputValue(track.starts_at) : ""}
+          onChange={e => onChangeStartsAt(e.target.value ? fromLocalInputValue(e.target.value) : null)}
+          className="w-56 text-gray-900"
+        />
+      </div>
+      <p className="text-xs text-gray-500">{queueText}</p>
+      {scheduled && (
+        <p className="text-xs font-medium text-blue-700">
+          Programado para arrancar el {new Date(track.starts_at as string).toLocaleString("es-AR")} — hasta esa fecha no publica nada, aunque esté activada.
+        </p>
+      )}
+      {lastRun && <p className="text-xs text-gray-500">{lastRun}</p>}
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
 // Main page
 // ---------------------------------------------------------------------------
 
@@ -523,6 +635,7 @@ export default function ContentStudioPage() {
   const [showDirectEntry, setShowDirectEntry] = useState(false)
   const [directPaste, setDirectPaste] = useState("")
   const [directSaving, setDirectSaving] = useState(false)
+  const [creatingBlank, setCreatingBlank] = useState(false)
   const [directError, setDirectError] = useState<string | null>(null)
   const [libraryQuery, setLibraryQuery] = useState("")
   const [libraryStatus, setLibraryStatus] = useState<ContentStatus | "active">("active")
@@ -630,23 +743,6 @@ export default function ContentStudioPage() {
       ? autoPublishSettings.channels.filter(c => c !== channel)
       : [...autoPublishSettings.channels, channel]
     saveAutoPublishSettings({ ...autoPublishSettings, channels })
-  }
-
-  function describeLastAutoPublishRun(track: AutoPublishTrackSettings): string | null {
-    if (!track.last_run_at) return null
-    const when = new Date(track.last_run_at).toLocaleString("es-AR")
-    const reasonMap: Record<string, string> = {
-      skipped_disabled: "estaba apagada",
-      skipped_interval: "todavía no correspondía según la frecuencia configurada",
-      skipped_no_item: "no había ninguna pieza aprobada lista para publicar",
-      skipped_race: "el contenido elegido cambió de estado justo antes de publicar (probablemente se publicó manualmente)",
-      quota_exceeded: "se alcanzó el límite diario de generación con IA, se reintenta al otro día",
-      published: "se publicó correctamente",
-      partial: "se publicó parcialmente (revisá el detalle en la pieza correspondiente)",
-    }
-    const result = track.last_run_result ?? ""
-    const readable = reasonMap[result] ?? (result.startsWith("error") ? `hubo un error (${result.replace(/^error:\s*/, "")})` : result)
-    return `Último intento: ${when} — ${readable}`
   }
 
   const counts = useMemo(() => ({
@@ -840,6 +936,51 @@ export default function ContentStudioPage() {
     setItems(previous => [item, ...previous])
     setActive(item)
     setManualPrompt(null)
+  }
+
+  async function createBlankItem() {
+    setDirectError(null)
+    setCreatingBlank(true)
+    const now = new Date().toISOString()
+    const item: ContentItem = {
+      id: crypto.randomUUID(),
+      topic: topic.trim() || category.trim() || "Contenido manual",
+      category: category.trim() || "Contenido manual",
+      format,
+      goal: "Captar consultas y explicar como pedir turno",
+      status: "draft",
+      channels: format === "historia" ? ["instagram"] : ["instagram", "google_business"],
+      source: null,
+      created_at: now,
+      updated_at: now,
+      approved_at: null,
+      hook: "",
+      caption: "",
+      google_text: "",
+      hashtags: "",
+      visual_headline: "",
+      visual_subtitle: "",
+      visual_style: "blue",
+    }
+    try {
+      const saved = await fetch("/api/content/items", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(item),
+      })
+      if (!saved.ok) {
+        const data = await saved.json().catch(() => null) as { error?: string } | null
+        throw new Error(data?.error || "No se pudo crear la pieza en blanco.")
+      }
+      setItems(previous => [item, ...previous])
+      setActive(item)
+      setManualPrompt(null)
+      setShowDirectEntry(false)
+    } catch (e) {
+      setDirectError(e instanceof Error ? e.message : "No se pudo crear la pieza en blanco.")
+    } finally {
+      setCreatingBlank(false)
+    }
   }
 
   async function saveDirect() {
@@ -1221,25 +1362,43 @@ export default function ContentStudioPage() {
 
                   {showDirectEntry && (
                     <div className="mt-3 space-y-3">
-                      <Textarea
-                        rows={8}
-                        value={directPaste}
-                        onChange={e => { setDirectPaste(e.target.value); setDirectError(null) }}
-                        placeholder={`Pegá acá la respuesta JSON completa. Debe incluir los textos, image_prompt listo para Gemini e image_alt_text.`}
-                        className="font-mono text-xs text-gray-900 placeholder:text-gray-400 resize-none"
-                      />
-                      {directError && (
-                        <p className="text-xs text-red-600 bg-red-50 rounded p-2">{directError}</p>
-                      )}
                       <Button
-                        onClick={saveDirect}
-                        disabled={directSaving || !directPaste.trim()}
-                        className="w-full gap-2"
+                        type="button"
                         variant="outline"
+                        onClick={createBlankItem}
+                        disabled={creatingBlank}
+                        className="w-full gap-2"
                       >
-                        {directSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
-                        Procesar y guardar como borrador
+                        {creatingBlank ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+                        Crear pieza en blanco (completar todo a mano)
                       </Button>
+                      <p className="text-xs text-gray-400">
+                        Se abre en el editor con todos los campos vacíos. Completalos, subí ahí mismo
+                        una imagen propia ya lista (sin pasar por Gemini) y aprobala cuando quieras
+                        para que entre a la cola de publicación.
+                      </p>
+                      <div className="border-t pt-3 space-y-2">
+                        <p className="text-xs text-gray-500">O pegá la respuesta JSON de una IA (ChatGPT, Gemini, Claude):</p>
+                        <Textarea
+                          rows={8}
+                          value={directPaste}
+                          onChange={e => { setDirectPaste(e.target.value); setDirectError(null) }}
+                          placeholder={`Pegá acá la respuesta JSON completa. Debe incluir los textos, image_prompt listo para Gemini e image_alt_text.`}
+                          className="font-mono text-xs text-gray-900 placeholder:text-gray-400 resize-none"
+                        />
+                        {directError && (
+                          <p className="text-xs text-red-600 bg-red-50 rounded p-2">{directError}</p>
+                        )}
+                        <Button
+                          onClick={saveDirect}
+                          disabled={directSaving || !directPaste.trim()}
+                          className="w-full gap-2"
+                          variant="outline"
+                        >
+                          {directSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+                          Procesar y guardar como borrador
+                        </Button>
+                      </div>
                     </div>
                   )}
                 </div>
@@ -1320,68 +1479,24 @@ export default function ContentStudioPage() {
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <div className="rounded-lg border border-gray-100 p-3 space-y-2">
-                    <p className="text-sm font-medium text-gray-900">Posts de feed</p>
-                    <div className="flex flex-wrap items-center gap-3">
-                      <Button
-                        variant={autoPublishSettings.post.enabled ? "default" : "outline"}
-                        size="sm"
-                        disabled={savingAutoPublish}
-                        onClick={() => saveTrackSettings("post", { enabled: !autoPublishSettings.post.enabled })}
-                      >
-                        {autoPublishSettings.post.enabled ? "Activada" : "Desactivada"}
-                      </Button>
-                      <div className="flex items-center gap-2 text-sm text-gray-700">
-                        <Input
-                          type="number"
-                          min={1}
-                          max={7}
-                          value={autoPublishSettings.post.times_per_week}
-                          onChange={e => saveTrackSettings("post", { times_per_week: Math.min(7, Math.max(1, Number(e.target.value) || 1)) })}
-                          className="w-16 text-gray-900"
-                        />
-                        <span>veces por semana</span>
-                      </div>
-                    </div>
-                    <p className="text-xs text-gray-500">
-                      {counts.approvedPost} post{counts.approvedPost === 1 ? "" : "s"} aprobado{counts.approvedPost === 1 ? "" : "s"} en cola
-                      {counts.approvedPost > 0 && ` — a este ritmo, el último saldría en unos ${Math.ceil(counts.approvedPost * (7 / autoPublishSettings.post.times_per_week))} días`}.
-                    </p>
-                    {describeLastAutoPublishRun(autoPublishSettings.post) && (
-                      <p className="text-xs text-gray-500">{describeLastAutoPublishRun(autoPublishSettings.post)}</p>
-                    )}
-                  </div>
-                  <div className="rounded-lg border border-gray-100 p-3 space-y-2">
-                    <p className="text-sm font-medium text-gray-900">Historias</p>
-                    <div className="flex flex-wrap items-center gap-3">
-                      <Button
-                        variant={autoPublishSettings.historia.enabled ? "default" : "outline"}
-                        size="sm"
-                        disabled={savingAutoPublish}
-                        onClick={() => saveTrackSettings("historia", { enabled: !autoPublishSettings.historia.enabled })}
-                      >
-                        {autoPublishSettings.historia.enabled ? "Activada" : "Desactivada"}
-                      </Button>
-                      <div className="flex items-center gap-2 text-sm text-gray-700">
-                        <Input
-                          type="number"
-                          min={1}
-                          max={7}
-                          value={autoPublishSettings.historia.times_per_week}
-                          onChange={e => saveTrackSettings("historia", { times_per_week: Math.min(7, Math.max(1, Number(e.target.value) || 1)) })}
-                          className="w-16 text-gray-900"
-                        />
-                        <span>veces por semana</span>
-                      </div>
-                    </div>
-                    <p className="text-xs text-gray-500">
-                      {counts.approvedHistoria} historia{counts.approvedHistoria === 1 ? "" : "s"} aprobada{counts.approvedHistoria === 1 ? "" : "s"} en cola
-                      {counts.approvedHistoria > 0 && ` — a este ritmo, la última saldría en unos ${Math.ceil(counts.approvedHistoria * (7 / autoPublishSettings.historia.times_per_week))} días`}.
-                    </p>
-                    {describeLastAutoPublishRun(autoPublishSettings.historia) && (
-                      <p className="text-xs text-gray-500">{describeLastAutoPublishRun(autoPublishSettings.historia)}</p>
-                    )}
-                  </div>
+                  <AutoPublishTrackCard
+                    title="Posts de feed"
+                    track={autoPublishSettings.post}
+                    queueText={describeAutoPublishQueue("post", counts.approvedPost, autoPublishSettings.post.times_per_week)}
+                    saving={savingAutoPublish}
+                    onToggleEnabled={() => saveTrackSettings("post", { enabled: !autoPublishSettings.post.enabled })}
+                    onChangeTimesPerWeek={value => saveTrackSettings("post", { times_per_week: value })}
+                    onChangeStartsAt={iso => saveTrackSettings("post", { starts_at: iso })}
+                  />
+                  <AutoPublishTrackCard
+                    title="Historias"
+                    track={autoPublishSettings.historia}
+                    queueText={describeAutoPublishQueue("historia", counts.approvedHistoria, autoPublishSettings.historia.times_per_week)}
+                    saving={savingAutoPublish}
+                    onToggleEnabled={() => saveTrackSettings("historia", { enabled: !autoPublishSettings.historia.enabled })}
+                    onChangeTimesPerWeek={value => saveTrackSettings("historia", { times_per_week: value })}
+                    onChangeStartsAt={iso => saveTrackSettings("historia", { starts_at: iso })}
+                  />
                 </CardContent>
               </Card>
               <div className="flex flex-col gap-3 rounded-lg border border-gray-200 bg-white p-3 md:flex-row">
@@ -1557,13 +1672,16 @@ function Editor({
   const [altTextError, setAltTextError] = useState<string | null>(null)
   const [directionGenerating, setDirectionGenerating] = useState(false)
   const [directionError, setDirectionError] = useState<string | null>(null)
+  const [imageUploading, setImageUploading] = useState(false)
+  const [imageUploadError, setImageUploadError] = useState<string | null>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const imagePrompt = item.image_prompt?.trim() || fallbackImagePrompt(item)
   const displayedVisualUrl = generatedVisual?.itemId === item.id ? generatedVisual.url : item.visual_url
   const approvalReady = Boolean(
     item.hook.trim() &&
     item.caption.trim() &&
     item.google_text.trim() &&
-    item.visual_headline.trim() &&
+    (item.visual_headline.trim() || item.visual_url) &&
     item.google_text.length <= 1500
   )
 
@@ -1612,6 +1730,35 @@ function Editor({
       setVisualError("No se pudo conectar con Gemini para generar la placa.")
     } finally {
       setVisualGenerating(false)
+    }
+  }
+
+  async function handleImageUpload(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0]
+    event.target.value = ""
+    if (!file) return
+    setImageUploading(true)
+    setImageUploadError(null)
+    try {
+      const dataUrl = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader()
+        reader.onload = () => resolve(reader.result as string)
+        reader.onerror = () => reject(new Error("No se pudo leer el archivo."))
+        reader.readAsDataURL(file)
+      })
+      const response = await fetch("/api/content/upload-image", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ itemId: item.id, imageDataUrl: dataUrl }),
+      })
+      const data = await response.json()
+      if (!response.ok || data.error) throw new Error(data.error ?? "No se pudo subir la imagen.")
+      onGeneratedVisual(null)
+      onSave({ visual_url: data.visual_url })
+    } catch (error) {
+      setImageUploadError(error instanceof Error ? error.message : "No se pudo subir la imagen.")
+    } finally {
+      setImageUploading(false)
     }
   }
 
@@ -1735,6 +1882,26 @@ function Editor({
                   Descargar placa
                 </Button>
               )}
+            </div>
+            <div className="space-y-2">
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/png,image/jpeg,image/webp"
+                className="hidden"
+                onChange={handleImageUpload}
+              />
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={imageUploading}
+                className="w-full gap-2"
+              >
+                {imageUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImageIcon className="h-4 w-4" />}
+                Subir imagen propia (sin generar con IA)
+              </Button>
+              {imageUploadError && <p className="text-xs text-red-600 bg-red-50 rounded p-2">{imageUploadError}</p>}
             </div>
             <details className="rounded-lg border border-violet-100 bg-white p-3 text-xs text-gray-600" open={Boolean(directionError)}>
               <summary className="cursor-pointer font-medium text-gray-800">Ver dirección visual decidida por la IA</summary>
@@ -1916,7 +2083,7 @@ function Editor({
             </div>
           )}
           {!approvalReady && item.status === "draft" && (
-            <p className="text-xs text-amber-700">Para aprobar, completá hook, caption, texto de Google y titular visual.</p>
+            <p className="text-xs text-amber-700">Para aprobar, completá hook, caption y texto de Google, y agregá un titular visual o subí una imagen propia.</p>
           )}
           <p className="text-xs text-gray-500">
             {igConnected

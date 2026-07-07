@@ -166,6 +166,8 @@ export interface ContentItem {
 export interface AutoPublishTrackSettings {
   enabled: boolean
   times_per_week: number
+  /** Si esta en el futuro, el track no publica nada hasta esa fecha (aunque este activado). null = arrancar ya. */
+  starts_at: string | null
   last_published_at: string | null
   last_run_at: string | null
   last_run_result: string | null
