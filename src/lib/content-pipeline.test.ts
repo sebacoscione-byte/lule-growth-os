@@ -128,4 +128,12 @@ describe("resolveChannelsToPublish", () => {
     )
     expect(result).toEqual([])
   })
+
+  it("excluye canales que ya se publicaron con exito, para no duplicar un reintento parcial", () => {
+    const result = resolveChannelsToPublish(
+      item({ channels: ["instagram", "google_business"], auto_publish_result: { instagram: "published", google_business: "error" } }),
+      ["instagram", "google_business"]
+    )
+    expect(result).toEqual(["google_business"])
+  })
 })

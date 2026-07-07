@@ -88,7 +88,11 @@ export function pickNextPublishableItem(items: ContentItem[], format: "post" | "
   return candidates[0] ?? null
 }
 
-/** Pura, sin I/O: interseccion entre los canales pedidos por la pieza y los habilitados globalmente. */
+/**
+ * Pura, sin I/O: interseccion entre los canales pedidos por la pieza y los habilitados globalmente,
+ * excluyendo los que ya se publicaron con exito antes (reintento tras una publicacion parcial no
+ * debe volver a postear en el canal que ya salio bien).
+ */
 export function resolveChannelsToPublish(item: ContentItem, channels: ContentChannel[]): ContentChannel[] {
-  return item.channels.filter(channel => channels.includes(channel))
+  return item.channels.filter(channel => channels.includes(channel) && item.auto_publish_result?.[channel] !== "published")
 }
