@@ -65,7 +65,7 @@ Google Maps, Instagram, WhatsApp y búsqueda orgánica.
 - [x] ~~Formulario "No pude pedir turno" en las landings~~ — se sacó de la web pública. Creaba un lead `seguimiento_pendiente` prometiendo "te ayudamos", pero **hoy nadie revisa el CRM/Inbox** para mandar ese seguimiento manual (`/api/followup` requiere que un usuario logueado lo dispare a mano). Mostrar el formulario sin nadie contestando es peor que no tenerlo. Quedan solo los canales que responden solos: llamar y el bot de WhatsApp. El backend (`/api/public/lead`, con el campo `insurance` ya soportado) queda intacto sin uso — reactivar cuando haya alguien asignado a hacer el seguimiento manual, o cuando se automatice la respuesta por WhatsApp (Etapa 7).
 
 ### Acciones externas (las hace Lucía)
-- [ ] Configurar `/dra-lucia-chahin` como link de la bio en Instagram *(acción de Lucía)*
+- [x] Configurar `/dra-lucia-chahin` como link de la bio en Instagram — hecho vía dominio propio `draluciachahin.ar`, ver Etapa 5
 - [ ] Configurar `/dra-lucia-chahin` como sitio web en Google Business Profile *(acción de Lucía)*
 
 ### Decisión pendiente: Google Cloud — fin de la prueba gratuita (~90 días desde 2026-07-04)
