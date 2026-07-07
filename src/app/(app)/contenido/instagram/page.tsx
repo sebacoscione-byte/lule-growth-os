@@ -1558,6 +1558,7 @@ function Editor({
           format: item.format,
           visual_headline: item.visual_headline,
           visual_subtitle: item.visual_subtitle,
+          caption: item.caption,
           previous_image_prompt: imagePrompt,
         }),
       })

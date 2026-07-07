@@ -11,7 +11,7 @@ export async function POST(request: Request) {
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
     const body = await request.json() as Record<string, unknown>
-    const required = ["category", "topic", "visual_headline", "visual_subtitle"]
+    const required = ["category", "topic", "visual_headline", "visual_subtitle", "caption"]
     if (required.some(field => typeof body[field] !== "string" || !(body[field] as string).trim())) {
       return NextResponse.json({ error: "Faltan datos para regenerar la dirección visual." }, { status: 400 })
     }
@@ -25,6 +25,7 @@ export async function POST(request: Request) {
       format: body.format as typeof FORMATS[number],
       visual_headline: (body.visual_headline as string).slice(0, 90),
       visual_subtitle: (body.visual_subtitle as string).slice(0, 90),
+      caption: (body.caption as string).slice(0, 3000),
       previous_image_prompt: typeof body.previous_image_prompt === "string" ? body.previous_image_prompt : undefined,
     })
 

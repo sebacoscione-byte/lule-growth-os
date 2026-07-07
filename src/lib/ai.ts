@@ -814,6 +814,7 @@ export async function regenerateImageDirection(input: {
   format: "reel" | "historia" | "carrusel" | "post"
   visual_headline: string
   visual_subtitle: string
+  caption: string
   previous_image_prompt?: string
 }): Promise<{ image_prompt: string; image_alt_text: string }> {
   if (getAiMode() === "manual") {
@@ -828,12 +829,16 @@ export async function regenerateImageDirection(input: {
     purpose: "image_direction",
     system: `${IMAGE_PROMPT_RULES}
 
-Te paso una pieza de contenido ya escrita (categoria, tema, titular y subtitulo de la placa). Tu unica
-tarea es proponer una direccion visual nueva para esa pieza puntual, siguiendo las reglas de arriba.
+Te paso una pieza de contenido ya escrita (categoria, tema, titular, subtitulo y el caption completo
+que va a acompañar la placa). Tu tarea es proponer una direccion visual nueva para esa pieza puntual,
+siguiendo las reglas de arriba. La escena tiene que guardar correlacion concreta con lo que dice el
+caption (el gancho, el ejemplo o la idea central que desarrolla), no solo con el titular corto —
+si el caption habla de un habito, una situacion o un dato puntual, la imagen deberia reflejar eso
+mismo en vez de una escena generica de la categoria.
 Devolve SOLO un JSON con esta forma exacta: { "image_prompt": "...", "image_alt_text": "..." }`,
     messages: [{
       role: "user",
-      content: `Categoria: ${input.category}\nTema: ${input.topic}\nFormato: ${input.format}\nTitular: "${input.visual_headline}"\nSubtitulo: "${input.visual_subtitle}"${avoidPrevious}`,
+      content: `Categoria: ${input.category}\nTema: ${input.topic}\nFormato: ${input.format}\nTitular: "${input.visual_headline}"\nSubtitulo: "${input.visual_subtitle}"\nCaption completo:\n${input.caption}${avoidPrevious}`,
     }],
   })
   const parsed = parseJson<{ image_prompt: string; image_alt_text: string }>(text)
