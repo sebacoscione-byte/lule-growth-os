@@ -119,6 +119,12 @@ intención de turno: quien busca "cardióloga en Lanús" tiene alta probabilidad
 
 ### Módulo en la app ✅
 - [x] Checklist de configuración del perfil con ítems priorizados
+- [x] Checklist: 5 de 14 items se auto-detectan leyendo el perfil real de Google en cada carga
+      (nombre, descripción, horario del martes, link a la landing, teléfono) — quedan no-editables
+      con badge "Detectado automáticamente" mientras Google esté conectado; si se desconecta, caen
+      de vuelta al valor manual guardado (2026-07-07). Los 9 restantes (categorías, fotos, Q&A,
+      pin del mapa, servicios, y 2 que en realidad son de Instagram) no tienen forma de verificarse
+      por API — ver `src/lib/google-business.ts` → `computeChecklistAutoStatus`.
 - [x] Publicaciones: generador con IA + modo manual (copiar y pegar)
 - [x] Reseñas: sugerencias de respuesta con IA
 - [x] Perfil: editar descripción, horarios, teléfono y sitio web
