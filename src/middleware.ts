@@ -1,6 +1,7 @@
 import { createServerClient } from "@supabase/ssr"
 import { NextResponse, type NextRequest } from "next/server"
 import { PUBLIC_LANDING_SLUGS } from "@/lib/public-landings"
+import { HERO_VARIANT_COOKIE } from "@/lib/landing-track"
 
 const PUBLIC_ROOT_PATHS = new Set(PUBLIC_LANDING_SLUGS.map((slug) => `/${slug}`))
 
@@ -36,6 +37,26 @@ export async function middleware(request: NextRequest) {
     request.nextUrl.pathname.startsWith("/api") ||
     request.nextUrl.pathname === "/" ||
     PUBLIC_ROOT_PATHS.has(request.nextUrl.pathname)
+
+  const isLandingRoute =
+    request.nextUrl.pathname.startsWith("/landings/") ||
+    PUBLIC_ROOT_PATHS.has(request.nextUrl.pathname)
+
+  if (isLandingRoute) {
+    const existingVariant = request.cookies.get(HERO_VARIANT_COOKIE)?.value
+    if (existingVariant !== "a" && existingVariant !== "b") {
+      const variant = Math.random() < 0.5 ? "a" : "b"
+      const previousCookies = supabaseResponse.cookies.getAll()
+      request.cookies.set(HERO_VARIANT_COOKIE, variant)
+      supabaseResponse = NextResponse.next({ request })
+      previousCookies.forEach((cookie) => supabaseResponse.cookies.set(cookie))
+      supabaseResponse.cookies.set(HERO_VARIANT_COOKIE, variant, {
+        maxAge: 60 * 60 * 24 * 90,
+        path: "/",
+        sameSite: "lax",
+      })
+    }
+  }
 
   if (!user && request.nextUrl.pathname === "/") {
     const url = request.nextUrl.clone()

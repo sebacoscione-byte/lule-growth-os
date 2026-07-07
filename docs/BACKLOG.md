@@ -248,7 +248,18 @@ público para pedir turno.
 - [ ] Google Search Console: monitorear keywords, indexación y clics
 - [ ] Google Analytics: visitas, sesiones, tasa de rebote y conversión por página
 - [ ] Google Ads: campañas de búsqueda pagada para Lanús y Lomas de Zamora
-- [ ] A/B testing de landings: variantes de hero, CTA y formulario
+- [x] A/B testing de landings (2026-07-07) — primer test real en producción: la landing principal
+      (`/dra-lucia-chahin`) asigna automáticamente, por cookie (`lule_hero_variant`, 90 días), cuál de
+      los dos botones del hero es primario — "Pedir turno" (variante A, control) o "Ver sedes y
+      horarios" (variante B). Asignación 50/50 en `middleware.ts`, sin cuenta de usuario ni backend de
+      experimentos: el visitante siempre ve la misma variante mientras dure la cookie. Resultados en
+      `/dashboard` → "Test A/B: hero de la landing principal" (visitas, clicks por botón e
+      interacciones downstream por variante, últimos 90 días). *Alcance a propósito: solo la landing
+      principal (las 6 landings SEO tienen un hero más simple, de un solo botón, sin tocar) y un solo
+      test a la vez — no se construyó una plataforma de experimentos genérica todavía. No hay ganador
+      automático: hay que mirar la tabla y decidir a mano cuándo cortar el test.* Ver
+      `src/middleware.ts`, `src/app/landings/[slug]/page.tsx`, `src/app/landings/[slug]/hero-cta-link.tsx`,
+      `src/lib/landing-track.ts`, migración `20260707_landing_events_variant.sql`.
 - [ ] Sistema de recomendaciones de crecimiento basado en métricas acumuladas
 
 ---
@@ -296,12 +307,14 @@ mensajes "entrantes" forjados. Los tres quedaron corregidos y mergeados — `WHA
 cargado en Vercel y confirmado activo con una prueba real. Detalle completo en memory
 `project_security_audit_2026-07-07`.
 
-### [SECURITY] Verificar que el alta de usuarios (signup) esté cerrada en Supabase Auth
+### [SECURITY] ✅ Resuelto (2026-07-07): Alta de usuarios (signup) cerrada en Supabase Auth
 Las políticas RLS de `leads`, `messages`, `app_config`, etc. dan acceso total de lectura/escritura a
 "cualquier usuario autenticado" (`to authenticated using (true)`) — es un patrón razonable para un
-equipo chico, pero solo es seguro si el registro de cuentas nuevas por email está deshabilitado o
-restringido a invitación en el dashboard de Supabase (Authentication → Providers → Email). No se puede
-verificar desde el código del repo — pendiente de chequeo manual.
+equipo chico, pero solo es seguro si el registro de cuentas nuevas por email está deshabilitado. Se
+verificó en el dashboard de Supabase (Authentication → Sign In / Providers) que "Allow new users to
+sign up" estaba **prendido** (cualquiera podía registrarse y quedar con acceso total) — se apagó y
+guardó. Solo quedan los 3 usuarios ya existentes (dra. Lucía, lchahin2015, Seba); para sumar gente
+nueva al equipo hay que crearla a mano desde Authentication → Users → Add user.
 
 ### [TECH] `npm audit`: vuln moderada transitiva en `postcss` (vía `next`)
 XSS en el stringify de CSS de `postcss` (`GHSA-qx2v-qp2m-jg93`), dependencia interna de `next`. El fix
