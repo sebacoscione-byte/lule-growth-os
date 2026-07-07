@@ -180,7 +180,8 @@ sistema de costos está preparado para ese cambio, pero **no viene con montos re
 El Estudio de contenido (`Estudio de contenido → pestaña Biblioteca`) tiene una tarjeta "Publicación
 automática" con **dos cronogramas independientes** — Posts de feed e Historias — para que las piezas
 aprobadas se publiquen solas cada tantas veces por semana, sin depender de que alguien entre a clickear
-"Publicar". Corre vía un **Vercel Cron** diario (`vercel.json`, 09:00 UTC) que pega a
+"Publicar". Corre vía un **Vercel Cron** diario (`vercel.json`, 11:45 UTC = 08:45 ART, Argentina no tiene
+horario de verano) que pega a
 `/api/cron/publish-content` y evalúa ambos cronogramas en la misma corrida (cada uno con su propio
 enabled/frecuencia/última publicación).
 
