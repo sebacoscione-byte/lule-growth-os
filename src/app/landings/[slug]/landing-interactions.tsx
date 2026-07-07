@@ -116,16 +116,18 @@ function CtaCard({ sede, expanded, onToggle, onEngage }: CtaCardProps) {
             Llamar
           </a>
         )}
-        <a
-          href={whatsappUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          onClick={onEngage}
-          className="inline-flex items-center gap-2 rounded-full border border-green-300 px-4 py-2 text-sm font-semibold text-green-700 hover:bg-green-50 transition-colors"
-        >
-          <MessageCircle className="h-4 w-4" />
-          Consultar por WhatsApp
-        </a>
+        {sede.whatsapp && (
+          <a
+            href={whatsappUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={onEngage}
+            className="inline-flex items-center gap-2 rounded-full border border-green-300 px-4 py-2 text-sm font-semibold text-green-700 hover:bg-green-50 transition-colors"
+          >
+            <MessageCircle className="h-4 w-4" />
+            Consultar por WhatsApp
+          </a>
+        )}
         {sede.mapsUrl && (
           <a
             href={sede.mapsUrl}
