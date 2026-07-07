@@ -106,13 +106,59 @@ export async function listLocations(token: string, accountName: string) {
 
 // ─── Profile ─────────────────────────────────────────────────────────────────
 
-export async function getLocation(token: string, locationName: string) {
+export interface GoogleLocationProfile {
+  name?: string
+  title?: string
+  storefrontAddress?: { addressLines?: string[]; locality?: string; administrativeArea?: string }
+  regularHours?: { periods?: Array<{ openDay: string; openTime: unknown; closeTime: unknown }> }
+  phoneNumbers?: { primaryPhone?: string }
+  websiteUri?: string
+  profile?: { description?: string }
+}
+
+export async function getLocation(token: string, locationName: string): Promise<GoogleLocationProfile> {
   const url = `${INFO_API}/${locationName}?readMask=name,title,storefrontAddress,regularHours,phoneNumbers,websiteUri,profile`
   const res = await fetch(url, {
     headers: { Authorization: `Bearer ${token}` },
   })
   if (!res.ok) throw new Error(await res.text())
-  return res.json()
+  return res.json() as Promise<GoogleLocationProfile>
+}
+
+// ─── Checklist auto-detection ─────────────────────────────────────────────────
+
+/**
+ * Subconjunto de items del checklist de Google Local que se pueden verificar leyendo el perfil
+ * real (Business Information API), en vez de depender de que alguien los tilde a mano. El resto
+ * de los items (Q&A, fotos, categorías, etc.) no tiene API pública de Google o requiere una API
+ * separada con la misma restricción de cuota que ya bloquea "listar cuentas" para esta cuenta —
+ * quedan manuales.
+ */
+export const AUTO_CHECKLIST_KEYS = [
+  "nombre_correcto",
+  "descripcion_cargada",
+  "horario_real",
+  "link_landing",
+  "telefono_configurado",
+] as const
+
+const ACCENTS: Record<string, string> = { á: "a", é: "e", í: "i", ó: "o", ú: "u", ñ: "n" }
+
+function normalizeText(s: string): string {
+  return s.toLowerCase().replace(/[áéíóúñ]/g, c => ACCENTS[c] ?? c)
+}
+
+export function computeChecklistAutoStatus(location: GoogleLocationProfile): Record<string, boolean> {
+  const title = normalizeText(location.title ?? "")
+  const keywordStuffing = ["cardiolog", "consultorio", "clinica", "cimel", "turno", "medic"]
+
+  return {
+    nombre_correcto: title.includes("lucia chahin") && !keywordStuffing.some(k => title.includes(k)),
+    descripcion_cargada: Boolean(location.profile?.description && location.profile.description.trim().length > 20),
+    horario_real: Boolean(location.regularHours?.periods?.some(p => p.openDay === "TUESDAY")),
+    link_landing: Boolean(location.websiteUri?.includes("dra-lucia-chahin")),
+    telefono_configurado: Boolean(location.phoneNumbers?.primaryPhone?.trim()),
+  }
 }
 
 export async function updateDescription(token: string, locationName: string, description: string) {
