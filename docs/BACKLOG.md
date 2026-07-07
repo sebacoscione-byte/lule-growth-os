@@ -260,7 +260,18 @@ público para pedir turno.
       automático: hay que mirar la tabla y decidir a mano cuándo cortar el test.* Ver
       `src/middleware.ts`, `src/app/landings/[slug]/page.tsx`, `src/app/landings/[slug]/hero-cta-link.tsx`,
       `src/lib/landing-track.ts`, migración `20260707_landing_events_variant.sql`.
-- [ ] Sistema de recomendaciones de crecimiento basado en métricas acumuladas
+- [x] Sistema de recomendaciones de crecimiento (2026-07-07) — motor de reglas simples (sin ML) sobre
+      datos que la app ya junta en 4 canales, mostrado en `/dashboard` → "Recomendaciones de
+      crecimiento". Cada regla es pura y está testeada por separado (`src/lib/growth-recommendations.ts`,
+      38 tests): **web** (landing con muchas visitas y baja interacción, landing sin ninguna visita,
+      sede sin obras sociales cargadas, señal para cortar el test A/B del hero), **WhatsApp** (costo
+      proyectado sobre el presupuesto, templates sin aprobar, conversaciones abandonadas sin derivar),
+      **Instagram** (no conectado, publicación automática apagada, última corrida con error, track
+      activado que no publica hace más de 21 días) y **Google Maps** (reseñas no configuradas, pocas
+      reseñas, rating bajo, Google Business no conectado). *Sin acción automática — cada recomendación
+      es informativa, la decisión la sigue tomando una persona.* No incluye Google Search Console/Ads
+      ni tasa de rebote de GA (esos dos ítems de arriba siguen pendientes, son acciones externas de
+      configuración, no datos que la app ya tenga).
 
 ---
 

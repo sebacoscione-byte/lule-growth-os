@@ -332,6 +332,23 @@ pieza puntual. **Limitación real de la plataforma**: Instagram no permite links
 de feed comunes — este link solo es útil pegado en historias (link sticker) o en la bio/Linktree, no
 hay forma de atribuir un post de feed sin pasar por ahí.
 
+## Sistema de recomendaciones de crecimiento — cómo funciona (2026-07-07)
+
+`/dashboard` → "Recomendaciones de crecimiento" muestra sugerencias automáticas sobre los 4 canales de
+adquisición (web/landings, WhatsApp, Instagram, Google Maps), basadas en datos que la app **ya** junta
+hoy — no es Machine Learning, es un motor de reglas simples con umbrales fijos
+(`src/lib/growth-recommendations.ts`, cada regla es una función pura con sus propios tests). Ejemplos:
+"esta landing tuvo muchas visitas pero casi nadie hizo click", "Swiss Medical no tiene obras sociales
+cargadas", "hay 3 templates de WhatsApp sin aprobar", "Instagram no publica nada hace 3 semanas", "el
+rating de Google bajó". **No hay ninguna acción automática** — cada recomendación es solo informativa,
+con un link a la pantalla relevante para que la persona decida. La función que junta los datos
+(`getGrowthRecommendationsData` en `dashboard/page.tsx`) está en un try/catch: si falla cualquier query,
+la card simplemente no aparece, no rompe el resto del dashboard (mismo patrón que el resto de las
+métricas del dashboard). Para agregar una regla nueva: escribir una función pura en
+`growth-recommendations.ts` que reciba datos ya fetcheados y devuelva `GrowthRecommendation | null`,
+testearla ahí, y sumarla al `Promise.all`/`buildGrowthRecommendations` en el dashboard si necesita un
+dato que hoy no se fetchea.
+
 ## Tests
 
 El proyecto usa **Jest** (`npm test`) para lógica pura sin UI: pricing, ventana de 24h, intents,
