@@ -3,6 +3,7 @@
 ## Estado actual
 - 2026-06-11: Setup inicial del proyecto. MVP Fase 1 en construcción.
 - 2026-07-05: Se sumó el Hospital Británico como tercera sede de derivación (miércoles), junto a CIMEL Lanús (martes) y Swiss Medical Lomas (viernes).
+- 2026-07-06: Se eliminó `createServiceClient()` (bug de sesión pisando service_role, ver más abajo) migrando todas las rutas a `getServiceDb()`. Se ampliaron los eventos de landing (visitas + clicks por acción/sede), se agregó ranking de landings, link de seguimiento por pieza de contenido (utm_content) y reportes semanales automáticos en `/dashboard`.
 
 ## Qué es esta app
 Sistema de adquisición de pacientes para la Dra. Lucía Chahin, cardióloga.
@@ -92,8 +93,8 @@ INSTAGRAM_OAUTH_BASE_URL=https://tu-dominio.com
 WHATSAPP_PHONE_NUMBER_ID=     # Panel: developers.facebook.com → app → WhatsApp → API Setup
 WHATSAPP_ACCESS_TOKEN=        # Token permanente o de sistema (no el temporal de 24h)
 WHATSAPP_VERIFY_TOKEN=        # String secreto elegido por vos, para verificar el webhook
-# Publicacion automatica de contenido (Vercel Cron → /api/cron/publish-content)
-CRON_SECRET=                  # String secreto elegido por vos. Sin esto seteado, el cron falla-cerrado (401) y no publica nada
+# Cron jobs de Vercel (publicacion automatica de contenido + reporte semanal). Mismo secreto para ambos.
+CRON_SECRET=                  # String secreto elegido por vos. Sin esto seteado, los crons fallan-cerrado (401) y no corren nada
 ```
 
 ## Optimización de tokens / costos de IA
@@ -207,6 +208,23 @@ enabled/frecuencia/última publicación).
    implementada todavía porque requeriría un template de WhatsApp aprobado por Meta. Revisar la tarjeta
    de vez en cuando, o los logs de función en Vercel, mientras tanto.
 
+## Reportes semanales y link de seguimiento por pieza — cómo funcionan (2026-07-06)
+
+Un segundo **Vercel Cron** (`vercel.json`, lunes 08:00 UTC, mismo `CRON_SECRET`) pega a
+`/api/cron/weekly-report`: calcula leads nuevos, confirmados, tasa de conversión, canales y
+visitas/interacciones de landing de los últimos 7 días, y guarda un snapshot en `weekly_reports`
+(un registro por semana, se pisa si se re-corre la misma semana). Se ve en `/dashboard` → "Reportes
+semanales" — **no se envía a ningún lado**, es el mismo motivo que el punto 8 de arriba (sin template
+de WhatsApp aprobado no hay forma de mandarlo proactivamente).
+
+Cada pieza del Estudio de contenido tiene un **link de seguimiento** (`/api/content/track/[itemId]`,
+visible en el editor con botón de copiar) que redirige a `/dra-lucia-chahin` con
+`utm_content=<id de la pieza>`. La landing pública ya manda ese `utm_content` en sus eventos de
+`landing_events`, así que Biblioteca y el editor muestran cuántas visitas/interacciones generó esa
+pieza puntual. **Limitación real de la plataforma**: Instagram no permite links clickeables en posts
+de feed comunes — este link solo es útil pegado en historias (link sticker) o en la bio/Linktree, no
+hay forma de atribuir un post de feed sin pasar por ahí.
+
 ## Tests
 
 El proyecto usa **Jest** (`npm test`) para lógica pura sin UI: pricing, ventana de 24h, intents,
@@ -261,6 +279,24 @@ parte del array reescrito.
 - Desde el 2026-07-07 existe `app_config_history` (trigger `before update`) que guarda el valor
   anterior de cualquier fila de `app_config` antes de pisarla — sirve de red de seguridad, pero
   no reemplaza escribir la migración con cuidado.
+
+## Cliente de Supabase con service_role — usar siempre `getServiceDb()`, nunca un cliente con cookies
+Para código que necesita permisos de `service_role` (Storage, tablas con RLS restrictivo, webhooks,
+cron), usar **`getServiceDb()`** (`src/lib/supabase/service.ts`) — es un cliente de `@supabase/supabase-js`
+plano, sin cookies, que siempre autentica como `service_role` real.
+- **Nunca** crear un cliente de `@supabase/ssr` (`createServerClient`) pasándole la `service_role` key
+  junto con el `cookies` adapter. Ese patrón existió en el proyecto como `createServiceClient()`
+  (ya eliminado, 2026-07-06) y tenía un bug crítico: en cuanto había una sesión de usuario activa
+  (cookies de auth presentes), el cliente de `@supabase/ssr` hidrataba esa sesión y autenticaba
+  **todo** — incluido Storage — como ese usuario en vez de como `service_role`. La policy de Storage
+  de `content-media` solo permite escribir a `service_role` real, así que cualquier ruta que subía
+  archivos con ese patrón fallaba en silencio.
+- Si además necesitás verificar que hay un usuario logueado (rutas de la app, no públicas/webhooks),
+  usá **dos clientes separados**: `createClient()` (`src/lib/supabase/server.ts`, cookie-aware) solo
+  para `await supabase.auth.getUser()`, y `getServiceDb()` para todas las queries de negocio. Ver
+  cualquier ruta de `src/app/api/google-business/` como referencia del patrón.
+- Rutas públicas (`api/public/*`, callbacks de OAuth, la landing pública) no necesitan `createClient()`
+  en absoluto — no hay sesión de usuario que verificar — así que usan `getServiceDb()` directamente.
 
 ## Doctora y configuración
 - **Nombre**: Dra. Lucía Chahin

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { createServiceClient } from "@/lib/supabase/server"
+import { getServiceDb } from "@/lib/supabase/service"
 import { saveTokens, listAccounts, listLocations } from "@/lib/google-business"
 import {
   GOOGLE_OAUTH_REDIRECT_COOKIE,
@@ -43,7 +43,7 @@ export async function GET(req: NextRequest) {
   }
 
   const tokens = await tokenRes.json()
-  const supabase = await createServiceClient()
+  const supabase = getServiceDb()
 
   await saveTokens(supabase, tokens)
 

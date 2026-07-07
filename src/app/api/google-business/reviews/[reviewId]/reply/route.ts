@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
-import { createClient, createServiceClient } from "@/lib/supabase/server"
+import { createClient } from "@/lib/supabase/server"
+import { getServiceDb } from "@/lib/supabase/service"
 import { getValidToken, getConnectionInfo, replyToReview } from "@/lib/google-business"
 
 export async function PUT(
@@ -14,7 +15,7 @@ export async function PUT(
   const { comment } = await req.json() as { comment: string }
   if (!comment?.trim()) return NextResponse.json({ error: "comment required" }, { status: 400 })
 
-  const supabase = await createServiceClient()
+  const supabase = getServiceDb()
   const info = await getConnectionInfo(supabase)
   if (!info?.google_account_id || !info?.google_location_id) {
     return NextResponse.json({ error: "Falta Account ID. Google no lo expone en algunas cuentas; responde resenas desde el panel oficial." }, { status: 400 })

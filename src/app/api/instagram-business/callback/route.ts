@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { createServiceClient } from "@/lib/supabase/server"
+import { getServiceDb } from "@/lib/supabase/service"
 import { exchangeCodeForToken, exchangeForLongLivedToken, getProfile, saveTokens } from "@/lib/instagram-business"
 import {
   INSTAGRAM_OAUTH_REDIRECT_COOKIE,
@@ -26,7 +26,7 @@ export async function GET(req: NextRequest) {
     const longLived = await exchangeForLongLivedToken(shortLived.access_token)
     const profile = await getProfile(longLived.access_token)
 
-    const supabase = await createServiceClient()
+    const supabase = getServiceDb()
     await saveTokens(supabase, {
       access_token: longLived.access_token,
       expires_in: longLived.expires_in,

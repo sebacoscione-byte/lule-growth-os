@@ -1,7 +1,27 @@
 import { NextRequest, NextResponse } from "next/server"
+import type { SupabaseClient } from "@supabase/supabase-js"
 import { createClient } from "@/lib/supabase/server"
 import { readContentItems, writeContentItems } from "@/lib/content-pipeline"
 import type { ContentItem } from "@/types"
+
+const INTERACTION_EVENT_TYPES = new Set(["click_booking", "click_call", "click_whatsapp", "click_maps"])
+
+async function readAttribution(supabase: SupabaseClient, itemIds: string[]) {
+  const attribution: Record<string, { visits: number; interactions: number }> = {}
+  if (itemIds.length === 0) return attribution
+  const { data } = await supabase
+    .from("landing_events")
+    .select("utm_content, event_type")
+    .in("utm_content", itemIds)
+  for (const row of data ?? []) {
+    if (!row.utm_content) continue
+    const entry = attribution[row.utm_content] ?? { visits: 0, interactions: 0 }
+    if (row.event_type === "page_view") entry.visits += 1
+    else if (INTERACTION_EVENT_TYPES.has(row.event_type)) entry.interactions += 1
+    attribution[row.utm_content] = entry
+  }
+  return attribution
+}
 
 function errorResponse(error: unknown) {
   const message = error instanceof Error ? error.message : String(error)
@@ -25,7 +45,15 @@ async function writeItems(items: ContentItem[]) {
 
 export async function GET() {
   try {
-    return NextResponse.json({ items: await readItems() })
+    const supabase = await authenticatedClient()
+    const items = await readContentItems(supabase)
+    const attribution = await readAttribution(supabase, items.map(item => item.id))
+    const itemsWithAttribution = items.map(item => ({
+      ...item,
+      tracked_visits: attribution[item.id]?.visits ?? 0,
+      tracked_interactions: attribution[item.id]?.interactions ?? 0,
+    }))
+    return NextResponse.json({ items: itemsWithAttribution })
   } catch (error) {
     return errorResponse(error)
   }

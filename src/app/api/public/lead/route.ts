@@ -1,4 +1,4 @@
-import { createServiceClient } from "@/lib/supabase/server"
+import { getServiceDb } from "@/lib/supabase/service"
 import { NextResponse } from "next/server"
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit"
 
@@ -37,7 +37,7 @@ export async function POST(request: Request) {
     )
   }
 
-  const supabase = await createServiceClient()
+  const supabase = getServiceDb()
 
   const originChannel =
     utm_source === "google_maps" ? "google_maps" :

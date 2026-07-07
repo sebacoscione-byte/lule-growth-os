@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
-import { createClient, createServiceClient } from "@/lib/supabase/server"
+import { createClient } from "@/lib/supabase/server"
+import { getServiceDb } from "@/lib/supabase/service"
 import { getConnectionInfo } from "@/lib/google-business"
 
 export async function POST(req: NextRequest) {
@@ -15,7 +16,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "locationId required" }, { status: 400 })
   }
 
-  const supabase = await createServiceClient()
+  const supabase = getServiceDb()
   const info = await getConnectionInfo(supabase)
   if (!info) return NextResponse.json({ error: "Not connected" }, { status: 401 })
 

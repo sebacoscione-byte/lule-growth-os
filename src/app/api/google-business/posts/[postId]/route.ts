@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
-import { createClient, createServiceClient } from "@/lib/supabase/server"
+import { createClient } from "@/lib/supabase/server"
+import { getServiceDb } from "@/lib/supabase/service"
 import { getValidToken, getConnectionInfo, deletePost } from "@/lib/google-business"
 
 export async function DELETE(
@@ -11,7 +12,7 @@ export async function DELETE(
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
   const { postId } = await params
-  const supabase = await createServiceClient()
+  const supabase = getServiceDb()
   const info = await getConnectionInfo(supabase)
   if (!info?.google_account_id || !info?.google_location_id) {
     return NextResponse.json({ error: "Falta Account ID. Google no lo expone en algunas cuentas; administra publicaciones desde el panel oficial." }, { status: 400 })

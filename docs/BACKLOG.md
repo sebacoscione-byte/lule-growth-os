@@ -59,7 +59,7 @@ Google Maps, Instagram, WhatsApp y búsqueda orgánica.
 - [x] Sección "Obras sociales y formas de atención" — muestra coberturas cargadas por sede en Configuración, o mensaje honesto invitando a consultar si todavía no hay datos cargados *(pendiente: cargar `obras_sociales` reales por sede en Configuración — hoy están vacías)*
 - [x] Sección "Opiniones de pacientes" — reseñas reales de Google vía Places API (New) desde el 2026-07-04 (`GOOGLE_PLACES_API_KEY` + `GOOGLE_PLACE_ID`, ver CLAUDE.md). Cae al placeholder honesto si la API no está disponible.
 - [x] JSON-LD: `Physician` + `FAQPage` en todas las landings, `BreadcrumbList` en landings SEO, `identifier` (matrícula) cuando esté cargada *(pendiente: `MedicalClinic` por sede)*
-- [ ] Eventos de analítica ampliados (click en booking/whatsapp/maps/call por separado) — hoy se sigue registrando `cta_cimel`/`cta_britanico`/`cta_swiss` al primer engagement con cada sede; el catálogo completo de eventos sugerido en el brief queda para Etapa 6
+- [x] Eventos de analítica ampliados (2026-07-06) — `landing_events` ahora también registra `page_view` (una vez por carga de landing) y clicks separados por acción (`click_booking`/`click_call`/`click_whatsapp`/`click_maps`) con `location_key` por sede, además de los `cta_*` históricos que se mantienen para no romper las métricas globales existentes. El link "Cómo llegar" no trackeaba nada antes; ahora sí.
 
 ### Revertido (2026-07-04)
 - [x] ~~Formulario "No pude pedir turno" en las landings~~ — se sacó de la web pública. Creaba un lead `seguimiento_pendiente` prometiendo "te ayudamos", pero **hoy nadie revisa el CRM/Inbox** para mandar ese seguimiento manual (`/api/followup` requiere que un usuario logueado lo dispare a mano). Mostrar el formulario sin nadie contestando es peor que no tenerlo. Quedan solo los canales que responden solos: llamar y el bot de WhatsApp. El backend (`/api/public/lead`, con el campo `insurance` ya soportado) queda intacto sin uso — reactivar cuando haya alguien asignado a hacer el seguimiento manual, o cuando se automatice la respuesta por WhatsApp (Etapa 7).
@@ -175,11 +175,22 @@ público para pedir turno.
 - [x] Dashboard con métricas de conversión global
 - [x] Tasa de conversión: confirmaron turno / total leads
 
+### Implementado ✅ (2026-07-06)
+- [x] Dashboard por landing: visitas y interacciones por slug (`/dashboard` → "Ranking de landings"),
+      ordenado por tasa de interacción. *Nota honesta: no es "leads generados" en sentido estricto —
+      el formulario público que hubiera atribuido un lead a un slug está revertido (ver Etapa 2), así
+      que hoy no hay un canal real que genere leads atribuibles a una landing puntual. Se usa
+      visitas + clicks en pedir turno/llamar/WhatsApp/cómo llegar como proxy de interés real.*
+- [x] Ranking de landings por efectividad — mismo tablero, ordenado por tasa de interacción.
+
 ### Pendiente
-- [ ] Dashboard por landing: visitas, leads generados y conversión por slug
-- [ ] Ranking de landings por efectividad
 - [ ] Google Analytics: integración para visitas y sesiones por página
-- [ ] Métricas por campaña UTM: vincular contenido generado con leads captados
+- [x] Métricas por campaña UTM: vincular contenido generado con leads captados — cada pieza del
+      Estudio de contenido tiene un "Link de seguimiento" (`/api/content/track/[itemId]`) que redirige
+      a `/dra-lucia-chahin` con `utm_content=<id>`; Biblioteca y el editor muestran visitas/interacciones
+      atribuidas a esa pieza. *Limitación real: Instagram no permite links clickeables en posts de feed,
+      así que solo sirve para historias (link sticker) o para pegarlo en la bio/Linktree — no hay forma
+      de atribuir un post de feed común sin ese link.*
 
 ---
 
@@ -201,8 +212,14 @@ público para pedir turno.
       "veces por semana"). Ver `src/lib/content-publish.ts`, `src/app/api/cron/publish-content/`,
       `docs/CONTENT_STUDIO.md` → "Publicacion automatica".
 - [ ] Automatización de flujos de seguimiento con n8n
-- [ ] Reportes automáticos semanales (leads nuevos, conversión, canales)
-- [ ] Vincular campañas UTM con el contenido del estudio para saber qué pieza genera leads
+- [x] Reportes automáticos semanales (2026-07-06) — cron semanal (`/api/cron/weekly-report`, lunes
+      08:00 UTC) calcula leads nuevos, confirmados, tasa de conversión, canales y visitas/interacciones
+      de landing de los últimos 7 días y los guarda en `weekly_reports`; se ven en `/dashboard` →
+      "Reportes semanales". *No se envía por WhatsApp/email de forma proactiva — ese canal no existe
+      todavía (requeriría un template de WhatsApp aprobado por Meta), así que queda para consultar en
+      la app en vez de mandarse solo.*
+- [x] Vincular campañas UTM con el contenido del estudio para saber qué pieza genera leads — ver nota
+      en Etapa 6 (link de seguimiento por pieza)
 
 ---
 
@@ -218,19 +235,13 @@ público para pedir turno.
 
 ## Pendientes — sin sesión asignada
 
-### [TECH] Documentar en CLAUDE.md el bug de `createServiceClient()` vs `getServiceDb()`
-`src/lib/supabase/server.ts` — `createServiceClient()` (usa `createServerClient` de `@supabase/ssr`
-+ cookies) deja de operar como `service_role` real apenas hay una sesión de usuario activa: el cliente
-hidrata la sesión desde las cookies y autentica todo (incluido Storage) como ese usuario. La policy de
-Storage de `content-media` solo permite escribir a `service_role` real, así que cualquier ruta que use
-`createServiceClient()` para subir archivos falla en silencio. Ya se corrigió en las 4 rutas que tocan
-Storage/publicación (`/api/content/visual`, `/api/instagram-business/publish`, `/api/content/publish-now`,
-`/api/google-business/posts` — todas migradas a `getServiceDb()`), pero falta: (1) agregar esta regla a
-CLAUDE.md para que no se repita en rutas nuevas, (2) auditar las ~14 rutas restantes que todavía usan
-`createServiceClient()` (`google-business/callback|disconnect|locations|profile|reviews|select-location|status`,
-`instagram-business/callback|disconnect|status`, `public/click`, `public/lead`) — hoy "funcionan" solo
-porque `app_config` tiene RLS permisivo para `authenticated`, no porque el cliente sea realmente
-service_role; si alguna en el futuro necesita tocar una tabla/bucket más restrictivo, va a fallar igual.
+### [TECH] ✅ Resuelto (2026-07-06): `createServiceClient()` vs `getServiceDb()`
+Se auditaron y migraron las ~14 rutas restantes que usaban `createServiceClient()` (todas las de
+`google-business/*` e `instagram-business/*` que faltaban, `public/click`, `public/lead`, y la landing
+pública `src/app/landings/[slug]/page.tsx`) a `getServiceDb()`. Como ya no queda ningún uso real, se
+**eliminó por completo** la función `createServiceClient()` de `src/lib/supabase/server.ts` para que no
+se pueda volver a usar por error. Regla documentada en `CLAUDE.md` → "Cliente de Supabase con
+service_role — usar siempre `getServiceDb()`, nunca un cliente con cookies".
 
 ### [FEATURE] Alerta proactiva si falla el cron de auto-publicación
 Ya anotado como "fuera de alcance a propósito" en `CLAUDE.md` — el cron de `/api/cron/publish-content`

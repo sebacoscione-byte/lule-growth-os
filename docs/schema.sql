@@ -167,11 +167,27 @@ create table if not exists ai_outputs (
 create table if not exists landing_events (
   id uuid default uuid_generate_v4() primary key,
   event_type text not null
-    check (event_type in ('cta_cimel', 'cta_swiss', 'cta_britanico', 'instructions_viewed', 'form_started', 'form_submitted')),
+    check (event_type in (
+      'cta_cimel', 'cta_swiss', 'cta_britanico', 'instructions_viewed', 'form_started', 'form_submitted',
+      'page_view', 'click_booking', 'click_call', 'click_whatsapp', 'click_maps'
+    )),
   slug text not null,
+  location_key text check (location_key is null or location_key in ('cimel', 'swiss', 'britanico')),
   utm_source text,
   utm_medium text,
   utm_campaign text,
+  utm_content text,
+  created_at timestamptz not null default now()
+);
+
+-- ============================================================
+-- WEEKLY REPORTS (snapshot generado por /api/cron/weekly-report)
+-- ============================================================
+create table if not exists weekly_reports (
+  id uuid default uuid_generate_v4() primary key,
+  week_start date not null,
+  week_end date not null,
+  metrics jsonb not null,
   created_at timestamptz not null default now()
 );
 
@@ -318,6 +334,9 @@ create index if not exists ai_requests_prompt_hash_idx on ai_requests(prompt_has
 create index if not exists landing_events_slug_idx on landing_events(slug);
 create index if not exists landing_events_event_type_idx on landing_events(event_type);
 create index if not exists landing_events_created_at_idx on landing_events(created_at desc);
+create index if not exists landing_events_location_key_idx on landing_events(location_key);
+create index if not exists landing_events_utm_content_idx on landing_events(utm_content);
+create unique index if not exists weekly_reports_week_start_idx on weekly_reports(week_start);
 
 -- ============================================================
 -- UPDATED_AT trigger
@@ -392,6 +411,14 @@ create policy "service_role_write_landing_events"
 
 create policy "authenticated_read_landing_events"
   on landing_events for select to authenticated using (true);
+
+alter table weekly_reports enable row level security;
+
+create policy "service_role_write_weekly_reports"
+  on weekly_reports for all to service_role using (true) with check (true);
+
+create policy "authenticated_read_weekly_reports"
+  on weekly_reports for select to authenticated using (true);
 
 -- ============================================================
 -- SEED: Configuración inicial

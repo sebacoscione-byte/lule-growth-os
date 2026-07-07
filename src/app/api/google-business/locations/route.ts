@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
-import { createClient, createServiceClient } from "@/lib/supabase/server"
+import { createClient } from "@/lib/supabase/server"
+import { getServiceDb } from "@/lib/supabase/service"
 import { getValidToken, getConnectionInfo, listAccounts, listLocations } from "@/lib/google-business"
 
 export async function GET() {
@@ -7,7 +8,7 @@ export async function GET() {
   const { data: { user } } = await userClient.auth.getUser()
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
-  const supabase = await createServiceClient()
+  const supabase = getServiceDb()
   const info = await getConnectionInfo(supabase)
   if (!info) return NextResponse.json({ error: "Not connected" }, { status: 401 })
 

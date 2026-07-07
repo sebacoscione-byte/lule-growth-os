@@ -20,7 +20,7 @@ export interface SedeAction {
   preferredLocationValue: "cimel_lanus" | "swiss_lomas" | "hospital_britanico" | "sin_definir"
 }
 
-function useUtmParams() {
+function useUtmParams(onReady?: (utms: Record<string, string>) => void) {
   const [utms, setUtms] = useState<Record<string, string>>({})
   useEffect(() => {
     const sp = new URLSearchParams(window.location.search)
@@ -31,20 +31,25 @@ function useUtmParams() {
     }
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setUtms(result)
+    onReady?.(result)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
   return utms
 }
 
 // ─── Card de sede con CTA persistente ──────────────────────────────────────────
 
+type CtaClickAction = "booking" | "call" | "whatsapp" | "maps"
+
 interface CtaCardProps {
   sede: SedeAction
   expanded: boolean
   onToggle: () => void
   onEngage: () => void
+  onClickAction: (action: CtaClickAction) => void
 }
 
-function CtaCard({ sede, expanded, onToggle, onEngage }: CtaCardProps) {
+function CtaCard({ sede, expanded, onToggle, onEngage, onClickAction }: CtaCardProps) {
   const palette = {
     blue: {
       border: "border-blue-200",
@@ -99,7 +104,7 @@ function CtaCard({ sede, expanded, onToggle, onEngage }: CtaCardProps) {
             href={sede.bookingUrl}
             target="_blank"
             rel="noopener noreferrer"
-            onClick={onEngage}
+            onClick={() => { onEngage(); onClickAction("booking") }}
             className={`inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold transition-colors ${palette.primary}`}
           >
             <CalendarCheck className="h-4 w-4" />
@@ -109,7 +114,7 @@ function CtaCard({ sede, expanded, onToggle, onEngage }: CtaCardProps) {
         {phoneHref && (
           <a
             href={phoneHref}
-            onClick={onEngage}
+            onClick={() => { onEngage(); onClickAction("call") }}
             className={`inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold transition-colors ${sede.bookingUrl ? palette.secondary : palette.primary}`}
           >
             <Phone className="h-4 w-4" />
@@ -121,7 +126,7 @@ function CtaCard({ sede, expanded, onToggle, onEngage }: CtaCardProps) {
             href={whatsappUrl}
             target="_blank"
             rel="noopener noreferrer"
-            onClick={onEngage}
+            onClick={() => { onEngage(); onClickAction("whatsapp") }}
             className="inline-flex items-center gap-2 rounded-full border border-green-300 px-4 py-2 text-sm font-semibold text-green-700 hover:bg-green-50 transition-colors"
           >
             <MessageCircle className="h-4 w-4" />
@@ -133,6 +138,7 @@ function CtaCard({ sede, expanded, onToggle, onEngage }: CtaCardProps) {
             href={sede.mapsUrl}
             target="_blank"
             rel="noopener noreferrer"
+            onClick={() => { onEngage(); onClickAction("maps") }}
             className="inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium text-gray-500 hover:text-gray-700 transition-colors"
           >
             <Map className="h-4 w-4" />
@@ -167,24 +173,29 @@ const TRACKED_KEYS = new Set(["cimel", "swiss", "britanico"])
 function fireEvent(
   event_type: string,
   slug: string,
-  utms: Record<string, string>
+  utms: Record<string, string>,
+  location_key?: string
 ) {
   fetch("/api/public/click", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ event_type, slug, ...utms }),
+    body: JSON.stringify({ event_type, slug, location_key, ...utms }),
   }).catch(() => {})
 }
 
 export function LandingInteractions({ slug, locations }: { slug: string; locations: SedeAction[] }) {
   const [expandedKey, setExpandedKey] = useState<string | null>(null)
   const [engagedKeys, setEngagedKeys] = useState<Set<string>>(new Set())
-  const utms = useUtmParams()
+  const utms = useUtmParams(freshUtms => fireEvent("page_view", slug, freshUtms))
 
   function engage(key: string) {
     if (engagedKeys.has(key)) return
     setEngagedKeys(prev => new Set(prev).add(key))
     if (TRACKED_KEYS.has(key)) fireEvent(`cta_${key}`, slug, utms)
+  }
+
+  function trackClick(key: string, action: CtaClickAction) {
+    if (TRACKED_KEYS.has(key)) fireEvent(`click_${action}`, slug, utms, key)
   }
 
   return (
@@ -202,6 +213,7 @@ export function LandingInteractions({ slug, locations }: { slug: string; locatio
             expanded={expandedKey === sede.key}
             onToggle={() => setExpandedKey(prev => prev === sede.key ? null : sede.key)}
             onEngage={() => engage(sede.key)}
+            onClickAction={action => trackClick(sede.key, action)}
           />
         ))}
       </div>

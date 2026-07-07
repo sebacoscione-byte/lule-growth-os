@@ -1433,6 +1433,11 @@ export default function ContentStudioPage() {
                         No se pudo publicar en {Object.entries(item.auto_publish_result).filter(([, v]) => v === "error").map(([k]) => k === "instagram" ? "Instagram" : "Google Business").join(" ni ")}. Probá de nuevo con &ldquo;Publicar ahora&rdquo;.
                       </p>
                     )}
+                    {((item.tracked_visits ?? 0) > 0 || (item.tracked_interactions ?? 0) > 0) && (
+                      <p className="text-xs text-gray-500">
+                        {item.tracked_visits} visitas · {item.tracked_interactions} interacciones (link de seguimiento)
+                      </p>
+                    )}
                     <div className="flex gap-2">
                       <Button variant="outline" size="sm" className="flex-1" onClick={() => { setActive(item); setManualPrompt(null); setTab("crear") }}>
                         <BookOpen className="h-4 w-4" /> Abrir
@@ -1479,6 +1484,43 @@ export default function ContentStudioPage() {
           )}
         </TabsContent>
       </Tabs>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Link de seguimiento (utm_content por pieza)
+// ---------------------------------------------------------------------------
+
+function TrackedLinkField({ itemId, visits, interactions }: { itemId: string; visits: number; interactions: number }) {
+  const [copied, setCopied] = useState(false)
+  const trackedUrl = typeof window !== "undefined" ? `${window.location.origin}/api/content/track/${itemId}` : ""
+
+  function copy() {
+    navigator.clipboard.writeText(trackedUrl).catch(() => {})
+    setCopied(true)
+    setTimeout(() => setCopied(false), 1800)
+  }
+
+  return (
+    <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 space-y-2">
+      <div className="flex items-center justify-between">
+        <Label className="text-gray-900">Link de seguimiento</Label>
+        {(visits > 0 || interactions > 0) && (
+          <span className="text-xs text-gray-500">{visits} visitas · {interactions} interacciones</span>
+        )}
+      </div>
+      <div className="flex gap-2">
+        <Input value={trackedUrl} readOnly className="bg-white text-xs text-gray-600" />
+        <Button type="button" variant="outline" size="sm" onClick={copy} className="shrink-0 gap-1.5">
+          {copied ? <Check className="h-3.5 w-3.5 text-green-600" /> : <Copy className="h-3.5 w-3.5" />}
+          {copied ? "Copiado" : "Copiar"}
+        </Button>
+      </div>
+      <p className="text-xs text-gray-500">
+        Redirige a la landing pública identificando esta pieza (utm_content). Instagram no permite links
+        clickeables en posts de feed — usalo en el link sticker de historias o en tu bio/Linktree.
+      </p>
     </div>
   )
 }
@@ -1742,6 +1784,7 @@ function Editor({
           </CardContent>
         </Card>
         <Button variant="outline" onClick={onCopy} className="w-full gap-2">{copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />} Copiar Instagram</Button>
+        <TrackedLinkField itemId={item.id} visits={item.tracked_visits ?? 0} interactions={item.tracked_interactions ?? 0} />
         {item.source && (
           <a href={item.source.url} target="_blank" rel="noreferrer" className="block rounded-lg border border-blue-100 bg-blue-50 p-3 text-xs text-blue-800">
             <span className="font-medium">Fuente revisada:</span> {item.source.title} <ExternalLink className="inline h-3 w-3" />

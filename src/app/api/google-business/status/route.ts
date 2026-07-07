@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server"
-import { createServiceClient } from "@/lib/supabase/server"
+import { getServiceDb } from "@/lib/supabase/service"
 import { getConnectionInfo, getValidToken, getLocation } from "@/lib/google-business"
 
 export async function GET() {
-  const supabase = await createServiceClient()
+  const supabase = getServiceDb()
   const info = await getConnectionInfo(supabase)
 
   if (!info) return NextResponse.json({ connected: false })

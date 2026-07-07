@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
-import { createClient, createServiceClient } from "@/lib/supabase/server"
+import { createClient } from "@/lib/supabase/server"
+import { getServiceDb } from "@/lib/supabase/service"
 import { clearTokens } from "@/lib/instagram-business"
 
 export async function POST() {
@@ -7,7 +8,7 @@ export async function POST() {
   const { data: { user } } = await userClient.auth.getUser()
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
-  const supabase = await createServiceClient()
+  const supabase = getServiceDb()
   await clearTokens(supabase)
   return NextResponse.json({ ok: true })
 }

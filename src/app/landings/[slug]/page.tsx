@@ -10,7 +10,7 @@ import {
   LANDING_DATA, WHATSAPP_MESSAGES, whatsAppKeyForLocation, SERVICE_MICROCOPY,
   RELATED_LANDING_SLUGS, buildWhatsAppUrl, type PublicLandingLocation,
 } from "@/lib/public-landings"
-import { createServiceClient } from "@/lib/supabase/server"
+import { getServiceDb } from "@/lib/supabase/service"
 import { getGooglePlaceReviews } from "@/lib/google-places"
 import { LandingInteractions, type SedeAction } from "./landing-interactions"
 
@@ -137,7 +137,7 @@ function buildSubpageFaq(data: (typeof LANDING_DATA)[string]) {
 
 async function getConfigLocations(): Promise<ConfigLocation[]> {
   try {
-    const supabase = await createServiceClient()
+    const supabase = getServiceDb()
     const { data } = await supabase.from("app_config").select("value").eq("key", "locations").single()
     return Array.isArray(data?.value) ? (data.value as ConfigLocation[]) : []
   } catch {
@@ -147,7 +147,7 @@ async function getConfigLocations(): Promise<ConfigLocation[]> {
 
 async function getConfigDoctor(): Promise<ConfigDoctor> {
   try {
-    const supabase = await createServiceClient()
+    const supabase = getServiceDb()
     const { data } = await supabase.from("app_config").select("value").eq("key", "doctor").single()
     const value = (data?.value ?? {}) as ConfigDoctor
     return {

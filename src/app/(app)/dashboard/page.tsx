@@ -6,7 +6,86 @@ import {
 } from "lucide-react"
 import { STATUS_LABELS, STATUS_COLORS, type Lead } from "@/types"
 import { timeAgo } from "@/lib/utils"
+import { LANDING_DATA, PUBLIC_LANDING_SLUGS } from "@/lib/public-landings"
 import Link from "next/link"
+
+const INTERACTION_EVENT_TYPES = ["click_booking", "click_call", "click_whatsapp", "click_maps"]
+
+type LandingRankingRow = {
+  slug: string
+  label: string
+  visits: number
+  interactions: number
+  rate: number
+}
+
+async function getLandingRanking(
+  supabase: Awaited<ReturnType<typeof createClient>>
+): Promise<{ rows: LandingRankingRow[]; available: boolean }> {
+  try {
+    const ninetyDaysAgo = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString()
+    const { data, error } = await supabase
+      .from("landing_events")
+      .select("slug, event_type")
+      .in("event_type", ["page_view", ...INTERACTION_EVENT_TYPES])
+      .gte("created_at", ninetyDaysAgo)
+      .limit(20000)
+    if (error) throw error
+
+    const bySlug = new Map<string, { visits: number; interactions: number }>()
+    for (const row of data ?? []) {
+      const entry = bySlug.get(row.slug) ?? { visits: 0, interactions: 0 }
+      if (row.event_type === "page_view") entry.visits += 1
+      else entry.interactions += 1
+      bySlug.set(row.slug, entry)
+    }
+
+    const rows = PUBLIC_LANDING_SLUGS.map(slug => {
+      const entry = bySlug.get(slug) ?? { visits: 0, interactions: 0 }
+      return {
+        slug,
+        label: LANDING_DATA[slug]?.h1 ?? slug,
+        visits: entry.visits,
+        interactions: entry.interactions,
+        rate: entry.visits > 0 ? Math.round((entry.interactions / entry.visits) * 100) : 0,
+      }
+    }).sort((a, b) => b.rate - a.rate || b.visits - a.visits)
+
+    return { rows, available: true }
+  } catch {
+    return { rows: [], available: false }
+  }
+}
+
+type WeeklyReportMetrics = {
+  leads_total: number
+  leads_confirmed: number
+  conversion_rate: number
+  landing_visits: number
+  landing_interactions: number
+}
+
+type WeeklyReportRow = {
+  week_start: string
+  week_end: string
+  metrics: WeeklyReportMetrics
+}
+
+async function getWeeklyReports(
+  supabase: Awaited<ReturnType<typeof createClient>>
+): Promise<{ rows: WeeklyReportRow[]; available: boolean }> {
+  try {
+    const { data, error } = await supabase
+      .from("weekly_reports")
+      .select("week_start, week_end, metrics")
+      .order("week_start", { ascending: false })
+      .limit(6)
+    if (error) throw error
+    return { rows: (data ?? []) as WeeklyReportRow[], available: true }
+  } catch {
+    return { rows: [], available: false }
+  }
+}
 
 async function count(supabase: Awaited<ReturnType<typeof createClient>>, filter: Record<string, unknown>) {
   const query = supabase.from("leads").select("id", { count: "exact", head: true })
@@ -91,11 +170,14 @@ async function getDashboardData() {
     }
   })()
 
-  return { metrics, conversionRate, recentLeads: (recentLeads ?? []) as Lead[], landingMetrics }
+  const landingRanking = await getLandingRanking(supabase)
+  const weeklyReports = await getWeeklyReports(supabase)
+
+  return { metrics, conversionRate, recentLeads: (recentLeads ?? []) as Lead[], landingMetrics, landingRanking, weeklyReports }
 }
 
 export default async function DashboardPage() {
-  const { metrics, conversionRate, recentLeads, landingMetrics } = await getDashboardData()
+  const { metrics, conversionRate, recentLeads, landingMetrics, landingRanking, weeklyReports } = await getDashboardData()
 
   return (
     <div className="p-4 md:p-6 space-y-4 md:space-y-6">
@@ -262,6 +344,102 @@ export default async function DashboardPage() {
                 <p className="text-xs text-gray-500 mt-1">Formularios enviados</p>
               </div>
             </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Ranking de landings */}
+      {landingRanking.available && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Ranking de landings</CardTitle>
+            <p className="text-xs text-gray-500">
+              Visitas e interacciones con los botones de pedir turno (últimos 90 días). La tasa de
+              interacción es la proporción de visitas que hicieron click en pedir turno online, llamar,
+              WhatsApp o cómo llegar — no confirma que hayan pedido turno.
+            </p>
+          </CardHeader>
+          <CardContent>
+            {landingRanking.rows.every(row => row.visits === 0) ? (
+              <p className="text-sm text-gray-400">
+                Todavía no hay visitas registradas. Este dato empieza a acumularse desde que se agregó
+                el tracking de visitas (2026-07-06).
+              </p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b text-left text-xs text-gray-500">
+                      <th className="pb-2 font-medium">Landing</th>
+                      <th className="pb-2 font-medium text-right">Visitas</th>
+                      <th className="pb-2 font-medium text-right">Interacciones</th>
+                      <th className="pb-2 font-medium text-right">Tasa</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {landingRanking.rows.map(row => (
+                      <tr key={row.slug} className="border-b border-gray-50 last:border-0">
+                        <td className="py-2 pr-2 text-gray-900">
+                          <Link href={`/${row.slug}`} target="_blank" className="hover:underline">
+                            {row.label}
+                          </Link>
+                        </td>
+                        <td className="py-2 text-right text-gray-700">{row.visits}</td>
+                        <td className="py-2 text-right text-gray-700">{row.interactions}</td>
+                        <td className="py-2 text-right font-semibold text-gray-900">{row.rate}%</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Reportes semanales */}
+      {weeklyReports.available && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Reportes semanales</CardTitle>
+            <p className="text-xs text-gray-500">
+              Snapshot automático generado todos los lunes (leads nuevos, conversión y canales de la
+              semana anterior). No se envía a ningún lado todavía — se guarda acá para consultar.
+            </p>
+          </CardHeader>
+          <CardContent>
+            {weeklyReports.rows.length === 0 ? (
+              <p className="text-sm text-gray-400">
+                Todavía no se generó ningún reporte semanal. El primero se genera el próximo lunes.
+              </p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b text-left text-xs text-gray-500">
+                      <th className="pb-2 font-medium">Semana</th>
+                      <th className="pb-2 font-medium text-right">Leads nuevos</th>
+                      <th className="pb-2 font-medium text-right">Confirmados</th>
+                      <th className="pb-2 font-medium text-right">Conversión</th>
+                      <th className="pb-2 font-medium text-right">Visitas landing</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {weeklyReports.rows.map(report => (
+                      <tr key={report.week_start} className="border-b border-gray-50 last:border-0">
+                        <td className="py-2 pr-2 text-gray-900">
+                          {new Date(report.week_start).toLocaleDateString("es-AR")} – {new Date(report.week_end).toLocaleDateString("es-AR")}
+                        </td>
+                        <td className="py-2 text-right text-gray-700">{report.metrics.leads_total}</td>
+                        <td className="py-2 text-right text-gray-700">{report.metrics.leads_confirmed}</td>
+                        <td className="py-2 text-right font-semibold text-gray-900">{report.metrics.conversion_rate}%</td>
+                        <td className="py-2 text-right text-gray-700">{report.metrics.landing_visits}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </CardContent>
         </Card>
       )}
