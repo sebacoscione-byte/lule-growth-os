@@ -4,7 +4,7 @@ import Link from "next/link"
 import { useEffect, useState, useCallback } from "react"
 import {
   Loader2, Sparkles, Star, Trash2, Send, RefreshCw, Copy,
-  CheckCircle2, ExternalLink, LogOut, MapPin, Link2,
+  CheckCircle2, ExternalLink, LogOut, MapPin, Link2, Zap,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
@@ -258,9 +258,10 @@ interface ChecklistItem {
   completed: boolean
   notes: string | null
   updated_at: string
+  auto: boolean
 }
 
-const CHECKLIST_META: Record<string, { label: string; description: string; priority?: boolean }> = {
+const CHECKLIST_META: Record<string, { label: string; description: string; priority?: boolean; whyManual?: string }> = {
   nombre_correcto: {
     label: "Nombre correcto en Google",
     description: "Aparece como \"Dra. Lucía Chahin\" sin keywords adicionales ni nombre de institución.",
@@ -268,14 +269,17 @@ const CHECKLIST_META: Record<string, { label: string; description: string; prior
   categoria_principal: {
     label: "Categoría principal configurada",
     description: "Cardióloga. Si no aparece esa opción, usar Médico.",
+    whyManual: "La API de Google no expone la categoría del perfil para esta cuenta (limitación de cuota, no del código) — se verifica a mano en Google Business.",
   },
   categoria_cardiologia: {
     label: "Categoría secundaria Cardiología",
     description: "Agregar Cardiología como categoría adicional si la plataforma lo permite.",
+    whyManual: "Misma limitación que la categoría principal: la API no expone categorías para esta cuenta.",
   },
   ubicacion_cimel: {
     label: "Ubicación en CIMEL Lanús",
     description: "Dirección: Tucumán 1314, Lanús. Verificar que el pin en el mapa sea correcto.",
+    whyManual: "La dirección en texto llega por API, pero si el pin del mapa está bien ubicado solo se ve a mano en Google Maps.",
   },
   horario_real: {
     label: "Horarios configurados",
@@ -284,6 +288,7 @@ const CHECKLIST_META: Record<string, { label: string; description: string; prior
   servicios_cargados: {
     label: "Servicios cargados",
     description: "Consulta cardiológica, Ecocardiograma, Control cardiológico.",
+    whyManual: "El catálogo de servicios de Google no está conectado a esta app todavía — se carga y verifica directo ahí.",
   },
   descripcion_cargada: {
     label: "Descripción del perfil",
@@ -297,10 +302,12 @@ const CHECKLIST_META: Record<string, { label: string; description: string; prior
   link_instagram_bio: {
     label: "Bio de Instagram apunta a /dra-lucia-chahin",
     description: "El link en la bio de Instagram debe llevar a la landing principal, no a WhatsApp ni Linktree.",
+    whyManual: "Es un dato de Instagram, no de Google — no se puede verificar desde esta conexión.",
   },
   fotos_profesionales: {
     label: "Fotos subidas",
     description: "Foto de perfil profesional, foto del consultorio y/o foto exterior de CIMEL Lanús.",
+    whyManual: "Requiere la Media API de Google, separada de la que usa este perfil y con la misma restricción de cuota que ya bloquea \"listar cuentas\" — se verifica a mano.",
   },
   telefono_configurado: {
     label: "Teléfono configurado",
@@ -309,14 +316,17 @@ const CHECKLIST_META: Record<string, { label: string; description: string; prior
   primera_publicacion: {
     label: "Primera publicación publicada",
     description: "Al menos un post explicando cómo pedir turno con la Dra. Lucía Chahin.",
+    whyManual: "Requiere el Account ID de Google, que esta cuenta no expone (mismo motivo por el que Publicaciones usa \"copiar para Google\") — marcalo a mano cuando publiques la primera nota.",
   },
   preguntas_frecuentes: {
     label: "Preguntas frecuentes (Q&A)",
     description: "Agregar preguntas como: ¿Cómo saco turno? ¿Qué días atiende? ¿Hace ecocardiogramas?",
+    whyManual: "Google no tiene una API pública para leer ni escribir el Q&A del perfil — se administra solo desde la app de Google Maps.",
   },
   posts_fijados_3: {
     label: "3 publicaciones fijadas en Instagram",
     description: "Post 1: Cómo pedir turno. Post 2: Servicios. Post 3: Dónde atiende.",
+    whyManual: "Es de Instagram, no de Google, y Google Business Profile tampoco tiene concepto de \"post fijado\" — se verifica a mano en Instagram.",
   },
 }
 
@@ -348,6 +358,7 @@ function ChecklistTab() {
 
   const completed = items.filter(i => i.completed).length
   const total = items.length
+  const autoCount = items.filter(i => i.auto).length
 
   if (loading) {
     return <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-gray-400" /></div>
@@ -368,6 +379,11 @@ function ChecklistTab() {
               style={{ width: total > 0 ? `${(completed / total) * 100}%` : "0%" }}
             />
           </div>
+          {autoCount > 0 && (
+            <p className="mt-2 flex items-center gap-1 text-xs text-emerald-600">
+              <Zap className="h-3 w-3" /> {autoCount} de {total} se verifican solos leyendo tu perfil de Google.
+            </p>
+          )}
         </CardContent>
       </Card>
 
@@ -397,16 +413,17 @@ function ChecklistTab() {
               <CardContent className="pt-4 pb-4">
                 <div className="flex items-start gap-3">
                   <button
-                    onClick={() => toggle(item)}
-                    disabled={toggling === item.item_key}
-                    className="mt-0.5 shrink-0"
+                    onClick={() => !item.auto && toggle(item)}
+                    disabled={item.auto || toggling === item.item_key}
+                    title={item.auto ? "Se detecta automáticamente desde tu perfil de Google" : undefined}
+                    className={`mt-0.5 shrink-0 ${item.auto ? "cursor-default" : ""}`}
                   >
                     {toggling === item.item_key ? (
                       <Loader2 className="h-5 w-5 animate-spin text-gray-400" />
                     ) : item.completed ? (
                       <CheckCircle2 className="h-5 w-5 text-green-500" />
                     ) : (
-                      <div className="h-5 w-5 rounded-full border-2 border-gray-300 hover:border-blue-400 transition-colors" />
+                      <div className={`h-5 w-5 rounded-full border-2 ${item.auto ? "border-gray-200" : "border-gray-300 hover:border-blue-400 transition-colors"}`} />
                     )}
                   </button>
                   <div className="flex-1 min-w-0">
@@ -414,11 +431,19 @@ function ChecklistTab() {
                       <p className={`text-sm font-medium ${item.completed ? "line-through text-gray-400" : "text-gray-900"}`}>
                         {meta.label}
                       </p>
+                      {item.auto && (
+                        <Badge className="text-xs bg-emerald-100 text-emerald-700 border-emerald-200 gap-1">
+                          <Zap className="h-3 w-3" /> Detectado automáticamente
+                        </Badge>
+                      )}
                       {meta.priority && !item.completed && (
                         <Badge className="text-xs bg-blue-100 text-blue-700 border-blue-200">Prioritario</Badge>
                       )}
                     </div>
                     <p className="text-xs text-gray-500 mt-0.5">{meta.description}</p>
+                    {!item.auto && meta.whyManual && (
+                      <p className="text-xs text-gray-400 mt-1 italic">{meta.whyManual}</p>
+                    )}
                   </div>
                 </div>
               </CardContent>
