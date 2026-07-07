@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
+import { createClient } from "@/lib/supabase/server"
 import { getServiceDb } from "@/lib/supabase/service"
 import { saveTokens, listAccounts, listLocations } from "@/lib/google-business"
 import {
@@ -9,6 +10,14 @@ import {
 } from "@/lib/google-oauth"
 
 export async function GET(req: NextRequest) {
+  // Mismo motivo que /api/google-business/auth: sin sesión, no se completa el intercambio de
+  // tokens (evita que alguien sin login termine de conectar su propia cuenta de Google).
+  const authClient = await createClient()
+  const { data: { user } } = await authClient.auth.getUser()
+  if (!user) {
+    return NextResponse.redirect(new URL("/login", req.url))
+  }
+
   const code = req.nextUrl.searchParams.get("code")
   const error = req.nextUrl.searchParams.get("error")
   const state = req.nextUrl.searchParams.get("state")

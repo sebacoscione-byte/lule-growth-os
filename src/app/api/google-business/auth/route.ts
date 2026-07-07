@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
+import { createClient } from "@/lib/supabase/server"
 import {
   GOOGLE_OAUTH_COOKIE_MAX_AGE,
   GOOGLE_OAUTH_REDIRECT_COOKIE,
@@ -14,6 +15,14 @@ import {
 const SCOPES = ["https://www.googleapis.com/auth/business.manage"].join(" ")
 
 export async function GET(request: NextRequest) {
+  // Requiere sesión: sin esto, cualquiera con la URL podía iniciar el OAuth con su propia
+  // cuenta de Google y reemplazar la conexión de Lucía (ver auditoría de seguridad 2026-07-07).
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) {
+    return NextResponse.redirect(new URL("/login", request.url))
+  }
+
   const clientId = process.env.GOOGLE_CLIENT_ID
   const redirectUri = getGoogleRedirectUri(request)
 

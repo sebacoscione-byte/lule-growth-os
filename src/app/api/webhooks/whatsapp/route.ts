@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { handleIncomingMessage } from "@/lib/whatsapp-bot"
 import { markAsRead } from "@/lib/whatsapp"
+import { isValidWhatsAppSignature } from "@/lib/whatsapp-webhook-signature"
 
 // Meta llama a GET para verificar el webhook al configurarlo
 export async function GET(req: NextRequest) {
@@ -22,9 +23,16 @@ export async function GET(req: NextRequest) {
 
 // Meta envía mensajes entrantes como POST
 export async function POST(req: NextRequest) {
+  const rawBody = await req.text()
+  const signature = req.headers.get("x-hub-signature-256")
+
+  if (!isValidWhatsAppSignature(rawBody, signature, process.env.WHATSAPP_APP_SECRET)) {
+    return NextResponse.json({ status: "invalid_signature" }, { status: 401 })
+  }
+
   let body: Record<string, unknown>
   try {
-    body = await req.json()
+    body = JSON.parse(rawBody)
   } catch {
     return NextResponse.json({ status: "invalid_json" }, { status: 400 })
   }

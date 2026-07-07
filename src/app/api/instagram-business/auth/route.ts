@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
+import { createClient } from "@/lib/supabase/server"
 import {
   INSTAGRAM_OAUTH_COOKIE_MAX_AGE,
   INSTAGRAM_OAUTH_REDIRECT_COOKIE,
@@ -12,6 +13,14 @@ import {
 const SCOPES = ["instagram_business_basic", "instagram_business_content_publish"].join(",")
 
 export async function GET(request: NextRequest) {
+  // Requiere sesión: sin esto, cualquiera con la URL podía iniciar el OAuth con su propia
+  // cuenta de Instagram y reemplazar la conexión de Lucía (ver auditoría de seguridad 2026-07-07).
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) {
+    return NextResponse.redirect(new URL("/login", request.url))
+  }
+
   const appId = process.env.INSTAGRAM_APP_ID
   const redirectUri = getInstagramRedirectUri(request)
 
