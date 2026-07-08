@@ -1657,8 +1657,6 @@ function Editor({
   const [visualGenerating, setVisualGenerating] = useState(false)
   const [visualError, setVisualError] = useState<string | null>(null)
   const [visualHelpUrl, setVisualHelpUrl] = useState<string | null>(null)
-  const [altTextGenerating, setAltTextGenerating] = useState(false)
-  const [altTextError, setAltTextError] = useState<string | null>(null)
   const [directionGenerating, setDirectionGenerating] = useState(false)
   const [directionError, setDirectionError] = useState<string | null>(null)
   const [imageUploading, setImageUploading] = useState(false)
@@ -1707,7 +1705,24 @@ function Editor({
       }
       onGeneratedVisual({ itemId: item.id, url: `data:${data.mime_type};base64,${data.image_data}` })
       if (data.visual_url) {
-        onSave({ visual_url: data.visual_url })
+        // Texto alternativo (accesibilidad interna, no se le muestra al usuario): se recalcula solo
+        // en base a la descripcion recien usada, sin bloquear el guardado de la placa si falla.
+        let altText: string | undefined
+        try {
+          const altResponse = await fetch("/api/content/alt-text", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              topic: item.topic,
+              visual_headline: item.visual_headline,
+              visual_subtitle: item.visual_subtitle,
+              image_prompt: imagePrompt,
+            }),
+          })
+          const altData = await altResponse.json()
+          if (altResponse.ok && altData.image_alt_text) altText = altData.image_alt_text
+        } catch { /* best-effort */ }
+        onSave({ visual_url: data.visual_url, ...(altText ? { image_alt_text: altText } : {}) })
       } else {
         setVisualError(
           `La placa se generó pero no se pudo guardar (${data.visual_persist_error ?? "error desconocido"}). ` +
@@ -1751,10 +1766,9 @@ function Editor({
   }
 
   async function regenerateImageDirection() {
-    const hasManualContent = Boolean(item.image_prompt?.trim() || item.image_alt_text?.trim())
     if (
-      hasManualContent &&
-      !window.confirm("Esto va a reemplazar la descripción de la imagen y el texto alternativo actuales por un concepto nuevo. ¿Continuar?")
+      item.image_prompt?.trim() &&
+      !window.confirm("Esto va a reemplazar la descripción de la imagen actual por un concepto nuevo. ¿Continuar?")
     ) return
     setDirectionGenerating(true)
     setDirectionError(null)
@@ -1782,37 +1796,6 @@ function Editor({
       setDirectionError("No se pudo conectar con la IA para regenerar la dirección visual.")
     } finally {
       setDirectionGenerating(false)
-    }
-  }
-
-  async function regenerateAltText() {
-    if (
-      item.image_alt_text?.trim() &&
-      !window.confirm("Esto va a reemplazar el texto alternativo actual (describe la imagen real, no lo que hayas escrito a mano). ¿Continuar?")
-    ) return
-    setAltTextGenerating(true)
-    setAltTextError(null)
-    try {
-      const response = await fetch("/api/content/alt-text", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          topic: item.topic,
-          visual_headline: item.visual_headline,
-          visual_subtitle: item.visual_subtitle,
-          image_prompt: imagePrompt,
-        }),
-      })
-      const data = await response.json()
-      if (!response.ok || data.error) {
-        setAltTextError(data.error ?? "No se pudo regenerar el texto alternativo.")
-        return
-      }
-      onChange({ ...item, image_alt_text: data.image_alt_text })
-    } catch {
-      setAltTextError("No se pudo conectar con la IA para regenerar el texto alternativo.")
-    } finally {
-      setAltTextGenerating(false)
     }
   }
 
@@ -1936,34 +1919,6 @@ function Editor({
                 basada en el Caption de Instagram de abajo.
               </p>
               {directionError && <p className="text-xs text-red-600">{directionError}</p>}
-            </div>
-            <div className="space-y-1.5">
-              <div className="flex items-center justify-between">
-                <Label className="text-gray-900">Texto alternativo de la imagen</Label>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={regenerateAltText}
-                  disabled={altTextGenerating}
-                  className="h-auto gap-1.5 px-2 py-1 text-xs text-violet-700 hover:text-violet-800"
-                >
-                  {altTextGenerating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <WandSparkles className="h-3.5 w-3.5" />}
-                  Regenerar
-                </Button>
-              </div>
-              <Input
-                value={item.image_alt_text ?? ""}
-                maxLength={180}
-                onChange={event => onChange({ ...item, image_alt_text: event.target.value })}
-                placeholder="Descripción breve para accesibilidad"
-                className="bg-white text-gray-900"
-              />
-              <p className="text-xs text-gray-400">
-                &ldquo;Regenerar&rdquo; acá solo redacta de nuevo la descripción de accesibilidad de la imagen actual — no
-                cambia la imagen. Para eso usá &ldquo;Descripción de la imagen&rdquo; arriba.
-              </p>
-              {altTextError && <p className="text-xs text-red-600">{altTextError}</p>}
             </div>
           </CardContent>
         </Card>
