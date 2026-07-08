@@ -355,6 +355,17 @@ Auditoría de "borradores" encontró y corrigió 3 problemas reales (PR #12, #13
    generando solo, en segundo plano, sin intervención manual. Detalle en memory
    `project_content_draft_lifecycle_fixes` y `feedback_ui_completeness_lule` (caso 7).
 
+### [TECH] La confirmación de "esto va a volver a Borrador" solo cubre piezas `published`, no `approved`
+El fix del 2026-07-08 (arriba) agregó una confirmación al guardar cambios sobre una pieza
+`"published"` ("esto la va a devolver a Borrador"), pero `saveChanges()` en
+`src/app/(app)/contenido/instagram/page.tsx` solo chequea `item.status === "published"` — si la
+pieza está `"approved"` (no publicada todavía), guardar cualquier edición (incluido el nuevo
+selector de Formato agregado 2026-07-08) la revierte a Borrador **sin ningún aviso**. Pasó en esta
+sesión: el usuario cambió el Formato de una pieza aprobada, guardó, y se confundió al no ver más el
+badge de "próxima en publicarse" — no relacionó el cambio con que la pieza había vuelto a Borrador.
+Sugerencia: extender el mismo `window.confirm` (o un aviso menos invasivo) para `"approved"` también,
+no solo `"published"`.
+
 ### [TECH] Falta página de Política de Privacidad + instrucciones de borrado de datos
 Ninguna existe hoy (`grep -i "privacidad|privacy|terms"` sobre `src/app` no encontró nada). Son
 requisito de Meta para cualquier App Review de "Instagram Login" (permisos `instagram_business_basic`,
