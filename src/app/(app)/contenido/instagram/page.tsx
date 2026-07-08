@@ -1779,6 +1779,10 @@ function Editor({
   }
 
   async function regenerateAltText() {
+    if (
+      item.image_alt_text?.trim() &&
+      !window.confirm("Esto va a reemplazar el texto alternativo actual (describe la imagen real, no lo que hayas escrito a mano). ¿Continuar?")
+    ) return
     setAltTextGenerating(true)
     setAltTextError(null)
     try {
