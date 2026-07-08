@@ -158,6 +158,8 @@ export interface ContentItem {
   updated_at: string
   approved_at: string | null
   auto_publish_result?: Partial<Record<ContentChannel, "published" | "error">>
+  /** Estado justo antes de archivar, para poder restaurar a lo que era (no siempre "borrador"). */
+  archived_from_status?: ContentStatus
   /** Calculado en /api/content/items desde landing_events (utm_content = id) — no se persiste en content_pipeline. */
   tracked_visits?: number
   tracked_interactions?: number

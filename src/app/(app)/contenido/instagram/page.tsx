@@ -1575,7 +1575,9 @@ export default function ContentStudioPage() {
                         variant="ghost"
                         size="icon"
                         aria-label={item.status === "archived" ? "Restaurar pieza" : "Archivar pieza"}
-                        onClick={() => updateItem(item, { status: item.status === "archived" ? "draft" : "archived" })}
+                        onClick={() => item.status === "archived"
+                          ? updateItem(item, { status: item.archived_from_status ?? "draft" })
+                          : updateItem(item, { status: "archived", archived_from_status: item.status })}
                       >
                         {item.status === "archived" ? <ArchiveRestore className="h-4 w-4" /> : <Archive className="h-4 w-4" />}
                       </Button>
@@ -1809,6 +1811,14 @@ function Editor({
     }
   }
 
+  function saveChanges() {
+    if (
+      item.status === "published" &&
+      !window.confirm("Esta pieza ya está publicada en Instagram. Guardar estos cambios la va a devolver a \"Borrador\" acá en el sistema (no borra ni modifica la publicación real). ¿Continuar?")
+    ) return
+    onSave(editableContent(item))
+  }
+
   function downloadGeneratedVisual() {
     if (!generatedVisual || generatedVisual.itemId !== item.id) return
     const link = document.createElement("a")
@@ -1861,6 +1871,24 @@ function Editor({
                 )}
               </div>
             )}
+            <div className="space-y-1.5">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={regenerateImageDirection}
+                disabled={directionGenerating}
+                className="w-full gap-2"
+                title="Descarta la escena actual y propone una nueva, basada en el Caption de Instagram de abajo"
+              >
+                {directionGenerating ? <Loader2 className="h-4 w-4 animate-spin" /> : <WandSparkles className="h-4 w-4" />}
+                Regenerar concepto de la imagen (según el caption)
+              </Button>
+              <p className="text-xs text-gray-500">
+                Propone otra escena para la placa, basada en el Caption de Instagram de abajo (editalo primero si querés
+                cambiar de qué habla la imagen). Después usá &ldquo;{displayedVisualUrl ? "Regenerar placa" : "Generar placa final"}&rdquo; para renderizarla.
+              </p>
+              {directionError && <p className="text-xs text-red-600">{directionError}</p>}
+            </div>
             <div className="grid gap-2 sm:flex">
               <Button onClick={generateVisual} disabled={visualGenerating} className="w-full flex-1 gap-2">
                 {visualGenerating ? <Loader2 className="h-4 w-4 animate-spin" /> : <WandSparkles className="h-4 w-4" />}
@@ -1893,25 +1921,10 @@ function Editor({
               </Button>
               {imageUploadError && <p className="text-xs text-red-600 bg-red-50 rounded p-2">{imageUploadError}</p>}
             </div>
-            <details className="rounded-lg border border-violet-100 bg-white p-3 text-xs text-gray-600" open={Boolean(directionError)}>
+            <details className="rounded-lg border border-violet-100 bg-white p-3 text-xs text-gray-600">
               <summary className="cursor-pointer font-medium text-gray-800">Ver dirección visual decidida por la IA</summary>
               <div className="mt-2 space-y-2">
                 <p className="whitespace-pre-wrap">{imagePrompt}</p>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={regenerateImageDirection}
-                  disabled={directionGenerating}
-                  className="gap-1.5 text-xs"
-                >
-                  {directionGenerating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <WandSparkles className="h-3.5 w-3.5" />}
-                  Regenerar dirección visual (nuevo concepto)
-                </Button>
-                <p className="text-gray-400">
-                  Propone otro concepto (no solo otra redacción) — después usá &ldquo;{displayedVisualUrl ? "Regenerar placa" : "Generar placa final"}&rdquo; para renderizarlo.
-                </p>
-                {directionError && <p className="text-red-600">{directionError}</p>}
               </div>
             </details>
             <div className="space-y-1.5">
@@ -1936,6 +1949,11 @@ function Editor({
                 placeholder="Descripción breve para accesibilidad"
                 className="bg-white text-gray-900"
               />
+              <p className="text-xs text-gray-400">
+                &ldquo;Regenerar&rdquo; acá solo redacta de nuevo la descripción de la imagen actual — no la cambia. Para
+                que la placa muestre otra escena, usá &ldquo;Regenerar concepto de la imagen&rdquo; arriba y después
+                &ldquo;Regenerar placa&rdquo;.
+              </p>
               {altTextError && <p className="text-xs text-red-600">{altTextError}</p>}
             </div>
           </CardContent>
@@ -2014,7 +2032,7 @@ function Editor({
             </div>
           )}
           <div className="grid gap-2 sm:flex sm:flex-wrap">
-            <Button variant="outline" onClick={() => onSave(editableContent(item))} disabled={busy || !hasUnsavedChanges} className="gap-2">
+            <Button variant="outline" onClick={saveChanges} disabled={busy || !hasUnsavedChanges} className="gap-2">
               {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Guardar cambios
             </Button>
             {item.status === "draft" && (

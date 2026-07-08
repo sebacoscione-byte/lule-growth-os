@@ -96,6 +96,9 @@ export async function PATCH(request: NextRequest) {
     if (body.status && !["draft", "approved", "published", "archived"].includes(body.status)) {
       return NextResponse.json({ error: "Estado invalido" }, { status: 400 })
     }
+    if (body.archived_from_status && !["draft", "approved", "published"].includes(body.archived_from_status)) {
+      return NextResponse.json({ error: "Estado previo invalido" }, { status: 400 })
+    }
     if (body.visual_style && !["rose", "blue", "teal"].includes(body.visual_style)) {
       return NextResponse.json({ error: "Estilo visual invalido" }, { status: 400 })
     }
@@ -133,17 +136,18 @@ export async function PATCH(request: NextRequest) {
       "slides",
       "visual_url",
       "auto_publish_result",
+      "archived_from_status",
     ]
     const changes = Object.fromEntries(
       editableFields
         .filter(field => body[field] !== undefined)
         .map(field => [field, body[field]])
     ) as Partial<ContentItem>
-    // visual_url y auto_publish_result no cuentan como "edicion de contenido": adjuntar la placa
-    // generada o limpiar el resultado de publicacion (deshacer) no debe resetear a borrador.
-    const hasContentChanges = editableFields.some(field =>
-      field !== "status" && field !== "visual_url" && field !== "auto_publish_result" && body[field] !== undefined
-    )
+    // visual_url, auto_publish_result y archived_from_status no cuentan como "edicion de contenido":
+    // adjuntar la placa generada, limpiar el resultado de publicacion (deshacer) o registrar el
+    // estado previo al archivar no debe resetear a borrador.
+    const nonContentFields = new Set(["status", "visual_url", "auto_publish_result", "archived_from_status"])
+    const hasContentChanges = editableFields.some(field => !nonContentFields.has(field) && body[field] !== undefined)
     const resetApproval = hasContentChanges && !body.status && ["approved", "published"].includes(current.status)
     const nextItem = {
       ...current,
