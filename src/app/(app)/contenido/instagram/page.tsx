@@ -1751,6 +1751,11 @@ function Editor({
   }
 
   async function regenerateImageDirection() {
+    const hasManualContent = Boolean(item.image_prompt?.trim() || item.image_alt_text?.trim())
+    if (
+      hasManualContent &&
+      !window.confirm("Esto va a reemplazar la descripción de la imagen y el texto alternativo actuales por un concepto nuevo. ¿Continuar?")
+    ) return
     setDirectionGenerating(true)
     setDirectionError(null)
     try {
@@ -1871,24 +1876,6 @@ function Editor({
                 )}
               </div>
             )}
-            <div className="space-y-1.5">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={regenerateImageDirection}
-                disabled={directionGenerating}
-                className="w-full gap-2"
-                title="Descarta la escena actual y propone una nueva, basada en el Caption de Instagram de abajo"
-              >
-                {directionGenerating ? <Loader2 className="h-4 w-4 animate-spin" /> : <WandSparkles className="h-4 w-4" />}
-                Regenerar concepto de la imagen (según el caption)
-              </Button>
-              <p className="text-xs text-gray-500">
-                Propone otra escena para la placa, basada en el Caption de Instagram de abajo (editalo primero si querés
-                cambiar de qué habla la imagen). Después usá &ldquo;{displayedVisualUrl ? "Regenerar placa" : "Generar placa final"}&rdquo; para renderizarla.
-              </p>
-              {directionError && <p className="text-xs text-red-600">{directionError}</p>}
-            </div>
             <div className="grid gap-2 sm:flex">
               <Button onClick={generateVisual} disabled={visualGenerating} className="w-full flex-1 gap-2">
                 {visualGenerating ? <Loader2 className="h-4 w-4 animate-spin" /> : <WandSparkles className="h-4 w-4" />}
@@ -1921,12 +1908,35 @@ function Editor({
               </Button>
               {imageUploadError && <p className="text-xs text-red-600 bg-red-50 rounded p-2">{imageUploadError}</p>}
             </div>
-            <details className="rounded-lg border border-violet-100 bg-white p-3 text-xs text-gray-600">
-              <summary className="cursor-pointer font-medium text-gray-800">Ver dirección visual decidida por la IA</summary>
-              <div className="mt-2 space-y-2">
-                <p className="whitespace-pre-wrap">{imagePrompt}</p>
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <Label className="text-gray-900">Descripción de la imagen (para generar la placa)</Label>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={regenerateImageDirection}
+                  disabled={directionGenerating}
+                  className="h-auto gap-1.5 px-2 py-1 text-xs text-violet-700 hover:text-violet-800"
+                >
+                  {directionGenerating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <WandSparkles className="h-3.5 w-3.5" />}
+                  Regenerar
+                </Button>
               </div>
-            </details>
+              <Textarea
+                rows={4}
+                value={imagePrompt}
+                onChange={event => onChange({ ...item, image_prompt: event.target.value })}
+                placeholder="Describí la escena que querés para la placa"
+                className="bg-white text-gray-900 text-xs"
+              />
+              <p className="text-xs text-gray-400">
+                Esto es lo que usa &ldquo;{displayedVisualUrl ? "Regenerar placa" : "Generar placa final"}&rdquo; arriba para
+                crear la imagen — escribila a mano o tocá &ldquo;Regenerar&rdquo; para que la IA proponga una escena nueva
+                basada en el Caption de Instagram de abajo.
+              </p>
+              {directionError && <p className="text-xs text-red-600">{directionError}</p>}
+            </div>
             <div className="space-y-1.5">
               <div className="flex items-center justify-between">
                 <Label className="text-gray-900">Texto alternativo de la imagen</Label>
@@ -1950,9 +1960,8 @@ function Editor({
                 className="bg-white text-gray-900"
               />
               <p className="text-xs text-gray-400">
-                &ldquo;Regenerar&rdquo; acá solo redacta de nuevo la descripción de la imagen actual — no la cambia. Para
-                que la placa muestre otra escena, usá &ldquo;Regenerar concepto de la imagen&rdquo; arriba y después
-                &ldquo;Regenerar placa&rdquo;.
+                &ldquo;Regenerar&rdquo; acá solo redacta de nuevo la descripción de accesibilidad de la imagen actual — no
+                cambia la imagen. Para eso usá &ldquo;Descripción de la imagen&rdquo; arriba.
               </p>
               {altTextError && <p className="text-xs text-red-600">{altTextError}</p>}
             </div>
