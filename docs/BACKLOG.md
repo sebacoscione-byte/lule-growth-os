@@ -340,3 +340,26 @@ XSS en el stringify de CSS de `postcss` (`GHSA-qx2v-qp2m-jg93`), dependencia int
 automático (`npm audit fix --force`) bajaría Next a una versión canary vieja — no conviene. Bajo riesgo
 real (no hay contenido de usuario que fluya a valores CSS en esta app). Esperar a que Next libere un
 patch que actualice su propia dependencia de `postcss`.
+
+### [TECH] ✅ Resuelto (2026-07-08): ciclo de vida de piezas en Estudio de contenido (archivar/restaurar, edición de publicadas, UX de placa/alt text)
+Auditoría de "borradores" encontró y corrigió 3 problemas reales (PR #12, #13, #14):
+1. "Restaurar pieza" desde archivo siempre volvía a `"draft"`, sin importar si estaba `"approved"` o
+   `"published"` antes de archivarse — una pieza ya publicada en Instagram podía quedar como si nunca
+   se hubiera posteado. Se agregó `archived_from_status` en `ContentItem` para restaurar al estado real.
+2. Editar el contenido de una pieza `"published"` y guardar la revierte a `"draft"` en silencio
+   (comportamiento intencional desde antes, para no dejar contenido sin revisar marcado como
+   publicado) — se agregó la misma confirmación que ya tenía "Deshacer publicación".
+3. Dos botones "Regenerar" con alcance muy distinto (alt text vs. concepto de la imagen) generaban
+   confusión real de uso (clicks repetidos al equivocado). Tras dos iteraciones de UI que no
+   alcanzaron, se resolvió eliminando el campo de alt text de la vista por completo — se sigue
+   generando solo, en segundo plano, sin intervención manual. Detalle en memory
+   `project_content_draft_lifecycle_fixes` y `feedback_ui_completeness_lule` (caso 7).
+
+### [TECH] Falta página de Política de Privacidad + instrucciones de borrado de datos
+Ninguna existe hoy (`grep -i "privacidad|privacy|terms"` sobre `src/app` no encontró nada). Son
+requisito de Meta para cualquier App Review de "Instagram Login" (permisos `instagram_business_basic`,
+`instagram_business_content_publish`). No es urgente mientras la única cuenta de Instagram conectada
+(la de Lucía) siga agregada como tester en el Meta App — el modo desarrollo no expira para
+testers/admins. Si en algún momento se decide sacar la app del modo desarrollo, hace falta: página
+pública `/privacidad` con qué datos de leads se recolectan y cómo se usan, y una URL o texto de
+instrucciones de borrado de datos. Ver memoria `project_meta_business_checklist`.
