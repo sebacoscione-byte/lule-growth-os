@@ -102,6 +102,9 @@ export async function PATCH(request: NextRequest) {
     if (body.visual_style && !["rose", "blue", "teal"].includes(body.visual_style)) {
       return NextResponse.json({ error: "Estilo visual invalido" }, { status: 400 })
     }
+    if (body.format && !["reel", "historia", "carrusel", "post"].includes(body.format)) {
+      return NextResponse.json({ error: "Formato invalido" }, { status: 400 })
+    }
     if ((body.google_text?.length ?? 0) > 1500 || (body.visual_headline?.length ?? 0) > 90 ||
       (body.visual_subtitle?.length ?? 0) > 90 || (body.image_prompt?.length ?? 0) > 2400 ||
       (body.image_alt_text?.length ?? 0) > 180) {
@@ -124,6 +127,7 @@ export async function PATCH(request: NextRequest) {
     const now = new Date().toISOString()
     const editableFields: Array<keyof ContentItem> = [
       "status",
+      "format",
       "hook",
       "caption",
       "google_text",
