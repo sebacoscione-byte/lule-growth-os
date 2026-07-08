@@ -162,6 +162,8 @@ export interface ContentItem {
   archived_from_status?: ContentStatus
   /** Orden manual dentro de la cola de auto-publicacion de su formato (aprobados). null = todavia no se reordeno a mano, se ordena por approved_at. Se limpia al volver a borrador. */
   queue_rank?: number | null
+  /** Contenido "evergreen": si esta seteado, el cron vuelve a publicar esta misma pieza (ya publicada) cada tantos dias desde su ultima publicacion (`updated_at`), en vez de darla por consumida. null/undefined = comportamiento de siempre (se publica una vez y no vuelve a salir). */
+  repeat_interval_days?: number | null
   /** Calculado en /api/content/items desde landing_events (utm_content = id) — no se persiste en content_pipeline. */
   tracked_visits?: number
   tracked_interactions?: number

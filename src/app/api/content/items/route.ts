@@ -105,6 +105,9 @@ export async function PATCH(request: NextRequest) {
     if (body.format && !["reel", "historia", "carrusel", "post"].includes(body.format)) {
       return NextResponse.json({ error: "Formato invalido" }, { status: 400 })
     }
+    if (body.repeat_interval_days != null && (typeof body.repeat_interval_days !== "number" || body.repeat_interval_days < 1 || body.repeat_interval_days > 365)) {
+      return NextResponse.json({ error: "Intervalo de repeticion invalido" }, { status: 400 })
+    }
     if ((body.google_text?.length ?? 0) > 1500 || (body.visual_headline?.length ?? 0) > 90 ||
       (body.visual_subtitle?.length ?? 0) > 90 || (body.image_prompt?.length ?? 0) > 2400 ||
       (body.image_alt_text?.length ?? 0) > 180) {
@@ -141,6 +144,7 @@ export async function PATCH(request: NextRequest) {
       "visual_url",
       "auto_publish_result",
       "archived_from_status",
+      "repeat_interval_days",
     ]
     const changes = Object.fromEntries(
       editableFields
@@ -149,8 +153,9 @@ export async function PATCH(request: NextRequest) {
     ) as Partial<ContentItem>
     // visual_url, auto_publish_result y archived_from_status no cuentan como "edicion de contenido":
     // adjuntar la placa generada, limpiar el resultado de publicacion (deshacer) o registrar el
-    // estado previo al archivar no debe resetear a borrador.
-    const nonContentFields = new Set(["status", "visual_url", "auto_publish_result", "archived_from_status"])
+    // estado previo al archivar no debe resetear a borrador. repeat_interval_days es config de
+    // cronograma, no contenido -- cambiarla tampoco debe tirar la pieza de vuelta a borrador.
+    const nonContentFields = new Set(["status", "visual_url", "auto_publish_result", "archived_from_status", "repeat_interval_days"])
     const hasContentChanges = editableFields.some(field => !nonContentFields.has(field) && body[field] !== undefined)
     const resetApproval = hasContentChanges && !body.status && ["approved", "published"].includes(current.status)
     const nextItem = {

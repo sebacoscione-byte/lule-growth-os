@@ -4,6 +4,7 @@ import { getServiceDb } from "@/lib/supabase/service"
 import {
   readContentItems, writeContentItems, readAutoPublishSettings, writeAutoPublishSettings,
   shouldRunAutoPublish, isScheduledForFuture, pickNextPublishableItems, resolveChannelsToPublish,
+  isRepeatDue,
 } from "@/lib/content-pipeline"
 import { generateContentVisual } from "@/lib/ai"
 import { publishApprovedItem } from "@/lib/content-publish"
@@ -40,7 +41,7 @@ async function runTrack(
   }
 
   const items = await readContentItems(supabase)
-  const candidates = pickNextPublishableItems(items, format, track.items_per_run)
+  const candidates = pickNextPublishableItems(items, format, track.items_per_run, now)
   if (candidates.length === 0) {
     return { ...track, last_run_at: now.toISOString(), last_run_result: "skipped_no_item" }
   }
@@ -53,7 +54,15 @@ async function runTrack(
     // que ya se escribio de las piezas anteriores en esta misma corrida.
     const freshItems = await readContentItems(supabase)
     const current = freshItems.find(existing => existing.id === candidate.id)
-    if (!current || current.status !== "approved") continue // se publico/edito manualmente justo antes
+    if (!current) continue
+    // Piezas evergreen (repeat_interval_days) siguen "published" entre corridas: se re-publican
+    // cuando vuelve a cumplirse el intervalo, ver isRepeatDue. El resto solo se toma si sigue "approved"
+    // (evita publicar dos veces si se edito/publico a mano justo antes de esta corrida).
+    const dueRepeat = current.status !== "approved" && isRepeatDue(current, now)
+    if (current.status !== "approved" && !dueRepeat) continue
+    // Al repetir, limpiar el resultado de la vuelta anterior: sin esto, resolveChannelsToPublish
+    // ve auto_publish_result.instagram = "published" de la corrida pasada y no intenta publicar nada.
+    if (dueRepeat) current.auto_publish_result = {}
 
     // Si la doctora ya genero la placa a mano al revisar la pieza, la reusamos tal cual (ahorra
     // cupo diario de IA y evita generar una imagen distinta a la que ella aprobo visualmente).

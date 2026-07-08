@@ -143,14 +143,36 @@ function effectiveQueueRank(item: ContentItem): number {
 }
 
 /**
- * Pura, sin I/O: elige hasta "count" items para auto-publicar de un formato puntual (post u historia,
- * cada uno con su propio cronograma), en el orden de `effectiveQueueRank`.
+ * Pura, sin I/O: una pieza evergreen (`repeat_interval_days` seteado) ya publicada vuelve a estar
+ * disponible cuando pasaron al menos esos dias desde su ultima publicacion (`updated_at` se pisa
+ * en cada publicacion, ver `publishApprovedItem`).
  */
-export function pickNextPublishableItems(items: ContentItem[], format: "post" | "historia", count: number): ContentItem[] {
-  return items
+export function isRepeatDue(item: ContentItem, now: Date): boolean {
+  if (item.status !== "published") return false
+  if (!item.repeat_interval_days || item.repeat_interval_days <= 0) return false
+  const daysSinceLastPublish = (now.getTime() - new Date(item.updated_at).getTime()) / (1000 * 60 * 60 * 24)
+  return daysSinceLastPublish >= item.repeat_interval_days
+}
+
+/**
+ * Pura, sin I/O: elige hasta "count" items para auto-publicar de un formato puntual (post u historia,
+ * cada uno con su propio cronograma), en el orden de `effectiveQueueRank`. Las piezas aprobadas
+ * (contenido fresco) siempre van primero; las piezas evergreen que ya cumplieron su intervalo de
+ * repeticion (ver `isRepeatDue`) solo llenan los lugares que sobren, ordenadas por la mas atrasada.
+ */
+export function pickNextPublishableItems(
+  items: ContentItem[],
+  format: "post" | "historia",
+  count: number,
+  now: Date = new Date()
+): ContentItem[] {
+  const approved = items
     .filter(item => item.status === "approved" && item.format === format)
     .sort((a, b) => effectiveQueueRank(a) - effectiveQueueRank(b))
-    .slice(0, Math.max(0, count))
+  const dueRepeats = items
+    .filter(item => item.format === format && isRepeatDue(item, now))
+    .sort((a, b) => new Date(a.updated_at).getTime() - new Date(b.updated_at).getTime())
+  return [...approved, ...dueRepeats].slice(0, Math.max(0, count))
 }
 
 /** Pura, sin I/O: elige el proximo item para auto-publicar de un formato puntual. Ver `pickNextPublishableItems`. */

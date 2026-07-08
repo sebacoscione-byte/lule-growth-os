@@ -2,6 +2,7 @@ import {
   shouldRunAutoPublish, isScheduledForFuture, isTodayScheduledDay, alreadyPublishedToday,
   estimateAutoPublishDrainDays, estimateAutoPublishDateForPosition, pickNextPublishableItem,
   pickNextPublishableItems, moveItemInQueue, resolveChannelsToPublish, DEFAULT_AUTO_PUBLISH_SETTINGS,
+  isRepeatDue,
 } from "@/lib/content-pipeline"
 import type { AutoPublishTrackSettings, ContentItem } from "@/types"
 
@@ -220,6 +221,48 @@ describe("pickNextPublishableItems", () => {
   it("array vacio si count es 0", () => {
     const a = item({ id: "a", format: "historia" })
     expect(pickNextPublishableItems([a], "historia", 0)).toEqual([])
+  })
+
+  it("prioriza aprobadas frescas sobre evergreens vencidas, y llena lo que sobra con evergreens", () => {
+    const fresh = item({ id: "fresh", format: "historia", status: "approved", approved_at: "2026-07-01T00:00:00.000Z" })
+    const evergreen = item({
+      id: "evergreen", format: "historia", status: "published",
+      repeat_interval_days: 7, updated_at: "2026-07-01T00:00:00.000Z",
+    })
+    const now = new Date("2026-07-10T00:00:00.000Z") // 9 dias despues, ya vencio el intervalo de 7
+    expect(pickNextPublishableItems([evergreen, fresh], "historia", 1, now).map(i => i.id)).toEqual(["fresh"])
+    expect(pickNextPublishableItems([evergreen, fresh], "historia", 2, now).map(i => i.id)).toEqual(["fresh", "evergreen"])
+  })
+
+  it("no repite una evergreen si todavia no paso su intervalo", () => {
+    const evergreen = item({
+      id: "evergreen", format: "historia", status: "published",
+      repeat_interval_days: 7, updated_at: "2026-07-01T00:00:00.000Z",
+    })
+    const now = new Date("2026-07-05T00:00:00.000Z") // solo 4 dias despues
+    expect(pickNextPublishableItems([evergreen], "historia", 1, now)).toEqual([])
+  })
+})
+
+describe("isRepeatDue", () => {
+  it("false si el item no tiene repeat_interval_days", () => {
+    const a = item({ status: "published", updated_at: "2026-01-01T00:00:00.000Z" })
+    expect(isRepeatDue(a, new Date("2026-07-01T00:00:00.000Z"))).toBe(false)
+  })
+
+  it("false si el item no esta publicado (ej. sigue aprobada o en borrador)", () => {
+    const a = item({ status: "approved", repeat_interval_days: 1, updated_at: "2026-01-01T00:00:00.000Z" })
+    expect(isRepeatDue(a, new Date("2026-07-01T00:00:00.000Z"))).toBe(false)
+  })
+
+  it("false si todavia no paso el intervalo desde la ultima publicacion", () => {
+    const a = item({ status: "published", repeat_interval_days: 7, updated_at: "2026-07-01T00:00:00.000Z" })
+    expect(isRepeatDue(a, new Date("2026-07-05T00:00:00.000Z"))).toBe(false)
+  })
+
+  it("true si ya paso el intervalo desde la ultima publicacion", () => {
+    const a = item({ status: "published", repeat_interval_days: 7, updated_at: "2026-07-01T00:00:00.000Z" })
+    expect(isRepeatDue(a, new Date("2026-07-10T00:00:00.000Z"))).toBe(true)
   })
 })
 
