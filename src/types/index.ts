@@ -168,12 +168,25 @@ export interface ContentItem {
 export interface AutoPublishTrackSettings {
   enabled: boolean
   times_per_week: number
+  /** Dias de la semana elegidos para publicar (0=domingo...6=sabado, igual que Date.getDay()). Como maximo times_per_week dias. Vacio = todavia no se eligio ningun dia, no publica nada aunque este activado. */
+  days_of_week: number[]
   /** Si esta en el futuro, el track no publica nada hasta esa fecha (aunque este activado). null = arrancar ya. */
   starts_at: string | null
   last_published_at: string | null
   last_run_at: string | null
   last_run_result: string | null
 }
+
+/** Orden canonico lunes a domingo para mostrar los dias (Date.getDay() empieza en domingo=0). */
+export const WEEKDAY_OPTIONS: { day: number; label: string }[] = [
+  { day: 1, label: "Lun" },
+  { day: 2, label: "Mar" },
+  { day: 3, label: "Mié" },
+  { day: 4, label: "Jue" },
+  { day: 5, label: "Vie" },
+  { day: 6, label: "Sáb" },
+  { day: 0, label: "Dom" },
+]
 
 export interface AutoPublishSettings {
   channels: ContentChannel[]
