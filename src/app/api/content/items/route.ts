@@ -155,6 +155,9 @@ export async function PATCH(request: NextRequest) {
       ...(resetApproval ? { status: "draft" as const } : {}),
       updated_at: now,
       approved_at: body.status === "approved" ? now : resetApproval ? null : current.approved_at,
+      // El orden manual de la cola solo tiene sentido mientras esta aprobada -- si vuelve a borrador
+      // (por edicion o a mano) y se reaprueba mas adelante, que entre al final de la cola de nuevo.
+      queue_rank: resetApproval || body.status === "draft" ? null : current.queue_rank,
     }
     // Instagram no soporta caption en historias (asStory descarta el texto en publishImageToInstagram),
     // asi que hook/caption no son obligatorios para ese formato.

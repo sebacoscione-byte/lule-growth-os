@@ -160,6 +160,8 @@ export interface ContentItem {
   auto_publish_result?: Partial<Record<ContentChannel, "published" | "error">>
   /** Estado justo antes de archivar, para poder restaurar a lo que era (no siempre "borrador"). */
   archived_from_status?: ContentStatus
+  /** Orden manual dentro de la cola de auto-publicacion de su formato (aprobados). null = todavia no se reordeno a mano, se ordena por approved_at. Se limpia al volver a borrador. */
+  queue_rank?: number | null
   /** Calculado en /api/content/items desde landing_events (utm_content = id) — no se persiste en content_pipeline. */
   tracked_visits?: number
   tracked_interactions?: number
@@ -170,6 +172,8 @@ export interface AutoPublishTrackSettings {
   times_per_week: number
   /** Dias de la semana elegidos para publicar (0=domingo...6=sabado, igual que Date.getDay()). Como maximo times_per_week dias. Vacio = todavia no se eligio ningun dia, no publica nada aunque este activado. */
   days_of_week: number[]
+  /** Cuantas piezas aprobadas publicar juntas en cada corrida (ej. 3 para publicar las 3 sedes de una). Default 1 = comportamiento de siempre. */
+  items_per_run: number
   /** Si esta en el futuro, el track no publica nada hasta esa fecha (aunque este activado). null = arrancar ya. */
   starts_at: string | null
   last_published_at: string | null

@@ -3,7 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js"
 import { getServiceDb } from "@/lib/supabase/service"
 import {
   readContentItems, writeContentItems, readAutoPublishSettings, writeAutoPublishSettings,
-  shouldRunAutoPublish, isScheduledForFuture, pickNextPublishableItem, resolveChannelsToPublish,
+  shouldRunAutoPublish, isScheduledForFuture, pickNextPublishableItems, resolveChannelsToPublish,
 } from "@/lib/content-pipeline"
 import { generateContentVisual } from "@/lib/ai"
 import { publishApprovedItem } from "@/lib/content-publish"
@@ -40,55 +40,65 @@ async function runTrack(
   }
 
   const items = await readContentItems(supabase)
-  const item = pickNextPublishableItem(items, format)
-  if (!item) {
+  const candidates = pickNextPublishableItems(items, format, track.items_per_run)
+  if (candidates.length === 0) {
     return { ...track, last_run_at: now.toISOString(), last_run_result: "skipped_no_item" }
   }
 
-  // Si la doctora ya genero la placa a mano al revisar la pieza, la reusamos tal cual (ahorra
-  // cupo diario de IA y evita generar una imagen distinta a la que ella aprobo visualmente).
-  let imageDataUrl: string | undefined
-  if (!item.visual_url) {
-    if (!item.image_prompt) {
-      return { ...track, last_run_at: now.toISOString(), last_run_result: `error: item ${item.id} sin image_prompt` }
-    }
-    try {
-      const visual = await generateContentVisual({
-        category: item.category,
-        topic: item.topic,
-        format: item.format,
-        visual_headline: item.visual_headline,
-        visual_subtitle: item.visual_subtitle,
-        image_prompt: item.image_prompt,
-      })
-      imageDataUrl = `data:${visual.mime_type};base64,${visual.image_data}`
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error)
-      if (message.startsWith("DAILY_LIMIT_EXCEEDED")) {
-        return { ...track, last_run_at: now.toISOString(), last_run_result: "quota_exceeded" }
+  let publishedCount = 0
+  let lastIssue: string | null = null
+
+  for (const candidate of candidates) {
+    // Re-leer antes de cada pieza: mitiga la carrera con un click manual simultaneo y refleja lo
+    // que ya se escribio de las piezas anteriores en esta misma corrida.
+    const freshItems = await readContentItems(supabase)
+    const current = freshItems.find(existing => existing.id === candidate.id)
+    if (!current || current.status !== "approved") continue // se publico/edito manualmente justo antes
+
+    // Si la doctora ya genero la placa a mano al revisar la pieza, la reusamos tal cual (ahorra
+    // cupo diario de IA y evita generar una imagen distinta a la que ella aprobo visualmente).
+    let imageDataUrl: string | undefined
+    if (!current.visual_url) {
+      if (!current.image_prompt) {
+        lastIssue = `error: item ${current.id} sin image_prompt`
+        continue
       }
-      return { ...track, last_run_at: now.toISOString(), last_run_result: `error: ${message}` }
+      try {
+        const visual = await generateContentVisual({
+          category: current.category,
+          topic: current.topic,
+          format: current.format,
+          visual_headline: current.visual_headline,
+          visual_subtitle: current.visual_subtitle,
+          image_prompt: current.image_prompt,
+        })
+        imageDataUrl = `data:${visual.mime_type};base64,${visual.image_data}`
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error)
+        if (message.startsWith("DAILY_LIMIT_EXCEEDED")) {
+          lastIssue = "quota_exceeded"
+          break // sin cupo de imagenes no tiene sentido seguir probando el resto de las piezas hoy
+        }
+        lastIssue = `error: ${message}`
+        continue
+      }
     }
+
+    const channelsToPublish = resolveChannelsToPublish(current, channels)
+    const { item: nextItem, allPublished } = await publishApprovedItem(
+      supabase, current, channelsToPublish, { instagramImageDataUrl: imageDataUrl }
+    )
+    await writeContentItems(supabase, freshItems.map(existing => existing.id === current.id ? nextItem : existing))
+    if (allPublished) publishedCount++
   }
 
-  // Re-chequear el estado justo antes de publicar: mitiga la carrera con un click manual simultaneo.
-  const freshItems = await readContentItems(supabase)
-  const current = freshItems.find(existing => existing.id === item.id)
-  if (!current || current.status !== "approved") {
-    return { ...track, last_run_at: now.toISOString(), last_run_result: "skipped_race" }
-  }
-
-  const channelsToPublish = resolveChannelsToPublish(current, channels)
-  const { item: nextItem, allPublished } = await publishApprovedItem(
-    supabase, current, channelsToPublish, { instagramImageDataUrl: imageDataUrl }
-  )
-  await writeContentItems(supabase, freshItems.map(existing => existing.id === current.id ? nextItem : existing))
+  const resultLabel = `published:${publishedCount}/${candidates.length}${lastIssue ? ` (${lastIssue})` : ""}`
 
   return {
     ...track,
     last_run_at: now.toISOString(),
-    last_published_at: allPublished ? now.toISOString() : track.last_published_at,
-    last_run_result: allPublished ? "published" : "partial",
+    last_published_at: publishedCount > 0 ? now.toISOString() : track.last_published_at,
+    last_run_result: resultLabel,
   }
 }
 
@@ -112,8 +122,8 @@ export async function GET(request: Request) {
     // Alerta por email (ver src/lib/alert-email.ts) solo ante fallos reales -- no ante estados
     // esperados (skipped_*, quota_exceeded) ni ante el aviso ya conocido de template sin aprobar.
     const failures: string[] = []
-    if (post.last_run_result?.startsWith("error:")) failures.push(`Posts: ${post.last_run_result}`)
-    if (historia.last_run_result?.startsWith("error:")) failures.push(`Historias: ${historia.last_run_result}`)
+    if (post.last_run_result?.includes("(error:")) failures.push(`Posts: ${post.last_run_result}`)
+    if (historia.last_run_result?.includes("(error:")) failures.push(`Historias: ${historia.last_run_result}`)
     const realWhatsappErrors = whatsappFollowup.errors.filter(e => !e.includes("todavía no está aprobado"))
     if (realWhatsappErrors.length > 0) failures.push(`Seguimiento WhatsApp: ${realWhatsappErrors.join("; ")}`)
     if (failures.length > 0) {
