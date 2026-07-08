@@ -17,7 +17,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
 import { parseAiJson } from "@/lib/parse-ai-json"
-import { DEFAULT_AUTO_PUBLISH_SETTINGS, estimateAutoPublishDrainDays } from "@/lib/content-pipeline"
+import { DEFAULT_AUTO_PUBLISH_SETTINGS, estimateAutoPublishDrainDays, estimateAutoPublishDateForPosition, pickNextPublishableItems } from "@/lib/content-pipeline"
 import type { AutoPublishSettings, AutoPublishTrackSettings, ContentChannel, ContentItem, ContentSlide, ContentSource, ContentStatus } from "@/types"
 import { WEEKDAY_OPTIONS } from "@/types"
 
@@ -515,21 +515,28 @@ function fromLocalInputValue(value: string): string {
   return new Date(value).toISOString()
 }
 
-function describeAutoPublishQueue(kind: "post" | "historia", count: number, daysOfWeek: number[]): string {
+function describeAutoPublishQueue(kind: "post" | "historia", count: number, daysOfWeek: number[], itemsPerRun: number): string {
   const label = kind === "post"
     ? `${count} post${count === 1 ? "" : "s"} aprobado${count === 1 ? "" : "s"} en cola`
     : `${count} historia${count === 1 ? "" : "s"} aprobada${count === 1 ? "" : "s"} en cola`
   if (count === 0) return `${label}.`
   if (daysOfWeek.length === 0) return `${label} — elegí al menos un día de la semana para que empiece a publicar.`
-  const days = estimateAutoPublishDrainDays(count, daysOfWeek, new Date())
+  const days = estimateAutoPublishDrainDays(count, daysOfWeek, itemsPerRun, new Date())
   const article = kind === "post" ? "el último saldría" : "la última saldría"
-  return `${label} — a este ritmo, ${article} en unos ${days} días.`
+  const batch = itemsPerRun > 1 ? ` (publicando de a ${itemsPerRun})` : ""
+  return `${label} — a este ritmo${batch}, ${article} en unos ${days} días.`
 }
 
 function describeWeekdaySelection(daysOfWeek: number[]): string {
   if (daysOfWeek.length === 0) return ""
   const labels = WEEKDAY_OPTIONS.filter(option => daysOfWeek.includes(option.day)).map(option => option.label)
   return `Publica los ${labels.join(", ")}.`
+}
+
+function describeAutoPublishIssue(issue: string): string {
+  if (issue === "quota_exceeded") return "se alcanzó el límite diario de generación de imágenes con IA"
+  if (issue.startsWith("error:")) return `hubo un error (${issue.replace(/^error:\s*/, "")})`
+  return issue
 }
 
 function describeLastAutoPublishRun(track: AutoPublishTrackSettings): string | null {
@@ -541,14 +548,26 @@ function describeLastAutoPublishRun(track: AutoPublishTrackSettings): string | n
     skipped_no_days: "no elegiste ningún día de la semana para este cronograma",
     skipped_interval: "hoy no es uno de los días elegidos, o ya se publicó algo hoy",
     skipped_no_item: "no había ninguna pieza aprobada lista para publicar",
-    skipped_race: "el contenido elegido cambió de estado justo antes de publicar (probablemente se publicó manualmente)",
-    quota_exceeded: "se alcanzó el límite diario de generación con IA, se reintenta al otro día",
-    published: "se publicó correctamente",
-    partial: "se publicó parcialmente (revisá el detalle en la pieza correspondiente)",
   }
   const result = track.last_run_result ?? ""
-  const readable = reasonMap[result] ?? (result.startsWith("error") ? `hubo un error (${result.replace(/^error:\s*/, "")})` : result)
-  return `Último intento: ${when} — ${readable}`
+  const publishedMatch = result.match(/^published:(\d+)\/(\d+)(?:\s*\((.+)\))?$/)
+  let readable = reasonMap[result]
+  if (!readable && publishedMatch) {
+    const [, doneStr, totalStr, issue] = publishedMatch
+    const done = Number(doneStr)
+    const total = Number(totalStr)
+    if (done === total) {
+      readable = total === 1 ? "se publicó correctamente" : `se publicaron las ${total} piezas correctamente`
+    } else if (done === 0) {
+      readable = total === 1
+        ? "no se pudo publicar (revisá el detalle de la pieza)"
+        : `no se pudo publicar ninguna de las ${total} piezas (revisá el detalle de cada una)`
+    } else {
+      readable = `se publicaron ${done} de ${total} piezas (revisá el detalle de las que fallaron)`
+    }
+    if (issue) readable += ` — motivo: ${describeAutoPublishIssue(issue)}`
+  }
+  return `Último intento: ${when} — ${readable ?? result}`
 }
 
 function WeekdayPicker({
@@ -587,6 +606,7 @@ function WeekdayPicker({
 
 function AutoPublishTrackCard({
   title, track, queueText, saving, onToggleEnabled, onChangeTimesPerWeek, onChangeDaysOfWeek, onChangeStartsAt,
+  onChangeItemsPerRun,
 }: {
   title: string
   track: AutoPublishTrackSettings
@@ -596,6 +616,7 @@ function AutoPublishTrackCard({
   onChangeTimesPerWeek: (value: number) => void
   onChangeDaysOfWeek: (days: number[]) => void
   onChangeStartsAt: (iso: string | null) => void
+  onChangeItemsPerRun?: (value: number) => void
 }) {
   const scheduled = isFutureStart(track)
   const lastRun = describeLastAutoPublishRun(track)
@@ -624,7 +645,26 @@ function AutoPublishTrackCard({
           />
           <span>veces por semana</span>
         </div>
+        {onChangeItemsPerRun && (
+          <div className="flex items-center gap-2 text-sm text-gray-700">
+            <span>Publicar de a</span>
+            <Input
+              type="number"
+              min={1}
+              max={10}
+              value={track.items_per_run}
+              onChange={e => onChangeItemsPerRun(Math.min(10, Math.max(1, Number(e.target.value) || 1)))}
+              className="w-16 text-gray-900"
+            />
+            <span>juntas</span>
+          </div>
+        )}
       </div>
+      {onChangeItemsPerRun && track.items_per_run > 1 && (
+        <p className="text-xs text-gray-500">
+          Ej: poné 3 para publicar las historias de las 3 sedes de una, cada vez que le toque a este cronograma.
+        </p>
+      )}
       <div className="space-y-1">
         <p className="text-xs text-gray-500">Elegí en qué días (hasta {track.times_per_week}):</p>
         <WeekdayPicker
@@ -824,9 +864,30 @@ export default function ContentStudioPage() {
     approvedHistoria: items.filter(item => item.status === "approved" && item.format === "historia").length,
   }), [items])
 
+  // Posicion (1-indexado) de cada pieza aprobada dentro de la cola de auto-publicacion de su propio
+  // formato, y una fecha estimada de cuando saldria segun el cronograma configurado. Se usa tanto para
+  // el badge en cada card como para ordenar la lista cuando se filtra por "Aprobados".
+  const queueInfo = useMemo(() => {
+    const info = new Map<string, { position: number; etaLabel: string }>()
+    const now = new Date();
+    (["post", "historia"] as const).forEach(format => {
+      const track = autoPublishSettings[format]
+      const queue = pickNextPublishableItems(items, format, items.length)
+      queue.forEach((queuedItem, index) => {
+        const position = index + 1
+        const date = estimateAutoPublishDateForPosition(position, track.days_of_week, track.items_per_run, now)
+        const etaLabel = date
+          ? `estimado ${date.toLocaleDateString("es-AR", { day: "numeric", month: "short" })}`
+          : "elegí días en \"Publicación automática\" para poder estimar cuándo"
+        info.set(queuedItem.id, { position, etaLabel })
+      })
+    })
+    return info
+  }, [items, autoPublishSettings])
+
   const filteredItems = useMemo(() => {
     const query = libraryQuery.trim().toLocaleLowerCase("es")
-    return items.filter(item => {
+    const matches = items.filter(item => {
       const matchesStatus = libraryStatus === "active"
         ? item.status !== "archived"
         : item.status === libraryStatus
@@ -835,7 +896,11 @@ export default function ContentStudioPage() {
         .some(value => value.toLocaleLowerCase("es").includes(query))
       return matchesStatus && matchesFormat && matchesQuery
     })
-  }, [items, libraryFormat, libraryQuery, libraryStatus])
+    // Al filtrar por Aprobados, mostrar en el mismo orden en que van a salir publicadas (no por fecha
+    // de creacion), para que las flechas de reordenar muevan la card visualmente donde uno espera.
+    if (libraryStatus !== "approved") return matches
+    return [...matches].sort((a, b) => (queueInfo.get(a.id)?.position ?? 0) - (queueInfo.get(b.id)?.position ?? 0))
+  }, [items, libraryFormat, libraryQuery, libraryStatus, queueInfo])
 
   const filteredCategories = useMemo(() => {
     const query = category.trim().toLocaleLowerCase("es")
@@ -1124,6 +1189,28 @@ export default function ContentStudioPage() {
       if (active?.id === item.id) setActive(data.item)
     } catch {
       setError("No se pudo publicar la pieza. Revisá tu conexión e intentá nuevamente.")
+    } finally {
+      setWorking(null)
+    }
+  }
+
+  async function reorderItem(item: ContentItem, direction: "up" | "down") {
+    setWorking(item.id)
+    setError(null)
+    try {
+      const response = await fetch("/api/content/reorder", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ itemId: item.id, direction }),
+      })
+      const data = await response.json()
+      if (!response.ok || data.error) {
+        setError(data.error ?? "No se pudo reordenar la pieza")
+        return
+      }
+      setItems(data.items)
+    } catch {
+      setError("No se pudo reordenar la pieza. Revisá tu conexión e intentá nuevamente.")
     } finally {
       setWorking(null)
     }
@@ -1521,7 +1608,7 @@ export default function ContentStudioPage() {
                   <AutoPublishTrackCard
                     title="Posts de feed"
                     track={autoPublishSettings.post}
-                    queueText={describeAutoPublishQueue("post", counts.approvedPost, autoPublishSettings.post.days_of_week)}
+                    queueText={describeAutoPublishQueue("post", counts.approvedPost, autoPublishSettings.post.days_of_week, autoPublishSettings.post.items_per_run)}
                     saving={savingAutoPublish}
                     onToggleEnabled={() => updateTrackSettings("post", { enabled: !autoPublishSettings.post.enabled })}
                     onChangeTimesPerWeek={value => changeTimesPerWeek("post", value)}
@@ -1531,12 +1618,13 @@ export default function ContentStudioPage() {
                   <AutoPublishTrackCard
                     title="Historias"
                     track={autoPublishSettings.historia}
-                    queueText={describeAutoPublishQueue("historia", counts.approvedHistoria, autoPublishSettings.historia.days_of_week)}
+                    queueText={describeAutoPublishQueue("historia", counts.approvedHistoria, autoPublishSettings.historia.days_of_week, autoPublishSettings.historia.items_per_run)}
                     saving={savingAutoPublish}
                     onToggleEnabled={() => updateTrackSettings("historia", { enabled: !autoPublishSettings.historia.enabled })}
                     onChangeTimesPerWeek={value => changeTimesPerWeek("historia", value)}
                     onChangeDaysOfWeek={days => updateTrackSettings("historia", { days_of_week: days })}
                     onChangeStartsAt={iso => updateTrackSettings("historia", { starts_at: iso })}
+                    onChangeItemsPerRun={value => updateTrackSettings("historia", { items_per_run: value })}
                   />
                 </CardContent>
               </Card>
@@ -1594,6 +1682,12 @@ export default function ContentStudioPage() {
                         {item.tracked_visits} visitas · {item.tracked_interactions} interacciones (link de seguimiento)
                       </p>
                     )}
+                    {item.status === "approved" && queueInfo.get(item.id) && (
+                      <p className="text-xs text-gray-500">
+                        {queueInfo.get(item.id)!.position === 1 ? "Próxima en publicarse" : `#${queueInfo.get(item.id)!.position} en la cola`}
+                        {" "}· {queueInfo.get(item.id)!.etaLabel}
+                      </p>
+                    )}
                     <div className="flex gap-2">
                       <Button variant="outline" size="sm" className="flex-1" onClick={() => { setActive(item); setManualPrompt(null); setTab("crear") }}>
                         <BookOpen className="h-4 w-4" /> Abrir
@@ -1608,6 +1702,30 @@ export default function ContentStudioPage() {
                         >
                           {working === item.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
                           Publicar ahora
+                        </Button>
+                      )}
+                      {item.status === "approved" && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          aria-label="Subir en la cola de auto-publicación"
+                          title="Publicar antes que la pieza que la precede en la cola"
+                          disabled={working === item.id}
+                          onClick={() => reorderItem(item, "up")}
+                        >
+                          <ChevronUp className="h-4 w-4" />
+                        </Button>
+                      )}
+                      {item.status === "approved" && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          aria-label="Bajar en la cola de auto-publicación"
+                          title="Publicar después que la pieza que la sigue en la cola"
+                          disabled={working === item.id}
+                          onClick={() => reorderItem(item, "down")}
+                        >
+                          <ChevronDown className="h-4 w-4" />
                         </Button>
                       )}
                       {item.status === "approved" && (

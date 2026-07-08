@@ -1,6 +1,7 @@
 import {
   shouldRunAutoPublish, isScheduledForFuture, isTodayScheduledDay, alreadyPublishedToday,
-  estimateAutoPublishDrainDays, pickNextPublishableItem, resolveChannelsToPublish, DEFAULT_AUTO_PUBLISH_SETTINGS,
+  estimateAutoPublishDrainDays, estimateAutoPublishDateForPosition, pickNextPublishableItem,
+  pickNextPublishableItems, moveItemInQueue, resolveChannelsToPublish, DEFAULT_AUTO_PUBLISH_SETTINGS,
 } from "@/lib/content-pipeline"
 import type { AutoPublishTrackSettings, ContentItem } from "@/types"
 
@@ -110,17 +111,49 @@ describe("alreadyPublishedToday", () => {
 
 describe("estimateAutoPublishDrainDays", () => {
   it("0 si la cola esta vacia", () => {
-    expect(estimateAutoPublishDrainDays(0, [1, 4], new Date("2026-07-10T12:00:00.000Z"))).toBe(0)
+    expect(estimateAutoPublishDrainDays(0, [1, 4], 1, new Date("2026-07-10T12:00:00.000Z"))).toBe(0)
   })
 
   it("0 si no hay ningun dia elegido", () => {
-    expect(estimateAutoPublishDrainDays(3, [], new Date("2026-07-10T12:00:00.000Z"))).toBe(0)
+    expect(estimateAutoPublishDrainDays(3, [], 1, new Date("2026-07-10T12:00:00.000Z"))).toBe(0)
   })
 
   it("cuenta dias de calendario hasta agotar la cola publicando en los dias elegidos", () => {
     // viernes 2026-07-10, eligiendo martes(2) y jueves(4): la 1ra ocurrencia es el martes siguiente (4 dias)
     const now = new Date("2026-07-10T12:00:00.000Z")
-    expect(estimateAutoPublishDrainDays(1, [2, 4], now)).toBe(4)
+    expect(estimateAutoPublishDrainDays(1, [2, 4], 1, now)).toBe(4)
+  })
+
+  it("con mas de un item por corrida, agota la cola en menos dias", () => {
+    // 3 piezas, 3 por corrida: alcanza con 1 corrida (el martes siguiente, 4 dias)
+    const now = new Date("2026-07-10T12:00:00.000Z")
+    expect(estimateAutoPublishDrainDays(3, [2, 4], 3, now)).toBe(4)
+  })
+})
+
+describe("estimateAutoPublishDateForPosition", () => {
+  it("null si no hay ningun dia elegido", () => {
+    expect(estimateAutoPublishDateForPosition(1, [], 1, new Date("2026-07-10T12:00:00.000Z"))).toBeNull()
+  })
+
+  it("la primera posicion sale en la primera corrida programada", () => {
+    const now = new Date("2026-07-10T12:00:00.000Z") // viernes
+    const result = estimateAutoPublishDateForPosition(1, [2, 4], 1, now)
+    expect(result?.getDay()).toBe(2) // martes siguiente
+  })
+
+  it("con items_per_run > 1, varias posiciones caen en la misma corrida", () => {
+    const now = new Date("2026-07-10T12:00:00.000Z")
+    const first = estimateAutoPublishDateForPosition(1, [2], 3, now)
+    const third = estimateAutoPublishDateForPosition(3, [2], 3, now)
+    expect(first?.toDateString()).toBe(third?.toDateString())
+  })
+
+  it("la posicion 4 con items_per_run=3 cae en la segunda corrida", () => {
+    const now = new Date("2026-07-10T12:00:00.000Z")
+    const third = estimateAutoPublishDateForPosition(3, [2], 3, now)
+    const fourth = estimateAutoPublishDateForPosition(4, [2], 3, now)
+    expect(fourth?.getTime()).toBeGreaterThan(third?.getTime() ?? 0)
   })
 })
 
@@ -162,6 +195,70 @@ describe("pickNextPublishableItem", () => {
     const historia = item({ id: "historia", format: "historia" })
     expect(pickNextPublishableItem([post, historia], "historia")?.id).toBe("historia")
     expect(pickNextPublishableItem([post, historia], "post")?.id).toBe("post")
+  })
+
+  it("una pieza con queue_rank explicito se elige antes que una sin reordenar, aunque sea mas nueva", () => {
+    const vieja = item({ id: "vieja", format: "historia", approved_at: "2026-07-01T00:00:00.000Z" })
+    const reordenada = item({ id: "reordenada", format: "historia", approved_at: "2026-07-05T00:00:00.000Z", queue_rank: 1 })
+    expect(pickNextPublishableItem([vieja, reordenada], "historia")?.id).toBe("reordenada")
+  })
+})
+
+describe("pickNextPublishableItems", () => {
+  it("devuelve hasta N piezas aprobadas del formato pedido, en orden de cola", () => {
+    const a = item({ id: "a", format: "historia", approved_at: "2026-07-01T00:00:00.000Z" })
+    const b = item({ id: "b", format: "historia", approved_at: "2026-07-02T00:00:00.000Z" })
+    const c = item({ id: "c", format: "historia", approved_at: "2026-07-03T00:00:00.000Z" })
+    expect(pickNextPublishableItems([c, a, b], "historia", 2).map(i => i.id)).toEqual(["a", "b"])
+  })
+
+  it("devuelve menos de N si no hay suficientes aprobadas", () => {
+    const a = item({ id: "a", format: "historia" })
+    expect(pickNextPublishableItems([a], "historia", 3)).toHaveLength(1)
+  })
+
+  it("array vacio si count es 0", () => {
+    const a = item({ id: "a", format: "historia" })
+    expect(pickNextPublishableItems([a], "historia", 0)).toEqual([])
+  })
+})
+
+describe("moveItemInQueue", () => {
+  it("no hace nada si la pieza ya esta primera y se pide subir", () => {
+    const a = item({ id: "a", format: "historia", approved_at: "2026-07-01T00:00:00.000Z" })
+    const b = item({ id: "b", format: "historia", approved_at: "2026-07-02T00:00:00.000Z" })
+    const original = [a, b]
+    const result = moveItemInQueue(original, "a", "up")
+    expect(result).toBe(original)
+  })
+
+  it("no hace nada si la pieza ya esta ultima y se pide bajar", () => {
+    const a = item({ id: "a", format: "historia", approved_at: "2026-07-01T00:00:00.000Z" })
+    const b = item({ id: "b", format: "historia", approved_at: "2026-07-02T00:00:00.000Z" })
+    const result = moveItemInQueue([a, b], "b", "down")
+    expect(pickNextPublishableItems(result, "historia", 2).map(i => i.id)).toEqual(["a", "b"])
+  })
+
+  it("sube una pieza un lugar, intercambiando con la de arriba", () => {
+    const a = item({ id: "a", format: "historia", approved_at: "2026-07-01T00:00:00.000Z" })
+    const b = item({ id: "b", format: "historia", approved_at: "2026-07-02T00:00:00.000Z" })
+    const c = item({ id: "c", format: "historia", approved_at: "2026-07-03T00:00:00.000Z" })
+    const result = moveItemInQueue([a, b, c], "c", "up")
+    expect(pickNextPublishableItems(result, "historia", 3).map(i => i.id)).toEqual(["a", "c", "b"])
+  })
+
+  it("no mezcla la cola de posts con la de historias al reordenar", () => {
+    const post = item({ id: "post", format: "post", approved_at: "2026-07-01T00:00:00.000Z" })
+    const h1 = item({ id: "h1", format: "historia", approved_at: "2026-07-01T00:00:00.000Z" })
+    const h2 = item({ id: "h2", format: "historia", approved_at: "2026-07-02T00:00:00.000Z" })
+    const result = moveItemInQueue([post, h1, h2], "h2", "up")
+    expect(pickNextPublishableItems(result, "historia", 2).map(i => i.id)).toEqual(["h2", "h1"])
+    expect(pickNextPublishableItems(result, "post", 1).map(i => i.id)).toEqual(["post"])
+  })
+
+  it("ignora piezas que no estan aprobadas", () => {
+    const draft = item({ id: "draft", format: "historia", status: "draft" })
+    expect(moveItemInQueue([draft], "draft", "up")).toEqual([draft])
   })
 })
 

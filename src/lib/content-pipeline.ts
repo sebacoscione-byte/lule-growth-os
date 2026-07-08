@@ -8,6 +8,7 @@ const DEFAULT_TRACK: AutoPublishTrackSettings = {
   enabled: false,
   times_per_week: 2,
   days_of_week: [],
+  items_per_run: 1,
   starts_at: null,
   last_published_at: null,
   last_run_at: null,
@@ -88,32 +89,104 @@ export function shouldRunAutoPublish(track: AutoPublishTrackSettings, now: Date)
 }
 
 /**
- * Pura, sin I/O: cuantos dias de calendario van a pasar hasta que se agote una cola de "count"
- * piezas, publicando una por cada dia elegido de la semana a partir de "now" (sin contar hoy).
- * Solo para mostrar una estimacion en la UI, no se usa para decidir cuando publicar.
+ * Pura, sin I/O: cuantos dias de calendario van a pasar hasta que corra el n-esimo dia programado
+ * de la semana a partir de "now" (sin contar hoy). Base compartida por las dos estimaciones de abajo.
  */
-export function estimateAutoPublishDrainDays(count: number, daysOfWeek: number[], now: Date): number {
-  if (count <= 0 || daysOfWeek.length === 0) return 0
-  let published = 0
+function nthScheduledDayOffset(n: number, daysOfWeek: number[], now: Date): number {
+  if (n <= 0 || daysOfWeek.length === 0) return 0
+  let found = 0
   let elapsedDays = 0
   const cursor = new Date(now)
-  while (published < count && elapsedDays < 365) {
+  while (found < n && elapsedDays < 400) {
     cursor.setDate(cursor.getDate() + 1)
     elapsedDays++
-    if (daysOfWeek.includes(cursor.getDay())) published++
+    if (daysOfWeek.includes(cursor.getDay())) found++
   }
   return elapsedDays
 }
 
 /**
- * Pura, sin I/O: elige el proximo item para auto-publicar de un formato puntual (post u historia,
- * cada uno con su propio cronograma). FIFO por approved_at entre los aprobados de ese formato.
+ * Pura, sin I/O: cuantos dias de calendario van a pasar hasta que se agote una cola de "count"
+ * piezas, publicando hasta "itemsPerRun" por cada dia elegido de la semana a partir de "now" (sin
+ * contar hoy). Solo para mostrar una estimacion en la UI, no se usa para decidir cuando publicar.
  */
-export function pickNextPublishableItem(items: ContentItem[], format: "post" | "historia"): ContentItem | null {
-  const candidates = items
+export function estimateAutoPublishDrainDays(count: number, daysOfWeek: number[], itemsPerRun: number, now: Date): number {
+  if (count <= 0) return 0
+  const runsNeeded = Math.ceil(count / Math.max(1, itemsPerRun))
+  return nthScheduledDayOffset(runsNeeded, daysOfWeek, now)
+}
+
+/**
+ * Pura, sin I/O: fecha estimada en que saldria publicada la pieza que ocupa la posicion "position"
+ * (1-indexado) de la cola, dado cuantas piezas se publican por corrida. null si no hay ningun dia
+ * de la semana elegido todavia (no hay forma de estimar).
+ */
+export function estimateAutoPublishDateForPosition(
+  position: number, daysOfWeek: number[], itemsPerRun: number, now: Date
+): Date | null {
+  if (position <= 0 || daysOfWeek.length === 0) return null
+  const runsNeeded = Math.ceil(position / Math.max(1, itemsPerRun))
+  const offsetDays = nthScheduledDayOffset(runsNeeded, daysOfWeek, now)
+  const result = new Date(now)
+  result.setDate(result.getDate() + offsetDays)
+  return result
+}
+
+/**
+ * Orden efectivo dentro de la cola de un formato: `queue_rank` explicito (asignado al reordenar a
+ * mano) tiene prioridad; si nunca se reordeno, se ordena por approved_at (FIFO, el de siempre). Los
+ * ranks manuales son enteros chicos (1, 2, 3...) y los timestamps son numeros mucho mas grandes, asi
+ * que una pieza reordenada a mano siempre queda antes que una que nunca se toco.
+ */
+function effectiveQueueRank(item: ContentItem): number {
+  return item.queue_rank ?? new Date(item.approved_at ?? item.created_at).getTime()
+}
+
+/**
+ * Pura, sin I/O: elige hasta "count" items para auto-publicar de un formato puntual (post u historia,
+ * cada uno con su propio cronograma), en el orden de `effectiveQueueRank`.
+ */
+export function pickNextPublishableItems(items: ContentItem[], format: "post" | "historia", count: number): ContentItem[] {
+  return items
     .filter(item => item.status === "approved" && item.format === format)
-    .sort((a, b) => new Date(a.approved_at ?? a.created_at).getTime() - new Date(b.approved_at ?? b.created_at).getTime())
-  return candidates[0] ?? null
+    .sort((a, b) => effectiveQueueRank(a) - effectiveQueueRank(b))
+    .slice(0, Math.max(0, count))
+}
+
+/** Pura, sin I/O: elige el proximo item para auto-publicar de un formato puntual. Ver `pickNextPublishableItems`. */
+export function pickNextPublishableItem(items: ContentItem[], format: "post" | "historia"): ContentItem | null {
+  return pickNextPublishableItems(items, format, 1)[0] ?? null
+}
+
+/**
+ * Pura, sin I/O: mueve una pieza aprobada un lugar hacia arriba o abajo dentro de la cola de su
+ * propio formato. Al mover, normaliza `queue_rank` de TODA la cola de ese formato a enteros
+ * secuenciales segun el orden efectivo actual (esto "migra" piezas viejas sin queue_rank al nuevo
+ * sistema explicito) y despues intercambia el rank de las dos piezas afectadas. Si la pieza ya esta
+ * en la punta de la cola en esa direccion, no hace nada.
+ */
+export function moveItemInQueue(items: ContentItem[], id: string, direction: "up" | "down"): ContentItem[] {
+  const target = items.find(item => item.id === id)
+  if (!target || target.status !== "approved") return items
+
+  const queueIds = items
+    .filter(item => item.status === "approved" && item.format === target.format)
+    .sort((a, b) => effectiveQueueRank(a) - effectiveQueueRank(b))
+    .map(item => item.id)
+
+  const index = queueIds.indexOf(id)
+  const swapIndex = direction === "up" ? index - 1 : index + 1
+  if (swapIndex < 0 || swapIndex >= queueIds.length) return items
+
+  const ranks = new Map(queueIds.map((itemId, position) => [itemId, position + 1]))
+  const a = queueIds[index]
+  const b = queueIds[swapIndex]
+  const rankA = ranks.get(a) as number
+  const rankB = ranks.get(b) as number
+  ranks.set(a, rankB)
+  ranks.set(b, rankA)
+
+  return items.map(item => ranks.has(item.id) ? { ...item, queue_rank: ranks.get(item.id) as number } : item)
 }
 
 /**
