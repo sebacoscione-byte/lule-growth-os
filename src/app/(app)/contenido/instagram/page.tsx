@@ -59,7 +59,7 @@ const STYLE_CLASSES = {
 }
 
 const EDITABLE_FIELDS: Array<keyof ContentItem> = [
-  "hook", "caption", "google_text", "hashtags", "visual_headline",
+  "format", "hook", "caption", "google_text", "hashtags", "visual_headline",
   "visual_subtitle", "visual_style", "image_prompt", "image_alt_text", "slides",
 ]
 
@@ -2125,6 +2125,16 @@ function Editor({
               <Badge variant="outline">{STATUS_LABELS[item.status]}</Badge>
             </div>
           </div>
+          <div className="flex items-center gap-2">
+            <Label className="shrink-0 text-gray-900">Formato</Label>
+            <Select value={item.format} onValueChange={value => onChange({ ...item, format: value as ContentItem["format"] })}>
+              <SelectTrigger className="w-48 text-gray-900"><SelectValue /></SelectTrigger>
+              <SelectContent>{FORMATS.map(option => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}</SelectContent>
+            </Select>
+          </div>
+          {(item.format === "reel" || item.format === "carrusel") && (
+            <p className="text-xs text-amber-700">Este formato no se puede publicar directo a Instagram desde acá (requiere video o varias imágenes) ni entra en la publicación automática. Elegí &ldquo;Post estático&rdquo; o &ldquo;Historia&rdquo; si querés publicar con un clic.</p>
+          )}
           <div className="flex gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
             <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0" />
             <span>Verificá que no haya diagnósticos, tratamientos, interpretación de estudios ni promesas. Ante síntomas de alarma, derivá a guardia.</span>
