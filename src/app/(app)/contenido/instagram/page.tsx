@@ -2191,6 +2191,33 @@ function Editor({
               ))}
             </div>
           )}
+          {item.status !== "draft" && (
+            <div className="flex flex-wrap items-center gap-2 rounded-md border border-dashed border-gray-300 p-3 text-sm text-gray-700">
+              <span>Repetir esta pieza sola cada</span>
+              <Input
+                type="number"
+                min={1}
+                max={365}
+                value={item.repeat_interval_days ?? ""}
+                onChange={e => {
+                  const raw = e.target.value
+                  onChange({
+                    ...item,
+                    repeat_interval_days: raw === "" ? null : Math.min(365, Math.max(1, Number(raw) || 1)),
+                  })
+                }}
+                placeholder="—"
+                className="w-16 text-gray-900"
+              />
+              <span>días (vacío = publicar una sola vez, comportamiento de siempre)</span>
+              {Boolean(item.repeat_interval_days) && (
+                <p className="w-full text-xs text-amber-700">
+                  Los reposteos automáticos van por la API de Instagram: nunca pueden llevar sticker de link.
+                  Si el link tiene que estar, escribilo o poné un QR directo en la imagen antes de aprobarla.
+                </p>
+              )}
+            </div>
+          )}
           <div className="grid gap-2 sm:flex sm:flex-wrap">
             <Button variant="outline" onClick={saveChanges} disabled={busy || !hasUnsavedChanges} className="gap-2">
               {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Guardar cambios
@@ -2219,6 +2246,20 @@ function Editor({
                 title="Publica ya mismo en Instagram"
               >
                 {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />} Publicar ahora
+              </Button>
+            )}
+            {item.status === "approved" && (
+              <Button
+                variant="outline"
+                onClick={() => {
+                  if (!window.confirm("Usá esto solo si ya publicaste esta pieza vos mismo, a mano, desde la app de Instagram (por ejemplo para poder agregar el sticker de link). Esto NO publica nada — solo marca la pieza como publicada acá, para que el sistema no la vuelva a publicar sola. ¿Confirmar?")) return
+                  onSave({ status: "published", auto_publish_result: { instagram: "published" } })
+                }}
+                disabled={busy}
+                className="gap-2"
+                title="Ya la publiqué manualmente desde Instagram (ej. para agregar el sticker de link) — solo actualiza el estado acá, no publica nada"
+              >
+                <Check className="h-4 w-4" /> Marcar como publicada manualmente
               </Button>
             )}
             {item.status === "approved" && igConnected && (() => {
