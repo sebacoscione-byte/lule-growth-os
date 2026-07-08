@@ -7,6 +7,7 @@ const SETTINGS_KEY = "auto_publish_settings"
 const DEFAULT_TRACK: AutoPublishTrackSettings = {
   enabled: false,
   times_per_week: 2,
+  days_of_week: [],
   starts_at: null,
   last_published_at: null,
   last_run_at: null,
@@ -67,14 +68,41 @@ export function isScheduledForFuture(track: AutoPublishTrackSettings, now: Date)
   return Boolean(track.starts_at) && now.getTime() < new Date(track.starts_at as string).getTime()
 }
 
-/** Pura, sin I/O: false si el track esta apagado, si la fecha de inicio programada no llego, o si todavia no paso el intervalo (7 / veces_por_semana) desde la ultima publicacion. */
+/** Pura, sin I/O: true si "now" cae en uno de los dias de la semana elegidos para el track. */
+export function isTodayScheduledDay(track: AutoPublishTrackSettings, now: Date): boolean {
+  return track.days_of_week.includes(now.getDay())
+}
+
+/** Pura, sin I/O: true si ya se publico algo de este track el mismo dia calendario que "now" (evita duplicar si el cron corre mas de una vez el mismo dia). */
+export function alreadyPublishedToday(track: AutoPublishTrackSettings, now: Date): boolean {
+  if (!track.last_published_at) return false
+  return new Date(track.last_published_at).toDateString() === now.toDateString()
+}
+
+/** Pura, sin I/O: false si el track esta apagado, si la fecha de inicio programada no llego, si hoy no es uno de los dias elegidos, o si ya se publico hoy. */
 export function shouldRunAutoPublish(track: AutoPublishTrackSettings, now: Date): boolean {
   if (!track.enabled) return false
   if (isScheduledForFuture(track, now)) return false
-  if (!track.last_published_at) return true
-  const elapsedMs = now.getTime() - new Date(track.last_published_at).getTime()
-  const intervalDays = 7 / track.times_per_week
-  return elapsedMs >= intervalDays * 24 * 60 * 60 * 1000
+  if (!isTodayScheduledDay(track, now)) return false
+  return !alreadyPublishedToday(track, now)
+}
+
+/**
+ * Pura, sin I/O: cuantos dias de calendario van a pasar hasta que se agote una cola de "count"
+ * piezas, publicando una por cada dia elegido de la semana a partir de "now" (sin contar hoy).
+ * Solo para mostrar una estimacion en la UI, no se usa para decidir cuando publicar.
+ */
+export function estimateAutoPublishDrainDays(count: number, daysOfWeek: number[], now: Date): number {
+  if (count <= 0 || daysOfWeek.length === 0) return 0
+  let published = 0
+  let elapsedDays = 0
+  const cursor = new Date(now)
+  while (published < count && elapsedDays < 365) {
+    cursor.setDate(cursor.getDate() + 1)
+    elapsedDays++
+    if (daysOfWeek.includes(cursor.getDay())) published++
+  }
+  return elapsedDays
 }
 
 /**

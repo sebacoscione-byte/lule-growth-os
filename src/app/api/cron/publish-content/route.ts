@@ -32,6 +32,9 @@ async function runTrack(
   if (isScheduledForFuture(track, now)) {
     return { ...track, last_run_at: now.toISOString(), last_run_result: "skipped_scheduled" }
   }
+  if (track.days_of_week.length === 0) {
+    return { ...track, last_run_at: now.toISOString(), last_run_result: "skipped_no_days" }
+  }
   if (!shouldRunAutoPublish(track, now)) {
     return { ...track, last_run_at: now.toISOString(), last_run_result: "skipped_interval" }
   }

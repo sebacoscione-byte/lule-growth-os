@@ -1,4 +1,7 @@
-import { shouldRunAutoPublish, isScheduledForFuture, pickNextPublishableItem, resolveChannelsToPublish, DEFAULT_AUTO_PUBLISH_SETTINGS } from "@/lib/content-pipeline"
+import {
+  shouldRunAutoPublish, isScheduledForFuture, isTodayScheduledDay, alreadyPublishedToday,
+  estimateAutoPublishDrainDays, pickNextPublishableItem, resolveChannelsToPublish, DEFAULT_AUTO_PUBLISH_SETTINGS,
+} from "@/lib/content-pipeline"
 import type { AutoPublishTrackSettings, ContentItem } from "@/types"
 
 function item(overrides: Partial<ContentItem> = {}): ContentItem {
@@ -30,44 +33,94 @@ function track(overrides: Partial<AutoPublishTrackSettings> = {}): AutoPublishTr
 }
 
 describe("shouldRunAutoPublish", () => {
+  // 2026-07-10 = viernes (5), 2026-07-07 = martes (2), 2026-07-15 = miercoles (3)
   it("no corre si esta deshabilitado", () => {
-    expect(shouldRunAutoPublish(track({ enabled: false }), new Date())).toBe(false)
+    expect(shouldRunAutoPublish(track({ enabled: false, days_of_week: [5] }), new Date("2026-07-10T09:00:00.000Z"))).toBe(false)
   })
 
-  it("corre si nunca publico antes", () => {
-    expect(shouldRunAutoPublish(track({ enabled: true, last_published_at: null }), new Date())).toBe(true)
-  })
-
-  it("no corre si todavia no paso el intervalo (7 / veces_por_semana)", () => {
+  it("no corre si no eligio ningun dia de la semana", () => {
     const now = new Date("2026-07-10T09:00:00.000Z")
-    // 2 veces por semana = cada 3.5 dias; a 3 dias de la ultima publicacion, todavia no corresponde
-    const t = track({ enabled: true, times_per_week: 2, last_published_at: "2026-07-07T09:00:00.000Z" })
+    expect(shouldRunAutoPublish(track({ enabled: true, days_of_week: [] }), now)).toBe(false)
+  })
+
+  it("no corre si hoy no es uno de los dias elegidos", () => {
+    const now = new Date("2026-07-10T09:00:00.000Z") // viernes
+    const t = track({ enabled: true, days_of_week: [2] }) // solo martes
     expect(shouldRunAutoPublish(t, now)).toBe(false)
   })
 
-  it("corre al cumplirse el intervalo", () => {
-    const now = new Date("2026-07-11T09:00:00.000Z")
-    const t = track({ enabled: true, times_per_week: 2, last_published_at: "2026-07-07T09:00:00.000Z" })
+  it("corre si hoy es uno de los dias elegidos y nunca publico antes", () => {
+    const now = new Date("2026-07-10T09:00:00.000Z") // viernes
+    const t = track({ enabled: true, days_of_week: [5], last_published_at: null })
     expect(shouldRunAutoPublish(t, now)).toBe(true)
   })
 
-  it("con mas veces por semana, el intervalo requerido es mas corto", () => {
-    const now = new Date("2026-07-09T09:00:00.000Z")
-    // 7 veces por semana = cada 1 dia
-    const t = track({ enabled: true, times_per_week: 7, last_published_at: "2026-07-08T09:00:00.000Z" })
-    expect(shouldRunAutoPublish(t, now)).toBe(true)
-  })
-
-  it("no corre si tiene una fecha de inicio programada que todavia no llego, aunque nunca haya publicado", () => {
-    const now = new Date("2026-07-10T09:00:00.000Z")
-    const t = track({ enabled: true, last_published_at: null, starts_at: "2026-07-15T00:00:00.000Z" })
+  it("no corre si ya publico hoy mismo (evita duplicar si el cron corre dos veces)", () => {
+    const now = new Date("2026-07-10T09:00:00.000Z") // viernes
+    const t = track({ enabled: true, days_of_week: [5], last_published_at: "2026-07-10T06:00:00.000Z" })
     expect(shouldRunAutoPublish(t, now)).toBe(false)
   })
 
-  it("corre una vez que se cumple la fecha de inicio programada", () => {
-    const now = new Date("2026-07-15T00:00:01.000Z")
-    const t = track({ enabled: true, last_published_at: null, starts_at: "2026-07-15T00:00:00.000Z" })
+  it("corre si hoy es un dia elegido pero la ultima publicacion fue otro dia", () => {
+    const now = new Date("2026-07-10T09:00:00.000Z") // viernes
+    const t = track({ enabled: true, days_of_week: [2, 5], last_published_at: "2026-07-07T09:00:00.000Z" }) // martes
     expect(shouldRunAutoPublish(t, now)).toBe(true)
+  })
+
+  it("no corre si tiene una fecha de inicio programada que todavia no llego, aunque hoy sea un dia elegido", () => {
+    const now = new Date("2026-07-10T09:00:00.000Z") // viernes
+    const t = track({ enabled: true, days_of_week: [5], last_published_at: null, starts_at: "2026-07-15T00:00:00.000Z" })
+    expect(shouldRunAutoPublish(t, now)).toBe(false)
+  })
+
+  it("corre una vez que se cumple la fecha de inicio programada, si ademas hoy es un dia elegido", () => {
+    const now = new Date("2026-07-15T12:00:00.000Z") // miercoles
+    const t = track({ enabled: true, days_of_week: [3], last_published_at: null, starts_at: "2026-07-15T00:00:00.000Z" })
+    expect(shouldRunAutoPublish(t, now)).toBe(true)
+  })
+})
+
+describe("isTodayScheduledDay", () => {
+  it("true si el dia de now esta en days_of_week", () => {
+    const now = new Date("2026-07-10T09:00:00.000Z") // viernes = 5
+    expect(isTodayScheduledDay(track({ days_of_week: [2, 5] }), now)).toBe(true)
+  })
+
+  it("false si el dia de now no esta en days_of_week", () => {
+    const now = new Date("2026-07-10T09:00:00.000Z")
+    expect(isTodayScheduledDay(track({ days_of_week: [2] }), now)).toBe(false)
+  })
+})
+
+describe("alreadyPublishedToday", () => {
+  it("false si nunca publico", () => {
+    expect(alreadyPublishedToday(track({ last_published_at: null }), new Date())).toBe(false)
+  })
+
+  it("true si last_published_at es el mismo dia calendario", () => {
+    const now = new Date("2026-07-10T20:00:00.000Z")
+    expect(alreadyPublishedToday(track({ last_published_at: "2026-07-10T06:00:00.000Z" }), now)).toBe(true)
+  })
+
+  it("false si last_published_at fue otro dia", () => {
+    const now = new Date("2026-07-10T09:00:00.000Z")
+    expect(alreadyPublishedToday(track({ last_published_at: "2026-07-09T09:00:00.000Z" }), now)).toBe(false)
+  })
+})
+
+describe("estimateAutoPublishDrainDays", () => {
+  it("0 si la cola esta vacia", () => {
+    expect(estimateAutoPublishDrainDays(0, [1, 4], new Date("2026-07-10T12:00:00.000Z"))).toBe(0)
+  })
+
+  it("0 si no hay ningun dia elegido", () => {
+    expect(estimateAutoPublishDrainDays(3, [], new Date("2026-07-10T12:00:00.000Z"))).toBe(0)
+  })
+
+  it("cuenta dias de calendario hasta agotar la cola publicando en los dias elegidos", () => {
+    // viernes 2026-07-10, eligiendo martes(2) y jueves(4): la 1ra ocurrencia es el martes siguiente (4 dias)
+    const now = new Date("2026-07-10T12:00:00.000Z")
+    expect(estimateAutoPublishDrainDays(1, [2, 4], now)).toBe(4)
   })
 })
 
