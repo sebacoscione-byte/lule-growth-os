@@ -130,6 +130,17 @@ describe("estimateAutoPublishDrainDays", () => {
     const now = new Date("2026-07-10T12:00:00.000Z")
     expect(estimateAutoPublishDrainDays(3, [2, 4], 3, now)).toBe(4)
   })
+
+  it("si hoy es un dia elegido y todavia esta disponible, cuenta como el dia 0 (no lo salta)", () => {
+    // jueves 2026-07-09, eligiendo martes(2) y jueves(4): hoy mismo es la 1ra ocurrencia
+    const now = new Date("2026-07-09T12:00:00.000Z")
+    expect(estimateAutoPublishDrainDays(1, [2, 4], 1, now, true)).toBe(0)
+  })
+
+  it("si hoy ya no esta disponible (ya publico, o todavia no arranca), lo salta igual que antes", () => {
+    const now = new Date("2026-07-09T12:00:00.000Z")
+    expect(estimateAutoPublishDrainDays(1, [2, 4], 1, now, false)).toBe(5) // el martes siguiente
+  })
 })
 
 describe("estimateAutoPublishDateForPosition", () => {
@@ -155,6 +166,19 @@ describe("estimateAutoPublishDateForPosition", () => {
     const third = estimateAutoPublishDateForPosition(3, [2], 3, now)
     const fourth = estimateAutoPublishDateForPosition(4, [2], 3, now)
     expect(fourth?.getTime()).toBeGreaterThan(third?.getTime() ?? 0)
+  })
+
+  it("si hoy es un dia elegido y todavia esta disponible, la posicion 1 sale hoy (no la salta)", () => {
+    // jueves 2026-07-09, eligiendo martes(2) y jueves(4)
+    const now = new Date("2026-07-09T12:00:00.000Z")
+    const result = estimateAutoPublishDateForPosition(1, [2, 4], 1, now, true)
+    expect(result?.toDateString()).toBe(now.toDateString())
+  })
+
+  it("si hoy ya no esta disponible, la posicion 1 salta al proximo dia elegido igual que antes", () => {
+    const now = new Date("2026-07-09T12:00:00.000Z")
+    const result = estimateAutoPublishDateForPosition(1, [2, 4], 1, now, false)
+    expect(result?.getDay()).toBe(2) // martes siguiente
   })
 })
 
