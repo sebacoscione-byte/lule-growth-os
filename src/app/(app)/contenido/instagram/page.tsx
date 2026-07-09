@@ -17,7 +17,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
 import { parseAiJson } from "@/lib/parse-ai-json"
-import { DEFAULT_AUTO_PUBLISH_SETTINGS, estimateAutoPublishDrainDays, estimateAutoPublishDateForPosition, pickNextPublishableItems } from "@/lib/content-pipeline"
+import { DEFAULT_AUTO_PUBLISH_SETTINGS, alreadyPublishedToday, estimateAutoPublishDrainDays, estimateAutoPublishDateForPosition, pickNextPublishableItems } from "@/lib/content-pipeline"
 import type { AutoPublishSettings, AutoPublishTrackSettings, ContentChannel, ContentItem, ContentSlide, ContentSource, ContentStatus } from "@/types"
 import { WEEKDAY_OPTIONS } from "@/types"
 
@@ -505,6 +505,11 @@ function isFutureStart(track: AutoPublishTrackSettings): boolean {
   return Boolean(track.starts_at) && new Date(track.starts_at as string).getTime() > Date.now()
 }
 
+/** true si hoy todavia puede ser la fecha de la proxima publicacion de este track (no si ya arranco en el futuro, ni si ya publico algo hoy). */
+function isTodayAvailableForQueueEstimate(track: AutoPublishTrackSettings, now: Date): boolean {
+  return !isFutureStart(track) && !alreadyPublishedToday(track, now)
+}
+
 function toLocalInputValue(iso: string): string {
   const d = new Date(iso)
   const pad = (n: number) => String(n).padStart(2, "0")
@@ -515,16 +520,19 @@ function fromLocalInputValue(value: string): string {
   return new Date(value).toISOString()
 }
 
-function describeAutoPublishQueue(kind: "post" | "historia", count: number, daysOfWeek: number[], itemsPerRun: number): string {
+function describeAutoPublishQueue(kind: "post" | "historia", count: number, track: AutoPublishTrackSettings): string {
+  const { days_of_week: daysOfWeek, items_per_run: itemsPerRun } = track
   const label = kind === "post"
     ? `${count} post${count === 1 ? "" : "s"} aprobado${count === 1 ? "" : "s"} en cola`
     : `${count} historia${count === 1 ? "" : "s"} aprobada${count === 1 ? "" : "s"} en cola`
   if (count === 0) return `${label}.`
   if (daysOfWeek.length === 0) return `${label} — elegí al menos un día de la semana para que empiece a publicar.`
-  const days = estimateAutoPublishDrainDays(count, daysOfWeek, itemsPerRun, new Date())
+  const now = new Date()
+  const days = estimateAutoPublishDrainDays(count, daysOfWeek, itemsPerRun, now, isTodayAvailableForQueueEstimate(track, now))
   const article = kind === "post" ? "el último saldría" : "la última saldría"
   const batch = itemsPerRun > 1 ? ` (publicando de a ${itemsPerRun})` : ""
-  return `${label} — a este ritmo${batch}, ${article} en unos ${days} días.`
+  const daysLabel = days === 0 ? "hoy" : `en unos ${days} días`
+  return `${label} — a este ritmo${batch}, ${article} ${daysLabel}.`
 }
 
 function describeWeekdaySelection(daysOfWeek: number[]): string {
@@ -872,12 +880,15 @@ export default function ContentStudioPage() {
     const now = new Date();
     (["post", "historia"] as const).forEach(format => {
       const track = autoPublishSettings[format]
+      const todayAvailable = isTodayAvailableForQueueEstimate(track, now)
       const queue = pickNextPublishableItems(items, format, items.length)
       queue.forEach((queuedItem, index) => {
         const position = index + 1
-        const date = estimateAutoPublishDateForPosition(position, track.days_of_week, track.items_per_run, now)
+        const date = estimateAutoPublishDateForPosition(position, track.days_of_week, track.items_per_run, now, todayAvailable)
         const etaLabel = date
-          ? `estimado ${date.toLocaleDateString("es-AR", { day: "numeric", month: "short" })}`
+          ? date.toDateString() === now.toDateString()
+            ? "estimado hoy"
+            : `estimado ${date.toLocaleDateString("es-AR", { day: "numeric", month: "short" })}`
           : "elegí días en \"Publicación automática\" para poder estimar cuándo"
         info.set(queuedItem.id, { position, etaLabel })
       })
@@ -1608,7 +1619,7 @@ export default function ContentStudioPage() {
                   <AutoPublishTrackCard
                     title="Posts de feed"
                     track={autoPublishSettings.post}
-                    queueText={describeAutoPublishQueue("post", counts.approvedPost, autoPublishSettings.post.days_of_week, autoPublishSettings.post.items_per_run)}
+                    queueText={describeAutoPublishQueue("post", counts.approvedPost, autoPublishSettings.post)}
                     saving={savingAutoPublish}
                     onToggleEnabled={() => updateTrackSettings("post", { enabled: !autoPublishSettings.post.enabled })}
                     onChangeTimesPerWeek={value => changeTimesPerWeek("post", value)}
@@ -1618,7 +1629,7 @@ export default function ContentStudioPage() {
                   <AutoPublishTrackCard
                     title="Historias"
                     track={autoPublishSettings.historia}
-                    queueText={describeAutoPublishQueue("historia", counts.approvedHistoria, autoPublishSettings.historia.days_of_week, autoPublishSettings.historia.items_per_run)}
+                    queueText={describeAutoPublishQueue("historia", counts.approvedHistoria, autoPublishSettings.historia)}
                     saving={savingAutoPublish}
                     onToggleEnabled={() => updateTrackSettings("historia", { enabled: !autoPublishSettings.historia.enabled })}
                     onChangeTimesPerWeek={value => changeTimesPerWeek("historia", value)}

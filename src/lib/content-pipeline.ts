@@ -90,13 +90,16 @@ export function shouldRunAutoPublish(track: AutoPublishTrackSettings, now: Date)
 
 /**
  * Pura, sin I/O: cuantos dias de calendario van a pasar hasta que corra el n-esimo dia programado
- * de la semana a partir de "now" (sin contar hoy). Base compartida por las dos estimaciones de abajo.
+ * de la semana a partir de "now". Si "todayAvailable" es true y hoy es uno de los dias elegidos, hoy
+ * mismo cuenta como la primera ocurrencia (offset 0) — pasa a false cuando ya se publico hoy o el
+ * track todavia no arranco (ver "todayAvailable" en los callers de abajo).
  */
-function nthScheduledDayOffset(n: number, daysOfWeek: number[], now: Date): number {
+function nthScheduledDayOffset(n: number, daysOfWeek: number[], now: Date, todayAvailable: boolean = true): number {
   if (n <= 0 || daysOfWeek.length === 0) return 0
   let found = 0
   let elapsedDays = 0
   const cursor = new Date(now)
+  if (todayAvailable && daysOfWeek.includes(cursor.getDay())) found++
   while (found < n && elapsedDays < 400) {
     cursor.setDate(cursor.getDate() + 1)
     elapsedDays++
@@ -107,26 +110,30 @@ function nthScheduledDayOffset(n: number, daysOfWeek: number[], now: Date): numb
 
 /**
  * Pura, sin I/O: cuantos dias de calendario van a pasar hasta que se agote una cola de "count"
- * piezas, publicando hasta "itemsPerRun" por cada dia elegido de la semana a partir de "now" (sin
- * contar hoy). Solo para mostrar una estimacion en la UI, no se usa para decidir cuando publicar.
+ * piezas, publicando hasta "itemsPerRun" por cada dia elegido de la semana a partir de "now" (hoy
+ * cuenta si "todayAvailable" es true, ver `nthScheduledDayOffset`). Solo para mostrar una estimacion
+ * en la UI, no se usa para decidir cuando publicar.
  */
-export function estimateAutoPublishDrainDays(count: number, daysOfWeek: number[], itemsPerRun: number, now: Date): number {
+export function estimateAutoPublishDrainDays(
+  count: number, daysOfWeek: number[], itemsPerRun: number, now: Date, todayAvailable: boolean = true
+): number {
   if (count <= 0) return 0
   const runsNeeded = Math.ceil(count / Math.max(1, itemsPerRun))
-  return nthScheduledDayOffset(runsNeeded, daysOfWeek, now)
+  return nthScheduledDayOffset(runsNeeded, daysOfWeek, now, todayAvailable)
 }
 
 /**
  * Pura, sin I/O: fecha estimada en que saldria publicada la pieza que ocupa la posicion "position"
  * (1-indexado) de la cola, dado cuantas piezas se publican por corrida. null si no hay ningun dia
- * de la semana elegido todavia (no hay forma de estimar).
+ * de la semana elegido todavia (no hay forma de estimar). "todayAvailable" en false excluye hoy como
+ * candidato (ya se publico hoy, o el track todavia no arranco) — ver `nthScheduledDayOffset`.
  */
 export function estimateAutoPublishDateForPosition(
-  position: number, daysOfWeek: number[], itemsPerRun: number, now: Date
+  position: number, daysOfWeek: number[], itemsPerRun: number, now: Date, todayAvailable: boolean = true
 ): Date | null {
   if (position <= 0 || daysOfWeek.length === 0) return null
   const runsNeeded = Math.ceil(position / Math.max(1, itemsPerRun))
-  const offsetDays = nthScheduledDayOffset(runsNeeded, daysOfWeek, now)
+  const offsetDays = nthScheduledDayOffset(runsNeeded, daysOfWeek, now, todayAvailable)
   const result = new Date(now)
   result.setDate(result.getDate() + offsetDays)
   return result
