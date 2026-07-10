@@ -1919,7 +1919,7 @@ function Editor({
           const altData = await altResponse.json()
           if (altResponse.ok && altData.image_alt_text) altText = altData.image_alt_text
         } catch { /* best-effort */ }
-        onSave({ visual_url: data.visual_url, ...(altText ? { image_alt_text: altText } : {}) })
+        onSave({ visual_url: data.visual_url, image_prompt: imagePrompt, ...(altText ? { image_alt_text: altText } : {}) })
       } else {
         setVisualError(
           `La placa se generó pero no se pudo guardar (${data.visual_persist_error ?? "error desconocido"}). ` +
@@ -1954,7 +1954,7 @@ function Editor({
       const data = await response.json()
       if (!response.ok || data.error) throw new Error(data.error ?? "No se pudo subir la imagen.")
       onGeneratedVisual(null)
-      onSave({ visual_url: data.visual_url })
+      onSave({ visual_url: data.visual_url, image_prompt: imagePrompt })
     } catch (error) {
       setImageUploadError(error instanceof Error ? error.message : "No se pudo subir la imagen.")
     } finally {
