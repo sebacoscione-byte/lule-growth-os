@@ -1174,7 +1174,18 @@ export default function ContentStudioPage() {
       const data = await response.json()
       if (!response.ok || data.error) return setError(data.error ?? "No se pudieron guardar los cambios")
       setItems(previous => previous.map(existing => existing.id === item.id ? data.item : existing))
-      setActive(data.item)
+      setActive(previous => {
+        // Si esta operacion es sobre otra pieza (ej. aprobar una card de la biblioteca mientras
+        // esta pieza distinta esta abierta en el editor), no tocar lo que se esta viendo/editando.
+        if (!previous || previous.id !== item.id) return previous
+        // Conservar en pantalla los campos editables que esta operacion puntual no mando a guardar
+        // (ej. generar la placa solo guarda visual_url/image_prompt, no debe pisar un caption que
+        // se estaba editando sin guardar todavia).
+        const unsentEdits = Object.fromEntries(
+          EDITABLE_FIELDS.filter(field => !(field in changes)).map(field => [field, previous[field]])
+        )
+        return { ...data.item, ...unsentEdits }
+      })
     } catch {
       setError("No se pudieron guardar los cambios. Revisá tu conexión e intentá nuevamente.")
     } finally {
