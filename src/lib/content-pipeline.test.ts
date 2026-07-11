@@ -203,10 +203,22 @@ describe("pickNextPublishableItem", () => {
     expect(pickNextPublishableItem([item({ status: "draft" })], "post")).toBeNull()
   })
 
-  it("ignora reels y carruseles, quedan pendientes de accion manual", () => {
+  it("ignora reels y carruseles al pedir el formato post (cada uno tiene su propio track)", () => {
     const reel = item({ id: "reel", format: "reel" })
     const carrusel = item({ id: "carrusel", format: "carrusel" })
     expect(pickNextPublishableItem([reel, carrusel], "post")).toBeNull()
+  })
+
+  it("un carrusel aprobado se elige al pedir el formato carrusel", () => {
+    const carrusel = item({ id: "carrusel", format: "carrusel" })
+    expect(pickNextPublishableItem([carrusel], "carrusel")?.id).toBe("carrusel")
+  })
+
+  it("un reel nunca se elige, no tiene track propio (requiere video, sin soporte)", () => {
+    const reel = item({ id: "reel", format: "reel" })
+    expect(pickNextPublishableItem([reel], "post")).toBeNull()
+    expect(pickNextPublishableItem([reel], "historia")).toBeNull()
+    expect(pickNextPublishableItem([reel], "carrusel")).toBeNull()
   })
 
   it("elige el aprobado mas antiguo por approved_at, del formato pedido", () => {

@@ -169,6 +169,10 @@ público para pedir turno.
 ### Automatización (Etapa 7)
 - [x] Publicar contenido aprobado directamente desde la app vía Instagram Graph API — primer post real
       confirmado en producción 2026-07-07 (@draluciachahin).
+- [x] Publicación directa de carruseles (2026-07-11) — antes solo post/historia podían auto-publicarse;
+      ahora un carrusel genera una imagen por slide (además de la portada) y se publica con el flujo real
+      de Meta (contenedor por imagen → contenedor `CAROUSEL` → publish). Ver `docs/CONTENT_STUDIO.md` →
+      "Carruseles". El reel sigue siendo la única excepción (requiere video real, sin soporte).
 
 ---
 
@@ -415,7 +419,8 @@ generación IA con guardrails médicos propios en `ai.ts` (no depende de `medica
 del bot); research de fuentes clínicas reales vía Europe PMC (`/api/content/sources`, el doc externo ni
 lo contemplaba); 3 paletas visuales; link de tracking `utm_content` por pieza con visitas/clicks
 agregados; bloqueo duro (UI + backend, `PUBLISHABLE_FORMATS` en `instagram-business.ts`) de
-auto-publish/publish-now para reel y carrusel — coincide con lo que pide el doc; cola con
+auto-publish/publish-now para reel y carrusel — coincide con lo que pide el doc *(nota: el carrusel se
+desbloqueó más tarde el mismo día, ver Etapa 5/7 más arriba; el reel sigue bloqueado, requiere video)*; cola con
 `days_of_week`/`items_per_run`/`queue_rank`/`starts_at`; patrón de variantes A/B ya construido (aplicado
 hoy al hero de landings, reutilizable en concepto).
 

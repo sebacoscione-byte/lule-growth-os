@@ -135,6 +135,13 @@ function VisualCard({ item, compact = false }: { item: ContentItem; compact?: bo
 }
 
 function SlideCard({ slide, index, style, compact = false }: { slide: ContentSlide; index: number; style: ContentItem["visual_style"]; compact?: boolean }) {
+  if (slide.visual_url) {
+    return (
+      <div className={`relative ${compact ? "w-28 flex-shrink-0" : "w-full"} aspect-square overflow-hidden rounded-xl border border-gray-200 shadow-sm`}>
+        <Image src={slide.visual_url} alt={slide.headline || `Slide ${index + 1}`} fill unoptimized className="object-cover" />
+      </div>
+    )
+  }
   return (
     <div className={`${compact ? "w-28 flex-shrink-0" : "w-full"} aspect-square rounded-xl bg-gradient-to-br ${STYLE_CLASSES[style]} p-3 text-white flex flex-col justify-between shadow-sm`}>
       <span className="text-[10px] font-bold text-white/50 uppercase tracking-widest">{index + 1}</span>
@@ -536,16 +543,18 @@ function fromLocalInputValue(value: string): string {
   return new Date(value).toISOString()
 }
 
-function describeAutoPublishQueue(kind: "post" | "historia", count: number, track: AutoPublishTrackSettings): string {
+function describeAutoPublishQueue(kind: "post" | "historia" | "carrusel", count: number, track: AutoPublishTrackSettings): string {
   const { days_of_week: daysOfWeek, items_per_run: itemsPerRun } = track
   const label = kind === "post"
     ? `${count} post${count === 1 ? "" : "s"} aprobado${count === 1 ? "" : "s"} en cola`
-    : `${count} historia${count === 1 ? "" : "s"} aprobada${count === 1 ? "" : "s"} en cola`
+    : kind === "historia"
+    ? `${count} historia${count === 1 ? "" : "s"} aprobada${count === 1 ? "" : "s"} en cola`
+    : `${count} carrusel${count === 1 ? "" : "es"} aprobado${count === 1 ? "" : "s"} en cola`
   if (count === 0) return `${label}.`
   if (daysOfWeek.length === 0) return `${label} — elegí al menos un día de la semana para que empiece a publicar.`
   const now = new Date()
   const days = estimateAutoPublishDrainDays(count, daysOfWeek, itemsPerRun, now, isTodayAvailableForQueueEstimate(track, now))
-  const article = kind === "post" ? "el último saldría" : "la última saldría"
+  const article = kind === "historia" ? "la última saldría" : "el último saldría"
   const batch = itemsPerRun > 1 ? ` (publicando de a ${itemsPerRun})` : ""
   const daysLabel = days === 0 ? "hoy" : `en unos ${days} días`
   return `${label} — a este ritmo${batch}, ${article} ${daysLabel}.`
@@ -834,6 +843,7 @@ export default function ContentStudioPage() {
             channels: stored.channels ?? DEFAULT_AUTO_PUBLISH_SETTINGS.channels,
             post: { ...DEFAULT_AUTO_PUBLISH_SETTINGS.post, ...stored.post },
             historia: { ...DEFAULT_AUTO_PUBLISH_SETTINGS.historia, ...stored.historia },
+            carrusel: { ...DEFAULT_AUTO_PUBLISH_SETTINGS.carrusel, ...(stored.carrusel ?? {}) },
           }
           setAutoPublishSettings(loaded)
           setSavedAutoPublishSettings(loaded)
@@ -853,11 +863,11 @@ export default function ContentStudioPage() {
     setAutoPublishSaved(false)
   }
 
-  function updateTrackSettings(track: "post" | "historia", patch: Partial<AutoPublishTrackSettings>) {
+  function updateTrackSettings(track: "post" | "historia" | "carrusel", patch: Partial<AutoPublishTrackSettings>) {
     updateAutoPublishSettings({ ...autoPublishSettings, [track]: { ...autoPublishSettings[track], ...patch } })
   }
 
-  function changeTimesPerWeek(track: "post" | "historia", value: number) {
+  function changeTimesPerWeek(track: "post" | "historia" | "carrusel", value: number) {
     const current = autoPublishSettings[track]
     updateTrackSettings(track, { times_per_week: value, days_of_week: current.days_of_week.slice(0, value) })
   }
@@ -887,6 +897,7 @@ export default function ContentStudioPage() {
     approved: items.filter(item => item.status === "approved").length,
     approvedPost: items.filter(item => item.status === "approved" && item.format === "post").length,
     approvedHistoria: items.filter(item => item.status === "approved" && item.format === "historia").length,
+    approvedCarrusel: items.filter(item => item.status === "approved" && item.format === "carrusel").length,
   }), [items])
 
   // Posicion (1-indexado) de cada pieza aprobada dentro de la cola de auto-publicacion de su propio
@@ -895,7 +906,7 @@ export default function ContentStudioPage() {
   const queueInfo = useMemo(() => {
     const info = new Map<string, { position: number; etaLabel: string }>()
     const now = new Date();
-    (["post", "historia"] as const).forEach(format => {
+    (["post", "historia", "carrusel"] as const).forEach(format => {
       const track = autoPublishSettings[format]
       const todayAvailable = isTodayAvailableForQueueEstimate(track, now)
       const queue = pickNextPublishableItems(items, format, items.length)
@@ -1284,8 +1295,15 @@ export default function ContentStudioPage() {
   }
 
   async function publishInstagram(item: ContentItem) {
+    const isCarrusel = item.format === "carrusel"
+    const carruselImageUrls = [item.visual_url, ...(item.slides ?? []).map(slide => slide.visual_url)]
+      .filter((url): url is string => Boolean(url))
     const freshVisualUrl = generatedVisual?.itemId === item.id ? generatedVisual.url : null
-    if (!freshVisualUrl && !item.visual_url) {
+    if (isCarrusel && carruselImageUrls.length < 2) {
+      setError("Generá la imagen de la portada y de cada slide antes de publicar el carrusel.")
+      return
+    }
+    if (!isCarrusel && !freshVisualUrl && !item.visual_url) {
       setError("Generá la placa final antes de publicar en Instagram.")
       return
     }
@@ -1297,7 +1315,9 @@ export default function ContentStudioPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           itemId: item.id,
-          ...(freshVisualUrl ? { imageDataUrl: freshVisualUrl } : { imageUrl: item.visual_url }),
+          ...(isCarrusel
+            ? { imageUrls: carruselImageUrls }
+            : freshVisualUrl ? { imageDataUrl: freshVisualUrl } : { imageUrl: item.visual_url }),
           caption: `${item.hook}\n\n${item.caption}\n\n${item.hashtags}`,
           format: item.format,
         }),
@@ -1495,8 +1515,11 @@ export default function ContentStudioPage() {
                       <SelectTrigger className="text-gray-900"><SelectValue /></SelectTrigger>
                       <SelectContent>{FORMATS.map(item => <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>)}</SelectContent>
                     </Select>
-                    {(format === "reel" || format === "carrusel") && (
-                      <p className="text-xs text-amber-700">Este formato no se puede publicar directo a Instagram desde acá (requiere video o varias imágenes). Vas a poder copiarlo para publicarlo manualmente. Elegí &ldquo;Post estático&rdquo; o &ldquo;Historia&rdquo; si querés publicar con un clic.</p>
+                    {format === "reel" && (
+                      <p className="text-xs text-amber-700">Este formato no se puede publicar directo a Instagram desde acá (requiere video real). Vas a poder copiarlo para publicarlo manualmente.</p>
+                    )}
+                    {format === "carrusel" && (
+                      <p className="text-xs text-blue-700">Vas a poder generar una imagen por cada slide y publicar el carrusel completo con un clic, una vez que tengas todas las placas listas.</p>
                     )}
                   </div>
                   <div className="space-y-1.5">
@@ -1705,6 +1728,16 @@ export default function ContentStudioPage() {
                     onChangeDaysOfWeek={days => updateTrackSettings("historia", { days_of_week: days })}
                     onChangeStartsAt={iso => updateTrackSettings("historia", { starts_at: iso })}
                     onChangeItemsPerRun={value => updateTrackSettings("historia", { items_per_run: value })}
+                  />
+                  <AutoPublishTrackCard
+                    title="Carruseles"
+                    track={autoPublishSettings.carrusel}
+                    queueText={describeAutoPublishQueue("carrusel", counts.approvedCarrusel, autoPublishSettings.carrusel)}
+                    saving={savingAutoPublish}
+                    onToggleEnabled={() => updateTrackSettings("carrusel", { enabled: !autoPublishSettings.carrusel.enabled })}
+                    onChangeTimesPerWeek={value => changeTimesPerWeek("carrusel", value)}
+                    onChangeDaysOfWeek={days => updateTrackSettings("carrusel", { days_of_week: days })}
+                    onChangeStartsAt={iso => updateTrackSettings("carrusel", { starts_at: iso })}
                   />
                 </CardContent>
               </Card>
@@ -1933,14 +1966,28 @@ function Editor({
   const [imageUploading, setImageUploading] = useState(false)
   const [imageUploadError, setImageUploadError] = useState<string | null>(null)
   const [showHistoriaText, setShowHistoriaText] = useState(false)
+  const [slideGeneratingIndex, setSlideGeneratingIndex] = useState<number | null>(null)
+  const [slideErrors, setSlideErrors] = useState<Record<number, string>>({})
+  const [bulkGenerating, setBulkGenerating] = useState(false)
+  const [bulkError, setBulkError] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const imagePrompt = item.image_prompt?.trim() || fallbackImagePrompt(item)
   const displayedVisualUrl = generatedVisual?.itemId === item.id ? generatedVisual.url : item.visual_url
   const isHistoria = item.format === "historia"
+  const isCarrusel = item.format === "carrusel"
+  const carruselImagesReady = !isCarrusel || Boolean(
+    item.visual_url && (item.slides ?? []).length > 0 && (item.slides ?? []).every(slide => Boolean(slide.visual_url))
+  )
   const approvalReady = Boolean(
     (isHistoria || (item.hook.trim() && item.caption.trim())) &&
-    (item.visual_headline.trim() || item.visual_url)
+    (item.visual_headline.trim() || item.visual_url) &&
+    carruselImagesReady
   )
+  // Cualquier generacion de imagen (una slide puntual o la tanda completa) o guardado en curso bloquea
+  // el resto de las acciones que tocan "slides": todas leen/escriben el array completo del item en un
+  // closure fijo al momento de arrancar, asi que dos acciones superpuestas (ej. generar la slide 0 y
+  // editar el texto de la slide 1 mientras tanto) pueden pisarse -- serializar evita la carrera.
+  const carruselBusy = bulkGenerating || slideGeneratingIndex !== null || busy
 
   function updateSlide(index: number, changes: Partial<ContentSlide>) {
     if (!item.slides) return
@@ -1948,6 +1995,21 @@ function Editor({
       ...item,
       slides: item.slides.map((slide, slideIndex) => slideIndex === index ? { ...slide, ...changes } : slide),
     })
+  }
+
+  function addSlide() {
+    if (carruselBusy) return
+    const slides = item.slides ?? []
+    if (slides.length >= 9) return // Instagram permite hasta 10 items por carrusel, incluida la portada
+    onChange({ ...item, slides: [...slides, { headline: "", text: "" }] })
+  }
+
+  function removeSlide(index: number) {
+    if (carruselBusy || !item.slides) return
+    onChange({ ...item, slides: item.slides.filter((_, slideIndex) => slideIndex !== index) })
+    // Los errores quedan indexados por posicion -- tras sacar una slide, los indices se corren y un
+    // error viejo podria mostrarse bajo la slide equivocada. Mas simple limpiar todo que reindexar.
+    setSlideErrors({})
   }
 
   function updateScene(index: number, changes: Partial<ContentScene>) {
@@ -2025,6 +2087,89 @@ function Editor({
     } finally {
       setVisualGenerating(false)
     }
+  }
+
+  /**
+   * Genera y persiste una imagen individual (portada o una slide puntual) vía /api/content/visual,
+   * sin tocar el estado del item — quien llama decide qué hacer con la URL resultante. Se usa tanto
+   * para la portada como para cada slide del carrusel, reusando el mismo "look" (imagePrompt) con un
+   * titular/subtítulo distinto por imagen.
+   */
+  async function generateOneVisual(headline: string, subtitle: string, idSuffix: string): Promise<{ visual_url?: string; error?: string }> {
+    try {
+      const response = await fetch("/api/content/visual", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          itemId: `${item.id}${idSuffix}`,
+          category: item.category,
+          topic: item.topic,
+          format: item.format,
+          visual_headline: headline || item.topic.slice(0, 90),
+          visual_subtitle: subtitle,
+          image_prompt: imagePrompt,
+        }),
+      })
+      const data = await response.json()
+      if (!response.ok || data.error) return { error: data.error ?? "No se pudo generar la imagen." }
+      if (!data.visual_url) return { error: `Se generó pero no se pudo guardar (${data.visual_persist_error ?? "error desconocido"}).` }
+      return { visual_url: data.visual_url }
+    } catch {
+      return { error: "No se pudo conectar con Gemini para generar esta imagen." }
+    }
+  }
+
+  async function generateSlideVisual(index: number) {
+    if (carruselBusy) return
+    const slide = item.slides?.[index]
+    if (!slide) return
+    if (
+      item.status === "published" &&
+      !window.confirm("Esta pieza ya está publicada en Instagram. Regenerar esta placa la va a devolver a \"Borrador\" acá en el sistema (no borra ni modifica la publicación real). ¿Continuar?")
+    ) return
+    setSlideGeneratingIndex(index)
+    setSlideErrors(previous => { const next = { ...previous }; delete next[index]; return next })
+    const result = await generateOneVisual(slide.headline, slide.text.slice(0, 90), `-slide-${index}`)
+    if (result.error) {
+      setSlideErrors(previous => ({ ...previous, [index]: result.error as string }))
+    } else {
+      onSave({ slides: (item.slides ?? []).map((s, i) => i === index ? { ...s, visual_url: result.visual_url } : s) })
+    }
+    setSlideGeneratingIndex(null)
+  }
+
+  // Regenera portada + todas las slides en una sola tanda. Mientras corre, "carruselBusy" bloquea el
+  // resto de las acciones que tocan "slides" (editar texto, agregar/quitar, generar una slide suelta),
+  // asi que guardar de a una (en vez de todo junto al final) ya no puede pisarse con otra edicion
+  // concurrente -- y si falla a mitad de camino, lo generado hasta ahi queda guardado en vez de perderse.
+  async function generateAllCarouselVisuals() {
+    if (carruselBusy) return
+    if (
+      item.status === "published" &&
+      !window.confirm("Esta pieza ya está publicada en Instagram. Regenerar las placas la va a devolver a \"Borrador\" acá en el sistema (no borra ni modifica la publicación real). ¿Continuar?")
+    ) return
+    setBulkGenerating(true)
+    setBulkError(null)
+    const cover = await generateOneVisual(item.visual_headline, item.visual_subtitle, "")
+    if (cover.error) {
+      setBulkError(`Portada: ${cover.error}`)
+      setBulkGenerating(false)
+      return
+    }
+    onSave({ visual_url: cover.visual_url, image_prompt: imagePrompt })
+    const slides = item.slides ?? []
+    const nextSlides: ContentSlide[] = [...slides]
+    for (let index = 0; index < slides.length; index++) {
+      const result = await generateOneVisual(slides[index].headline, slides[index].text.slice(0, 90), `-slide-${index}`)
+      if (result.error) {
+        setBulkError(`Slide ${index + 1}: ${result.error} Las imágenes generadas hasta acá ya quedaron guardadas.`)
+        setBulkGenerating(false)
+        return
+      }
+      nextSlides[index] = { ...slides[index], visual_url: result.visual_url }
+      onSave({ slides: [...nextSlides] })
+    }
+    setBulkGenerating(false)
   }
 
   async function handleImageUpload(event: ChangeEvent<HTMLInputElement>) {
@@ -2237,6 +2382,57 @@ function Editor({
             </div>
           </CardContent>
         </Card>
+        {isCarrusel && (
+          <Card className="border-violet-200 bg-violet-50/40">
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2 text-base text-gray-900">
+                <WandSparkles className="h-4 w-4 text-violet-600" />
+                Placas de cada slide
+              </CardTitle>
+              <p className="text-xs text-gray-600">
+                Cada slide necesita su propia imagen para poder aprobar y publicar el carrusel completo.
+                Generalas todas juntas o de a una — todas usan la misma dirección visual de arriba, con el
+                titular y texto de cada slide.
+              </p>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <Button
+                onClick={generateAllCarouselVisuals}
+                disabled={carruselBusy || (item.slides ?? []).length === 0}
+                className="w-full gap-2"
+              >
+                {bulkGenerating ? <Loader2 className="h-4 w-4 animate-spin" /> : <WandSparkles className="h-4 w-4" />}
+                Generar todas las placas ({1 + (item.slides ?? []).length} imágenes)
+              </Button>
+              {(item.slides ?? []).length === 0 && (
+                <p className="text-xs text-gray-500">Agregá al menos una slide (más abajo, en la sección de texto) antes de generar imágenes.</p>
+              )}
+              {bulkError && <p className="text-xs text-red-600 bg-red-50 rounded p-2">{bulkError}</p>}
+              <p className="text-xs text-gray-400">Usa hasta {1 + (item.slides ?? []).length} llamadas a Gemini, una por imagen. Mientras se generan, no se puede editar el texto ni agregar/quitar slides.</p>
+              {(item.slides ?? []).length > 0 && (
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                  {(item.slides ?? []).map((slide, index) => (
+                    <div key={index} className="space-y-1.5">
+                      <SlideCard slide={slide} index={index} style={item.visual_style} />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => generateSlideVisual(index)}
+                        disabled={carruselBusy}
+                        className="w-full gap-1.5 text-xs"
+                      >
+                        {slideGeneratingIndex === index ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <WandSparkles className="h-3.5 w-3.5" />}
+                        {slide.visual_url ? "Regenerar" : "Generar"}
+                      </Button>
+                      {slideErrors[index] && <p className="text-xs text-red-600">{slideErrors[index]}</p>}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
         <Button variant="outline" onClick={onCopy} className="w-full gap-2">{copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />} Copiar Instagram</Button>
         <TrackedLinkField itemId={item.id} visits={item.tracked_visits ?? 0} interactions={item.tracked_interactions ?? 0} />
         {item.source && (
@@ -2261,8 +2457,11 @@ function Editor({
               <SelectContent>{FORMATS.map(option => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}</SelectContent>
             </Select>
           </div>
-          {(item.format === "reel" || item.format === "carrusel") && (
-            <p className="text-xs text-amber-700">Este formato no se puede publicar directo a Instagram desde acá (requiere video o varias imágenes) ni entra en la publicación automática. Elegí &ldquo;Post estático&rdquo; o &ldquo;Historia&rdquo; si querés publicar con un clic.</p>
+          {item.format === "reel" && (
+            <p className="text-xs text-amber-700">Este formato no se puede publicar directo a Instagram desde acá (requiere video real) ni entra en la publicación automática. Elegí &ldquo;Post estático&rdquo;, &ldquo;Historia&rdquo; o &ldquo;Carrusel&rdquo; si querés publicar con un clic.</p>
+          )}
+          {item.format === "carrusel" && (
+            <p className="text-xs text-blue-700">Generá la placa de la portada y de cada slide (más abajo) antes de aprobar — un carrusel necesita todas sus imágenes listas para poder publicarse.</p>
           )}
           <div className="flex gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
             <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0" />
@@ -2308,14 +2507,36 @@ function Editor({
               </div>
             </>
           )}
-          {item.slides && item.slides.length > 0 && (
+          {item.format === "carrusel" && (
             <div className="space-y-3 rounded-lg border border-gray-200 p-3">
-              <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Slides del carrusel</p>
-              {item.slides.map((slide, index) => (
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Slides del carrusel</p>
+                <Button
+                  type="button" variant="outline" size="sm" onClick={addSlide}
+                  disabled={carruselBusy || (item.slides ?? []).length >= 9} className="gap-1.5"
+                >
+                  <Plus className="h-3.5 w-3.5" /> Agregar slide
+                </Button>
+              </div>
+              {(item.slides ?? []).length === 0 && (
+                <p className="text-xs text-gray-500">Todavía no hay slides. Agregá al menos una para poder armar el carrusel.</p>
+              )}
+              {carruselBusy && (
+                <p className="text-xs text-gray-500">Generando placas — esperá a que termine para editar el texto o agregar/quitar slides.</p>
+              )}
+              {(item.slides ?? []).map((slide, index) => (
                 <div key={index} className="space-y-2 rounded-md bg-gray-50 p-3">
-                  <Label className="text-gray-900">Slide {index + 1}</Label>
-                  <Input value={slide.headline} maxLength={60} onChange={event => updateSlide(index, { headline: event.target.value })} className="bg-white text-gray-900" />
-                  <Textarea rows={3} value={slide.text} maxLength={300} onChange={event => updateSlide(index, { text: event.target.value })} className="bg-white text-gray-900" />
+                  <div className="flex items-center justify-between">
+                    <Label className="text-gray-900">Slide {index + 1}</Label>
+                    <button
+                      type="button" onClick={() => removeSlide(index)} disabled={carruselBusy}
+                      aria-label="Quitar slide" className="text-gray-400 hover:text-red-600 disabled:opacity-40 disabled:hover:text-gray-400"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                  <Input value={slide.headline} maxLength={60} disabled={carruselBusy} onChange={event => updateSlide(index, { headline: event.target.value })} className="bg-white text-gray-900" />
+                  <Textarea rows={3} value={slide.text} maxLength={300} disabled={carruselBusy} onChange={event => updateSlide(index, { text: event.target.value })} className="bg-white text-gray-900" />
                 </div>
               ))}
             </div>
@@ -2449,17 +2670,18 @@ function Editor({
               </Button>
             )}
             {item.status === "approved" && igConnected && (() => {
-              const formatSupported = item.format === "post" || item.format === "historia"
+              const formatSupported = item.format === "post" || item.format === "historia" || item.format === "carrusel"
+              const imagesReady = isCarrusel ? carruselImagesReady : Boolean(displayedVisualUrl)
               const disabledReason = !formatSupported
-                ? "Este formato no publica directo (requiere video o varias imágenes). Copiá el contenido y publicalo manualmente."
-                : !displayedVisualUrl
-                  ? "Generá la placa final primero"
+                ? "Este formato no publica directo (requiere video real). Copiá el contenido y publicalo manualmente."
+                : !imagesReady
+                  ? isCarrusel ? "Generá la imagen de la portada y de cada slide primero" : "Generá la placa final primero"
                   : undefined
               return (
                 <Button
                   variant="outline"
                   onClick={onPublishInstagram}
-                  disabled={busy || !formatSupported || !displayedVisualUrl}
+                  disabled={busy || !formatSupported || !imagesReady}
                   className="gap-2"
                   title={disabledReason}
                 >
@@ -2484,15 +2706,17 @@ function Editor({
           </div>
           {!approvalReady && item.status === "draft" && (
             <p className="text-xs text-amber-700">
-              {isHistoria
+              {isCarrusel
+                ? "Para aprobar, generá la placa de la portada y de cada slide (arriba)."
+                : isHistoria
                 ? "Para aprobar, agregá un titular visual o subí una imagen propia."
                 : "Para aprobar, completá hook y caption, y agregá un titular visual o subí una imagen propia."}
             </p>
           )}
           <p className="text-xs text-gray-500">
             {igConnected
-              ? "Instagram publica posts e historias con la placa generada (conectá y generá la placa final antes). Reels y carruseles todavia requieren copiar/publicar manualmente."
-              : "Conectá Instagram arriba para publicar posts e historias directamente."}
+              ? "Instagram publica posts, historias y carruseles con las placas generadas (conectá y generá las placas antes). Los reels todavia requieren video real, publicalos manualmente."
+              : "Conectá Instagram arriba para publicar posts, historias y carruseles directamente."}
           </p>
         </CardContent>
       </Card>

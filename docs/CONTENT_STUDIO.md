@@ -31,7 +31,7 @@ Estados:
 - `published`: publicado en todos los canales pedidos (Instagram y/o Google Business), a mano o automatico.
 - `archived`: retirado de la biblioteca activa.
 
-La revision humana guarda todos los campos editables de la pieza. Para aprobar se requieren hook, caption, texto de Google y titular visual. Si se edita una pieza aprobada o publicada, vuelve a borrador para requerir una nueva revision.
+La revision humana guarda todos los campos editables de la pieza. Para aprobar se requieren hook, caption y titular visual (la historia no necesita hook/caption, Instagram no los muestra); el carrusel ademas exige que la portada y cada slide tengan su propia imagen generada (ver seccion "Carruseles" mas abajo). Si se edita una pieza aprobada o publicada, vuelve a borrador para requerir una nueva revision.
 
 ## Imagenes con Gemini
 
@@ -64,27 +64,59 @@ La captacion no puede usar miedo, culpa, escasez, promesas ni asumir que el lect
 
 ## Canales
 
-- Instagram: generacion y descarga de placa con Gemini y copia del texto listo para publicar. La publicacion directa por API (manual o automatica) solo soporta los formatos `post` e `historia` — reel y carrusel requieren video o multiples imagenes, no implementado.
+- Instagram: generacion y descarga de placa con Gemini y copia del texto listo para publicar. La
+  publicacion directa por API (manual o automatica) soporta `post`, `historia` y `carrusel`. El reel
+  sigue sin soporte: requiere video real y la app solo genera imagenes estaticas — usar "Copiar
+  Instagram" para publicarlo a mano.
 - Google Business: publicacion desde la app solo para contenido aprobado y cuando Google habilita la API para la cuenta. Solo texto (`google_text`), sin imagen.
+
+## Carruseles (2026-07-11)
+
+A diferencia de post/historia (una sola placa), un carrusel necesita una imagen propia por cada slide
+ademas de la portada:
+
+- El editor tiene una tarjeta "Placas de cada slide" (visible solo para `format === "carrusel"`) con un
+  boton para generar todas las imagenes de una sola vez o de a una por slide. Todas reusan la misma
+  direccion visual (`image_prompt`) de la portada, solo cambia el titular/texto que se renderiza en cada
+  imagen — no hay un sistema de plantillas separado, cada imagen es una generacion independiente de
+  Gemini (no hay garantia de continuidad visual perfecta entre slides, es una limitacion conocida de
+  generar cada imagen por separado).
+- Se pueden agregar o quitar slides a mano (boton "Agregar slide", maximo 9 + portada = 10, el limite
+  real de Instagram) — util tanto para ajustar lo que genero la IA como para armar un carrusel 100% manual
+  desde "Crear pieza en blanco".
+- **Aprobar un carrusel exige que la portada y cada slide tengan su propia imagen generada** (`/api/content/items`
+  PATCH lo valida server-side, no solo en la UI) — a diferencia de post/historia, que pueden aprobarse
+  solo con el titular de texto. Esto evita publicar despues un carrusel a medio armar.
+- Publicacion: `publishCarouselToInstagram` en `src/lib/instagram-business.ts` crea un contenedor hijo
+  por imagen (`is_carousel_item: true`), espera a que cada uno termine de procesar, arma el contenedor
+  padre (`media_type: CAROUSEL`) y publica. Requiere minimo 2 imagenes (portada + 1 slide), maximo 10.
 
 ## Publicacion automatica
 
 Ademas del boton manual "Publicar en Instagram"/"Publicar en Google" y de "Publicar ahora" (publica una
-pieza aprobada al instante, sin esperar cronograma), las piezas `approved` con formato `post` u `historia`
-pueden publicarse solas via un Vercel Cron diario (`vercel.json` → `/api/cron/publish-content`, protegido
-por la env var `CRON_SECRET`, ver `CLAUDE.md`).
+pieza aprobada al instante, sin esperar cronograma), las piezas `approved` con formato `post`, `historia`
+o `carrusel` pueden publicarse solas via un Vercel Cron diario (`vercel.json` → `/api/cron/publish-content`,
+protegido por la env var `CRON_SECRET`, ver `CLAUDE.md`).
 
-- **Dos cronogramas independientes**: `app_config.auto_publish_settings` tiene `channels` (compartido) y
-  dos sub-objetos `post`/`historia`, cada uno con `enabled`, `times_per_week`, `last_published_at`,
+- **Tres cronogramas independientes**: `app_config.auto_publish_settings` tiene `channels` (compartido) y
+  tres sub-objetos `post`/`historia`/`carrusel`, cada uno con `enabled`, `times_per_week`, `last_published_at`,
   `last_run_at`, `last_run_result`. Se editan por separado desde la tarjeta "Publicacion automatica" en
   `Estudio de contenido → Biblioteca`. Motivo: no conviene mezclar la cadencia de posts de feed con la de
-  historias (referencia de investigacion sobre cadencia en cuentas de salud: no publicar todos los dias).
+  historias ni con la de carruseles (referencia de investigacion sobre cadencia en cuentas de salud: no
+  publicar todos los dias; carrusel por default arranca en 1 vez por semana, es la pieza mas pesada de
+  producir). El tercer track corre dentro del mismo cron job, no suma un cron nuevo de Vercel (el plan
+  Hobby sigue limitado a 2, ver `CLAUDE.md`).
 - Cada cronograma elige, dentro de su propio formato, la pieza aprobada mas antigua (por `approved_at`) —
-  reels y carruseles quedan siempre pendientes de accion manual, nunca bloquean ninguna cola.
+  el reel queda siempre pendiente de accion manual, nunca bloquea ninguna cola.
+- A diferencia de post/historia (que generan la placa "de apuro" en el cron si todavia no existe), el
+  track de carrusel **nunca genera imagenes dentro del cron** — como la aprobacion ya exige que todas
+  esten listas de antes, si alguna falta simplemente se salta esa pieza con un error en vez de publicar
+  un carrusel incompleto.
 - Publica por canal de forma independiente: si Instagram sale bien pero Google falla (o viceversa), la
   pieza queda en `approved` con `auto_publish_result` marcando que canal fallo, visible como aviso en su
   card. Solo pasa a `published` cuando **todos** los canales pedidos salieron bien. Google Business no
-  tiene concepto de "historia", asi que las piezas de ese formato solo se tagean con canal `instagram`.
+  tiene concepto de "historia" ni de "carrusel", asi que las piezas de esos formatos solo se tagean con
+  canal `instagram`.
 - Si se agota la cuota diaria de IA (`DAILY_AI_REQUEST_LIMIT`) antes de generar la placa, el cron lo trata
   como evento esperado (`quota_exceeded`) y reintenta al dia siguiente, sin marcar error en la pieza.
 - La logica de negocio (cuando corresponde correr cada track, que pieza elegir, que canales resolver) vive
