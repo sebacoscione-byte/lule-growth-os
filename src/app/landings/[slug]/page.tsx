@@ -822,6 +822,9 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
           {configDoctor.matricula && ` · Matrícula ${configDoctor.matricula}`}
         </p>
         <p className="mt-1">Este sitio tiene carácter informativo y no reserva turnos ni confirma disponibilidad.</p>
+        <p className="mt-2">
+          <Link href="/privacidad" className="hover:underline">Política de privacidad</Link>
+        </p>
       </footer>
 
       {/* CTA sticky mobile */}

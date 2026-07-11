@@ -11,10 +11,18 @@ export default function sitemap(): MetadataRoute.Sitemap {
   const base = getBaseUrl()
   const now = new Date()
 
-  return PUBLIC_LANDING_SLUGS.map((slug) => ({
-    url: `${base}/${slug}`,
-    lastModified: now,
-    changeFrequency: "monthly" as const,
-    priority: slug === "dra-lucia-chahin" ? 1.0 : 0.8,
-  }))
+  return [
+    ...PUBLIC_LANDING_SLUGS.map((slug) => ({
+      url: `${base}/${slug}`,
+      lastModified: now,
+      changeFrequency: "monthly" as const,
+      priority: slug === "dra-lucia-chahin" ? 1.0 : 0.8,
+    })),
+    {
+      url: `${base}/privacidad`,
+      lastModified: now,
+      changeFrequency: "yearly" as const,
+      priority: 0.3,
+    },
+  ]
 }
