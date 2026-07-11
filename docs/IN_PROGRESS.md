@@ -1,3 +1,28 @@
+# Plan de corrección posterior a auditoría integral
+
+## Objetivo
+
+Convertir los hallazgos de la revisión técnica del 2026-07-11 en un backlog ejecutable, priorizado
+por riesgo para pacientes, integridad de WhatsApp, privacidad y valor de negocio.
+
+## Plan
+
+- [x] Consolidar los hallazgos con evidencia del código y checks del proyecto.
+- [x] Separar correcciones P0/P1/P2 y ordenar sus dependencias.
+- [x] Definir criterios de aceptación verificables para cada iniciativa.
+- [x] Incorporar el plan en `docs/BACKLOG.md` sin tocar lógica médica ni producción.
+- [x] Verificar documentación, commitear, abrir PR y mergear según las reglas del proyecto.
+
+## Resultado
+
+- `docs/BACKLOG.md` contiene cuatro olas de trabajo: WhatsApp; privacidad/datos; operación,
+  calidad y conversión; UX/SEO/rendimiento.
+- Cada ticket incluye alcance y criterio de aceptación; los puntos con dependencia legal o de
+  despliegue están identificados explícitamente.
+- El plan respeta el límite de dos crons de Vercel y excluye cambios a guardrails médicos.
+
+---
+
 # Arquitectura de costos de WhatsApp Business Platform + reducción de mensajes
 
 ## Objetivo

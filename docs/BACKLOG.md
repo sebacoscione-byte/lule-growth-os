@@ -1,5 +1,157 @@
 # Backlog — Lule Growth OS
-**Actualizado:** 2026-07-06 | **Basado en:** PRD Estrategia de Captación v2.1
+**Actualizado:** 2026-07-11 | **Basado en:** PRD Estrategia de Captación v2.1
+
+---
+
+## Plan de corrección — auditoría integral (2026-07-11)
+
+Objetivo: corregir los riesgos de producción encontrados en la revisión integral y, después,
+mejorar privacidad, atribución de conversiones, calidad operativa y escalabilidad. El orden es
+deliberado: primero integridad de WhatsApp y datos de pacientes; luego medición y optimización.
+
+### Ola 0 — Blindaje de WhatsApp (P0, ejecutar primero)
+
+- [ ] **WA-01 — Webhook con firma obligatoria y fail-closed.**
+  - Cambiar `isValidWhatsAppSignature()` para rechazar el POST si falta
+    `WHATSAPP_APP_SECRET`; eliminar el comportamiento y test `fail-open`.
+  - Agregar chequeo administrativo de configuración sin exponer el secreto.
+  - **Aceptación:** una firma válida procesa el evento; firma ausente/incorrecta o secreto no
+    configurado devuelve error y no cambia sesiones, leads, mensajes ni costos.
+  - **Despliegue:** confirmar que la variable exista en Vercel antes de mergear. Toca webhook
+    de producción, pero no modifica lógica médica.
+
+- [ ] **WA-02 — Idempotencia por `wa_message_id`.**
+  - Crear migración con índice único parcial para mensajes entrantes con ID de Meta.
+  - Reclamar/persistir el ID antes de actualizar sesión, costo o enviar una respuesta.
+  - Agregar tests de entrega duplicada y de concurrencia básica.
+  - **Aceptación:** reenviar dos o más veces el mismo evento produce un solo mensaje entrante,
+    una sola transición de estado, una sola respuesta y un solo evento de costo.
+
+- [ ] **WA-03 — No perder mensajes por errores transitorios.**
+  - Dejar de devolver `200` incondicional cuando el procesamiento firmado falla antes de quedar
+    persistido; clasificar errores reintentables y permanentes.
+  - Conservar idempotencia para que los reintentos de Meta sean seguros.
+  - Agregar alerta con ID del evento, etapa y tipo de error, sin teléfono ni texto clínico en logs.
+  - **Aceptación:** un fallo transitorio puede reintentarse sin duplicar respuestas; un evento
+    persistido no se pierde silenciosamente; no se agrega un tercer cron de Vercel.
+
+### Ola 1 — Privacidad, integridad y seguridad de datos (P1)
+
+- [ ] **DATA-01 — Política de privacidad e instrucciones de borrado.**
+  - Publicar `/privacidad` con datos recolectados, finalidad, canales de contacto, terceros,
+    conservación y derechos de la persona.
+  - Publicar instrucciones/URL de eliminación de datos compatible con Meta App Review.
+  - Enlazar ambas desde el footer público y la configuración de Meta.
+  - **Aceptación:** las páginas son públicas, indexables cuando corresponda, legibles en móvil y
+    describen el funcionamiento real sin promesas legales no verificadas.
+  - **Dependencia:** texto final validado por asesoramiento legal por tratarse de datos de salud.
+
+- [ ] **DATA-02 — Retención, exportación y eliminación de pacientes.**
+  - Definir plazos por tipo de dato: leads, mensajes, consentimientos, handoffs y costos.
+  - Crear una acción administrativa auditable para anonimizar o eliminar un paciente y sus datos
+    relacionados, preservando solo agregados no identificables cuando corresponda.
+  - Documentar restauración, backups y responsable del procedimiento.
+  - **Aceptación:** una solicitud de borrado puede ejecutarse de punta a punta y queda evidencia
+    del procedimiento sin conservar el contenido eliminado en logs de aplicación.
+
+- [ ] **DATA-03 — Consentimiento de analítica y minimización.**
+  - Revisar con asesoramiento legal si GA4 requiere consentimiento previo para esta audiencia y
+    configurar Consent Mode o carga condicional según la decisión documentada.
+  - Evitar enviar teléfono, motivo, síntomas u otros identificadores a analítica.
+  - **Aceptación:** el comportamiento de cookies/GA coincide con la política publicada y ningún
+    evento contiene datos personales o clínicos.
+
+- [ ] **SEC-01 — Validación uniforme de APIs y rate limit distribuido.**
+  - Definir esquemas y límites de longitud/tipo para todos los cuerpos y query params.
+  - Manejar JSON inválido con `400`, comprobar errores de Supabase y normalizar respuestas.
+  - Reemplazar el `Map` en memoria por un límite compartido entre instancias (preferentemente
+    Supabase/RPC para no sumar infraestructura sin necesidad).
+  - **Aceptación:** payloads inválidos no llegan a `service_role`; el límite se mantiene entre
+    instancias y existen tests para abuso, tamaños máximos y errores de base.
+
+- [ ] **SEC-02 — Export CSV segura.**
+  - Neutralizar celdas que empiecen con `=`, `+`, `-`, `@`, tab o retorno antes de generar CSV.
+  - Agregar tests con fórmulas maliciosas y conservar compatibilidad UTF-8/Excel.
+  - **Aceptación:** abrir la exportación no ejecuta fórmulas provenientes de datos de leads.
+
+### Ola 2 — Operación, calidad y conversiones reales (P1)
+
+- [ ] **OPS-01 — Observabilidad sin exponer datos sensibles.**
+  - Estandarizar logs con `request_id`/`event_id`, ruta, etapa y código de error.
+  - Alertar fallos de webhook, cron, OAuth y publicación; redactar teléfono, tokens y contenido.
+  - Agregar panel/checklist de salud para integraciones críticas.
+  - **Aceptación:** cada fallo crítico permite ubicar la etapa y reintentar o resolver sin consultar
+    secretos ni texto del paciente.
+
+- [ ] **QA-01 — Tests de rutas e integración.**
+  - Cubrir auth de APIs, webhook firmado/duplicado, autorización de crons, OAuth en error,
+    creación/edición/exportación de leads y estados de publicación de contenido.
+  - **Aceptación:** los casos críticos se ejecutan en CI y fallan si una ruta pierde autenticación,
+    idempotencia o validación.
+
+- [ ] **QA-02 — Smoke E2E móvil y desktop.**
+  - Automatizar landing principal, slugs SEO, CTAs de cada sede, login y navegación del CRM.
+  - Validar ausencia de errores de consola, foco de teclado y viewport móvil representativo.
+  - **Aceptación:** el smoke corre antes de mergear cambios de UI y conserva evidencia del resultado.
+
+- [ ] **CRM-01 — Contexto reciente correcto en el inbox.**
+  - Consultar los últimos 20 mensajes y devolverlos en orden cronológico antes de generar respuesta,
+    en vez de usar los primeros 20 de la conversación.
+  - Agregar test para conversaciones de más de 20 mensajes.
+  - **Aceptación:** la IA recibe siempre el tramo más reciente y no se omite el mensaje actual.
+
+- [ ] **GROWTH-01 — Atribución de conversión de punta a punta.**
+  - Diseñar un identificador corto por visita/campaña/pieza que sobreviva al salto a WhatsApp o al
+    canal de reserva sin incluir datos personales.
+  - Propagarlo al lead y vincularlo con `confirmo_que_pidio_turno`.
+  - Mostrar embudo real: visita → CTA → conversación/lead → pidió turno, por slug, UTM y contenido.
+  - **Aceptación:** un caso de prueba completo atribuye el turno al origen correcto; el dashboard
+    diferencia claramente clic, lead y turno confirmado.
+
+- [ ] **GROWTH-02 — Guardrails estadísticos para experimentos A/B.**
+  - Mostrar tamaño de muestra, ventana temporal y criterio de finalización; no declarar ganador con
+    tráfico insuficiente.
+  - **Aceptación:** el panel identifica resultados preliminares y solo recomienda una variante cuando
+    cumple el umbral definido.
+
+### Ola 3 — UX, SEO, rendimiento y mantenimiento (P2)
+
+- [ ] **WEB-01 — QA visual y simplificación de la landing.**
+  - Revisar móvil/desktop con navegador real y prueba rápida con usuarios.
+  - Medir si la repetición de “Dónde atiende” y “Pedir turno” ayuda o alarga el recorrido; consolidar
+    sin perder instrucciones por sede si los datos muestran fricción.
+  - **Aceptación:** no hay regresiones visuales y el CTA principal queda accesible en teclado y móvil.
+
+- [ ] **SEO-01 — Cobertura de Hospital Británico y vista al compartir.**
+  - Evaluar y crear landing local para Hospital Británico/CABA con datos institucionales verificados.
+  - Agregar imagen Open Graph y validar previews de WhatsApp/Instagram.
+  - **Aceptación:** metadata, canonical, sitemap y contenido son consistentes y no prometen turnos ni
+    disponibilidad.
+
+- [ ] **PERF-01 — Paginación y agregaciones en base.**
+  - Paginar leads y exportar en forma segura para volúmenes mayores.
+  - Reemplazar la descarga de hasta 20.000 eventos del dashboard por vistas/RPC agregadas en SQL.
+  - **Aceptación:** el panel mantiene tiempos estables al crecer y los totales coinciden con consultas
+    de control.
+
+- [ ] **TECH-01 — Deuda técnica y headers.**
+  - Migrar `middleware.ts` a `proxy.ts`, eliminar warnings de lint y definir headers de seguridad
+    compatibles con OAuth, Supabase, Google, Meta y las imágenes públicas.
+  - Revisar la vulnerabilidad moderada transitiva PostCSS/Next y actualizar cuando exista una versión
+    compatible; no aplicar el downgrade incorrecto sugerido por `npm audit fix`.
+  - **Aceptación:** lint, tests y build limpios; OAuth, landings e integraciones siguen funcionando.
+
+### Secuencia y reglas de ejecución
+
+1. Ejecutar `WA-01` a `WA-03` en una misma iniciativa, con migración reversible y preview verificado.
+2. Ejecutar `DATA-01`/`DATA-02` antes de ampliar captación o conectar nuevas cuentas externas.
+3. Implementar `SEC-01`, `SEC-02`, `OPS-01` y `QA-01` antes del nuevo funnel de atribución.
+4. Construir `GROWTH-01` y validar datos reales antes de sumar más experimentos o dashboards.
+5. Cerrar con UX/SEO/rendimiento, guiado por métricas y QA visual.
+
+Este plan no incluye cambios a clasificación de síntomas, mensajes de alarma ni otros guardrails
+médicos. Si una implementación futura necesita tocarlos, aplica la pausa obligatoria con preview y
+aprobación explícita antes de mergear.
 
 ---
 
