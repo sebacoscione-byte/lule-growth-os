@@ -42,6 +42,8 @@ export async function proxy(request: NextRequest) {
     request.nextUrl.pathname.startsWith("/api") ||
     request.nextUrl.pathname === "/" ||
     request.nextUrl.pathname === "/privacidad" ||
+    request.nextUrl.pathname === "/sitemap.xml" ||
+    request.nextUrl.pathname === "/robots.txt" ||
     PUBLIC_ROOT_PATHS.has(firstSegment)
 
   const isLandingRoute =
