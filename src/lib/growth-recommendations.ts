@@ -125,6 +125,20 @@ export function checkUnapprovedTemplates(count: number): GrowthRecommendation | 
   return null
 }
 
+/** No expone el valor del secreto, solo si está cargado — ver WA-01 en docs/BACKLOG.md. */
+export function checkWhatsAppWebhookSignatureMissing(configured: boolean): GrowthRecommendation | null {
+  if (!configured) {
+    return {
+      id: "whatsapp-webhook-signature-missing",
+      channel: "whatsapp",
+      severity: "critical",
+      message: "Falta configurar WHATSAPP_APP_SECRET en Vercel — el webhook de WhatsApp rechaza todos los mensajes entrantes (fail-closed) hasta que se cargue esa variable.",
+      href: "/configuracion",
+    }
+  }
+  return null
+}
+
 export function checkAbandonedConversations(count: number): GrowthRecommendation | null {
   if (count > 0) {
     return {
@@ -262,6 +276,7 @@ export interface GrowthRecommendationsInput {
   heroVariantResults: HeroVariantRowInput[]
   locations: { name: string; obrasSociales: string[] }[]
   whatsapp: {
+    webhookSignatureConfigured: boolean
     projectedMonthlyCost: number
     monthlyCostAlertArs: number | null
     unapprovedTemplatesCount: number
@@ -290,6 +305,7 @@ export function buildGrowthRecommendations(input: GrowthRecommendationsInput): G
   }
   recs.push(checkHeroAbTestSignal(input.heroVariantResults))
 
+  recs.push(checkWhatsAppWebhookSignatureMissing(input.whatsapp.webhookSignatureConfigured))
   recs.push(checkWhatsAppBudget(input.whatsapp.projectedMonthlyCost, input.whatsapp.monthlyCostAlertArs))
   recs.push(checkUnapprovedTemplates(input.whatsapp.unapprovedTemplatesCount))
   recs.push(checkAbandonedConversations(input.whatsapp.abandonedConversations))

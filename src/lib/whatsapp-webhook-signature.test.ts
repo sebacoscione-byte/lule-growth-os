@@ -32,9 +32,9 @@ describe("isValidWhatsAppSignature", () => {
     expect(isValidWhatsAppSignature(body, null, SECRET)).toBe(false)
   })
 
-  it("deja pasar (fail-open) si todavía no hay WHATSAPP_APP_SECRET configurado", () => {
+  it("rechaza (fail-closed) si todavía no hay WHATSAPP_APP_SECRET configurado, aunque venga una firma", () => {
     const body = JSON.stringify({ object: "whatsapp_business_account", entry: [] })
-    expect(isValidWhatsAppSignature(body, null, undefined)).toBe(true)
-    expect(isValidWhatsAppSignature(body, "sha256=cualquier-cosa", undefined)).toBe(true)
+    expect(isValidWhatsAppSignature(body, null, undefined)).toBe(false)
+    expect(isValidWhatsAppSignature(body, "sha256=cualquier-cosa", undefined)).toBe(false)
   })
 })

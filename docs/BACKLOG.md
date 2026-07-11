@@ -9,31 +9,42 @@ Objetivo: corregir los riesgos de producción encontrados en la revisión integr
 mejorar privacidad, atribución de conversiones, calidad operativa y escalabilidad. El orden es
 deliberado: primero integridad de WhatsApp y datos de pacientes; luego medición y optimización.
 
-### Ola 0 — Blindaje de WhatsApp (P0, ejecutar primero)
+### Ola 0 — Blindaje de WhatsApp (P0, ejecutar primero) ✅ Resuelto (2026-07-11)
 
-- [ ] **WA-01 — Webhook con firma obligatoria y fail-closed.**
-  - Cambiar `isValidWhatsAppSignature()` para rechazar el POST si falta
-    `WHATSAPP_APP_SECRET`; eliminar el comportamiento y test `fail-open`.
-  - Agregar chequeo administrativo de configuración sin exponer el secreto.
-  - **Aceptación:** una firma válida procesa el evento; firma ausente/incorrecta o secreto no
-    configurado devuelve error y no cambia sesiones, leads, mensajes ni costos.
-  - **Despliegue:** confirmar que la variable exista en Vercel antes de mergear. Toca webhook
-    de producción, pero no modifica lógica médica.
+- [x] **WA-01 — Webhook con firma obligatoria y fail-closed.**
+  - `isValidWhatsAppSignature()` ahora rechaza el POST si falta `WHATSAPP_APP_SECRET` (antes
+    dejaba pasar sin validar); test de "fail-open" reemplazado por uno de "fail-closed".
+  - Chequeo administrativo agregado como recomendación crítica en `/dashboard`
+    (`checkWhatsAppWebhookSignatureMissing` en `growth-recommendations.ts`) — avisa si falta la
+    variable sin exponer su valor.
+  - Sigue existiendo la excepción de siempre para lógica médica (no aplica acá, esto es
+    infraestructura del webhook, no guardrails).
 
-- [ ] **WA-02 — Idempotencia por `wa_message_id`.**
-  - Crear migración con índice único parcial para mensajes entrantes con ID de Meta.
-  - Reclamar/persistir el ID antes de actualizar sesión, costo o enviar una respuesta.
-  - Agregar tests de entrega duplicada y de concurrencia básica.
-  - **Aceptación:** reenviar dos o más veces el mismo evento produce un solo mensaje entrante,
-    una sola transición de estado, una sola respuesta y un solo evento de costo.
+- [x] **WA-02 — Idempotencia por `wa_message_id`.**
+  - Migración `20260711_whatsapp_webhook_idempotency.sql`: tabla `whatsapp_webhook_events` con
+    `wa_message_id` único.
+  - `src/lib/whatsapp-idempotency.ts` reclama el ID (insert único) antes de tocar sesión, costo
+    o respuesta; `decideClaimOutcome` (testeado) decide claim/duplicate/retry según el estado
+    de la fila existente — cubre reenvío exitoso (duplicate) y concurrencia básica (dos
+    inserts simultáneos, uno gana por la constraint única).
+  - **Nota de alcance real**: no hay infraestructura en el proyecto para testear contra un
+    Supabase real (todos los tests de `src/lib` son de lógica pura, ver `whatsapp-pricing.ts`
+    como referencia del mismo patrón) — la parte que sí pega a la base (`claimWhatsAppEvent`,
+    etc.) queda sin test unitario, verificada en producción igual que el resto de las funciones
+    equivalentes del proyecto (`logWhatsAppMessage`, `incrementMessagesSentCount`).
 
-- [ ] **WA-03 — No perder mensajes por errores transitorios.**
-  - Dejar de devolver `200` incondicional cuando el procesamiento firmado falla antes de quedar
-    persistido; clasificar errores reintentables y permanentes.
-  - Conservar idempotencia para que los reintentos de Meta sean seguros.
-  - Agregar alerta con ID del evento, etapa y tipo de error, sin teléfono ni texto clínico en logs.
-  - **Aceptación:** un fallo transitorio puede reintentarse sin duplicar respuestas; un evento
-    persistido no se pierde silenciosamente; no se agrega un tercer cron de Vercel.
+- [x] **WA-03 — No perder mensajes por errores transitorios.**
+  - El webhook ya no devuelve `200` incondicional: si algún mensaje del POST falla de forma
+    transitoria, responde `500` para que Meta reintente la entrega completa — la idempotencia
+    de WA-02 hace que ese reintento sea seguro (los eventos ya procesados se ignoran, solo se
+    reprocesa el que falló).
+  - `classifyWebhookError()` (testeado) distingue error definitivo (`WindowClosedError`,
+    `TemplateNotApprovedError` — van a volver a fallar igual ante el mismo evento) de
+    transitorio (todo lo demás, default conservador: mejor reintentar de más que perder un
+    mensaje en silencio).
+  - Alerta por email reutilizando `sendCronFailureAlert` (mismo mecanismo que los cron jobs) con
+    ID del evento, clasificación y mensaje de error — sin teléfono ni contenido del paciente.
+    No se agregó un tercer cron de Vercel.
 
 ### Ola 1 — Privacidad, integridad y seguridad de datos (P1)
 
