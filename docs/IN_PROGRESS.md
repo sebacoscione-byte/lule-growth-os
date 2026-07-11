@@ -17,8 +17,9 @@ pedir confirmación, salvo que toque lógica médica — ver CLAUDE.md).
 - [ ] **DATA-02** — Retención/exportación/eliminación de datos de un paciente: acción
   administrativa auditable (anonimizar/eliminar lead + mensajes + eventos de costo/consentimiento
   relacionados).
-- [ ] **DATA-03** — GA4: cargar el script solo tras consentimiento explícito (banner simple),
-  default conservador mientras no haya confirmación legal de que no hace falta.
+- [x] **DATA-03** — GA4 ahora requiere consentimiento explícito (`AnalyticsConsentBanner` +
+  cookie `lule_analytics_consent`, opt-in) antes de cargar el script — default conservador,
+  la revisión legal explícita sigue pendiente.
 - [ ] **TECH-01** — Deuda técnica: revisar si `middleware.ts` → `proxy.ts` aplica en esta versión
   de Next (verificar con skill antes de tocar), limpiar warnings de lint, re-chequear
   vulnerabilidad de `postcss`.

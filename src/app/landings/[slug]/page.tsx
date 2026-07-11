@@ -15,6 +15,7 @@ import { getServiceDb } from "@/lib/supabase/service"
 import { getGooglePlaceReviews } from "@/lib/google-places"
 import { HERO_VARIANT_COOKIE } from "@/lib/landing-track"
 import { GoogleAnalytics } from "@/components/google-analytics"
+import { AnalyticsConsentBanner } from "@/components/analytics-consent-banner"
 import { EcgDivider } from "@/components/ecg-divider"
 import { LandingInteractions, type SedeAction } from "./landing-interactions"
 import { HeroCtaLink } from "./hero-cta-link"
@@ -364,6 +365,7 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
   return (
     <main className="min-h-screen bg-white pb-20 sm:pb-0">
       <GoogleAnalytics />
+      <AnalyticsConsentBanner />
       {isMain && (
         <>
           <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(personJsonLd) }} />

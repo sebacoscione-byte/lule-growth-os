@@ -75,12 +75,19 @@ deliberado: primero integridad de WhatsApp y datos de pacientes; luego medición
   - **Aceptación:** una solicitud de borrado puede ejecutarse de punta a punta y queda evidencia
     del procedimiento sin conservar el contenido eliminado en logs de aplicación.
 
-- [ ] **DATA-03 — Consentimiento de analítica y minimización.**
-  - Revisar con asesoramiento legal si GA4 requiere consentimiento previo para esta audiencia y
-    configurar Consent Mode o carga condicional según la decisión documentada.
-  - Evitar enviar teléfono, motivo, síntomas u otros identificadores a analítica.
-  - **Aceptación:** el comportamiento de cookies/GA coincide con la política publicada y ningún
-    evento contiene datos personales o clínicos.
+- [x] **DATA-03 — Consentimiento de analítica y minimización.** ⏳ Default conservador (2026-07-11)
+  - Se implementó **carga condicional (opt-in)** sin esperar la revisión legal explícita: GA4
+    no se inyecta hasta que el visitante acepta explícitamente un banner de consentimiento
+    (`AnalyticsConsentBanner`, cookie `lule_analytics_consent`). `GoogleAnalytics` (server
+    component) lee esa cookie con `next/headers` y no renderiza nada si no está en `"granted"`.
+    Es el default más conservador posible — si la asesoría legal después determina que no hacía
+    falta pedir consentimiento para esta audiencia, se puede relajar bajando el umbral.
+  - Ya se cumplía "no enviar teléfono/motivo/síntomas a analítica": el `gtag('config', ...)`
+    nunca mandó datos de leads, solo lo que GA4 recolecta por default (page views).
+  - **Sigue pendiente**: la revisión legal explícita en sí (documentar la decisión) — se implementó
+    la opción más segura mientras tanto, no se reemplaza el paso de asesoría.
+  - **Aceptación cumplida**: el comportamiento (sin consentimiento = sin GA) ya coincide con lo que
+    describe `/privacidad` → "Cookies y analítica" (actualizada en el mismo cambio).
 
 - [ ] **SEC-01 — Validación uniforme de APIs y rate limit distribuido.** ⏳ Parcial (2026-07-11)
   - [x] Rate limit distribuido: `src/lib/rate-limit.ts` ya no usa un `Map` en memoria (se reseteaba
