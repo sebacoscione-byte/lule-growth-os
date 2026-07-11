@@ -18,7 +18,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
 import { parseAiJson } from "@/lib/parse-ai-json"
 import { DEFAULT_AUTO_PUBLISH_SETTINGS, alreadyPublishedToday, estimateAutoPublishDrainDays, estimateAutoPublishDateForPosition, findRecentDuplicateTopic, pickNextPublishableItems } from "@/lib/content-pipeline"
-import type { AutoPublishSettings, AutoPublishTrackSettings, ContentChannel, ContentItem, ContentObjective, ContentScene, ContentSlide, ContentSource, ContentStatus } from "@/types"
+import type { AutoPublishSettings, AutoPublishTrackSettings, ContentItem, ContentObjective, ContentScene, ContentSlide, ContentSource, ContentStatus } from "@/types"
 import { CONTENT_OBJECTIVE_GOALS, CONTENT_OBJECTIVE_LABELS, WEEKDAY_OPTIONS } from "@/types"
 
 const IS_MANUAL_MODE = process.env.NEXT_PUBLIC_AI_MODE !== "gemini_api"

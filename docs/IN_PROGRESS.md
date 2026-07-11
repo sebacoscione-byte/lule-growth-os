@@ -21,9 +21,9 @@ pedir confirmación, salvo que toque lógica médica — ver CLAUDE.md).
 - [x] **DATA-03** — GA4 ahora requiere consentimiento explícito (`AnalyticsConsentBanner` +
   cookie `lule_analytics_consent`, opt-in) antes de cargar el script — default conservador,
   la revisión legal explícita sigue pendiente.
-- [ ] **TECH-01** — Deuda técnica: revisar si `middleware.ts` → `proxy.ts` aplica en esta versión
-  de Next (verificar con skill antes de tocar), limpiar warnings de lint, re-chequear
-  vulnerabilidad de `postcss`.
+- [x] **TECH-01** — `middleware.ts` → `proxy.ts` (confirmado con skill, rename 1:1), 0 warnings de
+  lint, vulnerabilidad de postcss re-chequeada (sigue sin solución estable). Falta la parte de
+  headers de seguridad (CSP, etc.) — riesgo real de romper OAuth en silencio, mejor aparte.
 - [ ] **SEO-01** — Landing local para Hospital Británico/CABA (mismo patrón que las 6 landings
   existentes) + imagen Open Graph.
 - [ ] **PERF-01** — Paginar leads/export; reemplazar el fetch de hasta 20.000 eventos del

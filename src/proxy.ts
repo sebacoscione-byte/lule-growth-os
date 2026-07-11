@@ -5,7 +5,7 @@ import { HERO_VARIANT_COOKIE } from "@/lib/landing-track"
 
 const PUBLIC_ROOT_PATHS = new Set(PUBLIC_LANDING_SLUGS.map((slug) => `/${slug}`))
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request })
 
   const supabase = createServerClient(
@@ -31,13 +31,18 @@ export async function middleware(request: NextRequest) {
 
   const { data: { user } } = await supabase.auth.getUser()
 
+  // Primer segmento del path: además de la landing en sí (/cardiologa-lanus), cubre los archivos
+  // de metadata que Next.js genera anidados bajo la misma ruta (ej. /cardiologa-lanus/opengraph-image),
+  // que un match exacto sobre PUBLIC_ROOT_PATHS dejaba afuera y mandaba a /login sin sesión.
+  const firstSegment = "/" + request.nextUrl.pathname.split("/")[1]
+
   const isAuthRoute = request.nextUrl.pathname.startsWith("/login")
   const isPublicRoute =
     request.nextUrl.pathname.startsWith("/landings") ||
     request.nextUrl.pathname.startsWith("/api") ||
     request.nextUrl.pathname === "/" ||
     request.nextUrl.pathname === "/privacidad" ||
-    PUBLIC_ROOT_PATHS.has(request.nextUrl.pathname)
+    PUBLIC_ROOT_PATHS.has(firstSegment)
 
   const isLandingRoute =
     request.nextUrl.pathname.startsWith("/landings/") ||
@@ -80,6 +85,10 @@ export async function middleware(request: NextRequest) {
   return supabaseResponse
 }
 
+// El nombre de este export sigue siendo "config" (no "proxyConfig") en Next.js 16.2.9 —
+// verificado directamente en node_modules/next/dist/build/analysis/get-page-static-info.js,
+// que busca literalmente el identificador "config" para extraer el matcher, incluso dentro de
+// proxy.ts. Solo el nombre de la función exportada cambia (proxy en vez de middleware).
 export const config = {
   matcher: [
     "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
