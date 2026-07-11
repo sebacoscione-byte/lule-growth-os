@@ -10,7 +10,11 @@ import { LANDING_DATA, PUBLIC_LANDING_SLUGS } from "@/lib/public-landings"
 import { readAutoPublishSettings } from "@/lib/content-pipeline"
 import { getGooglePlaceReviews } from "@/lib/google-places"
 import { getWhatsAppSettings } from "@/lib/whatsapp-settings"
-import { buildGrowthRecommendations, type GrowthRecommendation, type RecommendationChannel } from "@/lib/growth-recommendations"
+import {
+  buildGrowthRecommendations, evaluateAbTestReadiness,
+  AB_TEST_MIN_VISITS_PER_VARIANT, AB_TEST_MIN_RATE_GAP,
+  type GrowthRecommendation, type RecommendationChannel,
+} from "@/lib/growth-recommendations"
 import Link from "next/link"
 
 const CHANNEL_ICON: Record<RecommendationChannel, typeof Globe> = {
@@ -609,39 +613,79 @@ export default async function DashboardPage() {
               días). No hay ganador automático — mirá la tasa de interacción y decidí manualmente
               cuándo cortar el test.
             </p>
+            <p className="text-xs text-gray-500">
+              Criterio de finalización: se necesitan al menos {AB_TEST_MIN_VISITS_PER_VARIANT} visitas
+              por variante y una diferencia de al menos {AB_TEST_MIN_RATE_GAP} puntos de interacción
+              entre ambas para considerar el resultado confiable — con menos que eso, cualquier
+              diferencia puede ser ruido.
+            </p>
           </CardHeader>
           <CardContent>
             {heroVariantResults.rows.every(row => row.visits === 0) ? (
               <p className="text-sm text-gray-400">Todavía no hay visitas con variante asignada.</p>
             ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b text-left text-xs text-gray-500">
-                      <th className="pb-2 font-medium">Variante</th>
-                      <th className="pb-2 font-medium text-right">Visitas</th>
-                      <th className="pb-2 font-medium text-right">Click &quot;Pedir turno&quot;</th>
-                      <th className="pb-2 font-medium text-right">Click &quot;Ver sedes&quot;</th>
-                      <th className="pb-2 font-medium text-right">Interacciones</th>
-                      <th className="pb-2 font-medium text-right">Tasa</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {heroVariantResults.rows.map(row => (
-                      <tr key={row.variant} className="border-b border-gray-50 last:border-0">
-                        <td className="py-2 pr-2 font-medium text-gray-900">
-                          {row.variant === "a" ? "A — Pedir turno primero" : "B — Ver sedes primero"}
-                        </td>
-                        <td className="py-2 text-right text-gray-700">{row.visits}</td>
-                        <td className="py-2 text-right text-gray-700">{row.pedirTurnoClicks}</td>
-                        <td className="py-2 text-right text-gray-700">{row.verSedesClicks}</td>
-                        <td className="py-2 text-right text-gray-700">{row.interactions}</td>
-                        <td className="py-2 text-right font-semibold text-gray-900">{row.interactionRate}%</td>
+              <>
+                {(() => {
+                  const readiness = evaluateAbTestReadiness(heroVariantResults.rows)
+                  if (readiness === "insufficient_sample") {
+                    const missing = heroVariantResults.rows.map(row => ({
+                      variant: row.variant,
+                      missing: Math.max(AB_TEST_MIN_VISITS_PER_VARIANT - row.visits, 0),
+                    })).filter(r => r.missing > 0)
+                    return (
+                      <p className="mb-3 text-xs text-amber-700 bg-amber-50 rounded px-2 py-1.5">
+                        Resultado preliminar — muestra insuficiente todavía
+                        {missing.length > 0 && (
+                          <> (faltan {missing.map(m => `${m.missing} visitas en ${m.variant.toUpperCase()}`).join(" y ")}
+                          {" "}para el mínimo de {AB_TEST_MIN_VISITS_PER_VARIANT} por variante)</>
+                        )}.
+                      </p>
+                    )
+                  }
+                  if (readiness === "no_clear_signal") {
+                    return (
+                      <p className="mb-3 text-xs text-blue-700 bg-blue-50 rounded px-2 py-1.5">
+                        Ya hay muestra suficiente, pero la diferencia entre variantes todavía no llega a
+                        {" "}{AB_TEST_MIN_RATE_GAP} puntos — no alcanza para preferir una sobre la otra todavía.
+                      </p>
+                    )
+                  }
+                  return (
+                    <p className="mb-3 text-xs text-green-700 bg-green-50 rounded px-2 py-1.5">
+                      Hay señal suficiente para elegir una variante — ver &quot;Recomendaciones de
+                      crecimiento&quot; más abajo.
+                    </p>
+                  )
+                })()}
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b text-left text-xs text-gray-500">
+                        <th className="pb-2 font-medium">Variante</th>
+                        <th className="pb-2 font-medium text-right">Visitas</th>
+                        <th className="pb-2 font-medium text-right">Click &quot;Pedir turno&quot;</th>
+                        <th className="pb-2 font-medium text-right">Click &quot;Ver sedes&quot;</th>
+                        <th className="pb-2 font-medium text-right">Interacciones</th>
+                        <th className="pb-2 font-medium text-right">Tasa</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                    </thead>
+                    <tbody>
+                      {heroVariantResults.rows.map(row => (
+                        <tr key={row.variant} className="border-b border-gray-50 last:border-0">
+                          <td className="py-2 pr-2 font-medium text-gray-900">
+                            {row.variant === "a" ? "A — Pedir turno primero" : "B — Ver sedes primero"}
+                          </td>
+                          <td className="py-2 text-right text-gray-700">{row.visits}</td>
+                          <td className="py-2 text-right text-gray-700">{row.pedirTurnoClicks}</td>
+                          <td className="py-2 text-right text-gray-700">{row.verSedesClicks}</td>
+                          <td className="py-2 text-right text-gray-700">{row.interactions}</td>
+                          <td className="py-2 text-right font-semibold text-gray-900">{row.interactionRate}%</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </>
             )}
           </CardContent>
         </Card>
