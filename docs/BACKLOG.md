@@ -401,6 +401,84 @@ cron-job.org o un GitHub Action programado) que pegue a `/api/cron/publish-conte
 (decisión de billing, no tomarla sin confirmación explícita del usuario). Ver memoria
 `project_vercel_cron_limit`.
 
+### [ANÁLISIS] Plan de mejoras de Instagram (benchmark ChatGPT, 2026-07-11) — qué suma y qué no
+Seba compartió un documento externo (benchmark de perfiles médicos + propuesta de arquitectura para el
+Estudio de contenido: objetivos REACH/EDUCATION/TRUST/CONVERSION, pilares clínicos, reel silencioso con
+shot list, variantes A/B de hook, workflow editorial DRAFT_AI→REVIEW_REQUIRED→CHANGES_REQUESTED→
+APPROVED→SCHEDULED→PUBLISHED→ARCHIVED, plantillas visuales, banco de clips, benchmark de competidores).
+Se comparó contra el código real antes de sumar nada. Original en
+`Plan_mejoras_Lule_Growth_OS_Instagram_Dra_Lucia_Chahin_COMPLETO.md` (raíz del repo).
+
+**Ya cubierto hoy, no duplicar**: formatos post/reel/carrusel/historia + selector; 4 estados
+(draft/approved/published/archived) con auto-revert a borrador al editar una pieza aprobada/publicada;
+generación IA con guardrails médicos propios en `ai.ts` (no depende de `medical-safety.ts`, que es solo
+del bot); research de fuentes clínicas reales vía Europe PMC (`/api/content/sources`, el doc externo ni
+lo contemplaba); 3 paletas visuales; link de tracking `utm_content` por pieza con visitas/clicks
+agregados; bloqueo duro (UI + backend, `PUBLISHABLE_FORMATS` en `instagram-business.ts`) de
+auto-publish/publish-now para reel y carrusel — coincide con lo que pide el doc; cola con
+`days_of_week`/`items_per_run`/`queue_rank`/`starts_at`; patrón de variantes A/B ya construido (aplicado
+hoy al hero de landings, reutilizable en concepto).
+
+**Implementado (2026-07-11), ✅ los 4 items de bajo esfuerzo que sí eran viables**:
+1. ✅ Objetivo real seleccionable — `ContentObjective` (`alcance`/`educacion`/`confianza`/`conversion`) en
+   `src/types/index.ts`, selector en el brief del Estudio de contenido, alimenta el hook/CTA vía
+   `OBJECTIVE_GUIDANCE` en `ai.ts` (tanto modo IA como modo manual). `goal` ya no es un string fijo: se
+   calcula con `CONTENT_OBJECTIVE_GOALS[objective]`. Piezas viejas sin `objective` se tratan como
+   `conversion` al mostrarse.
+2. ✅ Pilares clínicos — se expandió `CATEGORIES` en `page.tsx` sumando los pilares del benchmark que
+   faltaban (Estudios cardiologicos, Sintomas de alarma, Mitos y errores frecuentes, Cardiologia
+   femenina, Corazon y metabolismo, Habitos y adherencia), sin agregar un campo nuevo — se decidió no
+   duplicar taxonomía, `category` ya cumplía ese rol y el usuario puede seguir escribiendo una categoría
+   libre.
+3. ✅ Guion estructurado para reel — nuevo campo `scenes` (`ContentScene[]`: `from`/`to`/`onScreenText`/
+   `shot`) + `reel_duration_seconds` en `ContentItem`. La IA lo genera solo para `format === "reel"`
+   (`REEL_SCENE_RULES` en `ai.ts`, 3-5 escenas, 8-25 seg, todo legible sin audio). Editor propio en la UI
+   (agregar/quitar escena, editar texto y dirección de toma) — no se generó ni gestiona video real, es
+   texto guía para filmar a mano, coherente con que reels siguen sin auto-publish por API.
+4. ✅ Detección de tema repetido — `findRecentDuplicateTopic()` en `content-pipeline.ts` (función pura,
+   con tests), aviso no bloqueante en el brief si ya se generó algo con la misma categoría (o el mismo
+   hook) en los últimos 30 días.
+
+**Descartado por hallazgo nuevo al implementar (2026-07-11): funnel de atribución completo por pieza**
+La idea original era unir `utm_content` de `landing_events` (ya agregado por pieza) con `utm_content` de
+`leads` para mostrar leads/turnos confirmados por pieza, no solo visitas/clicks. Al revisar el código se
+confirmó que **`leads.utm_content` nunca se completa hoy con un valor real**: el único escritor,
+`/api/public/lead`, no tiene ningún llamador — el formulario público que lo invocaba se sacó de la
+landing el 2026-07-04 (ver [DECISIÓN] "Revertido" en Etapa 2 de este mismo archivo), y el bot de
+WhatsApp tampoco propaga `utm_content` a los leads que crea (su `referral`/`ctwa_clid` es para
+clasificar pricing de Meta, no para atribuir a una pieza de contenido). Construir ese join hoy mostraría
+"0 leads" en todas las piezas para siempre — no porque el contenido no convierta, sino porque no hay
+ningún canal real conectando ambos datos. Es el mismo tipo de problema que ya llevó a revertir el
+formulario de leads en su momento ("mostrar algo sin que funcione de verdad es peor que no tenerlo").
+No se construyó nada — sigue mostrándose solo visitas/interacciones agregadas de landing (dato real, sin
+cambios). Para retomarlo hace falta antes reactivar algún canal real que estampe `utm_content` en un
+`lead` (reabrir el formulario público, o propagar el `utm_content` de la landing al bot de WhatsApp
+cuando el visitante entra por el link de "Consultar por WhatsApp").
+
+**Dudoso, requiere decisión explícita antes de construir**:
+- Variantes A/B de hook/portada por pieza — duplica generación y carga de revisión; el proyecto ya
+  decidió limitar a 3 piezas/semana para no sobrecargar la única revisora (Lucía). Sumar variantes va en
+  contra de esa decisión salvo que se pida explícitamente.
+- Migrar de "array JSON en `app_config.content_pipeline`" a tabla relacional — esfuerzo estructural
+  grande (RLS, migraciones, reescritura de casi todo `content-pipeline.ts`); hoy está capado a 100 items
+  y no hay señal de que se esté por llegar a ese límite. No iniciar sin necesidad real.
+- Estados editoriales más granulares (REVIEW_REQUIRED/CHANGES_REQUESTED/SCHEDULED separados) — el modelo
+  actual de 4 estados + revert automático a borrador ya cumple una función equivalente con menos
+  fricción para un solo revisor. Más estados = más complejidad sin beneficio claro acá.
+
+**Descartado, coherente con decisiones ya tomadas en el proyecto**:
+- Banco de clips reutilizables (B-roll) — la app no genera, sube ni publica video en ningún punto (reels
+  se bloquean de auto-publish igual que carruseles). Construir un banco de clips sin pipeline de video
+  real es el mismo patrón de "feature con fallback manual permanente" que ya se cortó con Google Business
+  (ver [DECISIÓN] arriba, 2026-07-07) — [[feedback_minimize_manual_work]].
+- Plantillas visuales como entidad separada del prompt de IA — hoy el rol de "plantilla" ya lo cumplen
+  las reglas de `IMAGE_PROMPT_RULES` + Gemini generando la imagen final directo; separar en una capa de
+  composición reutilizable es una reescritura grande para una ganancia marginal.
+- Benchmark de competidores vía API de Instagram — confirmado no viable sin vincular una Facebook Page
+  (mismo bloqueo que Business Discovery, ver standby arriba 2026-07-11) — cambio estructural que el
+  proyecto evita a propósito. La alternativa manual (carga CSV/JSON) es técnicamente viable pero de bajo
+  ROI para una consulta unipersonal; no construir salvo pedido explícito.
+
 ### [TECH] Falta página de Política de Privacidad + instrucciones de borrado de datos
 Ninguna existe hoy (`grep -i "privacidad|privacy|terms"` sobre `src/app` no encontró nada). Son
 requisito de Meta para cualquier App Review de "Instagram Login" (permisos `instagram_business_basic`,

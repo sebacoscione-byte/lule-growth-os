@@ -16,7 +16,7 @@ export async function POST(request: Request) {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
-    const { type, category, content_type, cta, topic, source, appointment_link } = await request.json()
+    const { type, category, content_type, cta, topic, source, appointment_link, objective } = await request.json()
     const mode = getAiMode()
 
     // -------------------------------------------------------------------------
@@ -32,6 +32,7 @@ export async function POST(request: Request) {
         category,
         format: content_type as "reel" | "historia" | "carrusel" | "post",
         cta: cta ?? "",
+        objective: ["alcance", "educacion", "confianza", "conversion"].includes(objective) ? objective : undefined,
         appointment_link: appointment_link ?? null,
         source: source ?? null,
       }
