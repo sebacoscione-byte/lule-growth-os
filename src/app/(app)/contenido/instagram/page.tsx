@@ -2100,6 +2100,30 @@ function Editor({
               {imageUploadError && <p className="text-xs text-red-600 bg-red-50 rounded p-2">{imageUploadError}</p>}
             </div>
             <div className="space-y-1.5">
+              <div className="flex items-center justify-between"><Label className="text-gray-900">Titular de la placa</Label><CharacterCount value={item.visual_headline} limit={90} /></div>
+              <Input
+                value={item.visual_headline}
+                maxLength={90}
+                onChange={event => onChange({ ...item, visual_headline: event.target.value })}
+                placeholder="Texto grande que va a aparecer en la imagen"
+                className="bg-white text-gray-900"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between"><Label className="text-gray-900">Subtítulo de la placa</Label><CharacterCount value={item.visual_subtitle} limit={90} /></div>
+              <Input
+                value={item.visual_subtitle}
+                maxLength={90}
+                onChange={event => onChange({ ...item, visual_subtitle: event.target.value })}
+                placeholder="Texto secundario que va a aparecer en la imagen"
+                className="bg-white text-gray-900"
+              />
+              <p className="text-xs text-gray-400">
+                Esto es el texto exacto que Gemini dibuja arriba de la escena — si no coincide con el
+                hook o el caption, corregilo acá y volvé a generar la placa.
+              </p>
+            </div>
+            <div className="space-y-1.5">
               <div className="flex items-center justify-between">
                 <Label className="text-gray-900">Descripción de la imagen (para generar la placa)</Label>
                 <Button
