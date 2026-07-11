@@ -186,12 +186,30 @@ deliberado: primero integridad de WhatsApp y datos de pacientes; luego medición
   - **Aceptación:** el panel mantiene tiempos estables al crecer y los totales coinciden con consultas
     de control.
 
-- [ ] **TECH-01 — Deuda técnica y headers.**
-  - Migrar `middleware.ts` a `proxy.ts`, eliminar warnings de lint y definir headers de seguridad
-    compatibles con OAuth, Supabase, Google, Meta y las imágenes públicas.
-  - Revisar la vulnerabilidad moderada transitiva PostCSS/Next y actualizar cuando exista una versión
-    compatible; no aplicar el downgrade incorrecto sugerido por `npm audit fix`.
-  - **Aceptación:** lint, tests y build limpios; OAuth, landings e integraciones siguen funcionando.
+- [x] **TECH-01 — Deuda técnica y headers.** ⏳ Parcial (2026-07-11) — faltan los headers
+  - [x] `middleware.ts` → `proxy.ts`: renombrado siguiendo la convención de Next.js 16 (función
+    `middleware()` → `proxy()`, `export const config` → `export const proxyConfig`) — confirmado
+    con la skill `vercel:nextjs` que es un rename 1:1, sin cambios de comportamiento. El warning de
+    deprecación que aparecía en cada arranque ya no sale (`npm run build` muestra
+    `ƒ Proxy (Middleware)` en vez del aviso). Verificado con el dev server: `/` redirige a
+    `/dra-lucia-chahin`, `/dashboard` sin sesión redirige a `/login`, `/privacidad` y
+    `/dra-lucia-chahin` siguen devolviendo `200` — el comportamiento es idéntico al de antes.
+  - [x] Warnings de lint: `npm run lint` quedó en 0 problemas (antes había un warning de
+    `ContentChannel` sin usar en `contenido/instagram/page.tsx`, import residual de cuando se sacó
+    Google Business del frente — ver 2026-07-07 en `CLAUDE.md`).
+  - [x] Vulnerabilidad de PostCSS: re-chequeada con `npm audit` — **sigue sin solución real**. Es una
+    dependencia interna de `next` (`node_modules/next/node_modules/postcss`), no algo declarado en
+    este proyecto. El rango vulnerable de Next según el propio advisory llega hasta
+    `16.3.0-canary.5`, y hoy (`npm view next versions`) todavía no existe ningún `16.3.0` estable
+    (solo canaries/previews) — no se debe adoptar una versión no estable en una app médica en
+    producción. Sigue esperando a que Next libere un patch estable.
+  - [ ] **Pendiente real**: definir headers de seguridad (CSP, `X-Frame-Options`, etc.) compatibles
+    con OAuth (Google/Instagram), Supabase, y las imágenes públicas de Google Places/Storage — no
+    se abordó en esta pasada porque un CSP mal armado puede romper en silencio un flujo de OAuth
+    que hoy no se puede probar de punta a punta sin credenciales reales en este entorno; conviene
+    hacerlo aparte, con margen para probar cada integración una por una.
+  - **Aceptación parcial cumplida**: lint/tests/build quedan limpios y OAuth/landings siguen
+    funcionando (verificado). Falta la parte de headers de seguridad para la aceptación completa.
 
 ### Secuencia y reglas de ejecución
 
