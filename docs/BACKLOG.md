@@ -298,6 +298,30 @@ Business falló) volvía a publicar también en el canal ya exitoso. Afectaba al
 ahora" (este último ni siquiera llamaba a la función). Se corrigió para excluir canales con resultado
 `"published"` — ver `src/lib/content-pipeline.ts`.
 
+### [BACKLOG] Instagram Business Discovery — en standby (2026-07-11)
+Se investigó traer datos públicos de otras cuentas de Instagram (caso concreto: @cinme.ar, CIMEL Lanús)
+vía Business Discovery. Confirmado que ese campo no existe en `graph.instagram.com` ("Instagram API with
+Instagram Login", lo que usa este proyecto) — probado tanto contra @cinme.ar como contra la propia cuenta
+conectada (@draluciachahin), mismo error en ambos casos, descartando que sea tema de permisos. Es
+exclusivo de la Instagram Graph API clásica, que requiere vincular una Facebook Page a la cuenta de
+Instagram (algo que este proyecto evita a propósito). El scope `instagram_business_manage_insights` y
+`getBusinessDiscovery()` en `src/lib/instagram-business.ts` quedaron agregados igual (inofensivos, sirven
+si algún día se retoma), pero no resuelven esto sin ese cambio de arquitectura.
+
+**Si se retoma más adelante, camino concreto (no urgente, decisión del usuario 2026-07-11 fue dejarlo en
+standby):**
+1. (Acción externa, la hace Lucía/Seba) Crear una cuenta personal de Facebook si no hay una, crear una
+   Página de Facebook para la práctica, vincular el Instagram profesional de Lucía a esa Página, y
+   agregar esa cuenta de Facebook como Administradora/Tester en la app de Meta ya existente (mismo
+   mecanismo por el que Instagram publica hoy sin necesitar App Review completo).
+2. (Código) Flujo de login **nuevo y separado** con Facebook Login (`graph.facebook.com`) — no reemplaza
+   ni toca el login de Instagram actual, que sigue publicando igual. Guardar el token de la Página en
+   claves nuevas de `app_config`. Reescribir `getBusinessDiscovery()` para pegarle a `graph.facebook.com`
+   con ese token en vez de `graph.instagram.com`.
+3. No debería requerir la verificación de negocio de Meta (esa está rechazada, pero es un trámite
+   específico de WhatsApp — ver [[project_whatsapp_setup]]) ni App Review completo, mientras la cuenta de
+   Facebook de Lucía quede como tester/admin de la app.
+
 ### [DECISIÓN] Google Business: descartado del front de Estudio de contenido (2026-07-07)
 La API de Google (`accounts.list`) nunca devolvió `account_id` para la sede conectada, así que
 publicar posts ahí siempre iba a requerir el paso manual de copiar/pegar (la cuenta probablemente es
