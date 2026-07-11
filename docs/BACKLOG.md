@@ -390,6 +390,18 @@ badge de "próxima en publicarse" — no relacionó el cambio con que la pieza h
 Sugerencia: extender el mismo `window.confirm` (o un aviso menos invasivo) para `"approved"` también,
 no solo `"published"`.
 
+### [TECH] Cron de `publish-content` no tiene horario garantizado (plan Hobby de Vercel)
+2026-07-10: el cron configurado para las 08:45 ART terminó ejecutándose a las 09:45 ART. Confirmado
+con la doc oficial de Vercel: el plan Hobby no garantiza precisión de minuto en cron jobs
+("per-hour, ±59 min"), solo el plan Pro ejecuta al minuto exacto. Se adelantó el horario a las
+**07:30 ART (10:30 UTC)** en `vercel.json` como paliativo (apuesta a que el margen de imprecisión
+típico caiga cerca de las 8:30 reales), pero **no hay garantía real** — si sigue disparando fuera
+de rango, las dos alternativas reales son: (1) mover el disparo a un cron externo gratuito (ej.
+cron-job.org o un GitHub Action programado) que pegue a `/api/cron/publish-content` con el
+`CRON_SECRET` existente, sin depender del scheduler de Vercel; o (2) upgradear a Vercel Pro
+(decisión de billing, no tomarla sin confirmación explícita del usuario). Ver memoria
+`project_vercel_cron_limit`.
+
 ### [TECH] Falta página de Política de Privacidad + instrucciones de borrado de datos
 Ninguna existe hoy (`grep -i "privacidad|privacy|terms"` sobre `src/app` no encontró nada). Son
 requisito de Meta para cualquier App Review de "Instagram Login" (permisos `instagram_business_basic`,
