@@ -79,7 +79,7 @@ export default function PrivacidadPage() {
           </li>
           <li>
             Datos de navegación agregados de este sitio (páginas vistas, clics en los botones
-            de "Pedir turno"/"Llamar"/"WhatsApp") — no incluyen tu nombre ni tu teléfono.
+            de &quot;Pedir turno&quot;/&quot;Llamar&quot;/&quot;WhatsApp&quot;) — no incluyen tu nombre ni tu teléfono.
           </li>
         </ul>
         <p>
