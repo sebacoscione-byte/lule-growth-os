@@ -18,8 +18,9 @@ pedir confirmación, salvo que toque lógica médica — ver CLAUDE.md).
   (transacción única: borra mensajes/handoffs, anonimiza wa_id en costo/consentimiento, borra
   sesión de WhatsApp y el lead, deja log auditable sin PII). Falta definir plazos de retención
   (decisión de política, no técnica).
-- [ ] **DATA-03** — GA4: cargar el script solo tras consentimiento explícito (banner simple),
-  default conservador mientras no haya confirmación legal de que no hace falta.
+- [x] **DATA-03** — GA4 ahora requiere consentimiento explícito (`AnalyticsConsentBanner` +
+  cookie `lule_analytics_consent`, opt-in) antes de cargar el script — default conservador,
+  la revisión legal explícita sigue pendiente.
 - [ ] **TECH-01** — Deuda técnica: revisar si `middleware.ts` → `proxy.ts` aplica en esta versión
   de Next (verificar con skill antes de tocar), limpiar warnings de lint, re-chequear
   vulnerabilidad de `postcss`.
