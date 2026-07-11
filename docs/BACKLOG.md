@@ -80,10 +80,14 @@ deliberado: primero integridad de WhatsApp y datos de pacientes; luego medición
   - **Aceptación:** payloads inválidos no llegan a `service_role`; el límite se mantiene entre
     instancias y existen tests para abuso, tamaños máximos y errores de base.
 
-- [ ] **SEC-02 — Export CSV segura.**
-  - Neutralizar celdas que empiecen con `=`, `+`, `-`, `@`, tab o retorno antes de generar CSV.
-  - Agregar tests con fórmulas maliciosas y conservar compatibilidad UTF-8/Excel.
-  - **Aceptación:** abrir la exportación no ejecuta fórmulas provenientes de datos de leads.
+- [x] **SEC-02 — Export CSV segura.** ✅ Resuelto (2026-07-11)
+  - `src/lib/csv.ts` (`neutralizeCsvFormula`/`escapeCsvCell`, con tests) antepone una comilla
+    simple a cualquier celda que empiece con `=`, `+`, `-`, `@`, tab o retorno de carro, antes de
+    aplicar el escapado de comillas/comas que ya existía. `src/app/api/leads/export/route.ts`
+    usa esta función en vez de la que tenía duplicada in-line.
+  - **Aceptación cumplida:** abrir la exportación ya no ejecuta fórmulas provenientes de datos de
+    leads (probado con `=HYPERLINK(...)`, ataques DDE clásicos con `+`/`-`/`@`); se conserva el
+    BOM UTF-8 y el escapado de comillas/comas que ya tenía la exportación.
 
 ### Ola 2 — Operación, calidad y conversiones reales (P1)
 
@@ -105,11 +109,15 @@ deliberado: primero integridad de WhatsApp y datos de pacientes; luego medición
   - Validar ausencia de errores de consola, foco de teclado y viewport móvil representativo.
   - **Aceptación:** el smoke corre antes de mergear cambios de UI y conserva evidencia del resultado.
 
-- [ ] **CRM-01 — Contexto reciente correcto en el inbox.**
-  - Consultar los últimos 20 mensajes y devolverlos en orden cronológico antes de generar respuesta,
-    en vez de usar los primeros 20 de la conversación.
-  - Agregar test para conversaciones de más de 20 mensajes.
-  - **Aceptación:** la IA recibe siempre el tramo más reciente y no se omite el mensaje actual.
+- [x] **CRM-01 — Contexto reciente correcto en el inbox.** ✅ Resuelto (2026-07-11)
+  - `src/app/api/ai/suggest/route.ts` (botón "Sugerir mensaje de seguimiento") pedía
+    `.order("created_at", { ascending: true }).limit(20)` — en una conversación de más de 20
+    mensajes eso trae los **primeros** 20 (los más viejos), no los últimos. Se cambió a
+    `.order(desc).limit(20)` + `toChronologicalContext()` (`src/lib/conversation-context.ts`,
+    con test) que reordena a cronológico antes de pasarlo a la IA.
+  - **Aceptación cumplida:** la IA recibe siempre el tramo más reciente de la conversación (el
+    mensaje más nuevo queda al final del contexto, nunca se omite) — verificado con test para una
+    conversación simulada de 25 mensajes.
 
 - [ ] **GROWTH-01 — Atribución de conversión de punta a punta.**
   - Diseñar un identificador corto por visita/campaña/pieza que sobreviva al salto a WhatsApp o al

@@ -1,15 +1,7 @@
 import { createClient } from "@/lib/supabase/server"
 import { NextResponse } from "next/server"
 import { CHANNEL_LABELS, SERVICE_LABELS, STATUS_LABELS, LOCATION_LABELS, type Lead } from "@/types"
-
-function escapeCsv(value: string | null | undefined): string {
-  if (value == null) return ""
-  const s = String(value)
-  if (s.includes(",") || s.includes('"') || s.includes("\n")) {
-    return `"${s.replace(/"/g, '""')}"`
-  }
-  return s
-}
+import { escapeCsvCell } from "@/lib/csv"
 
 export async function GET() {
   const supabase = await createClient()
@@ -57,7 +49,7 @@ export async function GET() {
     l.ai_summary,
     l.followup_due_at ? new Date(l.followup_due_at).toLocaleString("es-AR") : "",
     new Date(l.created_at).toLocaleString("es-AR"),
-  ].map(escapeCsv).join(","))
+  ].map(escapeCsvCell).join(","))
 
   const csv = [headers.join(","), ...rows].join("\r\n")
   const bom = "﻿"
