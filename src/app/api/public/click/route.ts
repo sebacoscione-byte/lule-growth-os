@@ -13,7 +13,7 @@ const VALID_VARIANTS = new Set(["a", "b"])
 
 export async function POST(request: Request) {
   const ip = getClientIp(request)
-  const { allowed } = checkRateLimit(`click:${ip}`, 30, 60_000)
+  const { allowed } = await checkRateLimit(`click:${ip}`, 30, 60_000)
   if (!allowed) {
     return NextResponse.json({ error: "Rate limit exceeded" }, { status: 429 })
   }

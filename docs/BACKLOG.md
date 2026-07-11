@@ -72,13 +72,22 @@ deliberado: primero integridad de WhatsApp y datos de pacientes; luego medición
   - **Aceptación:** el comportamiento de cookies/GA coincide con la política publicada y ningún
     evento contiene datos personales o clínicos.
 
-- [ ] **SEC-01 — Validación uniforme de APIs y rate limit distribuido.**
-  - Definir esquemas y límites de longitud/tipo para todos los cuerpos y query params.
-  - Manejar JSON inválido con `400`, comprobar errores de Supabase y normalizar respuestas.
-  - Reemplazar el `Map` en memoria por un límite compartido entre instancias (preferentemente
-    Supabase/RPC para no sumar infraestructura sin necesidad).
-  - **Aceptación:** payloads inválidos no llegan a `service_role`; el límite se mantiene entre
-    instancias y existen tests para abuso, tamaños máximos y errores de base.
+- [ ] **SEC-01 — Validación uniforme de APIs y rate limit distribuido.** ⏳ Parcial (2026-07-11)
+  - [x] Rate limit distribuido: `src/lib/rate-limit.ts` ya no usa un `Map` en memoria (se reseteaba
+    por instancia serverless, así que el límite real era `maxRequests × instancias activas`, no
+    `maxRequests`). Ahora pega a Postgres vía RPC `check_rate_limit` (migración
+    `20260711_rate_limit_distributed.sql`, ventana fija con UPSERT atómico) — todas las instancias
+    de Vercel comparten el mismo contador. Usado hoy por `/api/public/lead` y `/api/public/click`.
+    Fail-open a propósito si la consulta a la base falla (no tumba el endpoint público completo
+    por un límite de anti-abuso caído).
+  - [ ] **Pendiente real**: definir esquemas y límites de longitud/tipo para todos los cuerpos y
+    query params de todas las rutas (`/api/leads`, `/api/content/*`, `/api/whatsapp/*`,
+    `/api/google-business/*`, `/api/instagram-business/*`, etc.) — es un esfuerzo grande y
+    transversal (decenas de rutas), no se abordó en esta pasada para no rehacer cada endpoint sin
+    revisión individual. Manejar JSON inválido con `400` y normalizar respuestas de error de
+    Supabase de forma uniforme tampoco se hizo todavía.
+  - **Aceptación parcial cumplida**: el límite de abuso ya se mantiene entre instancias. Falta la
+    validación uniforme de payloads para la aceptación completa.
 
 - [x] **SEC-02 — Export CSV segura.** ✅ Resuelto (2026-07-11)
   - `src/lib/csv.ts` (`neutralizeCsvFormula`/`escapeCsvCell`, con tests) antepone una comilla

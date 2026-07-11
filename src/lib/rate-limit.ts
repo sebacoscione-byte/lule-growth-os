@@ -1,25 +1,40 @@
-// Simple in-memory rate limiter (resets per Vercel instance — sufficient for MVP abuse protection)
-const store = new Map<string, { count: number; resetAt: number }>()
+import { getServiceDb } from "@/lib/supabase/service"
 
-export function checkRateLimit(
+export interface RateLimitResult {
+  allowed: boolean
+  remaining: number
+}
+
+/**
+ * Límite compartido entre instancias de Vercel (SEC-01): antes vivía en un Map en memoria por
+ * proceso, que se reseteaba por instancia serverless — con más de una instancia activa a la vez
+ * el límite real terminaba siendo maxRequests * instancias, no maxRequests. Ahora el contador vive
+ * en Postgres (RPC `check_rate_limit`, ventana fija con UPSERT atómico) para que todas las
+ * instancias compartan el mismo estado.
+ *
+ * Fail-open a propósito: si la consulta a la base falla, no bloquea el endpoint público completo
+ * por un límite de anti-abuso caído — mismo criterio que el resto de las guardas no críticas del
+ * proyecto (ver CLAUDE.md).
+ */
+export async function checkRateLimit(
   key: string,
   maxRequests: number,
   windowMs: number
-): { allowed: boolean; remaining: number } {
-  const now = Date.now()
-  const entry = store.get(key)
+): Promise<RateLimitResult> {
+  const db = getServiceDb()
+  const { data, error } = await db.rpc("check_rate_limit", {
+    p_key: key,
+    p_window_ms: windowMs,
+    p_max: maxRequests,
+  })
 
-  if (!entry || now > entry.resetAt) {
-    store.set(key, { count: 1, resetAt: now + windowMs })
-    return { allowed: true, remaining: maxRequests - 1 }
+  if (error) {
+    console.error(`[rate-limit] error consultando límite para "${key}": ${error.message}`)
+    return { allowed: true, remaining: maxRequests }
   }
 
-  if (entry.count >= maxRequests) {
-    return { allowed: false, remaining: 0 }
-  }
-
-  entry.count++
-  return { allowed: true, remaining: maxRequests - entry.count }
+  const row = Array.isArray(data) ? data[0] : data
+  return { allowed: Boolean(row?.allowed), remaining: Number(row?.remaining ?? 0) }
 }
 
 export function getClientIp(request: Request): string {
