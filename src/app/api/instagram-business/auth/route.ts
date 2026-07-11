@@ -10,7 +10,11 @@ import {
   isSecureRequest,
 } from "@/lib/instagram-oauth"
 
-const SCOPES = ["instagram_business_basic", "instagram_business_content_publish"].join(",")
+const SCOPES = [
+  "instagram_business_basic",
+  "instagram_business_content_publish",
+  "instagram_business_manage_insights", // requerido para Business Discovery (consultar datos publicos de otras cuentas)
+].join(",")
 
 export async function GET(request: NextRequest) {
   // Requiere sesión: sin esto, cualquiera con la URL podía iniciar el OAuth con su propia
