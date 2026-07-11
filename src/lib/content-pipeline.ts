@@ -19,6 +19,7 @@ export const DEFAULT_AUTO_PUBLISH_SETTINGS: AutoPublishSettings = {
   channels: ["instagram"],
   post: { ...DEFAULT_TRACK, times_per_week: 2 },
   historia: { ...DEFAULT_TRACK, times_per_week: 3 },
+  carrusel: { ...DEFAULT_TRACK, times_per_week: 1 },
 }
 
 export async function readContentItems(supabase: SupabaseClient): Promise<ContentItem[]> {
@@ -50,10 +51,13 @@ export async function readAutoPublishSettings(supabase: SupabaseClient): Promise
   // (enabled seguia en false), asi que reseteamos directo a los defaults nuevos en vez de migrar.
   if (!stored?.post || !stored?.historia) return DEFAULT_AUTO_PUBLISH_SETTINGS
 
+  // .carrusel es nuevo (2026-07-11): las configuraciones ya guardadas en produccion no lo tienen.
+  // Nunca resetear post/historia por esto -- solo completar carrusel con el default (deshabilitado).
   return {
     channels: stored.channels ?? DEFAULT_AUTO_PUBLISH_SETTINGS.channels,
     post: { ...DEFAULT_AUTO_PUBLISH_SETTINGS.post, ...stored.post },
     historia: { ...DEFAULT_AUTO_PUBLISH_SETTINGS.historia, ...stored.historia },
+    carrusel: { ...DEFAULT_AUTO_PUBLISH_SETTINGS.carrusel, ...(stored.carrusel ?? {}) },
   }
 }
 
@@ -161,15 +165,18 @@ export function isRepeatDue(item: ContentItem, now: Date): boolean {
   return daysSinceLastPublish >= item.repeat_interval_days
 }
 
+/** Formatos con cronograma propio de auto-publicacion. Reel queda afuera: requiere video real, no soportado. */
+export type AutoPublishFormat = "post" | "historia" | "carrusel"
+
 /**
- * Pura, sin I/O: elige hasta "count" items para auto-publicar de un formato puntual (post u historia,
- * cada uno con su propio cronograma), en el orden de `effectiveQueueRank`. Las piezas aprobadas
+ * Pura, sin I/O: elige hasta "count" items para auto-publicar de un formato puntual (post, historia o
+ * carrusel, cada uno con su propio cronograma), en el orden de `effectiveQueueRank`. Las piezas aprobadas
  * (contenido fresco) siempre van primero; las piezas evergreen que ya cumplieron su intervalo de
  * repeticion (ver `isRepeatDue`) solo llenan los lugares que sobren, ordenadas por la mas atrasada.
  */
 export function pickNextPublishableItems(
   items: ContentItem[],
-  format: "post" | "historia",
+  format: AutoPublishFormat,
   count: number,
   now: Date = new Date()
 ): ContentItem[] {
@@ -183,7 +190,7 @@ export function pickNextPublishableItems(
 }
 
 /** Pura, sin I/O: elige el proximo item para auto-publicar de un formato puntual. Ver `pickNextPublishableItems`. */
-export function pickNextPublishableItem(items: ContentItem[], format: "post" | "historia"): ContentItem | null {
+export function pickNextPublishableItem(items: ContentItem[], format: AutoPublishFormat): ContentItem | null {
   return pickNextPublishableItems(items, format, 1)[0] ?? null
 }
 

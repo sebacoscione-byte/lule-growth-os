@@ -197,7 +197,7 @@ export async function publishImageToInstagram(
   input: { itemId: string; imageDataUrl?: string; imageUrl?: string; caption?: string; format: string }
 ): Promise<{ mediaId: string }> {
   if (!PUBLISHABLE_FORMATS.includes(input.format as typeof PUBLISHABLE_FORMATS[number])) {
-    throw new Error("Instagram solo permite publicar posts o historias por API. Reels y carruseles requieren video o multiples imagenes; usa Copiar Instagram.")
+    throw new Error("Esta funcion solo publica posts o historias (una imagen). Los reels requieren video real -- usa Copiar Instagram. Los carruseles usan publishCarouselToInstagram.")
   }
 
   const token = await getValidToken(supabase)
@@ -225,5 +225,61 @@ export async function publishImageToInstagram(
   })
   await waitForContainerReady(token, containerId)
   const mediaId = await publishContainer(token, containerId)
+  return { mediaId }
+}
+
+// ─── Publicacion (carrusel) ─────────────────────────────────────────────────
+
+const CAROUSEL_MIN_ITEMS = 2
+const CAROUSEL_MAX_ITEMS = 10
+
+export async function createCarouselItemContainer(token: string, imageUrl: string): Promise<string> {
+  const params = new URLSearchParams({ image_url: imageUrl, is_carousel_item: "true", access_token: token })
+  const res = await fetch(`${GRAPH_BASE}/me/media?${params}`, { method: "POST" })
+  const data = await res.json() as ContainerResponse
+  if (!res.ok || data.error) throw new Error(data.error?.message || `IG carousel item error ${res.status}`)
+  return data.id
+}
+
+export async function createCarouselContainer(token: string, childIds: string[], caption?: string): Promise<string> {
+  const params = new URLSearchParams({ media_type: "CAROUSEL", children: childIds.join(","), access_token: token })
+  if (caption) params.set("caption", caption)
+  const res = await fetch(`${GRAPH_BASE}/me/media?${params}`, { method: "POST" })
+  const data = await res.json() as ContainerResponse
+  if (!res.ok || data.error) throw new Error(data.error?.message || `IG carousel container error ${res.status}`)
+  return data.id
+}
+
+/**
+ * Publica un carrusel: cada imagen ya tiene que estar generada y persistida en Storage de antes (el
+ * flujo de aprobacion de una pieza "carrusel" exige portada + todas las slides con su propia placa,
+ * ver /api/content/items PATCH) -- a diferencia de publishImageToInstagram, esta funcion nunca sube
+ * un data URL nuevo, solo trabaja con URLs publicas ya existentes.
+ */
+export async function publishCarouselToInstagram(
+  supabase: SupabaseClient,
+  input: { imageUrls: string[]; caption?: string }
+): Promise<{ mediaId: string }> {
+  if (input.imageUrls.length < CAROUSEL_MIN_ITEMS) {
+    throw new Error(`Un carrusel necesita al menos ${CAROUSEL_MIN_ITEMS} imagenes generadas (portada + al menos una slide).`)
+  }
+  if (input.imageUrls.length > CAROUSEL_MAX_ITEMS) {
+    throw new Error(`Instagram no permite mas de ${CAROUSEL_MAX_ITEMS} imagenes en un carrusel.`)
+  }
+
+  const token = await getValidToken(supabase)
+  if (!token) throw new Error("Instagram no esta conectado. Conectá la cuenta primero.")
+
+  // En paralelo: cada child container es independiente, y esperar de a uno (hasta 40s cada uno) podria
+  // superar el maxDuration del cron con carruseles de varias imagenes. Promise.all preserva el orden.
+  const childIds = await Promise.all(input.imageUrls.map(async imageUrl => {
+    const childId = await createCarouselItemContainer(token, imageUrl)
+    await waitForContainerReady(token, childId)
+    return childId
+  }))
+
+  const carouselContainerId = await createCarouselContainer(token, childIds, (input.caption ?? "").slice(0, 2200))
+  await waitForContainerReady(token, carouselContainerId)
+  const mediaId = await publishContainer(token, carouselContainerId)
   return { mediaId }
 }

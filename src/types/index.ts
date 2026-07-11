@@ -150,6 +150,8 @@ export interface ContentSource {
 export interface ContentSlide {
   headline: string
   text: string
+  /** Placa generada para esta slide puntual (Gemini o subida a mano). Sin esto, la slide no tiene imagen propia y el carrusel no se puede aprobar/publicar. */
+  visual_url?: string
 }
 
 /** Un segmento del guion de un reel silencioso: se entiende sin audio, texto en pantalla + direccion de la toma. */
@@ -229,6 +231,7 @@ export interface AutoPublishSettings {
   channels: ContentChannel[]
   post: AutoPublishTrackSettings
   historia: AutoPublishTrackSettings
+  carrusel: AutoPublishTrackSettings
 }
 
 export interface ClassifyResult {

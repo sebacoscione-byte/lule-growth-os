@@ -115,7 +115,8 @@ export async function PATCH(request: NextRequest) {
     }
     if (body.slides && (!Array.isArray(body.slides) || body.slides.some(slide =>
       typeof slide?.headline !== "string" || typeof slide?.text !== "string" ||
-      slide.headline.length > 60 || slide.text.length > 300
+      slide.headline.length > 60 || slide.text.length > 300 ||
+      (slide.visual_url !== undefined && typeof slide.visual_url !== "string")
     ))) {
       return NextResponse.json({ error: "Slides invalidos" }, { status: 400 })
     }
@@ -189,6 +190,15 @@ export async function PATCH(request: NextRequest) {
         ? "Agregá un titular visual o subí una imagen propia antes de aprobar"
         : "Completá hook y caption, y agregá un titular visual o subí una imagen propia antes de aprobar"
       return NextResponse.json({ error: message }, { status: 400 })
+    }
+    // Un carrusel se publica con una imagen real por slide (no alcanza con el titular de texto como en
+    // post/historia): exigirlas todas antes de aprobar evita publicar despues un carrusel incompleto.
+    if (nextItem.status === "approved" && nextItem.format === "carrusel" && (
+      !nextItem.visual_url ||
+      !nextItem.slides || nextItem.slides.length === 0 ||
+      nextItem.slides.some(slide => !slide.visual_url)
+    )) {
+      return NextResponse.json({ error: "Para aprobar un carrusel, generá la placa de la portada y de cada slide." }, { status: 400 })
     }
 
     const updated = items.map(item => item.id === body.id ? nextItem : item)

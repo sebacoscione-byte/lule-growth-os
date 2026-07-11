@@ -6,6 +6,7 @@ import {
   shouldRunAutoPublish, isScheduledForFuture, pickNextPublishableItems, resolveChannelsToPublish,
   isRepeatDue,
 } from "@/lib/content-pipeline"
+import type { AutoPublishFormat } from "@/lib/content-pipeline"
 import { generateContentVisual } from "@/lib/ai"
 import { publishApprovedItem } from "@/lib/content-publish"
 import { runWhatsAppFollowup } from "@/lib/whatsapp-followup"
@@ -22,7 +23,7 @@ function isAuthorized(request: Request): boolean {
 
 async function runTrack(
   supabase: SupabaseClient,
-  format: "post" | "historia",
+  format: AutoPublishFormat,
   track: AutoPublishTrackSettings,
   channels: ContentChannel[],
   now: Date
@@ -66,8 +67,18 @@ async function runTrack(
 
     // Si la doctora ya genero la placa a mano al revisar la pieza, la reusamos tal cual (ahorra
     // cupo diario de IA y evita generar una imagen distinta a la que ella aprobo visualmente).
+    // Un carrusel necesita una imagen por slide (no una sola portada), asi que nunca se genera nada
+    // "de apuro" en el cron para ese formato -- la aprobacion ya exige que todas esten listas de antes
+    // (ver /api/content/items PATCH); si por algun motivo faltan, se salta con un error en vez de
+    // publicar un carrusel incompleto.
     let imageDataUrl: string | undefined
-    if (!current.visual_url) {
+    if (format === "carrusel") {
+      const missingSlideImages = (current.slides ?? []).some(slide => !slide.visual_url)
+      if (!current.visual_url || missingSlideImages) {
+        lastIssue = `error: item ${current.id} sin todas las placas del carrusel generadas`
+        continue
+      }
+    } else if (!current.visual_url) {
       if (!current.image_prompt) {
         lastIssue = `error: item ${current.id} sin image_prompt`
         continue
@@ -121,8 +132,11 @@ export async function GET(request: Request) {
 
     const post = await runTrack(supabase, "post", settings.post, settings.channels, now)
     const historia = await runTrack(supabase, "historia", settings.historia, settings.channels, now)
+    // Tercer track (2026-07-11), corre dentro de este mismo cron -- no suma un cron job nuevo de
+    // Vercel, el plan Hobby sigue en 2 (este + weekly-report).
+    const carrusel = await runTrack(supabase, "carrusel", settings.carrusel, settings.channels, now)
 
-    await writeAutoPublishSettings(supabase, { ...settings, post, historia })
+    await writeAutoPublishSettings(supabase, { ...settings, post, historia, carrusel })
 
     // El seguimiento de WhatsApp corre acá adentro (en vez de tener su propio Vercel Cron) para no
     // sumar un tercer cron job -- el plan Hobby de Vercel limita a 2. Ver src/lib/whatsapp-followup.ts.
@@ -133,13 +147,16 @@ export async function GET(request: Request) {
     const failures: string[] = []
     if (post.last_run_result?.includes("(error:")) failures.push(`Posts: ${post.last_run_result}`)
     if (historia.last_run_result?.includes("(error:")) failures.push(`Historias: ${historia.last_run_result}`)
+    if (carrusel.last_run_result?.includes("(error:")) failures.push(`Carruseles: ${carrusel.last_run_result}`)
     const realWhatsappErrors = whatsappFollowup.errors.filter(e => !e.includes("todavía no está aprobado"))
     if (realWhatsappErrors.length > 0) failures.push(`Seguimiento WhatsApp: ${realWhatsappErrors.join("; ")}`)
     if (failures.length > 0) {
       await sendCronFailureAlert("publish-content", failures.join("\n"))
     }
 
-    return NextResponse.json({ post: post.last_run_result, historia: historia.last_run_result, whatsappFollowup })
+    return NextResponse.json({
+      post: post.last_run_result, historia: historia.last_run_result, carrusel: carrusel.last_run_result, whatsappFollowup,
+    })
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
     await sendCronFailureAlert("publish-content", `Excepción no controlada: ${message}`)
