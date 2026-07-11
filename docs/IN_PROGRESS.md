@@ -308,14 +308,24 @@ conectado (`@draluciachahin`) no tenía el scope necesario: Meta devolvió
 - [x] `npm run build` y `npm test` (165 tests) sin errores.
 - [x] Rama + PR + merge (ver resumen técnico del PR).
 
-## Pendiente (acción del usuario — no la puede hacer el agente)
+## Resultado final (2026-07-11)
 
-- **Reconectar Instagram** una vez desplegado el cambio: Estudio de contenido → Instagram
-  conectado → Desconectar → "Conectar Instagram" de nuevo, autorizando con la cuenta de
-  Lucía. Meta exige reautorizar cuando cambia el scope pedido; el token actual sigue
-  vigente para publicar pero no tiene permiso para Business Discovery hasta reconectar.
-- Una vez reconectado, avisar para correr la consulta real contra `@cinme.ar` (o el
-  username real de CIMEL si "cinme.ar" no es exacto) y reportar los datos.
+- Usuario reconectó Instagram con el scope nuevo. Se volvió a probar `business_discovery`
+  contra `@cinme.ar` y, como control, contra la propia cuenta conectada (`@draluciachahin`)
+  — **ambas fallan igual** con `"Tried accessing nonexisting field (business_discovery)"`.
+  Esto descarta que sea un tema de permisos/scope o de la cuenta consultada: el campo
+  directamente no existe en `graph.instagram.com` (Instagram API with Instagram Login).
+- **Conclusión**: Business Discovery es exclusivo de la Instagram Graph API clásica
+  (atada a una Facebook Page), que este proyecto evita a propósito (ver setup OAuth en
+  `CLAUDE.md`). No se puede traer info de otras cuentas de Instagram sin ese cambio
+  estructural — no se hizo sin pedirlo explícitamente, queda como decisión pendiente del
+  usuario si le interesa en algún momento.
+- El scope `instagram_business_manage_insights` y `getBusinessDiscovery()` quedan en el
+  código igual (inofensivos, puede servir a futuro para otros campos de insights), pero
+  no resuelven el pedido original.
+
+## Otro pendiente (acción del usuario — no la puede hacer el agente)
+
 - Intento de agregar una regla de permisos en `settings.json` para no pedir aprobación en
   futuros scripts de solo lectura contra producción: bloqueado por el clasificador de
   auto-mode (no puede distinguir "solo lectura" de "escritura" a nivel de patrón de
