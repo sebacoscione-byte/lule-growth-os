@@ -2,6 +2,7 @@ import type { Metadata } from "next"
 import Link from "next/link"
 import { AlertTriangle, ShieldAlert } from "lucide-react"
 import { GoogleAnalytics } from "@/components/google-analytics"
+import { AnalyticsConsentBanner } from "@/components/analytics-consent-banner"
 import { EcgDivider } from "@/components/ecg-divider"
 import { buildWhatsAppUrl } from "@/lib/public-landings"
 
@@ -28,6 +29,7 @@ export default function PrivacidadPage() {
   return (
     <main className="min-h-screen bg-white">
       <GoogleAnalytics />
+      <AnalyticsConsentBanner />
 
       <section className="bg-paper px-4 pb-6 pt-14">
         <div className="max-w-2xl mx-auto">
@@ -166,10 +168,19 @@ export default function PrivacidadPage() {
       <Section title="Cookies y analítica">
         <p>
           Este sitio usa una cookie propia (<code>lule_hero_variant</code>) para mostrarte siempre
-          la misma versión de la página principal durante un test A/B interno, y el script de
-          Google Analytics (cuando está configurado) para medir visitas de forma agregada. Ninguna
-          de las dos incluye tu nombre, teléfono ni el contenido de tu consulta. Estas cookies solo
-          se cargan en las páginas públicas de este sitio, nunca en el sistema de gestión interno.
+          la misma versión de la página principal durante un test A/B interno — es necesaria para
+          que ese test funcione, así que se carga sin pedir nada.
+        </p>
+        <p>
+          El script de Google Analytics (cuando está configurado) es distinto: solo se activa si
+          diste tu consentimiento explícito en el aviso que aparece la primera vez que visitás el
+          sitio. Si todavía no decidiste, o si elegiste &quot;Rechazar&quot;, Google Analytics no se
+          carga. Podés cambiar tu decisión borrando las cookies del sitio en tu navegador.
+        </p>
+        <p>
+          Ninguna de las dos cookies incluye tu nombre, teléfono ni el contenido de tu consulta, y
+          ambas se cargan solo en las páginas públicas de este sitio, nunca en el sistema de
+          gestión interno.
         </p>
       </Section>
 
