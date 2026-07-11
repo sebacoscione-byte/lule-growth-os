@@ -22,6 +22,7 @@ export default function robots(): MetadataRoute.Robots {
           "/consulta-cardiologica-lanus",
           "/consulta-cardiologica-lomas",
           "/landings/",
+          "/privacidad",
         ],
         disallow: [
           "/dashboard",
