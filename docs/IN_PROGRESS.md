@@ -14,9 +14,10 @@ pedir confirmación, salvo que toque lógica médica — ver CLAUDE.md).
 - [x] **DATA-01** — `/privacidad` publicada como borrador (marcado explícitamente, pendiente de
   validación legal), enlazada desde el footer, sumada a sitemap/robots. Bug de middleware
   corregido de paso (la página quedaba detrás del auth gate).
-- [ ] **DATA-02** — Retención/exportación/eliminación de datos de un paciente: acción
-  administrativa auditable (anonimizar/eliminar lead + mensajes + eventos de costo/consentimiento
-  relacionados).
+- [x] **DATA-02** — Botón "Eliminar datos de este paciente" en `/leads/[id]` → RPC `erase_lead`
+  (transacción única: borra mensajes/handoffs, anonimiza wa_id en costo/consentimiento, borra
+  sesión de WhatsApp y el lead, deja log auditable sin PII). Falta definir plazos de retención
+  (decisión de política, no técnica).
 - [x] **DATA-03** — GA4 ahora requiere consentimiento explícito (`AnalyticsConsentBanner` +
   cookie `lule_analytics_consent`, opt-in) antes de cargar el script — default conservador,
   la revisión legal explícita sigue pendiente.

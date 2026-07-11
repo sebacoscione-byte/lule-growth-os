@@ -5,6 +5,7 @@ import { ArrowLeft } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { LeadStatusEditor } from "./lead-status-editor"
+import { LeadEraseAction } from "./lead-erase-action"
 import {
   CHANNEL_LABELS, SERVICE_LABELS, LOCATION_LABELS,
   type Lead, type Message
@@ -89,6 +90,16 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
               </CardContent>
             </Card>
           )}
+
+          <Card>
+            <CardHeader><CardTitle className="text-base">Privacidad</CardTitle></CardHeader>
+            <CardContent>
+              <p className="text-xs text-gray-500 mb-3">
+                Pedido de acceso, corrección o eliminación de datos (ver <Link href="/privacidad" className="underline">política de privacidad</Link>).
+              </p>
+              <LeadEraseAction leadId={l.id} leadLabel={l.name ?? l.instagram_username ?? l.phone ?? "este paciente"} />
+            </CardContent>
+          </Card>
         </div>
 
         {/* Conversación */}
