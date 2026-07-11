@@ -205,12 +205,21 @@ deliberado: primero integridad de WhatsApp y datos de pacientes; luego medición
 
 - [x] **TECH-01 — Deuda técnica y headers.** ⏳ Parcial (2026-07-11) — faltan los headers
   - [x] `middleware.ts` → `proxy.ts`: renombrado siguiendo la convención de Next.js 16 (función
-    `middleware()` → `proxy()`, `export const config` → `export const proxyConfig`) — confirmado
-    con la skill `vercel:nextjs` que es un rename 1:1, sin cambios de comportamiento. El warning de
-    deprecación que aparecía en cada arranque ya no sale (`npm run build` muestra
-    `ƒ Proxy (Middleware)` en vez del aviso). Verificado con el dev server: `/` redirige a
-    `/dra-lucia-chahin`, `/dashboard` sin sesión redirige a `/login`, `/privacidad` y
-    `/dra-lucia-chahin` siguen devolviendo `200` — el comportamiento es idéntico al de antes.
+    `middleware()` → `proxy()`). El warning de deprecación que aparecía en cada arranque ya no sale
+    (`npm run build` muestra `ƒ Proxy (Middleware)` en vez del aviso).
+  - [x] **Bug real encontrado y corregido antes de mergear** (recién al verificar con un screenshot
+    real, no solo con `npm run build`/`npm test`): la skill `vercel:nextjs` sugería
+    `export const proxyConfig` para el matcher — es **incorrecto para Next.js 16.2.9**, ese export
+    sigue llamándose literalmente `config` (confirmado leyendo
+    `node_modules/next/dist/build/analysis/get-page-static-info.js`). Con `proxyConfig` el matcher
+    no se reconoce y el proxy corre sobre *todas* las rutas, incluidos los assets de
+    `_next/static` — rompía el CSS de todo el sitio (redirect 307 en cada request de CSS/JS).
+    Además, `isPublicRoute` comparaba el pathname completo contra `PUBLIC_ROOT_PATHS` con match
+    exacto, así que un archivo de metadata anidado bajo una landing (ej.
+    `/cardiologa-lanus/opengraph-image`, agregado en SEO-01) no matcheaba y redirigía a `/login`
+    sin sesión — se cambió a comparar por el primer segmento del path. Verificado con `curl` contra
+    el dev server real: `/`, `/dashboard` sin sesión, `/privacidad`, todas las landings y sus
+    `opengraph-image` devuelven el código esperado.
   - [x] Warnings de lint: `npm run lint` quedó en 0 problemas (antes había un warning de
     `ContentChannel` sin usar en `contenido/instagram/page.tsx`, import residual de cuando se sacó
     Google Business del frente — ver 2026-07-07 en `CLAUDE.md`).
