@@ -131,10 +131,9 @@ intención de turno: quien busca "cardióloga en Lanús" tiene alta probabilidad
 - [x] Conexión OAuth con Google Business Profile API
 
 ### Acciones externas pendientes (las hace Lucía o el equipo)
-- [ ] Crear o reclamar el perfil "Dra. Lucía Chahin" en Google Business
-- [ ] Completar perfil: foto, servicios, horarios (martes CIMEL, miércoles Británico, viernes Swiss), descripción
-- [ ] Configurar sitio web del perfil → `/dra-lucia-chahin` (no Instagram)
-- [ ] Verificar el perfil ante Google
+- [x] Crear o reclamar el perfil "Dra. Lucía Chahin" en Google Business — verificado (confirmado 2026-07-11, ícono azul "Verificada")
+- [x] Completar perfil: foto, horarios, descripción — confirmado 2026-07-11 (13 reseñas 5,0★, foto y descripción cargadas)
+- [x] Configurar sitio web del perfil → confirmado 2026-07-11: `https://draluciachahin.ar/` (la raíz redirige a `/dra-lucia-chahin` para visitantes sin sesión, ver `src/middleware.ts`)
 - [ ] Evaluar si crear ficha separada para Swiss Medical Lomas (dirección ya confirmada: Oliden 141, Lomas de Zamora)
 - [ ] Definir estrategia de reseñas: cómo y cuándo pedirlas a pacientes actuales
 
