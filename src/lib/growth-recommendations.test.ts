@@ -3,6 +3,7 @@ import {
   checkZeroVisitLanding,
   checkMissingObrasSociales,
   checkHeroAbTestSignal,
+  evaluateAbTestReadiness,
   checkWhatsAppWebhookSignatureMissing,
   checkWhatsAppBudget,
   checkUnapprovedTemplates,
@@ -79,6 +80,31 @@ describe("web / landings", () => {
       { variant: "b", visits: 200, interactionRate: 22 },
     ])
     expect(rec).toBeNull()
+  })
+
+  it("evaluateAbTestReadiness: muestra insuficiente si falta alguna variante", () => {
+    expect(evaluateAbTestReadiness([{ variant: "a", visits: 500, interactionRate: 30 }])).toBe("insufficient_sample")
+  })
+
+  it("evaluateAbTestReadiness: muestra insuficiente si alguna variante no llegó al mínimo", () => {
+    expect(evaluateAbTestReadiness([
+      { variant: "a", visits: 200, interactionRate: 30 },
+      { variant: "b", visits: 50, interactionRate: 15 },
+    ])).toBe("insufficient_sample")
+  })
+
+  it("evaluateAbTestReadiness: sin señal clara con muestra suficiente pero diferencia chica", () => {
+    expect(evaluateAbTestReadiness([
+      { variant: "a", visits: 200, interactionRate: 20 },
+      { variant: "b", visits: 200, interactionRate: 22 },
+    ])).toBe("no_clear_signal")
+  })
+
+  it("evaluateAbTestReadiness: señal encontrada con muestra suficiente y diferencia clara", () => {
+    expect(evaluateAbTestReadiness([
+      { variant: "a", visits: 200, interactionRate: 30 },
+      { variant: "b", visits: 180, interactionRate: 15 },
+    ])).toBe("signal_found")
   })
 })
 

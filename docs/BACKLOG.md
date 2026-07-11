@@ -136,11 +136,18 @@ deliberado: primero integridad de WhatsApp y datos de pacientes; luego medición
   - **Aceptación:** un caso de prueba completo atribuye el turno al origen correcto; el dashboard
     diferencia claramente clic, lead y turno confirmado.
 
-- [ ] **GROWTH-02 — Guardrails estadísticos para experimentos A/B.**
-  - Mostrar tamaño de muestra, ventana temporal y criterio de finalización; no declarar ganador con
-    tráfico insuficiente.
-  - **Aceptación:** el panel identifica resultados preliminares y solo recomienda una variante cuando
-    cumple el umbral definido.
+- [x] **GROWTH-02 — Guardrails estadísticos para experimentos A/B.** ✅ Resuelto (2026-07-11)
+  - El motor de recomendaciones (`checkHeroAbTestSignal`) ya exigía un mínimo de 150 visitas por
+    variante y 8 puntos de diferencia antes de sugerir un ganador — nunca recomendaba con tráfico
+    insuficiente. Lo que faltaba era mostrarlo explícitamente en el panel de `/dashboard`, no solo
+    como recomendación aparte.
+  - Nueva función pura `evaluateAbTestReadiness()` (con tests) devuelve
+    `insufficient_sample` / `no_clear_signal` / `signal_found`; la card "Test A/B" del dashboard
+    ahora muestra ese estado con un aviso explícito (cuántas visitas faltan por variante para el
+    mínimo, o que la diferencia todavía no alcanza) y el criterio de finalización en texto
+    (mínimo de visitas por variante + diferencia mínima de puntos).
+  - **Aceptación cumplida:** el panel identifica resultados preliminares con un aviso visible y
+    solo se recomienda cortar el test hacia una variante cuando se cumplen ambos umbrales.
 
 ### Ola 3 — UX, SEO, rendimiento y mantenimiento (P2)
 

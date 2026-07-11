@@ -17,8 +17,8 @@ export interface GrowthRecommendation {
 // "Sistema de recomendaciones de crecimiento".
 const LOW_INTERACTION_MIN_VISITS = 20
 const LOW_INTERACTION_RATE_THRESHOLD = 15
-const AB_TEST_MIN_VISITS_PER_VARIANT = 150
-const AB_TEST_MIN_RATE_GAP = 8
+export const AB_TEST_MIN_VISITS_PER_VARIANT = 150
+export const AB_TEST_MIN_RATE_GAP = 8
 const STALE_INSTAGRAM_DAYS = 21
 const LOW_GOOGLE_RATING = 4.2
 const MIN_REVIEWS_FOR_RATING_CHECK = 3
@@ -78,15 +78,34 @@ export interface HeroVariantRowInput {
   interactionRate: number
 }
 
-export function checkHeroAbTestSignal(rows: HeroVariantRowInput[]): GrowthRecommendation | null {
+/**
+ * Estado del test A/B frente al criterio de finalización (GROWTH-02): nunca se recomienda una
+ * variante ganadora con tráfico insuficiente.
+ * - insufficient_sample: todavía no hay al menos `AB_TEST_MIN_VISITS_PER_VARIANT` visitas en
+ *   ambas variantes — cualquier diferencia observada hoy es preliminar y puede ser ruido.
+ * - no_clear_signal: ya hay muestra suficiente, pero la diferencia de tasa de interacción es
+ *   menor a `AB_TEST_MIN_RATE_GAP` puntos — no alcanza para preferir una variante sobre la otra.
+ * - signal_found: muestra suficiente y diferencia clara — recién acá tiene sentido cortar el test.
+ */
+export type AbTestReadiness = "insufficient_sample" | "no_clear_signal" | "signal_found"
+
+export function evaluateAbTestReadiness(rows: HeroVariantRowInput[]): AbTestReadiness {
   const a = rows.find(r => r.variant === "a")
   const b = rows.find(r => r.variant === "b")
-  if (!a || !b) return null
-  if (a.visits < AB_TEST_MIN_VISITS_PER_VARIANT || b.visits < AB_TEST_MIN_VISITS_PER_VARIANT) return null
+  if (!a || !b) return "insufficient_sample"
+  if (a.visits < AB_TEST_MIN_VISITS_PER_VARIANT || b.visits < AB_TEST_MIN_VISITS_PER_VARIANT) return "insufficient_sample"
 
   const gap = Math.abs(a.interactionRate - b.interactionRate)
-  if (gap < AB_TEST_MIN_RATE_GAP) return null
+  if (gap < AB_TEST_MIN_RATE_GAP) return "no_clear_signal"
+  return "signal_found"
+}
 
+export function checkHeroAbTestSignal(rows: HeroVariantRowInput[]): GrowthRecommendation | null {
+  if (evaluateAbTestReadiness(rows) !== "signal_found") return null
+
+  const a = rows.find(r => r.variant === "a")!
+  const b = rows.find(r => r.variant === "b")!
+  const gap = Math.abs(a.interactionRate - b.interactionRate)
   const winner = a.interactionRate > b.interactionRate ? "A (Pedir turno primero)" : "B (Ver sedes primero)"
   return {
     id: "web-ab-test-signal",
