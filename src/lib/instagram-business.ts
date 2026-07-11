@@ -109,6 +109,30 @@ export async function getProfile(token: string) {
   return res.json() as Promise<{ id: string; username: string }>
 }
 
+interface BusinessDiscoveryData {
+  username: string
+  name?: string
+  followers_count?: number
+  media_count?: number
+  biography?: string
+  website?: string
+  profile_picture_url?: string
+}
+
+/**
+ * Consulta datos publicos de OTRA cuenta Instagram Business/Creator (no la conectada) por
+ * username. Requiere el scope instagram_business_manage_insights en el token conectado.
+ */
+export async function getBusinessDiscovery(token: string, username: string): Promise<BusinessDiscoveryData> {
+  const fields = `business_discovery.username(${username}){username,name,followers_count,media_count,biography,website,profile_picture_url}`
+  const url = `${GRAPH_BASE}/me?fields=${encodeURIComponent(fields)}&access_token=${encodeURIComponent(token)}`
+  const res = await fetch(url)
+  const data = await res.json() as { business_discovery?: BusinessDiscoveryData; error?: { message: string } }
+  if (!res.ok || data.error) throw new Error(data.error?.message || `IG business discovery error ${res.status}`)
+  if (!data.business_discovery) throw new Error(`No se encontro la cuenta @${username} o no es una cuenta Business/Creator`)
+  return data.business_discovery
+}
+
 // ─── Publicacion (feed image post o story) ─────────────────────────────────
 
 interface ContainerResponse { id: string; error?: { message: string } }
