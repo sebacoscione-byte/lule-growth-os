@@ -187,6 +187,7 @@ async function getGrowthRecommendationsData(
       heroVariantResults: heroVariantRows.map(r => ({ variant: r.variant, visits: r.visits, interactionRate: r.interactionRate })),
       locations,
       whatsapp: {
+        webhookSignatureConfigured: Boolean(process.env.WHATSAPP_APP_SECRET),
         projectedMonthlyCost: cost1dTotal * 30,
         monthlyCostAlertArs: whatsappSettings.monthly_cost_alert_ars,
         unapprovedTemplatesCount: unapprovedTemplatesCount ?? 0,

@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server"
 import { handleIncomingMessage } from "@/lib/whatsapp-bot"
 import { markAsRead } from "@/lib/whatsapp"
 import { isValidWhatsAppSignature } from "@/lib/whatsapp-webhook-signature"
+import { claimWhatsAppEvent, markWhatsAppEventProcessed, markWhatsAppEventFailed } from "@/lib/whatsapp-idempotency"
+import { sendCronFailureAlert } from "@/lib/alert-email"
 
 // Meta llama a GET para verificar el webhook al configurarlo
 export async function GET(req: NextRequest) {
@@ -43,6 +45,7 @@ export async function POST(req: NextRequest) {
   }
 
   const entries = (body.entry as unknown[]) ?? []
+  let hadTransientFailure = false
 
   for (const entry of entries) {
     const changes =
@@ -110,7 +113,23 @@ export async function POST(req: NextRequest) {
           text = ""
         }
 
+        if (!msg.id) {
+          // Sin id de Meta no hay forma de deduplicar (no debería pasar según la spec de la API,
+          // pero procesamos igual en vez de descartar el mensaje).
+          try {
+            await markAsRead(msg.id)
+            await handleIncomingMessage({ phone, text, waName, messageType, buttonId, waMessageId: msg.id, referral: msg.referral })
+          } catch (err) {
+            console.error(`[whatsapp-webhook] mensaje sin id de Meta, no se pudo deduplicar (telefono=${phone}):`, err)
+            hadTransientFailure = true
+          }
+          continue
+        }
+
         try {
+          const claim = await claimWhatsAppEvent(msg.id, phone)
+          if (claim.outcome === "duplicate") continue
+
           await markAsRead(msg.id)
           await handleIncomingMessage({
             phone,
@@ -121,13 +140,27 @@ export async function POST(req: NextRequest) {
             waMessageId: msg.id,
             referral: msg.referral,
           })
+          await markWhatsAppEventProcessed(msg.id)
         } catch (err) {
-          console.error(`Error procesando mensaje WhatsApp de ${phone}:`, err)
+          const classification = await markWhatsAppEventFailed(msg.id, err).catch(() => "transient" as const)
+          const errMessage = err instanceof Error ? err.message : String(err)
+          console.error(`[whatsapp-webhook] evento=${msg.id} clasificacion=${classification}: ${errMessage}`)
+          await sendCronFailureAlert(
+            "webhook-whatsapp",
+            `Fallo ${classification === "permanent" ? "definitivo" : "transitorio"} procesando el evento ${msg.id}: ${errMessage}`
+          )
+          if (classification === "transient") hadTransientFailure = true
         }
       }
     }
   }
 
-  // Siempre responder 200 para que Meta no reintente
+  // Fallo transitorio → responder error para que Meta reintente la entrega completa; la
+  // idempotencia por wa_message_id (WA-02) hace que ese reintento sea seguro: los eventos ya
+  // procesados con éxito se ignoran, solo se reprocesa el que falló.
+  if (hadTransientFailure) {
+    return NextResponse.json({ status: "transient_error" }, { status: 500 })
+  }
+
   return NextResponse.json({ status: "ok" })
 }

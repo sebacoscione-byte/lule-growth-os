@@ -3,6 +3,7 @@ import {
   checkZeroVisitLanding,
   checkMissingObrasSociales,
   checkHeroAbTestSignal,
+  checkWhatsAppWebhookSignatureMissing,
   checkWhatsAppBudget,
   checkUnapprovedTemplates,
   checkAbandonedConversations,
@@ -82,6 +83,16 @@ describe("web / landings", () => {
 })
 
 describe("whatsapp", () => {
+  it("avisa (crítico) si falta configurar la firma del webhook", () => {
+    const rec = checkWhatsAppWebhookSignatureMissing(false)
+    expect(rec?.severity).toBe("critical")
+    expect(rec?.message).toContain("WHATSAPP_APP_SECRET")
+  })
+
+  it("no avisa si la firma del webhook ya está configurada", () => {
+    expect(checkWhatsAppWebhookSignatureMissing(true)).toBeNull()
+  })
+
   it("avisa si el costo proyectado supera el presupuesto", () => {
     expect(checkWhatsAppBudget(50000, 30000)?.severity).toBe("warning")
   })
@@ -207,7 +218,7 @@ describe("buildGrowthRecommendations", () => {
     landingRanking: [],
     heroVariantResults: [],
     locations: [],
-    whatsapp: { projectedMonthlyCost: 0, monthlyCostAlertArs: null, unapprovedTemplatesCount: 0, abandonedConversations: 0 },
+    whatsapp: { webhookSignatureConfigured: true, projectedMonthlyCost: 0, monthlyCostAlertArs: null, unapprovedTemplatesCount: 0, abandonedConversations: 0 },
     instagram: { connected: true, post: DISABLED_TRACK, historia: DISABLED_TRACK },
     google: { businessConnected: true, placesReviews: { reviews: [], rating: 4.8, reviewCount: 20, mapsUrl: null } },
   }
@@ -224,10 +235,11 @@ describe("buildGrowthRecommendations", () => {
     const recs = buildGrowthRecommendations({
       ...baseInput,
       landingRanking: [{ slug: "x", label: "X", visits: 0, rate: 0 }], // info
-      whatsapp: { ...baseInput.whatsapp, unapprovedTemplatesCount: 1 }, // warning
+      whatsapp: { ...baseInput.whatsapp, webhookSignatureConfigured: false, unapprovedTemplatesCount: 1 }, // critical + warning
       instagram: { connected: false, post: DISABLED_TRACK, historia: DISABLED_TRACK }, // warning
     })
     const severities = recs.map(r => r.severity)
+    expect(severities[0]).toBe("critical")
     expect(severities.indexOf("warning")).toBeLessThan(severities.indexOf("info"))
   })
 
