@@ -1,3 +1,51 @@
+# EN CURSO (2026-07-11) — continuación del plan de corrección de auditoría
+
+Contexto: `docs/BACKLOG.md` → "Plan de corrección — auditoría integral". Ola 0 (WA-01/02/03),
+SEC-02, CRM-01, SEC-01 (rate limit) y GROWTH-02 ya están mergeados a `main` (ver sección
+"Plan de corrección posterior a auditoría integral" más abajo para el contexto original). El
+usuario pidió seguir con todo lo que quede en mis manos, empezando por el borrador de política
+de privacidad.
+
+Cada item se hace en su propia rama + PR, con build/tests verificados antes de mergear (sin
+pedir confirmación, salvo que toque lógica médica — ver CLAUDE.md).
+
+## Orden de trabajo
+
+- [x] **DATA-01** — `/privacidad` publicada como borrador (marcado explícitamente, pendiente de
+  validación legal), enlazada desde el footer, sumada a sitemap/robots. Bug de middleware
+  corregido de paso (la página quedaba detrás del auth gate).
+- [x] **DATA-02** — Botón "Eliminar datos de este paciente" en `/leads/[id]` → RPC `erase_lead`
+  (transacción única: borra mensajes/handoffs, anonimiza wa_id en costo/consentimiento, borra
+  sesión de WhatsApp y el lead, deja log auditable sin PII). Falta definir plazos de retención
+  (decisión de política, no técnica).
+- [ ] **DATA-03** — GA4: cargar el script solo tras consentimiento explícito (banner simple),
+  default conservador mientras no haya confirmación legal de que no hace falta.
+- [ ] **TECH-01** — Deuda técnica: revisar si `middleware.ts` → `proxy.ts` aplica en esta versión
+  de Next (verificar con skill antes de tocar), limpiar warnings de lint, re-chequear
+  vulnerabilidad de `postcss`.
+- [ ] **SEO-01** — Landing local para Hospital Británico/CABA (mismo patrón que las 6 landings
+  existentes) + imagen Open Graph.
+- [ ] **PERF-01** — Paginar leads/export; reemplazar el fetch de hasta 20.000 eventos del
+  dashboard por agregación en SQL (vista o RPC).
+- [ ] **SEC-01 (resto)** — Esquemas de validación de tipo/longitud para los cuerpos de API más
+  expuestos (públicas primero, después internas).
+- [ ] **OPS-01** — Logging estructurado (`request_id`/etapa/error) en las rutas críticas restantes
+  (ya está en el webhook de WhatsApp desde WA-03).
+- [ ] **QA-01** — Tests de integración de rutas clave (auth, webhook, cron, exportación).
+- [ ] **QA-02** — Smoke E2E (evaluar si vale la pena sumar Playwright dado el alcance del proyecto).
+- [ ] **GROWTH-01** — Evaluar si hay un camino real y acotado (ej. propagar un id de tracking vía
+  el link de WhatsApp) antes de construir nada; si no, documentar por qué sigue bloqueado.
+
+## Reglas a mantener
+- Nunca tocar lógica médica sin avisar y esperar aprobación.
+- Rama + PR por cada item, nunca push directo a `main`.
+- Build + tests antes de cada merge.
+- Migraciones nuevas: aplicar con `npm run migrate` apenas se mergea el código que las usa (no
+  dejar una ventana donde el código en prod dependa de una tabla/función que no existe todavía).
+- Documentar en `CLAUDE.md` y `docs/BACKLOG.md` al cerrar cada item.
+
+---
+
 # Plan de corrección posterior a auditoría integral
 
 ## Objetivo

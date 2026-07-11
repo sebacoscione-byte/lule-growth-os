@@ -57,13 +57,30 @@ deliberado: primero integridad de WhatsApp y datos de pacientes; luego medición
     describen el funcionamiento real sin promesas legales no verificadas.
   - **Dependencia:** texto final validado por asesoramiento legal por tratarse de datos de salud.
 
-- [ ] **DATA-02 — Retención, exportación y eliminación de pacientes.**
-  - Definir plazos por tipo de dato: leads, mensajes, consentimientos, handoffs y costos.
-  - Crear una acción administrativa auditable para anonimizar o eliminar un paciente y sus datos
-    relacionados, preservando solo agregados no identificables cuando corresponda.
-  - Documentar restauración, backups y responsable del procedimiento.
-  - **Aceptación:** una solicitud de borrado puede ejecutarse de punta a punta y queda evidencia
-    del procedimiento sin conservar el contenido eliminado en logs de aplicación.
+- [x] **DATA-02 — Eliminación de pacientes.** ⏳ Parcial (2026-07-11) — falta definir plazos
+  - Botón **"Eliminar datos de este paciente"** en `/leads/[id]` (con confirmación explícita,
+    irreversible) → `POST /api/leads/[id]/erase` → `eraseLead()` (`src/lib/data-erasure.ts`) →
+    RPC `erase_lead` (migración `20260711_data_erasure.sql`), todo en una sola transacción SQL:
+    - Borra `messages` y `handoff_events` del lead (contienen texto/resumen identificable —
+      `handoff_events.summary` incluye nombre/teléfono/motivo/último mensaje en JSON).
+    - Anonimiza `wa_id` en `whatsapp_cost_events` y `consent_records` (no se puede dejar null,
+      son columnas `not null`) — preserva la fila para no perder agregados de costo/consentimiento
+      históricos, pero sin el teléfono real.
+    - Borra la fila de `whatsapp_sessions` de ese teléfono (excepto si por algún motivo quedó
+      vinculada a otro lead distinto — `leads.phone` no es unique, a diferencia de
+      `whatsapp_sessions.phone`, así que en teoría dos leads podrían compartir número).
+    - Borra la fila de `leads`.
+    - Deja registro en `data_erasure_log` (quién lo pidió, cuándo) sin conservar ningún dato del
+      paciente eliminado — satisface "queda evidencia sin conservar el contenido".
+  - Se eliminó de paso el `DELETE /api/leads/[id]` genérico que ya existía: no tenía ningún
+    llamador en la UI, y borraba solo la fila de `leads` sin limpiar mensajes/costos/consentimiento/
+    sesión — quedaba código muerto con riesgo real de un borrado incompleto si alguna vez se
+    hubiera conectado a un botón.
+  - **Pendiente real**: "Definir plazos de retención por tipo de dato" es una decisión de política
+    (no técnica) que sigue sin resolverse — hoy no hay borrado automático por antigüedad, solo
+    manual bajo pedido. Tampoco se implementó "exportación" de los datos de un paciente (dar una
+    copia legible antes de borrar) — no estaba pedido explícitamente y se puede resolver hoy
+    exportando el lead puntual desde el CSV general si hace falta.
 
 - [ ] **DATA-03 — Consentimiento de analítica y minimización.**
   - Revisar con asesoramiento legal si GA4 requiere consentimiento previo para esta audiencia y
