@@ -36,6 +36,7 @@ export async function middleware(request: NextRequest) {
     request.nextUrl.pathname.startsWith("/landings") ||
     request.nextUrl.pathname.startsWith("/api") ||
     request.nextUrl.pathname === "/" ||
+    request.nextUrl.pathname === "/privacidad" ||
     PUBLIC_ROOT_PATHS.has(request.nextUrl.pathname)
 
   const isLandingRoute =

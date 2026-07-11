@@ -48,14 +48,24 @@ deliberado: primero integridad de WhatsApp y datos de pacientes; luego medición
 
 ### Ola 1 — Privacidad, integridad y seguridad de datos (P1)
 
-- [ ] **DATA-01 — Política de privacidad e instrucciones de borrado.**
-  - Publicar `/privacidad` con datos recolectados, finalidad, canales de contacto, terceros,
-    conservación y derechos de la persona.
-  - Publicar instrucciones/URL de eliminación de datos compatible con Meta App Review.
-  - Enlazar ambas desde el footer público y la configuración de Meta.
-  - **Aceptación:** las páginas son públicas, indexables cuando corresponda, legibles en móvil y
-    describen el funcionamiento real sin promesas legales no verificadas.
-  - **Dependencia:** texto final validado por asesoramiento legal por tratarse de datos de salud.
+- [x] **DATA-01 — Política de privacidad e instrucciones de borrado.** ⏳ Borrador publicado (2026-07-11)
+  - `/privacidad` (`src/app/privacidad/page.tsx`) publicada: qué datos se recolectan (nombre,
+    teléfono, obra social, motivo/edad/síntomas si se comparten, contenido de WhatsApp, UTM,
+    analítica agregada), para qué se usan, con qué terceros se comparten (Meta/WhatsApp,
+    Anthropic/Google como proveedores de IA, Supabase, Vercel, Google Analytics), conservación
+    (todavía sin plazo automático — ver DATA-02) y cómo pedir acceso/corrección/borrado (hoy
+    manual, por WhatsApp). Enlazada desde el footer de todas las landings públicas, agregada a
+    `sitemap.ts`/`robots.ts` (indexable). **Bug encontrado y corregido de paso**: la página nueva
+    quedaba atrapada por el middleware de auth y redirigía a `/login` — `src/middleware.ts` no
+    tenía `/privacidad` en `isPublicRoute`, se agregó.
+  - Texto marcado explícitamente como **borrador** con un aviso visible arriba de todo: describe
+    el funcionamiento real (sin promesas legales), pero falta la validación de un asesor legal por
+    tratarse de datos de salud — esa dependencia sigue sin resolverse, no la puede saltear un
+    agente.
+  - **Pendiente real (acción de Seba/asesoría legal)**: validar el texto, y cargar
+    `https://draluciachahin.ar/privacidad` como Privacy Policy URL en el Meta Developer Console
+    (necesario recién si se saca la app de Instagram del modo desarrollo — no es urgente mientras
+    solo haya testers/admins agregados).
 
 - [ ] **DATA-02 — Retención, exportación y eliminación de pacientes.**
   - Definir plazos por tipo de dato: leads, mensajes, consentimientos, handoffs y costos.
