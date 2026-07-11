@@ -17,16 +17,24 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
 import { parseAiJson } from "@/lib/parse-ai-json"
-import { DEFAULT_AUTO_PUBLISH_SETTINGS, alreadyPublishedToday, estimateAutoPublishDrainDays, estimateAutoPublishDateForPosition, pickNextPublishableItems } from "@/lib/content-pipeline"
-import type { AutoPublishSettings, AutoPublishTrackSettings, ContentChannel, ContentItem, ContentSlide, ContentSource, ContentStatus } from "@/types"
-import { WEEKDAY_OPTIONS } from "@/types"
+import { DEFAULT_AUTO_PUBLISH_SETTINGS, alreadyPublishedToday, estimateAutoPublishDrainDays, estimateAutoPublishDateForPosition, findRecentDuplicateTopic, pickNextPublishableItems } from "@/lib/content-pipeline"
+import type { AutoPublishSettings, AutoPublishTrackSettings, ContentChannel, ContentItem, ContentObjective, ContentScene, ContentSlide, ContentSource, ContentStatus } from "@/types"
+import { CONTENT_OBJECTIVE_GOALS, CONTENT_OBJECTIVE_LABELS, WEEKDAY_OPTIONS } from "@/types"
 
 const IS_MANUAL_MODE = process.env.NEXT_PUBLIC_AI_MODE !== "gemini_api"
 
 const CATEGORIES = [
-  "Consulta cardiologica", "Ecocardiograma", "Presion arterial", "Colesterol",
-  "Palpitaciones", "Chequeo cardiovascular", "Factores de riesgo",
+  "Consulta cardiologica", "Ecocardiograma", "Estudios cardiologicos", "Presion arterial", "Colesterol",
+  "Palpitaciones", "Sintomas de alarma", "Mitos y errores frecuentes", "Cardiologia femenina",
+  "Corazon y metabolismo", "Chequeo cardiovascular", "Habitos y adherencia", "Factores de riesgo",
   "Atencion en Lanus", "Atencion en Lomas", "Atencion en Hospital Britanico", "Como pedir turno",
+]
+
+const OBJECTIVES: { value: ContentObjective; label: string }[] = [
+  { value: "conversion", label: CONTENT_OBJECTIVE_LABELS.conversion },
+  { value: "educacion", label: CONTENT_OBJECTIVE_LABELS.educacion },
+  { value: "confianza", label: CONTENT_OBJECTIVE_LABELS.confianza },
+  { value: "alcance", label: CONTENT_OBJECTIVE_LABELS.alcance },
 ]
 
 const CTA_OPTIONS = [
@@ -61,6 +69,7 @@ const STYLE_CLASSES = {
 const EDITABLE_FIELDS: Array<keyof ContentItem> = [
   "format", "hook", "caption", "google_text", "hashtags", "visual_headline",
   "visual_subtitle", "visual_style", "image_prompt", "image_alt_text", "slides",
+  "scenes", "reel_duration_seconds",
 ]
 
 function editableContent(item: ContentItem) {
@@ -70,6 +79,13 @@ function editableContent(item: ContentItem) {
 function capHashtags(raw: string, max = 5): string {
   const tags = raw.match(/#[\p{L}0-9_]+/gu) ?? []
   return tags.slice(0, max).join(" ")
+}
+
+function daysAgo(isoDate: string): string {
+  const days = Math.max(0, Math.floor((Date.now() - new Date(isoDate).getTime()) / (1000 * 60 * 60 * 24)))
+  if (days === 0) return "hoy"
+  if (days === 1) return "1 día"
+  return `${days} días`
 }
 
 function CharacterCount({ value, limit }: { value: string; limit?: number }) {
@@ -726,6 +742,7 @@ export default function ContentStudioPage() {
   const [topic, setTopic] = useState("")
   const [briefErrors, setBriefErrors] = useState<{ category?: string; topic?: string }>({})
   const [format, setFormat] = useState<ContentItem["format"]>("post")
+  const [objective, setObjective] = useState<ContentObjective>("conversion")
   const [cta, setCta] = useState("none")
   const [appointmentLink, setAppointmentLink] = useState("")
   const [sources, setSources] = useState<ContentSource[]>([])
@@ -920,6 +937,13 @@ export default function ContentStudioPage() {
       : CATEGORIES
   }, [category])
 
+  // Aviso no bloqueante: si ya se genero o publico algo con la misma categoria (o el mismo hook) en
+  // los ultimos 30 dias, mostrarlo antes de generar para evitar repetir el mismo angulo sin querer.
+  const recentDuplicate = useMemo(() => {
+    if (!category.trim()) return null
+    return findRecentDuplicateTopic(items, { category: category.trim() }, new Date())
+  }, [items, category])
+
   const savedActive = active ? items.find(item => item.id === active.id) : null
   const hasUnsavedChanges = Boolean(
     active && savedActive && JSON.stringify(editableContent(active)) !== JSON.stringify(editableContent(savedActive))
@@ -934,6 +958,7 @@ export default function ContentStudioPage() {
     setCategory("")
     setCategorySuggestionsOpen(false)
     setTopic("")
+    setObjective("conversion")
     setSources([])
     setSelectedSource(null)
     setTab("crear")
@@ -986,6 +1011,7 @@ export default function ContentStudioPage() {
           category: category.trim(),
           content_type: format,
           cta: cta === "none" ? "" : cta,
+          objective,
           appointment_link: appointmentLink.trim() || null,
           source: selectedSource,
         }),
@@ -1045,13 +1071,29 @@ export default function ContentStudioPage() {
           .filter(s => typeof s.headline === "string" && typeof s.text === "string")
           .map(s => ({ headline: (s.headline as string).slice(0, 60), text: (s.text as string).slice(0, 300) }))
       : undefined
+    const rawScenes = generated.scenes
+    const scenes = Array.isArray(rawScenes)
+      ? (rawScenes as Array<Record<string, unknown>>)
+          .filter(s => typeof s.onScreenText === "string" && typeof s.shot === "string")
+          .slice(0, 6)
+          .map(s => ({
+            from: typeof s.from === "number" ? s.from : 0,
+            to: typeof s.to === "number" ? s.to : 0,
+            onScreenText: (s.onScreenText as string).slice(0, 140),
+            shot: (s.shot as string).slice(0, 300),
+          }))
+      : undefined
+    const reelDurationSeconds = typeof generated.reel_duration_seconds === "number"
+      ? Math.min(60, Math.max(1, Math.round(generated.reel_duration_seconds)))
+      : undefined
 
     const item: ContentItem = {
       id: crypto.randomUUID(),
       topic: inferredTopic.slice(0, 200),
       category: inferredCategory.slice(0, 160),
       format,
-      goal: "Captar consultas y explicar como pedir turno",
+      goal: CONTENT_OBJECTIVE_GOALS[objective],
+      objective,
       status: "draft",
       channels: ["instagram"],
       source: selectedSource,
@@ -1070,6 +1112,8 @@ export default function ContentStudioPage() {
       image_prompt: (generated.image_prompt as string | undefined)?.slice(0, 2400),
       image_alt_text: (generated.image_alt_text as string | undefined)?.slice(0, 180),
       slides: slides && slides.length > 0 ? slides : undefined,
+      scenes: scenes && scenes.length > 0 ? scenes : undefined,
+      reel_duration_seconds: reelDurationSeconds,
     }
 
     const saved = await fetch("/api/content/items", {
@@ -1095,7 +1139,8 @@ export default function ContentStudioPage() {
       topic: topic.trim() || category.trim() || "Contenido manual",
       category: category.trim() || "Contenido manual",
       format,
-      goal: "Captar consultas y explicar como pedir turno",
+      goal: CONTENT_OBJECTIVE_GOALS[objective],
+      objective,
       status: "draft",
       channels: ["instagram"],
       source: null,
@@ -1414,6 +1459,11 @@ export default function ContentStudioPage() {
                   </div>
                   <p className="text-xs text-gray-500">Elegí una sugerencia o escribí una categoría nueva.</p>
                   {briefErrors.category && <p className="text-xs font-medium text-red-600">{briefErrors.category}</p>}
+                  {recentDuplicate && (
+                    <p className="text-xs text-amber-700">
+                      Ya generaste algo sobre esta categoría hace {daysAgo(recentDuplicate.created_at)}: &ldquo;{recentDuplicate.topic}&rdquo;. Elegí otro ángulo o esperá si no querés repetir el tema.
+                    </p>
+                  )}
                 </div>
                 <div className="space-y-1.5">
                   <Label className="text-gray-900">Tema o enfoque <span className="font-normal text-gray-400">(opcional)</span></Label>
@@ -1429,6 +1479,14 @@ export default function ContentStudioPage() {
                   />
                   {briefErrors.topic && <p className="text-xs font-medium text-red-600">{briefErrors.topic}</p>}
                   <p className="text-xs text-gray-500">Si lo dejás vacío, la IA elegirá el enfoque más atractivo y útil dentro de la categoría.</p>
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-gray-900">Objetivo</Label>
+                  <Select value={objective} onValueChange={value => setObjective(value as ContentObjective)}>
+                    <SelectTrigger className="text-gray-900"><SelectValue /></SelectTrigger>
+                    <SelectContent>{OBJECTIVES.map(item => <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>)}</SelectContent>
+                  </Select>
+                  <p className="text-xs text-gray-500">Guía el enfoque del hook y del CTA que genera la IA.</p>
                 </div>
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                   <div className="space-y-1.5">
@@ -1691,7 +1749,12 @@ export default function ContentStudioPage() {
                   <CardContent className="p-4 space-y-3">
                     <CarouselPreview item={item} compact />
                     <div className="flex items-center justify-between gap-2">
-                      <div><p className="font-medium text-gray-900">{item.topic}</p><p className="text-xs text-gray-500">{item.format} · {new Date(item.created_at).toLocaleDateString("es-AR")}</p></div>
+                      <div>
+                        <p className="font-medium text-gray-900">{item.topic}</p>
+                        <p className="text-xs text-gray-500">
+                          {item.format}{item.objective ? ` · ${CONTENT_OBJECTIVE_LABELS[item.objective]}` : ""} · {new Date(item.created_at).toLocaleDateString("es-AR")}
+                        </p>
+                      </div>
                       <Badge variant="outline">{STATUS_LABELS[item.status]}</Badge>
                     </div>
                     {item.auto_publish_result && Object.values(item.auto_publish_result).includes("error") && (
@@ -1885,6 +1948,26 @@ function Editor({
       ...item,
       slides: item.slides.map((slide, slideIndex) => slideIndex === index ? { ...slide, ...changes } : slide),
     })
+  }
+
+  function updateScene(index: number, changes: Partial<ContentScene>) {
+    if (!item.scenes) return
+    onChange({
+      ...item,
+      scenes: item.scenes.map((scene, sceneIndex) => sceneIndex === index ? { ...scene, ...changes } : scene),
+    })
+  }
+
+  function addScene() {
+    const scenes = item.scenes ?? []
+    const lastTo = scenes[scenes.length - 1]?.to ?? 0
+    if (scenes.length >= 6) return
+    onChange({ ...item, scenes: [...scenes, { from: lastTo, to: lastTo + 4, onScreenText: "", shot: "" }] })
+  }
+
+  function removeScene(index: number) {
+    if (!item.scenes) return
+    onChange({ ...item, scenes: item.scenes.filter((_, sceneIndex) => sceneIndex !== index) })
   }
 
   async function generateVisual() {
@@ -2235,6 +2318,63 @@ function Editor({
                   <Textarea rows={3} value={slide.text} maxLength={300} onChange={event => updateSlide(index, { text: event.target.value })} className="bg-white text-gray-900" />
                 </div>
               ))}
+            </div>
+          )}
+          {item.format === "reel" && (
+            <div className="space-y-3 rounded-lg border border-gray-200 p-3">
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Guion del reel silencioso</p>
+                <div className="flex items-center gap-1.5">
+                  <Label className="text-xs text-gray-500">Duración (seg)</Label>
+                  <Input
+                    type="number"
+                    min={1}
+                    max={60}
+                    value={item.reel_duration_seconds ?? ""}
+                    onChange={e => onChange({ ...item, reel_duration_seconds: e.target.value === "" ? undefined : Number(e.target.value) })}
+                    className="w-16 bg-white text-gray-900"
+                  />
+                </div>
+              </div>
+              <p className="text-xs text-gray-500">
+                Se entiende sin audio: texto breve en pantalla por escena + qué se filma. Sirve como guía para grabar (Lucía sin hablar a cámara, o B-roll) — la app no genera video.
+              </p>
+              {(item.scenes ?? []).map((scene, index) => (
+                <div key={index} className="space-y-2 rounded-md bg-gray-50 p-3">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-gray-900">Escena {index + 1}</Label>
+                    <div className="flex items-center gap-2">
+                      <Input type="number" min={0} value={scene.from} onChange={e => updateScene(index, { from: Number(e.target.value) })} className="w-14 bg-white text-gray-900" />
+                      <span className="text-xs text-gray-400">a</span>
+                      <Input type="number" min={0} value={scene.to} onChange={e => updateScene(index, { to: Number(e.target.value) })} className="w-14 bg-white text-gray-900" />
+                      <span className="text-xs text-gray-400">seg</span>
+                      <button type="button" onClick={() => removeScene(index)} aria-label="Quitar escena" className="text-gray-400 hover:text-red-600">
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                  <Input
+                    placeholder="Texto en pantalla (4-10 palabras)"
+                    value={scene.onScreenText}
+                    maxLength={140}
+                    onChange={e => updateScene(index, { onScreenText: e.target.value })}
+                    className="bg-white text-gray-900"
+                  />
+                  <Textarea
+                    rows={2}
+                    placeholder="Dirección de la toma: qué se ve, sin hablar a cámara"
+                    value={scene.shot}
+                    maxLength={300}
+                    onChange={e => updateScene(index, { shot: e.target.value })}
+                    className="bg-white text-gray-900 text-xs"
+                  />
+                </div>
+              ))}
+              {(item.scenes?.length ?? 0) < 6 && (
+                <Button type="button" variant="outline" size="sm" onClick={addScene} className="gap-1.5">
+                  <Plus className="h-3.5 w-3.5" /> Agregar escena
+                </Button>
+              )}
             </div>
           )}
           {item.status !== "draft" && (

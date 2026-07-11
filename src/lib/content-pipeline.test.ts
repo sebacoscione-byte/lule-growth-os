@@ -2,7 +2,7 @@ import {
   shouldRunAutoPublish, isScheduledForFuture, isTodayScheduledDay, alreadyPublishedToday,
   estimateAutoPublishDrainDays, estimateAutoPublishDateForPosition, pickNextPublishableItem,
   pickNextPublishableItems, moveItemInQueue, resolveChannelsToPublish, DEFAULT_AUTO_PUBLISH_SETTINGS,
-  isRepeatDue,
+  isRepeatDue, findRecentDuplicateTopic,
 } from "@/lib/content-pipeline"
 import type { AutoPublishTrackSettings, ContentItem } from "@/types"
 
@@ -326,6 +326,45 @@ describe("moveItemInQueue", () => {
   it("ignora piezas que no estan aprobadas", () => {
     const draft = item({ id: "draft", format: "historia", status: "draft" })
     expect(moveItemInQueue([draft], "draft", "up")).toEqual([draft])
+  })
+})
+
+describe("findRecentDuplicateTopic", () => {
+  it("null si no hay ninguna pieza con la misma categoria ni el mismo hook", () => {
+    const a = item({ id: "a", category: "Colesterol", hook: "hook a", created_at: "2026-07-01T00:00:00.000Z" })
+    const now = new Date("2026-07-05T00:00:00.000Z")
+    expect(findRecentDuplicateTopic([a], { category: "Presion arterial", hook: "otro hook" }, now)).toBeNull()
+  })
+
+  it("encuentra la pieza mas reciente con la misma categoria dentro de la ventana", () => {
+    const vieja = item({ id: "vieja", category: "Colesterol", created_at: "2026-06-01T00:00:00.000Z" })
+    const nueva = item({ id: "nueva", category: "Colesterol", created_at: "2026-07-01T00:00:00.000Z" })
+    const now = new Date("2026-07-05T00:00:00.000Z")
+    expect(findRecentDuplicateTopic([vieja, nueva], { category: "Colesterol" }, now)?.id).toBe("nueva")
+  })
+
+  it("ignora piezas fuera de la ventana de dias", () => {
+    const vieja = item({ id: "vieja", category: "Colesterol", created_at: "2026-01-01T00:00:00.000Z" })
+    const now = new Date("2026-07-05T00:00:00.000Z")
+    expect(findRecentDuplicateTopic([vieja], { category: "Colesterol" }, now, 30)).toBeNull()
+  })
+
+  it("ignora piezas archivadas", () => {
+    const archivada = item({ id: "archivada", category: "Colesterol", status: "archived", created_at: "2026-07-01T00:00:00.000Z" })
+    const now = new Date("2026-07-05T00:00:00.000Z")
+    expect(findRecentDuplicateTopic([archivada], { category: "Colesterol" }, now)).toBeNull()
+  })
+
+  it("ignora la propia pieza cuando se pasa su id (editando una pieza existente)", () => {
+    const propia = item({ id: "propia", category: "Colesterol", created_at: "2026-07-01T00:00:00.000Z" })
+    const now = new Date("2026-07-05T00:00:00.000Z")
+    expect(findRecentDuplicateTopic([propia], { id: "propia", category: "Colesterol" }, now)).toBeNull()
+  })
+
+  it("tambien detecta el mismo hook aunque la categoria sea distinta", () => {
+    const a = item({ id: "a", category: "Colesterol", hook: "Mismo hook exacto", created_at: "2026-07-01T00:00:00.000Z" })
+    const now = new Date("2026-07-05T00:00:00.000Z")
+    expect(findRecentDuplicateTopic([a], { category: "Otra categoria", hook: "mismo hook exacto  " }, now)?.id).toBe("a")
   })
 })
 

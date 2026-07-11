@@ -218,6 +218,40 @@ export function moveItemInQueue(items: ContentItem[], id: string, direction: "up
   return items.map(item => ranks.has(item.id) ? { ...item, queue_rank: ranks.get(item.id) as number } : item)
 }
 
+const DEFAULT_DUPLICATE_TOPIC_WINDOW_DAYS = 30
+
+function normalizeForComparison(text: string): string {
+  return text.trim().toLocaleLowerCase("es")
+}
+
+/**
+ * Pura, sin I/O: la pieza mas reciente con la misma categoria o el mismo hook (comparacion exacta,
+ * sin mayusculas/espacios) generada dentro de la ventana de dias hacia atras desde "now", para avisar
+ * antes de repetir un tema o un gancho reciente. Ignora piezas archivadas (ya descartadas a proposito)
+ * y, si se pasa el id de la pieza que se esta editando, se ignora a si misma.
+ */
+export function findRecentDuplicateTopic(
+  items: ContentItem[],
+  candidate: { id?: string; category: string; hook?: string },
+  now: Date = new Date(),
+  windowDays: number = DEFAULT_DUPLICATE_TOPIC_WINDOW_DAYS
+): ContentItem | null {
+  const cutoff = now.getTime() - windowDays * 24 * 60 * 60 * 1000
+  const normalizedCategory = normalizeForComparison(candidate.category)
+  const normalizedHook = normalizeForComparison(candidate.hook ?? "")
+
+  const matches = items.filter(item => {
+    if (item.status === "archived") return false
+    if (candidate.id && item.id === candidate.id) return false
+    if (new Date(item.created_at).getTime() < cutoff) return false
+    const sameCategory = normalizedCategory.length > 0 && normalizeForComparison(item.category) === normalizedCategory
+    const sameHook = normalizedHook.length > 0 && normalizeForComparison(item.hook) === normalizedHook
+    return sameCategory || sameHook
+  })
+  if (matches.length === 0) return null
+  return matches.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0]
+}
+
 /**
  * Pura, sin I/O: interseccion entre los canales pedidos por la pieza y los habilitados globalmente,
  * excluyendo los que ya se publicaron con exito antes (reintento tras una publicacion parcial no

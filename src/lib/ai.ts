@@ -2,7 +2,7 @@ import Anthropic from "@anthropic-ai/sdk"
 import { createHash } from "crypto"
 import { createClient as createSupabaseClient } from "@supabase/supabase-js"
 import { parseAiJson } from "@/lib/parse-ai-json"
-import type { ClassifyResult, ContentSource, WhatsAppIntent } from "@/types"
+import type { ClassifyResult, ContentObjective, ContentScene, ContentSource, WhatsAppIntent } from "@/types"
 
 export type AiMode = "manual" | "gemini_api"
 
@@ -181,11 +181,26 @@ const PATIENT_ACQUISITION_RULES = `CRITERIO DE CAPTACION DE PACIENTES:
 - El CTA debe reducir friccion y explicar el siguiente paso por canales oficiales. Nunca uses escasez, culpa, miedo o urgencia comercial.
 - Evita hooks vagos o genericos como "cuidar tu corazon es importante", "todo lo que tenes que saber" o "la salud es lo primero".`
 
+const OBJECTIVE_GUIDANCE: Record<ContentObjective, string> = {
+  alcance: "Objetivo ALCANCE: priorizá un hook que genere curiosidad, sorpresa o identificación inmediata para maximizar alcance y comentarios. El CTA puede ser una pregunta abierta o invitar a comentar/guardar, no hace falta que invite a pedir turno.",
+  educacion: "Objetivo EDUCACION: priorizá dejar un aprendizaje concreto y accionable, algo que valga la pena guardar. El CTA invita a guardar la pieza para el próximo control, no hace falta que invite a pedir turno ahora.",
+  confianza: "Objetivo CONFIANZA: priorizá mostrar cercanía, criterio médico y empatía por sobre dar información nueva. El CTA invita a comentar una duda o conocer más sobre la consulta.",
+  conversion: "Objetivo CONVERSION: priorizá conectar el aprendizaje con la decisión de pedir turno. El CTA invita explícitamente a pedir turno por los canales disponibles.",
+}
+
+const REEL_SCENE_RULES = `GUION DEL REEL SILENCIOSO:
+- Lucía no habla a cámara ni hay audio con información: la pieza se tiene que entender completa con el sonido apagado.
+- Generá entre 3 y 5 escenas que sumen entre 8 y 25 segundos en total.
+- Cada escena tiene "onScreenText" (4 a 10 palabras, máximo 14, una sola idea, se lee en menos de 3 segundos) y "shot" (dirección de la toma en español: qué se ve, sin mostrar el rostro real de la doctora ni datos personales — ej. "Primer plano de un tensiómetro inflándose", "Manos preparando el consultorio").
+- La primera escena es el hook visual. La última cierra con una acción concreta o una pregunta, coherente con el CTA.
+- No pidas que la doctora hable, mueva los labios o mire directo a cámara explicando algo — son tomas mudas o B-roll.`
+
 export function buildContentPlanPrompt(input: {
   topic: string
   category: string
   format: string
   cta: string
+  objective?: ContentObjective
   appointment_link?: string | null
   source?: ContentSource | null
 }): string {
@@ -234,11 +249,13 @@ ${input.topic.trim()
   : "No se definio un tema. Elegi de forma autonoma el enfoque mas atractivo, util y concreto dentro de la categoria."}
 Categoría: ${input.category}
 Formato Instagram: ${input.format}
+${input.objective ? OBJECTIVE_GUIDANCE[input.objective] : ""}
 ${input.cta ? `Estilo de cierre sugerido: ${input.cta}` : ""}
 ${input.appointment_link
   ? `Link de turnos: ${input.appointment_link}
 El caption debe cerrar invitando al lector a usar ese link para pedir turno. NO invitar a escribir mensajes directos ni a responder al post.`
   : `No hay link disponible aún. Si incluís un cierre, usá "link en la bio" como referencia al link de turnos. NO invitar a escribir mensajes directos.`}
+${input.format === "reel" ? `\n${REEL_SCENE_RULES}\n` : ""}
 ${sourceSection}
 RESPUESTA ESPERADA:
 Devolvé ÚNICAMENTE el JSON válido, sin markdown, sin bloques de código, sin explicaciones.
@@ -262,6 +279,25 @@ Usá exactamente estas claves:
     {"headline": "Slide 2 — título", "text": "Contenido de esta slide."},
     {"headline": "Slide 3 — título", "text": "Contenido de esta slide."},
     {"headline": "Slide 4 — título", "text": "Contenido de esta slide."}
+  ]
+}` : input.format === "reel" ? `Formato REEL SILENCIOSO: incluí "reel_duration_seconds" (número entre 8 y 25) y un array "scenes" de 3 a 5 escenas.
+Usá exactamente estas claves:
+
+{
+  "hook": "frase gancho para la primera escena",
+  "caption": "caption completo para Instagram con emojis y párrafos (150-300 palabras)",
+  "google_text": "texto para publicación en Google Business, máximo 1500 caracteres",
+  "hashtags": "#hashtag1 #hashtag2 (3-5 hashtags relevantes al tema y cardiología)",
+  "visual_headline": "titular para la placa de portada, máximo 60 caracteres",
+  "visual_subtitle": "subtítulo para la placa de portada, máximo 80 caracteres",
+  "visual_style": "rose",
+  "image_prompt": "prompt visual detallado listo para que Gemini genere la portada final",
+  "image_alt_text": "descripcion accesible breve en espanol",
+  "reel_duration_seconds": 14,
+  "scenes": [
+    {"from": 0, "to": 3, "onScreenText": "texto de la primera escena", "shot": "dirección de la toma"},
+    {"from": 3, "to": 8, "onScreenText": "texto de la segunda escena", "shot": "dirección de la toma"},
+    {"from": 8, "to": 14, "onScreenText": "texto de cierre", "shot": "dirección de la toma"}
   ]
 }` : `Usá exactamente estas claves:
 
@@ -582,6 +618,7 @@ export async function generateContentPlan(input: {
   category: string
   format: "reel" | "historia" | "carrusel" | "post"
   cta: string
+  objective?: ContentObjective
   appointment_link?: string | null
   source?: ContentSource | null
 }): Promise<{
@@ -595,6 +632,8 @@ export async function generateContentPlan(input: {
   image_prompt: string
   image_alt_text: string
   slides?: Array<{ headline: string; text: string }>
+  scenes?: ContentScene[]
+  reel_duration_seconds?: number
 }> {
   const sourceContext = input.source
     ? `Fuente para contextualizar:
@@ -619,6 +658,14 @@ El caption debe cerrar invitando a pedir turno con la Dra. Lucia Chahin usando e
     {"headline": "Slide 3", "text": "..."},
     {"headline": "Slide 4", "text": "..."}
   ]`
+    : input.format === "reel"
+    ? `,
+  "reel_duration_seconds": 14,
+  "scenes": [
+    {"from": 0, "to": 3, "onScreenText": "texto de la primera escena", "shot": "direccion de la toma"},
+    {"from": 3, "to": 8, "onScreenText": "texto de la segunda escena", "shot": "direccion de la toma"},
+    {"from": 8, "to": 14, "onScreenText": "texto de cierre", "shot": "direccion de la toma"}
+  ]`
     : ""
 
   const userContent = `${input.topic.trim()
@@ -627,12 +674,13 @@ El caption debe cerrar invitando a pedir turno con la Dra. Lucia Chahin usando e
 Categoria: ${input.category}
 Formato Instagram: ${input.format}
 CTA: ${input.cta}
+${input.objective ? OBJECTIVE_GUIDANCE[input.objective] : ""}
 
 ${appointmentContext}
 
 ${sourceContext}
 
-${input.format === "carrusel" ? "Es un CARRUSEL: generá 4-5 slides con headline y texto corto para cada slide, ademas de la portada.\n\n" : ""}Devolve:
+${input.format === "carrusel" ? "Es un CARRUSEL: generá 4-5 slides con headline y texto corto para cada slide, ademas de la portada.\n\n" : ""}${input.format === "reel" ? "Es un REEL SILENCIOSO: generá reel_duration_seconds y de 3 a 5 escenas en 'scenes', siguiendo las reglas de guion mudo de arriba.\n\n" : ""}Devolve:
 {
   "hook": "...",
   "caption": "...",
@@ -665,6 +713,7 @@ Reglas:
 - Gemini resolvera despues la placa final e integrara el titular y subtitulo.
 ${IMAGE_PROMPT_RULES}
 ${PATIENT_ACQUISITION_RULES}
+${REEL_SCENE_RULES}
 - El texto de Google debe tener maximo 1500 caracteres.
 - Los hashtags deben ser entre 3 y 5, los mas relevantes al tema y a cardiologia. Nunca mas de 5.
 - Si un texto necesita comillas, escapalas como \\\" o usa comillas simples para no romper el JSON.
@@ -683,6 +732,22 @@ ${PATIENT_ACQUISITION_RULES}
         .map(s => ({ headline: (s.headline as string).slice(0, 60), text: (s.text as string).slice(0, 300) }))
     : undefined
 
+  const rawScenes = parsed.scenes
+  const scenes = Array.isArray(rawScenes)
+    ? (rawScenes as Array<Record<string, unknown>>)
+        .filter(s => typeof s.onScreenText === "string" && typeof s.shot === "string")
+        .slice(0, 6)
+        .map(s => ({
+          from: typeof s.from === "number" ? s.from : 0,
+          to: typeof s.to === "number" ? s.to : 0,
+          onScreenText: (s.onScreenText as string).slice(0, 140),
+          shot: (s.shot as string).slice(0, 300),
+        }))
+    : undefined
+  const reelDurationSeconds = typeof parsed.reel_duration_seconds === "number"
+    ? Math.min(40, Math.max(6, Math.round(parsed.reel_duration_seconds)))
+    : undefined
+
   return {
     hook: parsed.hook as string,
     caption: parsed.caption as string,
@@ -696,6 +761,8 @@ ${PATIENT_ACQUISITION_RULES}
     image_prompt: (parsed.image_prompt as string).slice(0, 2400),
     image_alt_text: (parsed.image_alt_text as string).slice(0, 180),
     slides: slides && slides.length > 0 ? slides : undefined,
+    scenes: scenes && scenes.length > 0 ? scenes : undefined,
+    reel_duration_seconds: reelDurationSeconds,
   }
 }
 

@@ -121,6 +121,24 @@ export interface GrowthExperiment {
 export type ContentStatus = "draft" | "approved" | "published" | "archived"
 export type ContentChannel = "instagram" | "google_business"
 
+/** Objetivo editorial de la pieza: que efecto buscamos, no solo que formato/tema tiene. Alimenta el CTA y el enfoque que le pide el prompt a la IA. */
+export type ContentObjective = "alcance" | "educacion" | "confianza" | "conversion"
+
+export const CONTENT_OBJECTIVE_LABELS: Record<ContentObjective, string> = {
+  alcance: "Alcance",
+  educacion: "Educación",
+  confianza: "Confianza",
+  conversion: "Conversión",
+}
+
+/** Texto de "goal" por defecto segun el objetivo elegido — reemplaza el string fijo que tenia toda pieza antes. */
+export const CONTENT_OBJECTIVE_GOALS: Record<ContentObjective, string> = {
+  alcance: "Generar alcance y comentarios con una pregunta o un dato que sorprenda",
+  educacion: "Dejar un aprendizaje concreto y util para guardar o compartir",
+  confianza: "Mostrar cercania y criterio medico para generar confianza",
+  conversion: "Captar consultas y explicar como pedir turno",
+}
+
 export interface ContentSource {
   title: string
   url: string
@@ -134,12 +152,22 @@ export interface ContentSlide {
   text: string
 }
 
+/** Un segmento del guion de un reel silencioso: se entiende sin audio, texto en pantalla + direccion de la toma. */
+export interface ContentScene {
+  from: number
+  to: number
+  onScreenText: string
+  shot: string
+}
+
 export interface ContentItem {
   id: string
   topic: string
   category: string
   format: "reel" | "historia" | "carrusel" | "post"
   goal: string
+  /** Objetivo elegido al generar la pieza. Piezas viejas (previas a esto) no lo tienen -- tratar como "conversion" al mostrar/filtrar. */
+  objective?: ContentObjective
   status: ContentStatus
   channels: ContentChannel[]
   hook: string
@@ -152,6 +180,9 @@ export interface ContentItem {
   image_prompt?: string
   image_alt_text?: string
   slides?: ContentSlide[]
+  /** Guion del reel silencioso: solo se genera/edita cuando format === "reel". Duracion total sugerida + texto/toma por escena. */
+  scenes?: ContentScene[]
+  reel_duration_seconds?: number
   visual_url?: string
   source: ContentSource | null
   created_at: string
