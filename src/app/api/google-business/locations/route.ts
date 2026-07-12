@@ -35,6 +35,7 @@ export async function GET() {
 
     return NextResponse.json({ locations: result })
   } catch (e) {
+    console.error(`[google-business/locations] ${String(e)}`)
     return NextResponse.json({ error: String(e) }, { status: 500 })
   }
 }

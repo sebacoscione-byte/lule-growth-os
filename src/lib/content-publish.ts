@@ -42,7 +42,9 @@ export async function publishApprovedItem(
         })
       }
       result.instagram = "published"
-    } catch {
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      console.error(`[content-publish] item=${item.id} canal=instagram: ${message}`)
       result.instagram = "error"
     }
   }
@@ -51,7 +53,9 @@ export async function publishApprovedItem(
     try {
       await createGoogleBusinessPost(supabase, { summary: item.google_text })
       result.google_business = "published"
-    } catch {
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      console.error(`[content-publish] item=${item.id} canal=google_business: ${message}`)
       result.google_business = "error"
     }
   }

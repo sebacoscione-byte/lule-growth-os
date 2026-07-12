@@ -21,6 +21,7 @@ export async function GET() {
     const data = await listReviews(token, info.google_account_id, info.google_location_id)
     return NextResponse.json(data)
   } catch (e) {
+    console.error(`[google-business/reviews] ${String(e)}`)
     return NextResponse.json({ error: String(e) }, { status: 500 })
   }
 }

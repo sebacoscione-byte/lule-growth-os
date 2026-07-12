@@ -47,6 +47,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: true, mediaId })
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
+    console.error(`[instagram-business/publish] ${message}`)
     return NextResponse.json({ error: message }, { status: 500 })
   }
 }

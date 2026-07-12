@@ -28,6 +28,7 @@ export async function GET() {
     const data = await getLocation(token, info.google_location_name)
     return NextResponse.json(data)
   } catch (e) {
+    console.error(`[google-business/profile] ${String(e)}`)
     return NextResponse.json({ error: String(e) }, { status: 500 })
   }
 }
@@ -79,6 +80,7 @@ export async function PATCH(req: NextRequest) {
     }
     return NextResponse.json({ ok: true })
   } catch (e) {
+    console.error(`[google-business/profile] ${String(e)}`)
     return NextResponse.json({ error: String(e) }, { status: 500 })
   }
 }

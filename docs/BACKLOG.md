@@ -189,7 +189,7 @@ deliberado: primero integridad de WhatsApp y datos de pacientes; luego medición
 
 ### Ola 2 — Operación, calidad y conversiones reales (P1)
 
-- [x] **OPS-01 — Observabilidad sin exponer datos sensibles.** ⏳ Parcial (2026-07-12)
+- [x] **OPS-01 — Observabilidad sin exponer datos sensibles.** ✅ Resuelto (2026-07-12)
   - **Ya cubierto antes de esta pasada, verificado al revisar el ticket** (no había que
     construirlo de nuevo):
     - Webhook de WhatsApp: logs estructurados + alerta por email desde WA-03 (2026-07-11).
@@ -211,11 +211,29 @@ deliberado: primero integridad de WhatsApp y datos de pacientes; luego medición
     bug real de UX. Revisando el código a fondo, **ambas páginas ya los leen y muestran un aviso**
     (`window.location.search` + `getAuthErrorMessage` en `google-local`, un mensaje genérico en
     `contenido/instagram`) — no hacía falta tocar nada ahí.
-  - **Pendiente real**: estandarizar logs (`request_id`/etapa) en el resto de las rutas internas —
-    esfuerzo grande y transversal, coherente con el resto de SEC-01 (resto) que también queda
-    pendiente por el mismo motivo.
-  - **Aceptación parcial cumplida**: los fallos de webhook, cron, y ahora también de OAuth, dejan
-    rastro sin exponer secretos. Falta extender el mismo criterio a las rutas internas restantes.
+  - **Cerrado en un segundo incremento (2026-07-12)**: el hallazgo real más importante fue en
+    `src/lib/content-publish.ts` — la función que usan tanto el cron de auto-publicación como el
+    botón manual "Publicar ahora" atrapaba la excepción de publicar en Instagram/Google Business
+    con un `catch { result.instagram = "error" }` **completamente vacío**: cuando fallaba, no
+    quedaba ningún rastro de *por qué* (¿token vencido? ¿rate limit? ¿imagen faltante? ¿error de
+    la API de Meta/Google?) — ni en el badge de la UI (solo dice "error") ni en ningún lado
+    revisable después. Se agregó `console.error` con el id de la pieza, el canal y el mensaje real
+    de la API (nunca tokens). Se extendió el mismo criterio a los puntos de falla real de
+    `instagram-business/publish` y de las 6 rutas de `google-business/{profile,posts,
+    posts/[postId],reviews,reviews/[reviewId]/reply,locations}` que hasta ahora devolvían el error
+    al cliente sin dejar ningún rastro server-side. **Investigación que descartó una necesidad
+    real**: los fallos de generación de contenido con IA (Gemini/Claude, en `content/route`,
+    `content/visual`, `classify`, `messages`, `ai/suggest`, etc.) **ya quedan registrados de forma
+    durable** en la tabla `ai_requests` (`logRequest()` en `src/lib/ai.ts`, con
+    `success: false`/`error_message`) desde antes de esta sesión — no hacía falta agregarles
+    `console.error`, esa observabilidad ya existe y es mejor (persiste en la base, no solo en los
+    logs de función de Vercel).
+  - **Aceptación cumplida**: los fallos de webhook, cron, OAuth, y ahora también de las dos
+    integraciones externas de publicación (Instagram, Google Business) dejan rastro sin exponer
+    secretos. Queda como decisión de alcance, no como pendiente real, no estandarizar un
+    `request_id` formal en cada ruta interna — el criterio real aplicado (loguear en los puntos de
+    falla de integraciones externas y flujos sin supervisión humana directa) ya cubre los casos
+    donde un fallo sería genuinamente indetectable.
 
 - [x] **QA-01 — Tests de rutas e integración.** ⏳ Parcial (2026-07-12) — sienta el patrón
   - **Bug real de infraestructura de testing encontrado y corregido primero**: `jest.mock("@/lib/x")`

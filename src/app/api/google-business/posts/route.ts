@@ -27,6 +27,7 @@ export async function GET() {
     const data = await listPosts(token, info.google_account_id, info.google_location_id)
     return NextResponse.json(data)
   } catch (e) {
+    console.error(`[google-business/posts] GET: ${String(e)}`)
     return NextResponse.json({ error: String(e) }, { status: 500 })
   }
 }
@@ -48,6 +49,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(data)
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e)
-    return NextResponse.json({ error: message }, { status: message.includes("Account ID") ? 400 : message === "Token expired" ? 401 : 500 })
+    const isKnownCondition = message.includes("Account ID") || message === "Token expired"
+    if (!isKnownCondition) console.error(`[google-business/posts] POST: ${message}`)
+    return NextResponse.json({ error: message }, { status: isKnownCondition ? (message === "Token expired" ? 401 : 400) : 500 })
   }
 }
