@@ -140,6 +140,23 @@ requieren algo que no puedo decidir/verificar yo): QA-02 (decisión de sumar Pla
 puede probar login real acá), GROWTH-01 (decisión de diseño del identificador de atribución),
 DATA-02 (plazos de retención, decisión de política), y la revisión legal explícita de DATA-01/03.
 
+## Cuarta continuación (2026-07-12) — resolviendo pendientes de a partes, del más fácil al más difícil
+
+El usuario pidió ir resolviendo los pendientes reales (los que dependen de él) de a uno, del más
+fácil al más difícil. Empezamos por **DATA-02**, que resultó no ser tan simple como parecía: el
+usuario dio una política de retención diferenciada real (leads nunca convertidos/administrativos:
+24 meses de inactividad; datos de protocolo clínico: nunca se borran, retención legal mínima de 10
+años, solo se bloquea el uso comercial). Se implementó completo: migración
+`20260712_data_retention.sql` (columna `retention_hold` + función SQL de filtro de inactividad),
+`src/lib/data-retention.ts` (`isClinicalOrProtocolLead` puro con tests + `runDataRetentionSweep`
+que reusa `erase_lead`), badge en `/leads/[id]`, barrida semanal dentro del cron de
+`weekly-report`, y detección determinista de baja de marketing inmediata en el bot de WhatsApp
+(`isMarketingOptOutMessage`). Migración ya corrida contra Supabase de producción. DATA-02 queda
+resuelto — ver `docs/BACKLOG.md` para el detalle completo.
+
+Siguiente en la fila (de más fácil a más difícil, según lo acordado): QA-02 → GROWTH-01 → revisión
+legal de DATA-01/03.
+
 ## Reglas a mantener
 - Nunca tocar lógica médica sin avisar y esperar aprobación.
 - Rama + PR por cada item, nunca push directo a `main`.

@@ -67,7 +67,7 @@ deliberado: primero integridad de WhatsApp y datos de pacientes; luego medición
     (necesario recién si se saca la app de Instagram del modo desarrollo — no es urgente mientras
     solo haya testers/admins agregados).
 
-- [x] **DATA-02 — Eliminación de pacientes.** ⏳ Parcial (2026-07-11) — falta definir plazos
+- [x] **DATA-02 — Eliminación de pacientes.** ✅ Resuelto (2026-07-12) — plazos de retención definidos
   - Botón **"Eliminar datos de este paciente"** en `/leads/[id]` (con confirmación explícita,
     irreversible) → `POST /api/leads/[id]/erase` → `eraseLead()` (`src/lib/data-erasure.ts`) →
     RPC `erase_lead` (migración `20260711_data_erasure.sql`), todo en una sola transacción SQL:
@@ -86,11 +86,36 @@ deliberado: primero integridad de WhatsApp y datos de pacientes; luego medición
     llamador en la UI, y borraba solo la fila de `leads` sin limpiar mensajes/costos/consentimiento/
     sesión — quedaba código muerto con riesgo real de un borrado incompleto si alguna vez se
     hubiera conectado a un botón.
-  - **Pendiente real**: "Definir plazos de retención por tipo de dato" es una decisión de política
-    (no técnica) que sigue sin resolverse — hoy no hay borrado automático por antigüedad, solo
-    manual bajo pedido. Tampoco se implementó "exportación" de los datos de un paciente (dar una
-    copia legible antes de borrar) — no estaba pedido explícitamente y se puede resolver hoy
-    exportando el lead puntual desde el CSV general si hace falta.
+  - **Plazos de retención definidos e implementados (2026-07-12)** — política confirmada por Seba:
+    - **Leads que nunca se convirtieron en pacientes, o con solo datos administrativos/
+      comerciales**: se anonimizan/eliminan tras 24 meses de inactividad. Implementado como
+      `runDataRetentionSweep()` (`src/lib/data-retention.ts`) — reusa `erase_lead()` (mismo
+      mecanismo auditable que el botón manual, ver arriba), corriendo automáticamente en vez de
+      esperar un pedido.
+    - **Datos de participación en protocolo de investigación clínica** (`protocol_interest`,
+      `protocol_name`, `status = elegible_protocolo`): **nunca se borran automáticamente** —
+      se conservan por el plazo legal aplicable (mínimo 10 años desde la última actuación). En
+      cambio, tras 24 meses de inactividad se bloquea el uso comercial (`consent_to_contact =
+      false` + `retention_hold = true`, columna nueva en `leads`, migración
+      `20260712_data_retention.sql`) sin tocar el dato — visible como aviso
+      "🔒 En resguardo legal" en `/leads/[id]`.
+    - La clasificación clínica/protocolo vive en `isClinicalOrProtocolLead()` — función pura con
+      tests, única fuente de verdad de este criterio (no duplicado en SQL). La barrida corre
+      semanalmente dentro del cron de `weekly-report` (no suma un tercer cron job de Vercel, mismo
+      patrón que `whatsapp-followup`), y manda alerta por email si falla.
+    - **Baja de comunicaciones de marketing inmediata**: nueva detección determinista
+      (`isMarketingOptOutMessage()` en `whatsapp-intents.ts`, palabras clave "BAJA"/"STOP"/frases
+      explícitas) que corta el flujo del bot ni bien se detecta y pone `consent_to_contact = false`
+      al instante — no espera a la barrida semanal. Chequeada antes que cualquier otra lógica de
+      estado del bot, para que funcione sin importar en qué parte de la conversación esté el
+      paciente. Distinta de `protocol_opt_out` (esa es solo para la invitación puntual a un
+      protocolo, ya existía).
+    - Dado que el proyecto arrancó el 2026-06-11, **hoy no hay ningún lead con 24 meses de
+      inactividad real** — el umbral no va a tener ningún efecto práctico hasta mediados de 2028,
+      lo que da margen de sobra para revisar/ajustar el criterio antes de que borre algo real.
+  - Tampoco se implementó "exportación" de los datos de un paciente (dar una copia legible antes de
+    borrar) — no estaba pedido explícitamente y se puede resolver hoy exportando el lead puntual
+    desde el CSV general si hace falta.
 
 - [x] **DATA-03 — Consentimiento de analítica y minimización.** ⏳ Default conservador (2026-07-11)
   - Se implementó **carga condicional (opt-in)** sin esperar la revisión legal explícita: GA4

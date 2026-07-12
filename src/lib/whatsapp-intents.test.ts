@@ -1,4 +1,4 @@
-import { extractIntake, classifyIntentDeterministic, classifyIntent, classifyProtocolButtonReply } from "@/lib/whatsapp-intents"
+import { extractIntake, classifyIntentDeterministic, classifyIntent, classifyProtocolButtonReply, isMarketingOptOutMessage } from "@/lib/whatsapp-intents"
 
 describe("extractIntake", () => {
   it("extrae motivo, obra social, edad, sede y notas del mensaje combinado", () => {
@@ -85,5 +85,31 @@ describe("classifyProtocolButtonReply", () => {
 
   it("no confunde un mensaje de texto libre parecido con el boton", () => {
     expect(classifyProtocolButtonReply("no gracias, no me interesa por ahora")).toBeNull()
+  })
+})
+
+describe("isMarketingOptOutMessage (DATA-02)", () => {
+  it("reconoce la palabra clave BAJA", () => {
+    expect(isMarketingOptOutMessage("BAJA")).toBe(true)
+    expect(isMarketingOptOutMessage("quiero la baja")).toBe(true)
+  })
+
+  it("reconoce STOP", () => {
+    expect(isMarketingOptOutMessage("STOP")).toBe(true)
+  })
+
+  it("reconoce frases explicitas de no contactar mas", () => {
+    expect(isMarketingOptOutMessage("no me escriban mas por favor")).toBe(true)
+    expect(isMarketingOptOutMessage("no quiero mas mensajes")).toBe(true)
+    expect(isMarketingOptOutMessage("dejen de contactarme")).toBe(true)
+  })
+
+  it("no confunde un mensaje normal de cancelar/reprogramar turno con un opt-out de marketing", () => {
+    expect(isMarketingOptOutMessage("necesito cancelar mi turno de mañana")).toBe(false)
+    expect(isMarketingOptOutMessage("no puedo ir a mi turno")).toBe(false)
+  })
+
+  it("no confunde una consulta normal con un opt-out", () => {
+    expect(isMarketingOptOutMessage("quiero un turno con la doctora")).toBe(false)
   })
 })

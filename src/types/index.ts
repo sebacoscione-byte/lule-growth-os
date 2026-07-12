@@ -94,6 +94,10 @@ export interface Lead {
   protocol_name: string | null
   patient_age: number | null
   prior_studies_or_symptoms: string | null
+  /** DATA-02: true cuando la barrida de retención (24 meses de inactividad) bloqueó el uso
+   * comercial de este lead por tratarse de datos de protocolo/investigación clínica — se conserva
+   * el dato (nunca se borra), pero no se lo vuelve a contactar. Ver src/lib/data-retention.ts. */
+  retention_hold: boolean
 }
 
 export interface Message {
