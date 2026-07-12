@@ -38,7 +38,7 @@ export default function PrivacidadPage() {
           </p>
           <h1 className="font-display text-3xl font-semibold text-ink">Política de privacidad</h1>
           <p className="mt-2 text-sm text-ink-soft">
-            Última actualización: 11 de julio de 2026.
+            Última actualización: 12 de julio de 2026.
           </p>
 
           <div className="mt-5 flex items-start gap-3 rounded-2xl border border-orange-200 bg-orange-50 p-4">
@@ -140,11 +140,20 @@ export default function PrivacidadPage() {
 
       <Section title="Cuánto tiempo conservamos tus datos">
         <p>
-          Hoy no tenemos un plazo automático de eliminación — tus datos se conservan mientras
-          sigas siendo paciente o mientras el consultorio los necesite para el seguimiento de tu
-          consulta. Estamos trabajando en definir plazos de conservación por tipo de dato y en
-          automatizar el proceso de eliminación; hasta que esté implementado, cualquier pedido de
-          borrado se procesa a mano (ver la sección siguiente).
+          Si nos escribiste pero nunca llegaste a ser paciente, o tus datos son solo
+          administrativos (contacto, obra social), los conservamos hasta 24 meses desde tu último
+          contacto — pasado ese plazo sin actividad, se eliminan o anonimizan automáticamente.
+        </p>
+        <p>
+          Si tu consulta fue por interés en un protocolo de investigación clínica, esos datos no
+          se eliminan automáticamente: se conservan por el plazo legal aplicable (como mínimo 10
+          años desde la última actuación registrada). Pasados 24 meses sin actividad, dejamos de
+          usarlos para contactarte — el dato se conserva, pero no se vuelve a utilizar
+          comercialmente.
+        </p>
+        <p>
+          En cualquier momento podés pedirnos el borrado manual de tus datos, sin esperar a que se
+          cumplan estos plazos (ver la sección siguiente).
         </p>
       </Section>
 

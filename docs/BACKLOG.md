@@ -62,10 +62,17 @@ deliberado: primero integridad de WhatsApp y datos de pacientes; luego medición
     el funcionamiento real (sin promesas legales), pero falta la validación de un asesor legal por
     tratarse de datos de salud — esa dependencia sigue sin resolverse, no la puede saltear un
     agente.
-  - **Pendiente real (acción de Seba/asesoría legal)**: validar el texto, y cargar
-    `https://draluciachahin.ar/privacidad` como Privacy Policy URL en el Meta Developer Console
-    (necesario recién si se saca la app de Instagram del modo desarrollo — no es urgente mientras
-    solo haya testers/admins agregados).
+  - **Actualizado (2026-07-12)**: la sección "Cuánto tiempo conservamos tus datos" reflejaba la
+    política vieja ("hoy no tenemos plazo automático") — quedó desactualizada en cuanto se
+    implementó DATA-02 el mismo día. Corregida para describir la retención real de 24 meses/10
+    años. Se preparó además `docs/REVISION_LEGAL_PRIVACIDAD.md`: un resumen con las preguntas
+    concretas que necesitan una respuesta de un asesor legal (terceros/transferencia
+    internacional, si los plazos de retención son razonables, si hace falta pedir consentimiento
+    de analítica) — para que Seba se lo pueda mandar directo, sin tener que armar el resumen él.
+  - **Pendiente real (acción de Seba/asesoría legal)**: validar el texto con la ayuda de
+    `docs/REVISION_LEGAL_PRIVACIDAD.md`, y cargar `https://draluciachahin.ar/privacidad` como
+    Privacy Policy URL en el Meta Developer Console (necesario recién si se saca la app de
+    Instagram del modo desarrollo — no es urgente mientras solo haya testers/admins agregados).
 
 - [x] **DATA-02 — Eliminación de pacientes.** ✅ Resuelto (2026-07-12) — plazos de retención definidos
   - Botón **"Eliminar datos de este paciente"** en `/leads/[id]` (con confirmación explícita,
@@ -127,7 +134,10 @@ deliberado: primero integridad de WhatsApp y datos de pacientes; luego medición
   - Ya se cumplía "no enviar teléfono/motivo/síntomas a analítica": el `gtag('config', ...)`
     nunca mandó datos de leads, solo lo que GA4 recolecta por default (page views).
   - **Sigue pendiente**: la revisión legal explícita en sí (documentar la decisión) — se implementó
-    la opción más segura mientras tanto, no se reemplaza el paso de asesoría.
+    la opción más segura mientras tanto, no se reemplaza el paso de asesoría. La pregunta puntual
+    para el abogado (¿hace falta pedir consentimiento explícito para analítica agregada y anónima
+    en esta audiencia?) ya quedó redactada en `docs/REVISION_LEGAL_PRIVACIDAD.md` (2026-07-12),
+    junto con las de DATA-01.
   - **Aceptación cumplida**: el comportamiento (sin consentimiento = sin GA) ya coincide con lo que
     describe `/privacidad` → "Cookies y analítica" (actualizada en el mismo cambio).
 
