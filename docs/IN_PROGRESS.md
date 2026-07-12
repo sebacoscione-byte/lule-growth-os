@@ -37,14 +37,23 @@ pedir confirmación, salvo que toque lógica médica — ver CLAUDE.md).
   agregación en SQL (sin tope artificial, evita un undercount silencioso). No se pudo verificar
   visualmente `/dashboard` (sin credenciales de login en este entorno). Falta paginar
   `/leads`/`/api/leads/export` — no abordado, cambio de UI más grande.
-- [ ] **SEC-01 (resto)** — Esquemas de validación de tipo/longitud para los cuerpos de API más
-  expuestos (públicas primero, después internas).
+- [x] **SEC-01 (parcial #2)** — Esquemas de validación (zod) en las dos rutas públicas sin sesión
+  (`/api/public/lead`, `/api/public/click` — las de mayor riesgo real). Verificado en vivo con
+  `curl` contra el dev server que los rechazos devuelven 400 sin insertar datos de prueba en
+  producción. Falta el resto de las rutas (todas requieren sesión, menor riesgo, pero son decenas).
 - [ ] **OPS-01** — Logging estructurado (`request_id`/etapa/error) en las rutas críticas restantes
   (ya está en el webhook de WhatsApp desde WA-03).
 - [ ] **QA-01** — Tests de integración de rutas clave (auth, webhook, cron, exportación).
 - [ ] **QA-02** — Smoke E2E (evaluar si vale la pena sumar Playwright dado el alcance del proyecto).
 - [ ] **GROWTH-01** — Evaluar si hay un camino real y acotado (ej. propagar un id de tracking vía
   el link de WhatsApp) antes de construir nada; si no, documentar por qué sigue bloqueado.
+
+## Continuación (2026-07-12, misma sesión)
+
+Tras el cierre de más abajo, el usuario pidió seguir. Se sumó SEC-01 (parcial #2): validación con
+`zod` en las dos rutas públicas sin sesión. Sigue en pie la misma decisión de no encarar
+OPS-01/QA-01/QA-02/GROWTH-01/el resto de SEC-01 en esta sesión — son esfuerzos grandes y
+transversales o requieren una decisión de producto/legal previa.
 
 ## Cierre de esta sesión (2026-07-12)
 

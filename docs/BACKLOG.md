@@ -106,22 +106,43 @@ deliberado: primero integridad de WhatsApp y datos de pacientes; luego medición
   - **Aceptación cumplida**: el comportamiento (sin consentimiento = sin GA) ya coincide con lo que
     describe `/privacidad` → "Cookies y analítica" (actualizada en el mismo cambio).
 
-- [ ] **SEC-01 — Validación uniforme de APIs y rate limit distribuido.** ⏳ Parcial (2026-07-11)
+- [ ] **SEC-01 — Validación uniforme de APIs y rate limit distribuido.** ⏳ Parcial (2026-07-12)
   - [x] Rate limit distribuido: `src/lib/rate-limit.ts` ya no usa un `Map` en memoria (se reseteaba
     por instancia serverless, así que el límite real era `maxRequests × instancias activas`, no
     `maxRequests`). Ahora pega a Postgres vía RPC `check_rate_limit` (migración
     `20260711_rate_limit_distributed.sql`, ventana fija con UPSERT atómico) — todas las instancias
-    de Vercel comparten el mismo contador. Usado hoy por `/api/public/lead` y `/api/public/click`.
-    Fail-open a propósito si la consulta a la base falla (no tumba el endpoint público completo
-    por un límite de anti-abuso caído).
-  - [ ] **Pendiente real**: definir esquemas y límites de longitud/tipo para todos los cuerpos y
-    query params de todas las rutas (`/api/leads`, `/api/content/*`, `/api/whatsapp/*`,
-    `/api/google-business/*`, `/api/instagram-business/*`, etc.) — es un esfuerzo grande y
-    transversal (decenas de rutas), no se abordó en esta pasada para no rehacer cada endpoint sin
-    revisión individual. Manejar JSON inválido con `400` y normalizar respuestas de error de
-    Supabase de forma uniforme tampoco se hizo todavía.
-  - **Aceptación parcial cumplida**: el límite de abuso ya se mantiene entre instancias. Falta la
-    validación uniforme de payloads para la aceptación completa.
+    de Vercel comparten el mismo contador. Fail-open a propósito si la consulta a la base falla.
+  - [x] Validación con esquemas en **las dos rutas públicas sin sesión** (`/api/public/lead`,
+    `/api/public/click`) — las de mayor riesgo real, porque un atacante no necesita ni siquiera
+    una cuenta para llegar a ellas. Se sumó `zod` (nueva dependencia) + `src/lib/api-validation.ts`
+    (`parseJsonBody`/`formatZodError`, con tests) como helpers compartidos.
+    - `/api/public/lead` no tenía **ninguna** validación de tipo/longitud — un `name`,
+      `general_reason`, etc. de cualquier tamaño se guardaba tal cual en `leads` (se muestra en el
+      CRM y se exporta a CSV). `requested_service`/`preferred_location` tampoco se validaban
+      contra los enums reales de `src/types/index.ts` — un valor arbitrario rompía los lookups de
+      `SERVICE_LABELS`/`LOCATION_LABELS` en cualquier pantalla que no tuviera un fallback. Ahora
+      tiene límites de longitud, los enums exactos, y `consent_to_contact` exige el booleano
+      `true` literal (antes aceptaba cualquier valor "truthy" de JS).
+    - `/api/public/click` ya validaba `event_type`/`location_key`/`variant` a mano, pero no
+      `slug` (podía ensuciar `landing_events` con slugs inventados, rompiendo el ranking del
+      dashboard en silencio) ni la longitud de los `utm_*`. Ahora `slug` valida contra
+      `PUBLIC_LANDING_SLUGS` (misma fuente que sitemap/robots/proxy, ver SEO-01 — agregar una
+      landing nueva la habilita acá también sin tocar este archivo).
+    - Ambas: `request.json()` ya no puede tirar una excepción no controlada (JSON inválido ahora es
+      un `400` claro, antes un `500` genérico de Next) y los errores de Supabase ya no se
+      reenvían tal cual al cliente (mensaje genérico en su lugar).
+    - Verificado en vivo contra el dev server real (`curl`, sin sesión — ambas rutas son
+      públicas): JSON inválido, campo faltante, enum inválido y campo demasiado largo devuelven
+      `400` con el mensaje esperado. No se probó el camino exitoso en vivo a propósito, para no
+      insertar un lead/evento de prueba en la base de producción real.
+  - [ ] **Pendiente real**: el resto de las rutas (`/api/leads`, `/api/content/*`,
+    `/api/whatsapp/*`, `/api/google-business/*`, `/api/instagram-business/*`, etc.) — todas
+    requieren sesión, así que el riesgo es menor que el de las dos públicas ya resueltas, pero
+    sigue siendo un esfuerzo grande y transversal (decenas de rutas) que conviene abordar aparte,
+    con revisión individual de cada una.
+  - **Aceptación parcial cumplida**: el límite de abuso se mantiene entre instancias, y las dos
+    rutas públicas sin sesión ya validan tipo/longitud y no reenvían errores de Supabase. Falta
+    extender esto al resto de las rutas para la aceptación completa.
 
 - [x] **SEC-02 — Export CSV segura.** ✅ Resuelto (2026-07-11)
   - `src/lib/csv.ts` (`neutralizeCsvFormula`/`escapeCsvCell`, con tests) antepone una comilla
