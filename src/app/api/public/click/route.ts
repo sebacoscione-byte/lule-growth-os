@@ -1,15 +1,26 @@
 import { getServiceDb } from "@/lib/supabase/service"
 import { NextResponse } from "next/server"
+import { z } from "zod"
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit"
+import { parseJsonBody, formatZodError } from "@/lib/api-validation"
+import { PUBLIC_LANDING_SLUGS } from "@/lib/public-landings"
 
-const VALID_EVENT_TYPES = new Set([
+const EVENT_TYPES = [
   "cta_cimel", "cta_swiss", "cta_britanico", "instructions_viewed", "form_started", "form_submitted",
   "page_view", "click_booking", "click_call", "click_whatsapp", "click_maps",
   "click_hero_primary", "click_hero_secondary",
-])
+] as const
 
-const VALID_LOCATION_KEYS = new Set(["cimel", "swiss", "britanico"])
-const VALID_VARIANTS = new Set(["a", "b"])
+const clickEventSchema = z.object({
+  event_type: z.enum(EVENT_TYPES),
+  slug: z.enum(PUBLIC_LANDING_SLUGS as [string, ...string[]]),
+  location_key: z.enum(["cimel", "swiss", "britanico"]).optional().nullable(),
+  variant: z.enum(["a", "b"]).optional().nullable(),
+  utm_source: z.string().trim().max(200).optional().nullable(),
+  utm_medium: z.string().trim().max(200).optional().nullable(),
+  utm_campaign: z.string().trim().max(200).optional().nullable(),
+  utm_content: z.string().trim().max(200).optional().nullable(),
+})
 
 export async function POST(request: Request) {
   const ip = getClientIp(request)
@@ -18,21 +29,17 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Rate limit exceeded" }, { status: 429 })
   }
 
-  const body = await request.json()
-  const { event_type, slug, location_key, variant, utm_source, utm_medium, utm_campaign, utm_content } = body
+  const parsedBody = await parseJsonBody(request)
+  if (!parsedBody.ok) return NextResponse.json({ error: parsedBody.error }, { status: 400 })
 
-  if (!event_type || !slug || !VALID_EVENT_TYPES.has(event_type)) {
-    return NextResponse.json({ error: "Invalid event" }, { status: 400 })
+  const result = clickEventSchema.safeParse(parsedBody.data)
+  if (!result.success) {
+    return NextResponse.json({ error: formatZodError(result.error) }, { status: 400 })
   }
-  if (location_key !== undefined && location_key !== null && !VALID_LOCATION_KEYS.has(location_key)) {
-    return NextResponse.json({ error: "Invalid location_key" }, { status: 400 })
-  }
-  if (variant !== undefined && variant !== null && !VALID_VARIANTS.has(variant)) {
-    return NextResponse.json({ error: "Invalid variant" }, { status: 400 })
-  }
+  const { event_type, slug, location_key, variant, utm_source, utm_medium, utm_campaign, utm_content } = result.data
 
   const supabase = getServiceDb()
-  await supabase.from("landing_events").insert({
+  const { error } = await supabase.from("landing_events").insert({
     event_type,
     slug,
     location_key: location_key ?? null,
@@ -43,5 +50,6 @@ export async function POST(request: Request) {
     utm_content: utm_content ?? null,
   })
 
+  if (error) return NextResponse.json({ error: "No se pudo registrar el evento" }, { status: 500 })
   return NextResponse.json({ ok: true })
 }
