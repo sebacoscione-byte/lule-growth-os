@@ -42,7 +42,9 @@ export async function GET(req: NextRequest) {
       user_id: shortLived.user_id,
     })
     await supabase.from("app_config").upsert({ key: "instagram_username", value: profile.username }, { onConflict: "key" })
-  } catch {
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err)
+    console.error(`[instagram-business/callback] etapa=token_exchange: ${message}`)
     return NextResponse.redirect(new URL("/contenido/instagram?ig_error=token_exchange", req.url))
   }
 

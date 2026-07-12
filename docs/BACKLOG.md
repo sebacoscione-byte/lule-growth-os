@@ -155,12 +155,33 @@ deliberado: primero integridad de WhatsApp y datos de pacientes; luego medición
 
 ### Ola 2 — Operación, calidad y conversiones reales (P1)
 
-- [ ] **OPS-01 — Observabilidad sin exponer datos sensibles.**
-  - Estandarizar logs con `request_id`/`event_id`, ruta, etapa y código de error.
-  - Alertar fallos de webhook, cron, OAuth y publicación; redactar teléfono, tokens y contenido.
-  - Agregar panel/checklist de salud para integraciones críticas.
-  - **Aceptación:** cada fallo crítico permite ubicar la etapa y reintentar o resolver sin consultar
-    secretos ni texto del paciente.
+- [x] **OPS-01 — Observabilidad sin exponer datos sensibles.** ⏳ Parcial (2026-07-12)
+  - **Ya cubierto antes de esta pasada, verificado al revisar el ticket** (no había que
+    construirlo de nuevo):
+    - Webhook de WhatsApp: logs estructurados + alerta por email desde WA-03 (2026-07-11).
+    - Cron jobs (`publish-content`, `weekly-report`): alerta por email desde el 2026-07-07.
+    - "Panel de salud para integraciones críticas": ya existe como el motor de
+      `growth-recommendations.ts` en `/dashboard` (Instagram desconectado, Google Business
+      desconectado, templates de WhatsApp sin aprobar, firma del webhook faltante, etc.) —
+      no hacía falta un panel nuevo separado.
+  - **Se agregó en esta pasada**: los callbacks de OAuth (`/api/google-business/callback`,
+    `/api/instagram-business/callback`) tenían `catch` completamente silenciosos ante fallos
+    reales (intercambio de token, descubrimiento de cuenta/ubicación) — nada quedaba registrado
+    en ningún lado más allá de un código de error genérico en la URL de redirect. Se agregó
+    `console.error` con ruta/etapa/mensaje de error (nunca el token ni el client secret — solo la
+    respuesta de error de la API de Google/Meta, que nunca hace eco de nuestras credenciales) en
+    los dos puntos de falla real de cada callback.
+  - **Se revisó y descartó un problema que parecía existir pero no era tal**: al principio pareció
+    que `/google-local` y `/contenido/instagram` ignoraban por completo los query params de error
+    del redirect de OAuth (`?error=...`, `?ig_error=...`) — de haber sido cierto, hubiera sido un
+    bug real de UX. Revisando el código a fondo, **ambas páginas ya los leen y muestran un aviso**
+    (`window.location.search` + `getAuthErrorMessage` en `google-local`, un mensaje genérico en
+    `contenido/instagram`) — no hacía falta tocar nada ahí.
+  - **Pendiente real**: estandarizar logs (`request_id`/etapa) en el resto de las rutas internas —
+    esfuerzo grande y transversal, coherente con el resto de SEC-01 (resto) que también queda
+    pendiente por el mismo motivo.
+  - **Aceptación parcial cumplida**: los fallos de webhook, cron, y ahora también de OAuth, dejan
+    rastro sin exponer secretos. Falta extender el mismo criterio a las rutas internas restantes.
 
 - [ ] **QA-01 — Tests de rutas e integración.**
   - Cubrir auth de APIs, webhook firmado/duplicado, autorización de crons, OAuth en error,
