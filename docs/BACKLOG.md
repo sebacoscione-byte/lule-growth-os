@@ -191,11 +191,39 @@ deliberado: primero integridad de WhatsApp y datos de pacientes; luego medición
     sin perder instrucciones por sede si los datos muestran fricción.
   - **Aceptación:** no hay regresiones visuales y el CTA principal queda accesible en teclado y móvil.
 
-- [ ] **SEO-01 — Cobertura de Hospital Británico y vista al compartir.**
-  - Evaluar y crear landing local para Hospital Británico/CABA con datos institucionales verificados.
-  - Agregar imagen Open Graph y validar previews de WhatsApp/Instagram.
-  - **Aceptación:** metadata, canonical, sitemap y contenido son consistentes y no prometen turnos ni
-    disponibilidad.
+- [x] **SEO-01 — Cobertura de Hospital Británico y vista al compartir.** ✅ Resuelto (2026-07-11)
+  - Nueva landing `/cardiologa-caba` (mismo patrón data-driven que las 6 existentes, en
+    `src/lib/public-landings.ts`) — servicios, instrucciones de turno y datos institucionales del
+    Hospital Británico ya verificados y usados en el resto del sitio (dirección, teléfono, horario),
+    sin inventar nada nuevo. Cross-linkeada con `cardiologa-lanus`/`cardiologa-lomas` en
+    `RELATED_LANDING_SLUGS`. Se suma automáticamente a `sitemap.ts`/`robots.ts`/rutas públicas del
+    proxy porque los tres ya derivan de `PUBLIC_LANDING_SLUGS` (a `robots.ts` que antes tenía la
+    lista de slugs hardcodeada se le aplicó el mismo fix, para que agregar una landing nueva no
+    vuelva a requerir tocar ese archivo a mano).
+  - **Bug real encontrado y corregido de paso**: `buildSubpageFaq()` (la pregunta "¿Puedo atenderme
+    en otra sede?" de cada landing de servicio/sede) tenía hardcodeado un ternario binario
+    CIMEL/Swiss — con una tercera sede real, la landing de Hospital Británico hubiera respondido
+    mal (mencionando solo CIMEL, omitiendo Swiss Medical). Se generalizó para calcular "las otras
+    sedes" a partir de la lista completa de la landing principal, sin hardcodear nombres.
+  - **Imagen Open Graph**: antes no existía ninguna (`openGraph.images` nunca se completaba en
+    ninguna landing). Se agregó generación dinámica (`src/app/[slug]/opengraph-image.tsx`, `next/og`)
+    con el nombre de la doctora + el `h1` de cada landing — **no se reusó la foto real de Lucía**
+    porque tiene relleno negro en las esquinas pensado solo para uso circular (`rounded-full`);
+    usarla tal cual en una placa rectangular de OG se hubiera visto rota en cualquier preview de
+    WhatsApp/Instagram.
+  - **Tres bugs reales de infraestructura encontrados y corregidos verificando esto visualmente**
+    (no alcanzaba con build/tests) — dos ya en TECH-01 (nombre de export del matcher de `proxy.ts`,
+    y el match exacto de `isPublicRoute` que dejaba afuera archivos de metadata anidados como
+    `/cardiologa-caba/opengraph-image`), y un tercero encontrado recién acá: **`/sitemap.xml` y
+    `/robots.txt` también quedaban atrapados por el auth gate** (mismo problema de match exacto,
+    preexistente desde antes de esta sesión — no lo introdujo ningún cambio de hoy) y redirigían a
+    `/login` sin sesión. Esto probablemente explica por qué "Verificar indexación en Search
+    Console" seguía pendiente en la Etapa 3 de este mismo archivo: Google no podía leer el sitemap.
+    Corregido agregando ambas rutas a `isPublicRoute` en `proxy.ts`.
+  - **Aceptación cumplida**: metadata/canonical/sitemap consistentes (mismo generador que las 6
+    landings existentes), contenido no promete turnos ni disponibilidad (mismos avisos que el resto
+    del sitio). Verificado con `curl` contra el dev server real que la página y su imagen OG cargan
+    con el CSS/diseño completo.
 
 - [ ] **PERF-01 — Paginación y agregaciones en base.**
   - Paginar leads y exportar en forma segura para volúmenes mayores.
@@ -355,8 +383,12 @@ orgánico de búsqueda y convierten con instrucciones claras para pedir turno.
 - [ ] ~~Formulario "No pude pedir turno" en cada landing SEO~~ — revertido, ver nota en Etapa 2
 
 ### Acciones externas (las hace el equipo)
-- [ ] Configurar Google Search Console con el sitemap
-- [ ] Verificar indexación de las 7 páginas públicas en Search Console
+- [ ] Configurar Google Search Console con el sitemap — **antes de esto (2026-07-11, SEO-01) el
+      sitemap no era alcanzable en absoluto**: `/sitemap.xml` y `/robots.txt` quedaban atrapados
+      por el auth gate de `proxy.ts` y devolvían un redirect a `/login`, así que si esto se había
+      intentado antes probablemente falló. Ya corregido, ahora ambos son públicos.
+- [ ] Verificar indexación de las 8 páginas públicas en Search Console (7 + `/cardiologa-caba`
+      nueva)
 
 ---
 

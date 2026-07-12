@@ -21,11 +21,18 @@ pedir confirmación, salvo que toque lógica médica — ver CLAUDE.md).
 - [x] **DATA-03** — GA4 ahora requiere consentimiento explícito (`AnalyticsConsentBanner` +
   cookie `lule_analytics_consent`, opt-in) antes de cargar el script — default conservador,
   la revisión legal explícita sigue pendiente.
-- [x] **TECH-01** — `middleware.ts` → `proxy.ts` (confirmado con skill, rename 1:1), 0 warnings de
-  lint, vulnerabilidad de postcss re-chequeada (sigue sin solución estable). Falta la parte de
-  headers de seguridad (CSP, etc.) — riesgo real de romper OAuth en silencio, mejor aparte.
-- [ ] **SEO-01** — Landing local para Hospital Británico/CABA (mismo patrón que las 6 landings
-  existentes) + imagen Open Graph.
+- [x] **TECH-01** — `middleware.ts` → `proxy.ts`, 0 warnings de lint, vulnerabilidad de postcss
+  re-chequeada. **La skill sugería `proxyConfig` para el matcher — es incorrecto en Next 16.2.9,
+  sigue siendo `config`** (verificado en el código fuente de `node_modules/next`); usar el nombre
+  equivocado rompía el CSS de todo el sitio (matcher no reconocido, proxy corriendo sobre
+  `_next/static` también). Encontrado y corregido antes de mergear, verificando visualmente con
+  el dev server real, no solo con build/tests. Falta la parte de headers de seguridad (CSP, etc.)
+  — riesgo real de romper OAuth en silencio, mejor aparte.
+- [x] **SEO-01** — Landing `/cardiologa-caba` (mismo patrón data-driven que las 6 existentes) +
+  imagen Open Graph dinámica (`next/og`, no la foto real de Lucía por el relleno negro pensado
+  para uso circular). Bug real corregido de paso: `buildSubpageFaq()` tenía un ternario binario
+  hardcodeado (CIMEL/Swiss) que hubiera respondido mal con la tercera sede. Y otro preexistente:
+  `/sitemap.xml`/`/robots.txt` quedaban atrapados por el auth gate y redirigían a `/login`.
 - [ ] **PERF-01** — Paginar leads/export; reemplazar el fetch de hasta 20.000 eventos del
   dashboard por agregación en SQL (vista o RPC).
 - [ ] **SEC-01 (resto)** — Esquemas de validación de tipo/longitud para los cuerpos de API más

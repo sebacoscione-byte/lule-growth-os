@@ -144,18 +144,21 @@ const MAIN_FAQ = [
   },
 ]
 
+// Genérico a propósito (no hardcodea nombres de sede): calcula "las otras sedes" a partir de la
+// lista completa de ubicaciones de la landing principal, para que agregar una sede nueva no rompa
+// esta pregunta en las landings de servicio/sede existentes.
 function buildSubpageFaq(data: (typeof LANDING_DATA)[string]) {
   const loc = data.locations[0]
-  const otherSede = loc.name.toLowerCase().includes("cimel")
-    ? "Swiss Medical Lomas de Zamora los viernes"
-    : "CIMEL Lanús los martes"
+  const allSedes = LANDING_DATA["dra-lucia-chahin"].locations
+  const otherSedes = allSedes.filter(s => s.name !== loc.name)
+  const otherSedesText = otherSedes.map(s => `${s.name} los ${s.day.toLowerCase()}`).join(" y ")
   return [
     { q: `¿Cómo pido turno con la Dra. Lucía Chahin en ${loc.name}?`, a: loc.instruction },
     {
       q: "¿Atiende con obra social o prepaga?",
       a: "Cada sede acepta distintas coberturas. Consultá directamente con la institución o escribinos por WhatsApp y te ayudamos a confirmarlo.",
     },
-    { q: "¿Puedo atenderme en la otra sede?", a: `Sí, la Dra. Lucía Chahin también atiende en ${otherSede}.` },
+    { q: "¿Puedo atenderme en otra sede?", a: `Sí, la Dra. Lucía Chahin también atiende en ${otherSedesText}.` },
   ]
 }
 

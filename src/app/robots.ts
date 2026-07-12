@@ -1,4 +1,5 @@
 import type { MetadataRoute } from "next"
+import { PUBLIC_LANDING_SLUGS } from "@/lib/public-landings"
 
 function getBaseUrl(): string {
   if (process.env.GOOGLE_OAUTH_BASE_URL) return process.env.GOOGLE_OAUTH_BASE_URL.replace(/\/$/, "")
@@ -14,13 +15,7 @@ export default function robots(): MetadataRoute.Robots {
         userAgent: "*",
         allow: [
           "/",
-          "/dra-lucia-chahin",
-          "/cardiologa-lanus",
-          "/cardiologa-lomas",
-          "/ecocardiograma-lanus",
-          "/ecocardiograma-lomas",
-          "/consulta-cardiologica-lanus",
-          "/consulta-cardiologica-lomas",
+          ...PUBLIC_LANDING_SLUGS.map((slug) => `/${slug}`),
           "/landings/",
           "/privacidad",
         ],

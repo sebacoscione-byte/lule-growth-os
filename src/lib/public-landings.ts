@@ -113,6 +113,16 @@ export const LANDING_DATA: Record<string, PublicLandingData> = {
       { ...SWISS, instruction: "Llamá a Turnos al 0810-333-8876, escribile a Swity (WhatsApp) o usá la app Mi Swiss Medical, pedí turno con la Dra. Lucía Chahin y mencioná que es para consulta de cardiología." },
     ],
   },
+  "cardiologa-caba": {
+    title: "Cardióloga en CABA — Dra. Lucía Chahin | Hospital Británico",
+    description: "¿Buscás una cardióloga en CABA? La Dra. Lucía Chahin atiende los miércoles en el Hospital Británico (Perdriel 74), donde hizo su residencia y hoy continúa como cardióloga de planta. Consultas cardiológicas y ecocardiogramas.",
+    h1: "Cardióloga en CABA — Dra. Lucía Chahin",
+    intro: "Si buscás una cardióloga en CABA, la Dra. Lucía Chahin atiende los miércoles en el Hospital Británico (Central), donde se formó como residente de cardiología y hoy continúa como cardióloga de planta. Realizá consultas cardiológicas y ecocardiogramas.",
+    services: ["Consulta cardiológica", "Ecocardiograma", "Control cardiológico"],
+    locations: [
+      { ...BRITANICO, instruction: "Llamá al 4309-6400 (atención telefónica 24hs) o a la Central de Turnos 0810-222-2748 / 11-3015-9749, o pedí turno desde la app del Hospital Británico, y solicitá turno con la Dra. Lucía Chahin en cardiología." },
+    ],
+  },
 }
 
 export const PUBLIC_LANDING_SLUGS = Object.keys(LANDING_DATA)
@@ -160,8 +170,9 @@ export function whatsAppKeyForLocation(name: string): keyof typeof WHATSAPP_MESS
 
 // Enlazado interno entre landings SEO hermanas (mismo servicio, otra sede) — mejora crawling y UX.
 export const RELATED_LANDING_SLUGS: Record<string, string[]> = {
-  "cardiologa-lanus": ["cardiologa-lomas"],
-  "cardiologa-lomas": ["cardiologa-lanus"],
+  "cardiologa-lanus": ["cardiologa-lomas", "cardiologa-caba"],
+  "cardiologa-lomas": ["cardiologa-lanus", "cardiologa-caba"],
+  "cardiologa-caba": ["cardiologa-lanus", "cardiologa-lomas"],
   "ecocardiograma-lanus": ["ecocardiograma-lomas"],
   "ecocardiograma-lomas": ["ecocardiograma-lanus"],
   "consulta-cardiologica-lanus": ["consulta-cardiologica-lomas"],
