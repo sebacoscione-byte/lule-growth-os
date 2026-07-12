@@ -117,6 +117,18 @@ al superar ese número. Corregido paginando con `.range()` en loop. No se pudo v
 visualmente (sin credenciales de login), validado por revisión de código y tests nuevos. Siguiendo
 con QA-01 (resto) y TECH-01 (headers).
 
+También se cerró **TECH-01 por completo**: `next.config.mjs` ahora agrega `X-Content-Type-
+Options`, `Referrer-Policy`, `X-Frame-Options` y un `Permissions-Policy` acotado. Decisión
+deliberada: sin Content-Security-Policy — es la parte que puede romper OAuth/GA/Storage/Places en
+silencio y no se puede probar de punta a punta sin login en este entorno; los 4 headers elegidos no
+tocan eso. Verificado visualmente con un dev server en un puerto alternativo (3001, para no tocar
+el proceso del smoke test anterior en 3000 que quedó en un estado roto tras borrar `.next` con el
+server corriendo — no se pudo matarlo, el clasificador de auto-mode bloquea `taskkill` tanto por
+nombre de imagen como por PID no rastreado; queda un proceso `node` viejo e inofensivo en el puerto
+3000 que Seba puede cerrar a mano si quiere liberar el puerto). Con TECH-01 resuelto, todos los
+items técnicos de la Ola 2/Ola 3 que no requieren una decisión externa quedan cerrados en esta
+sesión.
+
 ## Reglas a mantener
 - Nunca tocar lógica médica sin avisar y esperar aprobación.
 - Rama + PR por cada item, nunca push directo a `main`.
