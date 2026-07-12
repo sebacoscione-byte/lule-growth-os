@@ -33,8 +33,10 @@ pedir confirmación, salvo que toque lógica médica — ver CLAUDE.md).
   para uso circular). Bug real corregido de paso: `buildSubpageFaq()` tenía un ternario binario
   hardcodeado (CIMEL/Swiss) que hubiera respondido mal con la tercera sede. Y otro preexistente:
   `/sitemap.xml`/`/robots.txt` quedaban atrapados por el auth gate y redirigían a `/login`.
-- [ ] **PERF-01** — Paginar leads/export; reemplazar el fetch de hasta 20.000 eventos del
-  dashboard por agregación en SQL (vista o RPC).
+- [x] **PERF-01** — Reemplazado el fetch de hasta 20.000 eventos del dashboard por 2 RPC de
+  agregación en SQL (sin tope artificial, evita un undercount silencioso). No se pudo verificar
+  visualmente `/dashboard` (sin credenciales de login en este entorno). Falta paginar
+  `/leads`/`/api/leads/export` — no abordado, cambio de UI más grande.
 - [ ] **SEC-01 (resto)** — Esquemas de validación de tipo/longitud para los cuerpos de API más
   expuestos (públicas primero, después internas).
 - [ ] **OPS-01** — Logging estructurado (`request_id`/etapa/error) en las rutas críticas restantes
