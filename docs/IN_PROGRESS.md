@@ -109,6 +109,14 @@ tokens), mismo criterio extendido a `instagram-business/publish` y 6 rutas de `g
 Se investigó y no hizo falta tocar los fallos de IA: ya quedan en la tabla `ai_requests` desde
 antes de esta sesión. Siguiendo con QA-01 (resto), PERF-01 (paginación) y TECH-01 (headers).
 
+También se cerró **PERF-01 por completo**: `/leads` ahora pagina de verdad (50 por página,
+controles Anterior/Siguiente, preserva filtros en la URL) en vez del tope fijo de 300 sin forma de
+ver más atrás. Bug real encontrado en `/api/leads/export`: sin `.range()`, PostgREST aplica su
+propio tope de 1000 filas por respuesta en silencio — la exportación se hubiera truncado sin aviso
+al superar ese número. Corregido paginando con `.range()` en loop. No se pudo verificar
+visualmente (sin credenciales de login), validado por revisión de código y tests nuevos. Siguiendo
+con QA-01 (resto) y TECH-01 (headers).
+
 ## Reglas a mantener
 - Nunca tocar lógica médica sin avisar y esperar aprobación.
 - Rama + PR por cada item, nunca push directo a `main`.

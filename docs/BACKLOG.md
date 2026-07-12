@@ -345,7 +345,7 @@ deliberado: primero integridad de WhatsApp y datos de pacientes; luego medición
     del sitio). Verificado con `curl` contra el dev server real que la página y su imagen OG cargan
     con el CSS/diseño completo.
 
-- [x] **PERF-01 — Agregaciones en base.** ⏳ Parcial (2026-07-12) — falta paginar leads/export
+- [x] **PERF-01 — Agregaciones en base.** ✅ Resuelto (2026-07-12)
   - Reemplazadas las dos queries del dashboard que traían hasta 20.000 filas crudas de
     `landing_events` y contaban en JavaScript (`getLandingRanking`, `getHeroVariantResults`) por
     dos funciones SQL (`landing_events_ranking`, `landing_hero_variant_results`, migración
@@ -362,12 +362,25 @@ deliberado: primero integridad de WhatsApp y datos de pacientes; luego medición
     `/dashboard`** porque requiere sesión y este entorno no tiene credenciales de login — quedó
     validado por revisión de código y por el build/tests, no por captura de pantalla (a
     diferencia del resto de los cambios de esta sesión, que sí se verificaron visualmente).
-  - **Pendiente real**: paginar `/leads` (hoy tiene un tope fijo de 300 filas más recientes, sin UI
-    de paginación para ver más atrás) y `/api/leads/export` (hoy sin ningún límite — funciona bien
-    a la escala actual de una consulta unipersonal, pero no tiene un mecanismo de paginación para
-    cuando crezca mucho más). No se abordó en esta pasada por ser un cambio de UI más grande
-    (paginación real, no solo una función SQL) y para no seguir extendiendo una sesión ya larga
-    sin poder verificar visualmente el resultado.
+  - **Cerrado en un segundo incremento (2026-07-12)**:
+    - **`/leads`** ya no trae un tope fijo de 300 filas sin forma de ver más atrás. Ahora pagina
+      de verdad: `select("*", { count: "exact" })` + `.range()` (50 leads por página) con
+      controles "Anterior/Siguiente" y "Página X de Y" que preservan los filtros activos
+      (`status`/`channel`/`service`/`q`/`requires_human`) en la URL. El header también muestra el
+      total real de leads (antes mostraba solo cuántos había en esa página).
+    - **`/api/leads/export`** tenía un bug real más allá de "sin límite explícito": PostgREST (la
+      API REST de Supabase) aplica su propio tope de filas por respuesta (`db-max-rows`, 1000 por
+      default) que un `select("*")` sin `.range()` respeta **en silencio** — si los leads
+      superaran ese número, la exportación se truncaba sin ningún aviso (mismo patrón de "conteo
+      subestimado en silencio" que ya se había corregido para el dashboard). Corregido paginando
+      con `.range()` en un loop hasta agotar los resultados, así el CSV siempre incluye todos los
+      leads sin importar cuántos haya — sin necesidad de UI de paginación, porque una descarga
+      sigue siendo un solo archivo.
+    - No se pudo verificar visualmente `/leads` (requiere sesión, sin credenciales de login en
+      este entorno) — validado por revisión de código, tests nuevos (incluido uno que reproduce el
+      escenario de dos páginas de PostgREST para `/api/leads/export`) y build/tests.
+  - **Aceptación cumplida**: tanto el listado como la exportación de leads escalan sin techo
+    artificial ni truncamiento silencioso.
 
 - [x] **TECH-01 — Deuda técnica y headers.** ⏳ Parcial (2026-07-11) — faltan los headers
   - [x] `middleware.ts` → `proxy.ts`: renombrado siguiendo la convención de Next.js 16 (función

@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/server"
 import Link from "next/link"
-import { Plus, AlertTriangle, Clock, ChevronRight, Download } from "lucide-react"
+import { Plus, AlertTriangle, Clock, ChevronRight, ChevronLeft, Download } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   STATUS_LABELS, STATUS_COLORS, CHANNEL_LABELS, SERVICE_LABELS,
@@ -8,15 +8,23 @@ import {
 } from "@/types"
 import { timeAgo, sanitizePostgrestValue } from "@/lib/utils"
 
+const PAGE_SIZE = 50
+
 export default async function LeadsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ status?: string; channel?: string; service?: string; q?: string; requires_human?: string }>
+  searchParams: Promise<{ status?: string; channel?: string; service?: string; q?: string; requires_human?: string; page?: string }>
 }) {
   const sp = await searchParams
   const supabase = await createClient()
 
-  let query = supabase.from("leads").select("*").order("created_at", { ascending: false }).limit(300)
+  // Antes traía hasta 300 leads en una sola consulta sin ninguna forma de ver los más viejos —
+  // PERF-01: se pagina de verdad (range() + count exacto) para que la lista no tenga techo.
+  const currentPage = Math.max(1, Number.parseInt(sp.page ?? "1", 10) || 1)
+  const from = (currentPage - 1) * PAGE_SIZE
+  const to = from + PAGE_SIZE - 1
+
+  let query = supabase.from("leads").select("*", { count: "exact" }).order("created_at", { ascending: false })
 
   if (sp.status) query = query.eq("status", sp.status)
   if (sp.channel) query = query.eq("origin_channel", sp.channel)
@@ -27,15 +35,32 @@ export default async function LeadsPage({
     if (safeQ) query = query.or(`name.ilike.%${safeQ}%,phone.ilike.%${safeQ}%,instagram_username.ilike.%${safeQ}%`)
   }
 
-  const { data: leads } = await query
+  const { data: leads, count } = await query.range(from, to)
   const all = (leads ?? []) as Lead[]
+  const total = count ?? 0
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
+
+  function pageHref(targetPage: number) {
+    const params = new URLSearchParams()
+    if (sp.status) params.set("status", sp.status)
+    if (sp.channel) params.set("channel", sp.channel)
+    if (sp.service) params.set("service", sp.service)
+    if (sp.requires_human) params.set("requires_human", sp.requires_human)
+    if (sp.q) params.set("q", sp.q)
+    if (targetPage > 1) params.set("page", String(targetPage))
+    const qs = params.toString()
+    return qs ? `/leads?${qs}` : "/leads"
+  }
 
   return (
     <div className="p-4 md:p-6">
       <div className="flex items-center justify-between mb-4">
         <div>
           <h1 className="text-xl md:text-2xl font-bold text-gray-900">Leads</h1>
-          <p className="text-sm text-gray-500">{all.length} lead{all.length !== 1 ? "s" : ""}</p>
+          <p className="text-sm text-gray-500">
+            {total} lead{total !== 1 ? "s" : ""}
+            {totalPages > 1 && <> · página {currentPage} de {totalPages}</>}
+          </p>
         </div>
         <div className="flex items-center gap-2">
           <a href="/api/leads/export" download>
@@ -178,6 +203,38 @@ export default async function LeadsPage({
             </table>
           </div>
         </>
+      )}
+
+      {totalPages > 1 && (
+        <div className="mt-4 flex items-center justify-center gap-3">
+          {currentPage > 1 ? (
+            <Link href={pageHref(currentPage - 1)}>
+              <Button variant="outline" size="sm">
+                <ChevronLeft className="h-4 w-4" />
+                Anterior
+              </Button>
+            </Link>
+          ) : (
+            <Button variant="outline" size="sm" disabled>
+              <ChevronLeft className="h-4 w-4" />
+              Anterior
+            </Button>
+          )}
+          <span className="text-sm text-gray-500">Página {currentPage} de {totalPages}</span>
+          {currentPage < totalPages ? (
+            <Link href={pageHref(currentPage + 1)}>
+              <Button variant="outline" size="sm">
+                Siguiente
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </Link>
+          ) : (
+            <Button variant="outline" size="sm" disabled>
+              Siguiente
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          )}
+        </div>
       )}
     </div>
   )
