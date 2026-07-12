@@ -225,11 +225,29 @@ deliberado: primero integridad de WhatsApp y datos de pacientes; luego medición
     del sitio). Verificado con `curl` contra el dev server real que la página y su imagen OG cargan
     con el CSS/diseño completo.
 
-- [ ] **PERF-01 — Paginación y agregaciones en base.**
-  - Paginar leads y exportar en forma segura para volúmenes mayores.
-  - Reemplazar la descarga de hasta 20.000 eventos del dashboard por vistas/RPC agregadas en SQL.
-  - **Aceptación:** el panel mantiene tiempos estables al crecer y los totales coinciden con consultas
-    de control.
+- [x] **PERF-01 — Agregaciones en base.** ⏳ Parcial (2026-07-12) — falta paginar leads/export
+  - Reemplazadas las dos queries del dashboard que traían hasta 20.000 filas crudas de
+    `landing_events` y contaban en JavaScript (`getLandingRanking`, `getHeroVariantResults`) por
+    dos funciones SQL (`landing_events_ranking`, `landing_hero_variant_results`, migración
+    `20260712_landing_events_aggregation.sql`) que agregan con `GROUP BY` + `COUNT FILTER`
+    directamente en Postgres, sin ningún tope artificial.
+  - **Motivo real, no solo velocidad**: el límite de 20.000 filas no era solo una cuestión de
+    performance — si el tráfico real de una ventana de 90 días superaba esa cifra, el conteo
+    quedaba **subestimado en silencio**, sin ningún error visible en el dashboard. Con la
+    agregación en SQL ese techo desaparece.
+  - Se verificó que la migración corrió sin errores de sintaxis en la base real y se revisó
+    manualmente que ambas funciones repliquen exactamente los mismos filtros que la lógica
+    JavaScript que reemplazan (mismo rango de fechas, mismos `event_type`, mismo filtro de
+    `slug`/`variant` para el test A/B). **No se pudo verificar visualmente el panel en
+    `/dashboard`** porque requiere sesión y este entorno no tiene credenciales de login — quedó
+    validado por revisión de código y por el build/tests, no por captura de pantalla (a
+    diferencia del resto de los cambios de esta sesión, que sí se verificaron visualmente).
+  - **Pendiente real**: paginar `/leads` (hoy tiene un tope fijo de 300 filas más recientes, sin UI
+    de paginación para ver más atrás) y `/api/leads/export` (hoy sin ningún límite — funciona bien
+    a la escala actual de una consulta unipersonal, pero no tiene un mecanismo de paginación para
+    cuando crezca mucho más). No se abordó en esta pasada por ser un cambio de UI más grande
+    (paginación real, no solo una función SQL) y para no seguir extendiendo una sesión ya larga
+    sin poder verificar visualmente el resultado.
 
 - [x] **TECH-01 — Deuda técnica y headers.** ⏳ Parcial (2026-07-11) — faltan los headers
   - [x] `middleware.ts` → `proxy.ts`: renombrado siguiendo la convención de Next.js 16 (función

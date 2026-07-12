@@ -29,8 +29,6 @@ const SEVERITY_BADGE: Record<GrowthRecommendation["severity"], string> = {
   info: "bg-blue-100 text-blue-700",
 }
 
-const INTERACTION_EVENT_TYPES = ["click_booking", "click_call", "click_whatsapp", "click_maps"]
-
 type LandingRankingRow = {
   slug: string
   label: string
@@ -39,25 +37,20 @@ type LandingRankingRow = {
   rate: number
 }
 
+// Agregado en SQL (RPC landing_events_ranking, migración 20260712_landing_events_aggregation.sql)
+// en vez de traer filas crudas y contar en JS — antes tenía un tope de 20.000 filas que, superado,
+// subestimaba los conteos en silencio sin ningún error visible.
 async function getLandingRanking(
   supabase: Awaited<ReturnType<typeof createClient>>
 ): Promise<{ rows: LandingRankingRow[]; available: boolean }> {
   try {
     const ninetyDaysAgo = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString()
-    const { data, error } = await supabase
-      .from("landing_events")
-      .select("slug, event_type")
-      .in("event_type", ["page_view", ...INTERACTION_EVENT_TYPES])
-      .gte("created_at", ninetyDaysAgo)
-      .limit(20000)
+    const { data, error } = await supabase.rpc("landing_events_ranking", { p_since: ninetyDaysAgo })
     if (error) throw error
 
     const bySlug = new Map<string, { visits: number; interactions: number }>()
-    for (const row of data ?? []) {
-      const entry = bySlug.get(row.slug) ?? { visits: 0, interactions: 0 }
-      if (row.event_type === "page_view") entry.visits += 1
-      else entry.interactions += 1
-      bySlug.set(row.slug, entry)
+    for (const row of (data ?? []) as { slug: string; visits: number | string; interactions: number | string }[]) {
+      bySlug.set(row.slug, { visits: Number(row.visits), interactions: Number(row.interactions) })
     }
 
     const rows = PUBLIC_LANDING_SLUGS.map(slug => {
@@ -77,8 +70,6 @@ async function getLandingRanking(
   }
 }
 
-const HERO_VARIANT_EVENT_TYPES = ["page_view", "click_hero_primary", "click_hero_secondary", ...INTERACTION_EVENT_TYPES]
-
 type HeroVariantRow = {
   variant: "a" | "b"
   visits: number
@@ -90,30 +81,30 @@ type HeroVariantRow = {
 
 // Test A/B del hero de /dra-lucia-chahin (2026-07-07) — variante "b" invierte cual boton es
 // primario ("Pedir turno" vs "Ver sedes y horarios"). Ver src/app/landings/[slug]/page.tsx.
+// Agregado en SQL (RPC landing_hero_variant_results) por el mismo motivo que getLandingRanking.
 async function getHeroVariantResults(
   supabase: Awaited<ReturnType<typeof createClient>>
 ): Promise<{ rows: HeroVariantRow[]; available: boolean }> {
   try {
     const ninetyDaysAgo = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString()
-    const { data, error } = await supabase
-      .from("landing_events")
-      .select("event_type, variant")
-      .eq("slug", "dra-lucia-chahin")
-      .in("variant", ["a", "b"])
-      .in("event_type", HERO_VARIANT_EVENT_TYPES)
-      .gte("created_at", ninetyDaysAgo)
-      .limit(20000)
+    const { data, error } = await supabase.rpc("landing_hero_variant_results", { p_since: ninetyDaysAgo })
     if (error) throw error
 
     const byVariant = new Map<"a" | "b", { visits: number; heroPrimaryClicks: number; heroSecondaryClicks: number; interactions: number }>()
-    for (const row of data ?? []) {
-      const variant = row.variant as "a" | "b"
-      const entry = byVariant.get(variant) ?? { visits: 0, heroPrimaryClicks: 0, heroSecondaryClicks: 0, interactions: 0 }
-      if (row.event_type === "page_view") entry.visits += 1
-      else if (row.event_type === "click_hero_primary") entry.heroPrimaryClicks += 1
-      else if (row.event_type === "click_hero_secondary") entry.heroSecondaryClicks += 1
-      else entry.interactions += 1
-      byVariant.set(variant, entry)
+    for (const row of (data ?? []) as {
+      variant: string
+      visits: number | string
+      hero_primary_clicks: number | string
+      hero_secondary_clicks: number | string
+      interactions: number | string
+    }[]) {
+      if (row.variant !== "a" && row.variant !== "b") continue
+      byVariant.set(row.variant, {
+        visits: Number(row.visits),
+        heroPrimaryClicks: Number(row.hero_primary_clicks),
+        heroSecondaryClicks: Number(row.hero_secondary_clicks),
+        interactions: Number(row.interactions),
+      })
     }
 
     const rows: HeroVariantRow[] = (["a", "b"] as const).map(variant => {
