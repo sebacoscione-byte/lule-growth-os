@@ -16,8 +16,12 @@ por qué tipo de acción es, para que sepas qué esperar de cada uno. El detalle
   antes de volver a mandar documentos (ver Etapa 7 más abajo).
 
 ### ⚖️ Revisión legal (dato de salud)
-- [ ] Mandarle `docs/REVISION_LEGAL_PRIVACIDAD.md` a un abogado — ya tiene las 3 preguntas
-  concretas redactadas y listas para copiar/pegar (DATA-01/03).
+- [ ] Mandarle `docs/REVISION_LEGAL_PRIVACIDAD.md` a un abogado — ya tiene **7 preguntas
+  concretas** redactadas y listas para copiar/pegar (DATA-01/03): terceros, transferencia
+  internacional de datos, acuerdos de tratamiento de datos (DPA) con los proveedores, plazos de
+  retención, consentimiento de analítica, si el texto de consentimiento de WhatsApp alcanza como
+  consentimiento informado, y si hace falta un tratamiento especial para menores de edad (hoy no
+  hay ninguno — laguna real, no decisión tomada a propósito).
 
 ### 🔑 Trámites en cuentas externas (Meta/Google) que solo vos podés hacer
 - [ ] **2FA del Business Manager**: Facebook te bloqueó activarlo en tu cuenta personal ("no
@@ -118,9 +122,23 @@ deliberado: primero integridad de WhatsApp y datos de pacientes; luego medición
     política vieja ("hoy no tenemos plazo automático") — quedó desactualizada en cuanto se
     implementó DATA-02 el mismo día. Corregida para describir la retención real de 24 meses/10
     años. Se preparó además `docs/REVISION_LEGAL_PRIVACIDAD.md`: un resumen con las preguntas
-    concretas que necesitan una respuesta de un asesor legal (terceros/transferencia
-    internacional, si los plazos de retención son razonables, si hace falta pedir consentimiento
-    de analítica) — para que Seba se lo pueda mandar directo, sin tener que armar el resumen él.
+    concretas que necesitan una respuesta de un asesor legal — para que Seba se lo pueda mandar
+    directo, sin tener que armar el resumen él.
+  - **Ampliado el mismo día, a pedido de Seba**: el resumen legal pasó de 3 a **7 preguntas**
+    concretas — se agregó transferencia internacional de datos (los 5 proveedores procesan fuera
+    de Argentina), si conviene tener un Data Processing Agreement (DPA) de cada proveedor, si el
+    texto de consentimiento que muestra el bot de WhatsApp alcanza como consentimiento informado
+    válido para datos de salud (se citó el texto exacto), y si hace falta un tratamiento especial
+    para menores de edad — **hoy no hay ninguno, es una laguna real** (el bot pregunta la edad
+    pero no cambia nada si la persona es menor).
+  - **Bug real encontrado revisando esto y corregido con confirmación explícita del usuario**
+    (única excepción del proyecto que sí requiere ese paso, por tocar `medical-safety.ts`): el
+    mensaje del bot ante un síntoma de alarma decía "llamá al *911*", pero la landing pública y
+    `/privacidad` ya decían **107** (SAME, el número de emergencias médicas de CABA/provincia de
+    Buenos Aires, donde están las 3 sedes) — dos números distintos según qué parte de la app viera
+    el paciente. Seba confirmó unificar en 107; corregido en `src/lib/medical-safety.ts`
+    (`EMERGENCY_REPLY`) — **PR abierto, esperando el "dale" antes de mergear** (no se mergea solo
+    como el resto de los cambios de esta sesión, justamente porque toca ese archivo).
   - **Pendiente real (acción de Seba/asesoría legal)**: validar el texto con la ayuda de
     `docs/REVISION_LEGAL_PRIVACIDAD.md`, y cargar `https://draluciachahin.ar/privacidad` como
     Privacy Policy URL en el Meta Developer Console (necesario recién si se saca la app de
