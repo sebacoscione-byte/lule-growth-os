@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
+import { parseJsonBody } from "@/lib/api-validation"
 
 // Únicas claves que este endpoint (usado por la pantalla de Configuración y por el panel de
 // auto-publicación del Estudio de contenido) puede leer/escribir. El resto de app_config (tokens
@@ -30,8 +31,10 @@ export async function POST(req: Request) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
-  const body = await req.json()
-  const { key, value } = body as { key: string; value: unknown }
+  const parsedBody = await parseJsonBody(req)
+  if (!parsedBody.ok) return NextResponse.json({ error: parsedBody.error }, { status: 400 })
+
+  const { key, value } = parsedBody.data as { key?: string; value: unknown }
 
   if (!key || value === undefined) {
     return NextResponse.json({ error: "key y value son requeridos" }, { status: 400 })

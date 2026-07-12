@@ -84,6 +84,24 @@ segundo incremento del mismo ticket: test de integración de ruta completa para
 Mismo criterio que antes: bounded, mecánico, sin requerir decisión de producto/legal. Sigue en pie
 no encarar QA-02/GROWTH-01/el resto de SEC-01/OPS-01 en esta sesión.
 
+## Tercera continuación (2026-07-12, misma sesión) — el usuario pidió agotar todo lo técnico
+
+El usuario pidió explícitamente: dejar todo lo que depende de él para el final, y no frenar hasta
+terminar todo lo técnico de mi lado. Se cerró **SEC-01 por completo**: se revisaron una por una las
+~24 rutas de `src/app/api/**` que reciben un body JSON del cliente. Hallazgo más importante: mass
+assignment real (sin ningún filtro de campos) en `POST /api/experiments` y `PATCH
+/api/experiments/[id]` — peor que `/api/leads`, que al menos ya tenía un allowlist manual. Corregido
+con zod (que además actúa como allowlist). También: `/api/leads` (POST/PATCH), `/api/whatsapp/
+templates/[id]`, `/api/checklist`, `/api/messages`, `/api/classify`, `/api/followup`, `/api/ai/
+suggest` ahora validan tipo/longitud/enum. El resto de rutas con body (`google-business/*`,
+`content/reorder`, `content/publish-now`, `content/upload-image`, `whatsapp/pricing/[id]`,
+`config`) solo necesitaban envolver `request.json()` (crasheaba con JSON inválido). Deliberadamente
+sin tocar `content/items`, `content/visual`, `content/alt-text`, `content/image-direction`,
+`content/route`, `instagram-business/publish`: ya tenían validación manual sólida y reescribirlos a
+zod no sumaba seguridad real, solo riesgo de regresión. Siguiendo con OPS-01 (resto), QA-01
+(resto), PERF-01 (paginación) y TECH-01 (headers) en el mismo espíritu: todo lo técnico primero,
+sin frenar a pedir confirmación.
+
 ## Reglas a mantener
 - Nunca tocar lógica médica sin avisar y esperar aprobación.
 - Rama + PR por cada item, nunca push directo a `main`.

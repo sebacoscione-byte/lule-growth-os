@@ -2,13 +2,19 @@ import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { getServiceDb } from "@/lib/supabase/service"
 import { getConnectionInfo } from "@/lib/google-business"
+import { parseJsonBody } from "@/lib/api-validation"
 
 export async function POST(req: NextRequest) {
   const userClient = await createClient()
   const { data: { user } } = await userClient.auth.getUser()
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
-  const { accountName, accountId, locationId } = await req.json()
+  const parsedBody = await parseJsonBody(req)
+  if (!parsedBody.ok) return NextResponse.json({ error: parsedBody.error }, { status: 400 })
+
+  const { accountName, accountId, locationId } = parsedBody.data as {
+    accountName?: string; accountId?: string; locationId?: string
+  }
   const normalizedLocationId = String(locationId ?? "").trim().split("/").pop()
   const normalizedAccountId = String(accountId ?? "").trim().split("/").pop()
 

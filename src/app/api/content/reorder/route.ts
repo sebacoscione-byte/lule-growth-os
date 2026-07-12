@@ -1,13 +1,17 @@
 import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { readContentItems, writeContentItems, moveItemInQueue } from "@/lib/content-pipeline"
+import { parseJsonBody } from "@/lib/api-validation"
 
 export async function POST(request: Request) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
-  const { itemId, direction } = await request.json() as { itemId?: string; direction?: "up" | "down" }
+  const parsedBody = await parseJsonBody(request)
+  if (!parsedBody.ok) return NextResponse.json({ error: parsedBody.error }, { status: 400 })
+
+  const { itemId, direction } = parsedBody.data as { itemId?: string; direction?: "up" | "down" }
   if (!itemId || (direction !== "up" && direction !== "down")) {
     return NextResponse.json({ error: "itemId y direction (\"up\"/\"down\") son requeridos" }, { status: 400 })
   }

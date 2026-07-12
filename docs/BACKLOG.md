@@ -106,7 +106,7 @@ deliberado: primero integridad de WhatsApp y datos de pacientes; luego medición
   - **Aceptación cumplida**: el comportamiento (sin consentimiento = sin GA) ya coincide con lo que
     describe `/privacidad` → "Cookies y analítica" (actualizada en el mismo cambio).
 
-- [ ] **SEC-01 — Validación uniforme de APIs y rate limit distribuido.** ⏳ Parcial (2026-07-12)
+- [x] **SEC-01 — Validación uniforme de APIs y rate limit distribuido.** ✅ Resuelto (2026-07-12)
   - [x] Rate limit distribuido: `src/lib/rate-limit.ts` ya no usa un `Map` en memoria (se reseteaba
     por instancia serverless, así que el límite real era `maxRequests × instancias activas`, no
     `maxRequests`). Ahora pega a Postgres vía RPC `check_rate_limit` (migración
@@ -135,14 +135,48 @@ deliberado: primero integridad de WhatsApp y datos de pacientes; luego medición
       públicas): JSON inválido, campo faltante, enum inválido y campo demasiado largo devuelven
       `400` con el mensaje esperado. No se probó el camino exitoso en vivo a propósito, para no
       insertar un lead/evento de prueba en la base de producción real.
-  - [ ] **Pendiente real**: el resto de las rutas (`/api/leads`, `/api/content/*`,
-    `/api/whatsapp/*`, `/api/google-business/*`, `/api/instagram-business/*`, etc.) — todas
-    requieren sesión, así que el riesgo es menor que el de las dos públicas ya resueltas, pero
-    sigue siendo un esfuerzo grande y transversal (decenas de rutas) que conviene abordar aparte,
-    con revisión individual de cada una.
-  - **Aceptación parcial cumplida**: el límite de abuso se mantiene entre instancias, y las dos
-    rutas públicas sin sesión ya validan tipo/longitud y no reenvían errores de Supabase. Falta
-    extender esto al resto de las rutas para la aceptación completa.
+  - [x] **Extendido a las rutas autenticadas (2026-07-12, tercer incremento)** — recorridas las
+    ~24 rutas de `src/app/api/**` que parsean un body JSON. Criterio aplicado: si la ruta ya tenía
+    validación manual sólida (enums + límites de longitud) y estaba envuelta en `try/catch` — ej.
+    `content/items`, `content/visual`, `content/alt-text`, `content/image-direction`,
+    `content/route`, `instagram-business/publish` — se dejó como estaba, para no arriesgar una
+    regresión reescribiendo lógica ya extensa y probada por el uso real. Se corrigieron los
+    gaps reales:
+    - **Mass assignment real encontrado en `/api/experiments` y `/api/experiments/[id]`**: el
+      `POST` hacía `insert([body])` y el `PATCH` `update(body)` **sin ningún filtro de campos** —
+      peor que el caso de `/api/leads`, que al menos ya tenía un allowlist manual. Un request
+      armado a mano podía pisar `id`/`created_at`/`channel` de un experimento. Corregido con
+      schemas de zod que además funcionan como allowlist (el `PATCH` ahora solo acepta
+      `result`/`winner`, que es lo único que la UI de `/experimentos` envía).
+    - **`/api/leads` (POST) y `/api/leads/[id]` (PATCH)**: mismo problema que ya se había resuelto
+      en `/api/public/lead` — sin validación de tipo/longitud/enum. Ahora comparten
+      `src/lib/lead-schema.ts` (un único schema de zod, reusado entre alta y edición) con los
+      mismos enums exactos de `src/types/index.ts`.
+    - **`/api/whatsapp/templates/[id]`**: el `status` de un template podía ser cualquier string —
+      ahora valida contra el enum real del check constraint de `templates` en `docs/schema.sql`.
+    - **`/api/checklist` (PATCH)**: `item_key` no se validaba contra los 14 items reales
+      sembrados en la base — un valor inventado creaba una fila nueva que ninguna pantalla sabe
+      interpretar y desalineaba el conteo de progreso del checklist. Ahora valida contra la lista
+      real.
+    - **`/api/messages`, `/api/classify`, `/api/followup`, `/api/ai/suggest`**: no validaban tipo
+      ni longitud de `lead_id`/`content`/`message` antes de esto — ninguno toca lógica médica o
+      guardrails, solo el enrutamiento/clasificación de contacto.
+    - **Resto de rutas ya validadas a mano** (`google-business/profile`, `select-location`,
+      `posts`, `reviews/[reviewId]/reply`, `content/reorder`, `content/publish-now`,
+      `content/upload-image`, `whatsapp/pricing/[id]`, `config`): el gap real en todas era que
+      `request.json()` no estaba protegido — un JSON inválido tiraba una excepción no controlada
+      (crash a una respuesta genérica de Next) en vez de un `400` claro. Envueltas con el mismo
+      helper `parseJsonBody` que ya usaban las rutas públicas; se agregaron también topes de
+      longitud puntuales donde el texto viaja a una API externa de pago (Google Business Profile).
+  - **Aceptación parcial cumplida**: el límite de abuso se mantiene entre instancias, las dos
+    rutas públicas sin sesión y ahora también las rutas autenticadas de mayor uso real (leads,
+    experimentos, WhatsApp admin, Google Business, mensajería) validan tipo/longitud/enum y no
+    revientan con una excepción no controlada ante un JSON malformado. **Pendiente real**: quedan
+    sin tocar `/api/instagram-business/auth`, `/callback`, `/disconnect`, `/status`,
+    `/api/google-business/auth`, `/callback`, `/disconnect`, `/locations`, `/status` (todas
+    GET/OAuth por query params, no reciben body JSON del cliente) y las rutas de contenido que ya
+    tenían validación propia sólida (mencionadas arriba) — revisión completa, no queda ninguna
+    ruta genuinamente sin analizar.
 
 - [x] **SEC-02 — Export CSV segura.** ✅ Resuelto (2026-07-11)
   - `src/lib/csv.ts` (`neutralizeCsvFormula`/`escapeCsvCell`, con tests) antepone una comilla

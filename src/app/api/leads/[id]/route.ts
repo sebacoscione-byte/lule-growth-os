@@ -1,5 +1,7 @@
 import { createClient } from "@/lib/supabase/server"
 import { NextResponse } from "next/server"
+import { parseJsonBody, formatZodError } from "@/lib/api-validation"
+import { leadFieldsSchema } from "@/lib/lead-schema"
 
 async function getAuthedClient() {
   const supabase = await createClient()
@@ -34,12 +36,23 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   if (!supabase) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
   const { id } = await params
-  const body = await request.json()
+  const parsedBody = await parseJsonBody(request)
+  if (!parsedBody.ok) return NextResponse.json({ error: parsedBody.error }, { status: 400 })
 
-  const update: Record<string, unknown> = {}
-  for (const key of Object.keys(body)) {
-    if (PATCHABLE_FIELDS.has(key)) update[key] = body[key]
+  if (typeof parsedBody.data !== "object" || parsedBody.data === null) {
+    return NextResponse.json({ error: "El body debe ser un objeto JSON" }, { status: 400 })
   }
+  const rawBody = parsedBody.data as Record<string, unknown>
+  const candidate: Record<string, unknown> = {}
+  for (const key of Object.keys(rawBody)) {
+    if (PATCHABLE_FIELDS.has(key)) candidate[key] = rawBody[key]
+  }
+
+  const result = leadFieldsSchema.partial().safeParse(candidate)
+  if (!result.success) {
+    return NextResponse.json({ error: formatZodError(result.error) }, { status: 400 })
+  }
+  const update: Record<string, unknown> = { ...result.data }
 
   // Auto-set followup_due_at when transitioning to seguimiento_pendiente without explicit date
   if (update.status === "seguimiento_pendiente" && !update.followup_due_at) {

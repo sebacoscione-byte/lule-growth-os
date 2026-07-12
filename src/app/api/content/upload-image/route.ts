@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { getServiceDb } from "@/lib/supabase/service"
+import { parseJsonBody } from "@/lib/api-validation"
 
 const MAX_BYTES = 8 * 1024 * 1024
 const EXTENSION_BY_MIME: Record<string, string> = {
@@ -14,7 +15,10 @@ export async function POST(request: Request) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
-  const body = await request.json() as { itemId?: string; imageDataUrl?: string }
+  const parsedBody = await parseJsonBody(request)
+  if (!parsedBody.ok) return NextResponse.json({ error: parsedBody.error }, { status: 400 })
+
+  const body = parsedBody.data as { itemId?: string; imageDataUrl?: string }
   if (!body.itemId || typeof body.imageDataUrl !== "string") {
     return NextResponse.json({ error: "Falta la imagen o el id de la pieza." }, { status: 400 })
   }

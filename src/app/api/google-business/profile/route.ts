@@ -6,6 +6,7 @@ import {
   updateDescription, updateWebsite, updatePhone, updateHours,
   type HourPeriod
 } from "@/lib/google-business"
+import { parseJsonBody } from "@/lib/api-validation"
 
 async function requireAuth() {
   const userClient = await createClient()
@@ -34,11 +35,26 @@ export async function GET() {
 export async function PATCH(req: NextRequest) {
   if (!await requireAuth()) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
-  const body = await req.json() as {
+  const parsedBody = await parseJsonBody(req)
+  if (!parsedBody.ok) return NextResponse.json({ error: parsedBody.error }, { status: 400 })
+
+  const body = parsedBody.data as {
     description?: string
     websiteUri?: string
     primaryPhone?: string
     hours?: HourPeriod[]
+  }
+  if (body.description !== undefined && (typeof body.description !== "string" || body.description.length > 1500)) {
+    return NextResponse.json({ error: "description inválida (máx. 1500 caracteres)" }, { status: 400 })
+  }
+  if (body.websiteUri !== undefined && (typeof body.websiteUri !== "string" || body.websiteUri.length > 2000)) {
+    return NextResponse.json({ error: "websiteUri inválido" }, { status: 400 })
+  }
+  if (body.primaryPhone !== undefined && (typeof body.primaryPhone !== "string" || body.primaryPhone.length > 40)) {
+    return NextResponse.json({ error: "primaryPhone inválido" }, { status: 400 })
+  }
+  if (body.hours !== undefined && !Array.isArray(body.hours)) {
+    return NextResponse.json({ error: "hours inválido" }, { status: 400 })
   }
 
   const supabase = getServiceDb()

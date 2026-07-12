@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { getServiceDb } from "@/lib/supabase/service"
 import { getValidToken, getConnectionInfo, listPosts, createGoogleBusinessPost } from "@/lib/google-business"
+import { parseJsonBody } from "@/lib/api-validation"
 
 async function requireAuth() {
   const userClient = await createClient()
@@ -33,8 +34,13 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   if (!await requireAuth()) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
-  const { summary } = await req.json() as { summary: string }
-  if (!summary?.trim()) return NextResponse.json({ error: "summary required" }, { status: 400 })
+  const parsedBody = await parseJsonBody(req)
+  if (!parsedBody.ok) return NextResponse.json({ error: parsedBody.error }, { status: 400 })
+
+  const { summary } = parsedBody.data as { summary?: string }
+  if (typeof summary !== "string" || !summary.trim() || summary.length > 1500) {
+    return NextResponse.json({ error: "summary required (máx. 1500 caracteres)" }, { status: 400 })
+  }
 
   const supabase = getServiceDb()
   try {

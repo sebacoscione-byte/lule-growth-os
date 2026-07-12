@@ -1,5 +1,16 @@
 import { createClient } from "@/lib/supabase/server"
 import { NextResponse } from "next/server"
+import { z } from "zod"
+import { parseJsonBody, formatZodError } from "@/lib/api-validation"
+
+// La UI (experimentos/page.tsx) solo actualiza el resultado de un experimento ya creado — se
+// mantiene como allowlist estricta en vez de aceptar el body entero (antes hacía
+// `.update(body)` sin ningún filtro, permitiendo pisar cualquier columna incluida `channel` o
+// `created_at` con un request armado a mano).
+const updateResultSchema = z.object({
+  result: z.string().trim().max(2000).optional().nullable(),
+  winner: z.boolean().optional().nullable(),
+})
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -7,10 +18,17 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
-  const body = await request.json()
+  const parsedBody = await parseJsonBody(request)
+  if (!parsedBody.ok) return NextResponse.json({ error: parsedBody.error }, { status: 400 })
+
+  const result = updateResultSchema.safeParse(parsedBody.data)
+  if (!result.success) {
+    return NextResponse.json({ error: formatZodError(result.error) }, { status: 400 })
+  }
+
   const { data, error } = await supabase
     .from("growth_experiments")
-    .update(body)
+    .update(result.data)
     .eq("id", id)
     .select()
     .single()

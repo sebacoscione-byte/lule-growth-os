@@ -1,6 +1,8 @@
 import { createClient } from "@/lib/supabase/server"
 import { NextResponse } from "next/server"
 import { sanitizePostgrestValue } from "@/lib/utils"
+import { parseJsonBody, formatZodError } from "@/lib/api-validation"
+import { leadFieldsSchema } from "@/lib/lead-schema"
 
 export async function GET(request: Request) {
   const supabase = await createClient()
@@ -40,7 +42,14 @@ export async function POST(request: Request) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
-  const body = await request.json()
+  const parsedBody = await parseJsonBody(request)
+  if (!parsedBody.ok) return NextResponse.json({ error: parsedBody.error }, { status: 400 })
+
+  const result = leadFieldsSchema.safeParse(parsedBody.data)
+  if (!result.success) {
+    return NextResponse.json({ error: formatZodError(result.error) }, { status: 400 })
+  }
+  const body = result.data
 
   const allowed = {
     name: body.name ?? null,
