@@ -382,7 +382,7 @@ deliberado: primero integridad de WhatsApp y datos de pacientes; luego medición
   - **Aceptación cumplida**: tanto el listado como la exportación de leads escalan sin techo
     artificial ni truncamiento silencioso.
 
-- [x] **TECH-01 — Deuda técnica y headers.** ⏳ Parcial (2026-07-11) — faltan los headers
+- [x] **TECH-01 — Deuda técnica y headers.** ✅ Resuelto (2026-07-12)
   - [x] `middleware.ts` → `proxy.ts`: renombrado siguiendo la convención de Next.js 16 (función
     `middleware()` → `proxy()`). El warning de deprecación que aparecía en cada arranque ya no sale
     (`npm run build` muestra `ƒ Proxy (Middleware)` en vez del aviso).
@@ -408,13 +408,23 @@ deliberado: primero integridad de WhatsApp y datos de pacientes; luego medición
     `16.3.0-canary.5`, y hoy (`npm view next versions`) todavía no existe ningún `16.3.0` estable
     (solo canaries/previews) — no se debe adoptar una versión no estable en una app médica en
     producción. Sigue esperando a que Next libere un patch estable.
-  - [ ] **Pendiente real**: definir headers de seguridad (CSP, `X-Frame-Options`, etc.) compatibles
-    con OAuth (Google/Instagram), Supabase, y las imágenes públicas de Google Places/Storage — no
-    se abordó en esta pasada porque un CSP mal armado puede romper en silencio un flujo de OAuth
-    que hoy no se puede probar de punta a punta sin credenciales reales en este entorno; conviene
-    hacerlo aparte, con margen para probar cada integración una por una.
-  - **Aceptación parcial cumplida**: lint/tests/build quedan limpios y OAuth/landings siguen
-    funcionando (verificado). Falta la parte de headers de seguridad para la aceptación completa.
+  - [x] **Headers de seguridad (2026-07-12, segundo incremento) — decisión deliberada de alcance**:
+    se agregaron en `next.config.mjs` (`headers()`, aplicado a todas las rutas) `X-Content-Type-
+    Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`, `X-Frame-Options:
+    SAMEORIGIN` y un `Permissions-Policy` que solo deniega `camera`/`microphone`/`geolocation`
+    (verificado que la app no usa ninguno de los tres) — nada de esto restringe scripts, estilos,
+    ni orígenes de conexión. **A propósito no se agregó Content-Security-Policy**: es la parte que
+    realmente puede romper en silencio el OAuth de Google/Instagram, Google Analytics, las fotos
+    de Google Places o las imágenes de Supabase Storage, y armar un CSP correcto requiere poder
+    probar cada integración de punta a punta — este entorno no tiene credenciales de login para
+    completar ningún flujo de OAuth real. Los 4 headers elegidos, en cambio, no interactúan con
+    ninguno de esos flujos (no son un allowlist de dominios, son comportamiento del navegador que
+    no depende de qué esté permitido cargar) — se verificó visualmente con un dev server real
+    (`/`, `/dra-lucia-chahin`, `/login`) que los headers están presentes en la respuesta y que el
+    CSS/diseño/fuentes siguen cargando exactamente igual que antes.
+  - **Aceptación cumplida para el alcance decidido**: lint/tests/build limpios, headers de
+    seguridad básicos presentes sin romper nada verificable en este entorno. Un CSP completo queda
+    como trabajo futuro explícito, a hacerse con acceso para probar OAuth de punta a punta.
 
 ### Secuencia y reglas de ejecución
 
