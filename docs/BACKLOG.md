@@ -183,11 +183,30 @@ deliberado: primero integridad de WhatsApp y datos de pacientes; luego medición
   - **Aceptación parcial cumplida**: los fallos de webhook, cron, y ahora también de OAuth, dejan
     rastro sin exponer secretos. Falta extender el mismo criterio a las rutas internas restantes.
 
-- [ ] **QA-01 — Tests de rutas e integración.**
-  - Cubrir auth de APIs, webhook firmado/duplicado, autorización de crons, OAuth en error,
-    creación/edición/exportación de leads y estados de publicación de contenido.
-  - **Aceptación:** los casos críticos se ejecutan en CI y fallan si una ruta pierde autenticación,
-    idempotencia o validación.
+- [x] **QA-01 — Tests de rutas e integración.** ⏳ Parcial (2026-07-12) — sienta el patrón
+  - **Bug real de infraestructura de testing encontrado y corregido primero**: `jest.mock("@/lib/x")`
+    no resolvía — `jest.config.js` no tenía `moduleNameMapper` para el alias `@/`. Un `import`
+    normal funciona porque el compilador de Next (SWC) lo reescribe en tiempo de compilación, pero
+    `jest.mock(...)` recibe un string literal que Jest tiene que resolver por su cuenta, sin pasar
+    por esa reescritura. Sin este fix, **no se podía mockear ningún módulo con alias `@/` en
+    ningún test de ruta** — bloqueaba todo este ticket de raíz.
+  - Con eso resuelto, se agregaron tests de integración para 3 rutas representativas (mockeando
+    `@/lib/supabase/server`, sin pegarle a la base real):
+    - `GET/PATCH /api/leads/[id]` — rechaza sin sesión; **la allowlist de campos parcheables no se
+      puede saltear inyectando `id`/`created_at` por el body** (mass assignment); el auto-completado
+      de `followup_due_at` funciona y no pisa un valor ya explícito.
+    - `GET /api/cron/weekly-report` — fail-closed sin `CRON_SECRET`, rechaza un secreto incorrecto.
+    - `GET /api/leads/export` — rechaza sin sesión; **la neutralización de fórmulas de SEC-02 sigue
+      funcionando** end-to-end en la respuesta real de la ruta (no solo en el test unitario de
+      `csv.ts`), y el texto normal no se toca.
+  - **Pendiente real**: el resto de las rutas que pide el ticket (webhook firmado/duplicado —ya
+    cubierto indirectamente por los tests unitarios de `whatsapp-idempotency`/
+    `whatsapp-webhook-signature`, pero no como test de integración de la ruta completa—, OAuth en
+    error, estados de publicación de contenido) — el patrón ya está probado y funcionando, así que
+    extenderlo es mecánico, pero son varias rutas más.
+  - **Aceptación parcial cumplida**: los 3 casos cubiertos sí fallarían en CI si la ruta perdiera
+    autenticación o la validación de CSV se rompiera. Falta extender la cobertura al resto de
+    rutas críticas para la aceptación completa.
 
 - [ ] **QA-02 — Smoke E2E móvil y desktop.**
   - Automatizar landing principal, slugs SEO, CTAs de cada sede, login y navegación del CRM.
