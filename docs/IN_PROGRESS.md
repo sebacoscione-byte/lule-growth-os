@@ -46,7 +46,12 @@ pedir confirmación, salvo que toque lógica médica — ver CLAUDE.md).
   callbacks de OAuth (Google Business, Instagram). Se investigó y descartó una sospecha de bug de
   UX en `/google-local`/`/contenido/instagram` (ya manejan los errores de OAuth correctamente).
   Falta estandarizar logs en el resto de rutas internas.
-- [ ] **QA-01** — Tests de integración de rutas clave (auth, webhook, cron, exportación).
+- [x] **QA-01 (parcial)** — Corregido primero un bug real que bloqueaba todo el ticket:
+  `jest.config.js` no tenía `moduleNameMapper` para `@/`, así que `jest.mock("@/lib/x")` no
+  resolvía nunca. Con eso arreglado, se agregó el patrón de test de integración de rutas
+  (mockeando `@/lib/supabase/server`) en 3 rutas de referencia: `leads/[id]` (auth + allowlist
+  anti mass-assignment), `cron/weekly-report` (fail-closed), `leads/export` (auth + SEC-02
+  end-to-end). Falta extender a más rutas — el patrón ya funciona, es mecánico.
 - [ ] **QA-02** — Smoke E2E (evaluar si vale la pena sumar Playwright dado el alcance del proyecto).
 - [ ] **GROWTH-01** — Evaluar si hay un camino real y acotado (ej. propagar un id de tracking vía
   el link de WhatsApp) antes de construir nada; si no, documentar por qué sigue bloqueado.
@@ -54,10 +59,11 @@ pedir confirmación, salvo que toque lógica médica — ver CLAUDE.md).
 ## Continuación (2026-07-12, misma sesión)
 
 Tras el cierre de más abajo, el usuario pidió seguir varias veces. Se sumaron SEC-01 (parcial #2,
-validación con `zod` en las dos rutas públicas sin sesión) y OPS-01 (parcial, logging en los
-callbacks de OAuth). Sigue en pie la misma decisión de no encarar QA-01/QA-02/GROWTH-01/el resto
-de SEC-01/OPS-01 en esta sesión — son esfuerzos grandes y transversales o requieren una decisión
-de producto/legal previa.
+validación con `zod` en las dos rutas públicas sin sesión), OPS-01 (parcial, logging en los
+callbacks de OAuth) y QA-01 (parcial, patrón de tests de integración de rutas — encontró y
+corrigió un bug real en `jest.config.js` que bloqueaba esto de raíz). Sigue en pie la misma
+decisión de no encarar QA-02/GROWTH-01/el resto de SEC-01/OPS-01/QA-01 en esta sesión — son
+esfuerzos grandes y transversales o requieren una decisión de producto/legal previa.
 
 ## Cierre de esta sesión (2026-07-12)
 
