@@ -32,19 +32,28 @@ en lenguaje llano:
 
 ## 3. Terceros que reciben datos
 
-| Proveedor | Qué recibe | Para qué |
-|---|---|---|
-| Meta (WhatsApp Business Platform) | Mensajes de WhatsApp completos | Enviar/recibir mensajes |
-| Anthropic (Claude) y/o Google (Gemini) | El texto del mensaje del paciente | Clasificar el motivo de consulta, sugerir respuestas — no toman decisiones médicas |
-| Supabase | Toda la base de datos de la app | Almacenamiento |
-| Vercel | — (aloja la app) | Hosting |
-| Google Analytics (opcional, opt-in) | Navegación agregada, sin nombre/teléfono | Medir visitas |
+| Proveedor | Qué recibe | Para qué | ¿Procesa fuera de Argentina? |
+|---|---|---|---|
+| Meta (WhatsApp Business Platform) | Mensajes de WhatsApp completos | Enviar/recibir mensajes | Sí (EE.UU./infraestructura global de Meta) |
+| Anthropic (Claude) y/o Google (Gemini) | El texto del mensaje del paciente | Clasificar el motivo de consulta, sugerir respuestas — no toman decisiones médicas | Sí (EE.UU.) |
+| Supabase | Toda la base de datos de la app | Almacenamiento | Sí (el proyecto usa una región de EE.UU./AWS) |
+| Vercel | — (aloja la app) | Hosting | Sí (EE.UU./red global) |
+| Google Analytics (opcional, opt-in) | Navegación agregada, sin nombre/teléfono | Medir visitas | Sí (EE.UU.) |
 
-**Pregunta para el abogado**: ¿esta lista y estas descripciones alcanzan como aviso de terceros
-bajo la normativa aplicable (Ley 25.326 de Protección de Datos Personales + cualquier
-consideración especial por tratarse de datos de salud), o falta algo (ej. cláusulas de
-transferencia internacional, dado que varios de estos proveedores procesan datos fuera de
-Argentina)?
+**Pregunta para el abogado (aviso de terceros)**: ¿esta lista y estas descripciones alcanzan como
+aviso de terceros bajo la Ley 25.326 de Protección de Datos Personales, considerando que se trata
+de datos de salud?
+
+**Pregunta para el abogado (transferencia internacional)**: la Ley 25.326 (art. 12) restringe
+transferir datos personales a países que no tengan un nivel de protección "adecuado" — y **los 5
+proveedores de arriba procesan datos fuera de Argentina**. ¿Hace falta una cláusula específica de
+transferencia internacional en `/privacidad`, o algún mecanismo adicional (ej. cláusulas
+contractuales tipo) para que esto sea válido tratándose de datos de salud?
+
+**Pregunta para el abogado (acuerdos de tratamiento de datos)**: ¿conviene que Seba consiga y
+guarde un Data Processing Agreement (DPA) firmado o aceptado de cada proveedor (Meta, Anthropic,
+Google, Supabase, Vercel) — la mayoría los ofrece como parte de sus términos estándar — o alcanza
+con la descripción de `/privacidad` sin un documento adicional por proveedor?
 
 ## 4. Política de retención (implementada 2026-07-12, DATA-02)
 
@@ -76,18 +85,52 @@ la de Google Analytics, o alcanzaría con un aviso informativo sin bloquear la c
 respuesta es "no hace falta pedir consentimiento", se puede relajar el opt-in actual — mientras
 tanto se mantiene la versión más cuidadosa.
 
-## 6. Lo que la app garantiza no hacer (guardrails ya implementados, no depende de esta revisión)
+## 6. Texto de consentimiento en el primer contacto por WhatsApp
+
+Antes de registrar cualquier dato, el bot le muestra este texto exacto al paciente y espera que
+conteste que sí (o continúa si ya había aceptado antes):
+
+> "Para ayudarte, podemos registrar tus datos de contacto, cobertura médica y motivo de consulta.
+> No reemplaza una consulta médica. ¿Aceptás continuar?"
+
+Si el paciente contesta algo como "no acepto"/"no quiero"/"no autorizo", no se registra nada y se
+lo aclara explícitamente. Queda guardado (fecha, versión del texto, si aceptó o no) en
+`consent_records` — ver `src/lib/whatsapp-consent.ts`.
+
+**Pregunta para el abogado**: ¿este texto alcanza como consentimiento informado válido para
+recolectar datos de salud (motivo de consulta), o hace falta un texto más específico (ej.
+mencionar explícitamente "datos de salud", los terceros involucrados, o el derecho a retirar el
+consentimiento en cualquier momento)?
+
+## 7. Menores de edad — hoy sin ningún tratamiento especial
+
+El bot pregunta la edad del paciente como parte de la conversación (para saber si aplica algún
+criterio clínico), pero **no hay ninguna lógica distinta si la persona que escribe es menor de
+edad** — ni un aviso adicional, ni un pedido de que sea un adulto responsable quien continúe la
+conversación. Es una laguna real, no una decisión tomada a propósito.
+
+**Pregunta para el abogado**: ¿hace falta algún tratamiento especial (aviso, derivación directa a
+un adulto responsable, restricción de qué se pregunta) cuando la edad informada es menor a 18
+años, tratándose de datos de salud por WhatsApp? Si la respuesta es sí, es una decisión de
+producto que hay que diseñar aparte — no algo para resolver solo en el texto de `/privacidad`.
+
+## 8. Lo que la app garantiza no hacer (guardrails ya implementados, no depende de esta revisión)
 
 - No da diagnósticos ni interpreta estudios.
 - No confirma turnos ni disponibilidad.
 - No usa los datos de salud para ningún fin comercial ni los publica.
-- Ante un síntoma de alarma, siempre deriva a que el paciente llame al 107 o vaya a una guardia
-  (lógica determinística en `src/lib/medical-safety.ts`, no depende de IA).
+- Ante un síntoma de alarma, siempre deriva a que el paciente llame al **107 (SAME)** o vaya a una
+  guardia (lógica determinística en `src/lib/medical-safety.ts`, no depende de IA). *Corregido el
+  2026-07-12: el bot decía 911 en este mensaje puntual mientras el resto del sitio ya decía 107 —
+  quedaron unificados en 107, el número del sistema de emergencias médicas de CABA y provincia de
+  Buenos Aires, donde están las 3 sedes.*
 
-## 7. Qué falta después de esta revisión
+## 9. Qué falta después de esta revisión
 
 1. Confirmar o ajustar el texto de `/privacidad` según la respuesta del abogado a las preguntas de
-   los puntos 3-5.
-2. Sacar el aviso de "borrador" de la página una vez confirmado.
-3. Si corresponde, cargar `https://draluciachahin.ar/privacidad` como Privacy Policy URL en el
+   los puntos 3, 4, 5, 6 y 7.
+2. Si corresponde, decidir y diseñar un tratamiento especial para menores de edad (punto 7) —
+   requiere una decisión de producto, no solo de texto legal.
+3. Sacar el aviso de "borrador" de la página una vez confirmado.
+4. Si corresponde, cargar `https://draluciachahin.ar/privacidad` como Privacy Policy URL en el
    Meta Developer Console (solo urgente si se saca la app de Instagram del modo desarrollo).
