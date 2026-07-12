@@ -184,6 +184,18 @@ ensuciaría el mensaje). GROWTH-01 queda resuelto.
 
 Siguiente: revisión legal de DATA-01/03 (preparar material, no algo que se resuelva en el chat).
 
+Cerramos con **DATA-01/03**: preparado `docs/REVISION_LEGAL_PRIVACIDAD.md`, un resumen para
+mandarle a un asesor legal con las preguntas concretas (terceros/transferencia internacional,
+si los plazos de retención de DATA-02 son razonables, si hace falta pedir consentimiento de
+analítica). De paso, encontré que la sección de retención de `/privacidad` había quedado
+desactualizada apenas se implementó DATA-02 el mismo día ("hoy no tenemos plazo automático" ya no
+era cierto) — corregida antes de armar el material, para no mandarle al abogado un texto que ya
+no describe lo que la app hace de verdad.
+
+Con esto, los 4 pendientes ordenados de más fácil a más difícil quedaron resueltos en la medida de
+lo posible: DATA-02 (implementado), QA-02 (parcial, según el propio criterio del usuario), GROWTH-01
+(implementado), DATA-01/03 (material preparado — la revisión en sí la tiene que hacer un abogado).
+
 ## Reglas a mantener
 - Nunca tocar lógica médica sin avisar y esperar aprobación.
 - Rama + PR por cada item, nunca push directo a `main`.
