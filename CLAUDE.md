@@ -395,6 +395,58 @@ normal sí funciona porque Next lo reescribe en compilación, pero `jest.mock()`
 literal que Jest debe resolver por su cuenta). Ya está configurado; tenerlo en cuenta si algún día
 se toca ese archivo.
 
+### Tests E2E (Playwright) — QA-01/QA-02 (2026-07-12)
+
+`npm run test:e2e` corre **Playwright** contra un server real (no simula el navegador como Jest).
+Viven en `e2e/`, separados en dos proyectos.
+
+**Dos bugs reales de infraestructura encontrados y corregidos al sumar esto** (más allá de la
+flakiness de `next dev` de abajo):
+1. Jest matchea `*.spec.ts` por default — sin excluir `e2e/`, `npm test` intentaba correr los
+   specs de Playwright y fallaba con "Playwright Test needs to be invoked via 'npx playwright
+   test'". Agregado `<rootDir>/e2e/` a `testPathIgnorePatterns` en `jest.config.js`.
+2. El test de `/login` con credenciales inválidas pega a la API real de Supabase Auth (GoTrue) —
+   corriéndolo varias veces seguidas en poco tiempo (como se hizo para verificar esto), Supabase
+   aplica un throttle anti fuerza-bruta que demora la respuesta bastante más que el timeout
+   default de Playwright (5s) — el botón seguía "disabled" (esperando la respuesta) cuando el test
+   fallaba por timeout. Ese caso puntual usa un timeout de 20s en vez de bajar la exigencia del
+   test.
+
+- **`public`** (`e2e/public/*.spec.ts`): landing principal, las 6 landings SEO, `/login`
+  (validación de campos vacíos + error real de Supabase con credenciales inválidas) y que las
+  rutas del CRM redirigen a `/login` sin sesión. **No necesitan ninguna credencial** — corren y
+  pasan solas. Verificados con `npm run test:e2e:public` contra un build de producción real
+  (`npm run build && npm run start`), 18/18 ok.
+- **`authenticated`** (`e2e/authenticated/*.spec.ts`): dashboard, crear/editar/buscar un lead,
+  abrir una conversación del inbox. Requieren un usuario de prueba dedicado (`E2E_TEST_EMAIL`/
+  `E2E_TEST_PASSWORD` en `.env.local` — **nunca la cuenta real de Lucía o de Seba**, crear un
+  usuario nuevo en Supabase Auth solo para esto). `e2e/authenticated/auth.setup.ts` hace login una
+  vez y guarda la sesión en `e2e/.auth/user.json` (gitignored) para reusarla en el resto de los
+  tests de ese proyecto. **Sin esas variables, `auth.setup.ts` se salta solo y todos los tests
+  autenticados se reportan como "skipped"** (no como fallidos) — así no rompen un `npm run
+  test:e2e` corrido sin el usuario de prueba configurado.
+  - **Escritos pero sin verificar corriendo en este entorno** (no hay credenciales de prueba
+    disponibles acá) — a diferencia de todo el resto de tests de este proyecto, que sí se
+    verificaron pasando de verdad. No dar QA-02 por completamente cerrado hasta que alguien los
+    corra con un usuario de prueba real al menos una vez y confirme que pasan.
+  - El test de leads crea un lead real con nombre `E2E TEST — ...` y lo borra al final con el
+    mismo botón "Eliminar datos de este paciente" de DATA-02 (maneja el `window.confirm()` nativo
+    del botón) — si el test se corta a mitad de camino, ese lead de prueba puede quedar sin
+    borrar; buscarlo por ese prefijo en `/leads` y borrarlo a mano si pasa.
+- **Importante sobre modo dev**: correr `npm run test:e2e` contra `next dev` (Turbopack) con
+  varios workers en paralelo puede dar **falsos negativos** — el compilado on-demand de una ruta
+  recién visitada bajo carga concurrente tira `SyntaxError: Unexpected end of JSON input` /
+  `ECONNRESET` transitorios (confirmado en esta sesión: mismo test, mismo código, 3 fallos contra
+  `next dev` con 8 workers, 0 fallos contra `next dev` con `--workers=1`, y 0 fallos contra un
+  build de producción real con 8 workers). Para resultados confiables: correr contra
+  `npm run build && npm run start` (recomendado, así corre CI), o agregar `--workers=1` si hace
+  falta probar contra `next dev`.
+- Comandos: `npm run test:e2e` (todo), `npm run test:e2e:public` (solo lo que no necesita sesión),
+  `npm run test:e2e:ui` (modo interactivo de Playwright, útil para debuggear un test que falla).
+- **Pendiente real**: correr los tests autenticados con un usuario de prueba real al menos una vez
+  (dejar de ser "escritos, sin correr" para pasar a "verificados"), y configurar que corran en
+  CI/GitHub Actions con esas credenciales como secret.
+
 ## Comandos útiles
 ```bash
 # Build

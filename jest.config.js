@@ -12,7 +12,9 @@ const customJestConfig = {
   moduleNameMapper: {
     "^@/(.*)$": "<rootDir>/src/$1",
   },
-  testPathIgnorePatterns: ["<rootDir>/.next/", "<rootDir>/node_modules/"],
+  // /e2e usa Playwright (*.spec.ts), no Jest -- Jest matchea *.spec.ts por default y sin este
+  // ignore intenta correrlos igual, chocando con el runner de Playwright (ver CLAUDE.md → Tests E2E).
+  testPathIgnorePatterns: ["<rootDir>/.next/", "<rootDir>/node_modules/", "<rootDir>/e2e/"],
 }
 
 module.exports = createJestConfig(customJestConfig)

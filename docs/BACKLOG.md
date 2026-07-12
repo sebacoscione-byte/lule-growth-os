@@ -302,10 +302,36 @@ deliberado: primero integridad de WhatsApp y datos de pacientes; luego medición
     ambos callbacks de OAuth— fallarían en CI si la ruta perdiera autenticación, dejara de
     deduplicar, la validación de CSV se rompiera, o el logging de un fallo de OAuth desapareciera.
 
-- [ ] **QA-02 — Smoke E2E móvil y desktop.**
-  - Automatizar landing principal, slugs SEO, CTAs de cada sede, login y navegación del CRM.
-  - Validar ausencia de errores de consola, foco de teclado y viewport móvil representativo.
-  - **Aceptación:** el smoke corre antes de mergear cambios de UI y conserva evidencia del resultado.
+- [x] **QA-02 — Smoke E2E móvil y desktop.** ⏳ Parcial (2026-07-12) — falta correr los tests autenticados con un usuario real
+  - Se sumó **Playwright** (`e2e/`, ver CLAUDE.md → "Tests E2E") en dos proyectos:
+    - **`public`** (sin sesión): landing principal, las 6 landings SEO, `/login` (validación de
+      campos vacíos + error real de Supabase con credenciales inválidas), y que las rutas del CRM
+      redirigen a `/login` sin sesión. **Verificado corriendo de verdad**: 18/18 pasando contra un
+      build de producción real (`npm run build && npm run start`).
+    - **`authenticated`** (dashboard, crear/editar/buscar un lead, abrir una conversación del
+      inbox): requiere un usuario de prueba dedicado (`E2E_TEST_EMAIL`/`E2E_TEST_PASSWORD`) que no
+      existe en este entorno — **escritos a partir de la lectura del código real, pero sin
+      verificar que corren**, a diferencia del resto. Se salta solo (reporta "skipped", no
+      "failed") si esas variables no están configuradas.
+  - **Bug real de infraestructura encontrado y corregido antes de dar por buena la cobertura
+    pública**: corriendo los tests contra `next dev` (Turbopack) con 8 workers en paralelo, 3 de
+    18 fallaban con `SyntaxError: Unexpected end of JSON input` / `ECONNRESET` — no eran bugs de
+    la app, era el compilado on-demand de Turbopack bajo carga concurrente (confirmado: mismo
+    código, 0 fallos con `--workers=1` contra `next dev`, y 0 fallos con 8 workers contra un build
+    de producción real). Documentado en CLAUDE.md para que una sesión futura no lo confunda con
+    una regresión real.
+  - **Otros dos bugs reales encontrados de paso**: Jest matchea `*.spec.ts` por default y sin
+    excluir `e2e/` intentaba correr los tests de Playwright (rompiendo `npm test` para todo el
+    resto del proyecto) — agregado a `testPathIgnorePatterns` en `jest.config.js`. Y el test de
+    `/login` con credenciales inválidas (pega a Supabase Auth real) fallaba por timeout al
+    correrlo varias veces seguidas — Supabase aplica un throttle anti fuerza-bruta que demora la
+    respuesta más de los 5s default de Playwright; ese caso puntual ahora usa 20s.
+  - **Pendiente real**: correr los tests `authenticated` con un usuario de prueba real al menos
+    una vez (no dar QA-02 por completamente cerrado hasta entonces), y configurar que corran en
+    CI/GitHub Actions con esas credenciales como secret.
+  - **Aceptación parcial cumplida**: el smoke público corre y pasa contra un build de producción,
+    con evidencia (reporte HTML de Playwright). Falta la verificación real del smoke autenticado
+    para la aceptación completa.
 
 - [x] **CRM-01 — Contexto reciente correcto en el inbox.** ✅ Resuelto (2026-07-11)
   - `src/app/api/ai/suggest/route.ts` (botón "Sugerir mensaje de seguimiento") pedía

@@ -157,6 +157,20 @@ resuelto — ver `docs/BACKLOG.md` para el detalle completo.
 Siguiente en la fila (de más fácil a más difícil, según lo acordado): QA-02 → GROWTH-01 → revisión
 legal de DATA-01/03.
 
+Seguimos con **QA-02**: el usuario eligió sumar Playwright con implementación progresiva (tests
+públicos verificables ahora + infraestructura y tests autenticados escritos pero pendientes de
+correr con un usuario de prueba real). Implementado: `e2e/public/*` (landing, 6 SEO, login,
+acceso no autorizado — 18/18 verificados contra un build de producción real) y
+`e2e/authenticated/*` (dashboard, leads, inbox — escritos a partir del código real, sin verificar
+corriendo, se saltan solos sin `E2E_TEST_EMAIL`/`E2E_TEST_PASSWORD`). Bug real de infraestructura
+encontrado: `next dev` con varios workers en paralelo da falsos negativos por carga concurrente de
+Turbopack (no es un bug de la app) — documentado en CLAUDE.md. El usuario mismo fijó el criterio
+de cierre: "no considerar QA-02 terminado hasta que los tests autenticados hayan corrido
+exitosamente al menos una vez en un entorno de prueba" — se respeta ese criterio, QA-02 queda
+parcial hasta que eso pase.
+
+Siguiente: GROWTH-01 → revisión legal de DATA-01/03.
+
 ## Reglas a mantener
 - Nunca tocar lógica médica sin avisar y esperar aprobación.
 - Rama + PR por cada item, nunca push directo a `main`.
