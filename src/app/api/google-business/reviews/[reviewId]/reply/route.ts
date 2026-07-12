@@ -34,6 +34,7 @@ export async function PUT(
     const data = await replyToReview(token, info.google_account_id, info.google_location_id, reviewId, comment)
     return NextResponse.json(data)
   } catch (e) {
+    console.error(`[google-business/reviews/reply] review=${reviewId}: ${String(e)}`)
     return NextResponse.json({ error: String(e) }, { status: 500 })
   }
 }

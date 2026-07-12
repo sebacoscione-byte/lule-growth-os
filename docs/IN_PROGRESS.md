@@ -102,6 +102,13 @@ zod no sumaba seguridad real, solo riesgo de regresión. Siguiendo con OPS-01 (r
 (resto), PERF-01 (paginación) y TECH-01 (headers) en el mismo espíritu: todo lo técnico primero,
 sin frenar a pedir confirmación.
 
+También se cerró **OPS-01 por completo**: `src/lib/content-publish.ts` (cron + "Publicar ahora")
+atrapaba el fallo de publicar en Instagram/Google Business con un `catch` completamente vacío, sin
+ningún rastro de la causa real. Corregido con `console.error` (item id, canal, mensaje — nunca
+tokens), mismo criterio extendido a `instagram-business/publish` y 6 rutas de `google-business/*`.
+Se investigó y no hizo falta tocar los fallos de IA: ya quedan en la tabla `ai_requests` desde
+antes de esta sesión. Siguiendo con QA-01 (resto), PERF-01 (paginación) y TECH-01 (headers).
+
 ## Reglas a mantener
 - Nunca tocar lógica médica sin avisar y esperar aprobación.
 - Rama + PR por cada item, nunca push directo a `main`.

@@ -25,6 +25,7 @@ export async function DELETE(
     await deletePost(token, info.google_account_id, info.google_location_id, postId)
     return NextResponse.json({ ok: true })
   } catch (e) {
+    console.error(`[google-business/posts] DELETE post=${postId}: ${String(e)}`)
     return NextResponse.json({ error: String(e) }, { status: 500 })
   }
 }
