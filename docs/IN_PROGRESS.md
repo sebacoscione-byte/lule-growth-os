@@ -129,6 +129,17 @@ nombre de imagen como por PID no rastreado; queda un proceso `node` viejo e inof
 items técnicos de la Ola 2/Ola 3 que no requieren una decisión externa quedan cerrados en esta
 sesión.
 
+También se cerró **QA-01 por completo**: tests de integración para los callbacks de OAuth de
+Google Business e Instagram, cerrando el círculo con el logging que agregó OPS-01 (una falla real
+en el intercambio de tokens ahora tiene un test que verifica que loguea y redirige con el error
+correcto). El patrón cubre 6 rutas distintas. Con esto, de los 12 items del plan de corrección de
+auditoría integral, quedan resueltos todos los que no requieren una decisión de negocio/legal/
+producto: Ola 0 completa, DATA-01/02/03, SEC-01, SEC-02, OPS-01, QA-01, GROWTH-02, SEO-01,
+PERF-01, TECH-01, CRM-01. Quedan genuinamente pendientes (no por falta de esfuerzo, sino porque
+requieren algo que no puedo decidir/verificar yo): QA-02 (decisión de sumar Playwright + no se
+puede probar login real acá), GROWTH-01 (decisión de diseño del identificador de atribución),
+DATA-02 (plazos de retención, decisión de política), y la revisión legal explícita de DATA-01/03.
+
 ## Reglas a mantener
 - Nunca tocar lógica médica sin avisar y esperar aprobación.
 - Rama + PR por cada item, nunca push directo a `main`.
