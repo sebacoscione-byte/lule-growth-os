@@ -2,8 +2,24 @@ import { createClient } from "@/lib/supabase/server"
 import { getServiceDb } from "@/lib/supabase/service"
 import { AUTO_CHECKLIST_KEYS, computeChecklistAutoStatus, getConnectionInfo, getLocation, getValidToken } from "@/lib/google-business"
 import { NextResponse } from "next/server"
+import { z } from "zod"
+import { parseJsonBody, formatZodError } from "@/lib/api-validation"
 
 const AUTO_KEYS = new Set<string>(AUTO_CHECKLIST_KEYS)
+
+// Los 14 items reales sembrados en docs/schema.sql — un item_key fuera de esta lista no rompe
+// nada a nivel base (no hay check constraint), pero ensucia la tabla con una fila que ninguna
+// pantalla sabe interpretar y desalinea el conteo de progreso del checklist.
+const checklistPatchSchema = z.object({
+  item_key: z.enum([
+    "nombre_correcto", "categoria_principal", "ubicacion_cimel", "horario_real",
+    "servicios_cargados", "descripcion_cargada", "fotos_profesionales", "link_landing",
+    "telefono_configurado", "primera_publicacion", "preguntas_frecuentes",
+    "categoria_cardiologia", "link_instagram_bio", "posts_fijados_3",
+  ]),
+  completed: z.boolean(),
+  notes: z.string().trim().max(500).optional().nullable(),
+})
 
 /**
  * Trae el estado real de los items auto-detectables leyendo el perfil de Google conectado. Si
@@ -67,14 +83,20 @@ export async function PATCH(request: Request) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
-  const { item_key, completed, notes } = await request.json()
+  const parsedBody = await parseJsonBody(request)
+  if (!parsedBody.ok) return NextResponse.json({ error: parsedBody.error }, { status: 400 })
+
+  const result = checklistPatchSchema.safeParse(parsedBody.data)
+  if (!result.success) {
+    return NextResponse.json({ error: formatZodError(result.error) }, { status: 400 })
+  }
 
   // No hace falta bloquear item_key auto-detectables acá: mientras Google esté conectado, el
   // próximo GET vuelve a sobreescribir el valor con lo real. El botón ya está deshabilitado en
   // el front para esos items mientras se puedan verificar en vivo.
   const { data, error } = await supabase
     .from("google_local_checklist")
-    .upsert({ item_key, completed, notes }, { onConflict: "item_key" })
+    .upsert(result.data, { onConflict: "item_key" })
     .select()
     .single()
 

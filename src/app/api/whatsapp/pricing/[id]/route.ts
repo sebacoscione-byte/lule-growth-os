@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
+import { parseJsonBody } from "@/lib/api-validation"
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -7,7 +8,10 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
-  const { cost_amount } = await request.json() as { cost_amount: number | null }
+  const parsedBody = await parseJsonBody(request)
+  if (!parsedBody.ok) return NextResponse.json({ error: parsedBody.error }, { status: 400 })
+
+  const { cost_amount } = parsedBody.data as { cost_amount: number | null }
   if (cost_amount !== null && (typeof cost_amount !== "number" || cost_amount < 0)) {
     return NextResponse.json({ error: "cost_amount inválido" }, { status: 400 })
   }

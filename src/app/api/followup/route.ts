@@ -2,6 +2,10 @@ import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { generateFollowupMessage } from "@/lib/ai"
 import { LOCATION_LABELS } from "@/types"
+import { z } from "zod"
+import { parseJsonBody, formatZodError } from "@/lib/api-validation"
+
+const followupSchema = z.object({ lead_id: z.string().trim().min(1) })
 
 export async function GET() {
   const supabase = await createClient()
@@ -25,7 +29,14 @@ export async function POST(request: Request) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
-  const { lead_id } = await request.json()
+  const parsedBody = await parseJsonBody(request)
+  if (!parsedBody.ok) return NextResponse.json({ error: parsedBody.error }, { status: 400 })
+
+  const result = followupSchema.safeParse(parsedBody.data)
+  if (!result.success) {
+    return NextResponse.json({ error: formatZodError(result.error) }, { status: 400 })
+  }
+  const { lead_id } = result.data
 
   const { data: lead } = await supabase.from("leads").select("*").eq("id", lead_id).single()
   if (!lead) return NextResponse.json({ error: "lead not found" }, { status: 404 })

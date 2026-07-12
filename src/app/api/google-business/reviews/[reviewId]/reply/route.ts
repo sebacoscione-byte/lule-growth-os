@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { getServiceDb } from "@/lib/supabase/service"
 import { getValidToken, getConnectionInfo, replyToReview } from "@/lib/google-business"
+import { parseJsonBody } from "@/lib/api-validation"
 
 export async function PUT(
   req: NextRequest,
@@ -12,8 +13,13 @@ export async function PUT(
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
   const { reviewId } = await params
-  const { comment } = await req.json() as { comment: string }
-  if (!comment?.trim()) return NextResponse.json({ error: "comment required" }, { status: 400 })
+  const parsedBody = await parseJsonBody(req)
+  if (!parsedBody.ok) return NextResponse.json({ error: parsedBody.error }, { status: 400 })
+
+  const { comment } = parsedBody.data as { comment?: string }
+  if (typeof comment !== "string" || !comment.trim() || comment.length > 4000) {
+    return NextResponse.json({ error: "comment required (máx. 4000 caracteres)" }, { status: 400 })
+  }
 
   const supabase = getServiceDb()
   const info = await getConnectionInfo(supabase)

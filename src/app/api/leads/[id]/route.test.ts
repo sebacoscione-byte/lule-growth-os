@@ -95,4 +95,32 @@ describe("PATCH /api/leads/[id]", () => {
     const patch = updateSpy.mock.calls[0][0] as Record<string, unknown>
     expect(patch.followup_due_at).toBe("2030-01-01T00:00:00.000Z")
   })
+
+  it("SEC-01: rechaza con 400 un status fuera del enum real", async () => {
+    const { updateSpy } = mockClient({ id: "user-1" }, { data: { id: "abc" }, error: null })
+    const req = new Request("http://localhost/api/leads/abc", {
+      method: "PATCH",
+      body: JSON.stringify({ status: "estado_inventado" }),
+    })
+    const res = await PATCH(req, { params: Promise.resolve({ id: "abc" }) })
+    expect(res.status).toBe(400)
+    expect(updateSpy).not.toHaveBeenCalled()
+  })
+
+  it("SEC-01: rechaza con 400 un priority_score fuera de rango", async () => {
+    mockClient({ id: "user-1" }, { data: { id: "abc" }, error: null })
+    const req = new Request("http://localhost/api/leads/abc", {
+      method: "PATCH",
+      body: JSON.stringify({ priority_score: 999 }),
+    })
+    const res = await PATCH(req, { params: Promise.resolve({ id: "abc" }) })
+    expect(res.status).toBe(400)
+  })
+
+  it("SEC-01: rechaza con 400 si el body no es un objeto JSON", async () => {
+    mockClient({ id: "user-1" }, { data: { id: "abc" }, error: null })
+    const req = new Request("http://localhost/api/leads/abc", { method: "PATCH", body: JSON.stringify(null) })
+    const res = await PATCH(req, { params: Promise.resolve({ id: "abc" }) })
+    expect(res.status).toBe(400)
+  })
 })

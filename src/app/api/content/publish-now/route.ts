@@ -3,13 +3,17 @@ import { createClient } from "@/lib/supabase/server"
 import { getServiceDb } from "@/lib/supabase/service"
 import { readContentItems, writeContentItems, resolveChannelsToPublish } from "@/lib/content-pipeline"
 import { publishApprovedItem } from "@/lib/content-publish"
+import { parseJsonBody } from "@/lib/api-validation"
 
 export async function POST(request: Request) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
-  const { itemId } = await request.json() as { itemId?: string }
+  const parsedBody = await parseJsonBody(request)
+  if (!parsedBody.ok) return NextResponse.json({ error: parsedBody.error }, { status: 400 })
+
+  const { itemId } = parsedBody.data as { itemId?: string }
   if (!itemId) return NextResponse.json({ error: "itemId requerido" }, { status: 400 })
 
   const items = await readContentItems(supabase)
