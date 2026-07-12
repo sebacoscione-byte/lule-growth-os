@@ -46,6 +46,15 @@ pedir confirmación, salvo que toque lógica médica — ver CLAUDE.md).
 - [ ] **GROWTH-01** — Evaluar si hay un camino real y acotado (ej. propagar un id de tracking vía
   el link de WhatsApp) antes de construir nada; si no, documentar por qué sigue bloqueado.
 
+## Cierre de esta sesión (2026-07-12)
+
+DATA-01/02/03, TECH-01, SEO-01 y PERF-01 quedaron resueltos y mergeados a `main` (9 PRs en total
+contando Ola 0/SEC-02+CRM-01/rate limit/GROWTH-02 de la sesión anterior). Se decidió no seguir con
+SEC-01 (resto)/OPS-01/QA-01/QA-02/GROWTH-01 en esta misma sesión — son esfuerzos grandes y
+transversales (decenas de rutas, infraestructura de testing nueva, o requieren una decisión de
+producto/legal previa) que ameritan su propia sesión con foco, no apurarlos al final de una ya
+muy larga. Retomar desde acá cuando se pida seguir.
+
 ## Reglas a mantener
 - Nunca tocar lógica médica sin avisar y esperar aprobación.
 - Rama + PR por cada item, nunca push directo a `main`.
