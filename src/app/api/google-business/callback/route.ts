@@ -48,6 +48,8 @@ export async function GET(req: NextRequest) {
   })
 
   if (!tokenRes.ok) {
+    const bodyText = await tokenRes.text().catch(() => "")
+    console.error(`[google-business/callback] etapa=token_exchange status=${tokenRes.status}: ${bodyText.slice(0, 300)}`)
     return NextResponse.redirect(new URL("/google-local?error=token_exchange", req.url))
   }
 
@@ -81,8 +83,12 @@ export async function GET(req: NextRequest) {
         break // found the right location
       }
     }
-  } catch {
-    // Non-fatal: tokens saved, location discovery failed
+  } catch (err) {
+    // No fatal: los tokens ya se guardaron, solo falló encontrar la cuenta/ubicación — la app
+    // sigue funcionando con el flujo de carga manual (needsLocationPick). Logueado para poder
+    // diagnosticar sin tener que reproducir el flujo de OAuth entero.
+    const message = err instanceof Error ? err.message : String(err)
+    console.error(`[google-business/callback] etapa=location_discovery (no fatal, tokens ya guardados): ${message}`)
   }
 
   const response = NextResponse.redirect(new URL("/google-local?connected=1", req.url))

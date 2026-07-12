@@ -41,8 +41,11 @@ pedir confirmación, salvo que toque lógica médica — ver CLAUDE.md).
   (`/api/public/lead`, `/api/public/click` — las de mayor riesgo real). Verificado en vivo con
   `curl` contra el dev server que los rechazos devuelven 400 sin insertar datos de prueba en
   producción. Falta el resto de las rutas (todas requieren sesión, menor riesgo, pero son decenas).
-- [ ] **OPS-01** — Logging estructurado (`request_id`/etapa/error) en las rutas críticas restantes
-  (ya está en el webhook de WhatsApp desde WA-03).
+- [x] **OPS-01 (parcial)** — Gran parte ya estaba resuelta (alertas de webhook/cron, panel de
+  salud vía `growth-recommendations.ts`). Se agregó logging a los `catch` silenciosos de los
+  callbacks de OAuth (Google Business, Instagram). Se investigó y descartó una sospecha de bug de
+  UX en `/google-local`/`/contenido/instagram` (ya manejan los errores de OAuth correctamente).
+  Falta estandarizar logs en el resto de rutas internas.
 - [ ] **QA-01** — Tests de integración de rutas clave (auth, webhook, cron, exportación).
 - [ ] **QA-02** — Smoke E2E (evaluar si vale la pena sumar Playwright dado el alcance del proyecto).
 - [ ] **GROWTH-01** — Evaluar si hay un camino real y acotado (ej. propagar un id de tracking vía
@@ -50,10 +53,11 @@ pedir confirmación, salvo que toque lógica médica — ver CLAUDE.md).
 
 ## Continuación (2026-07-12, misma sesión)
 
-Tras el cierre de más abajo, el usuario pidió seguir. Se sumó SEC-01 (parcial #2): validación con
-`zod` en las dos rutas públicas sin sesión. Sigue en pie la misma decisión de no encarar
-OPS-01/QA-01/QA-02/GROWTH-01/el resto de SEC-01 en esta sesión — son esfuerzos grandes y
-transversales o requieren una decisión de producto/legal previa.
+Tras el cierre de más abajo, el usuario pidió seguir varias veces. Se sumaron SEC-01 (parcial #2,
+validación con `zod` en las dos rutas públicas sin sesión) y OPS-01 (parcial, logging en los
+callbacks de OAuth). Sigue en pie la misma decisión de no encarar QA-01/QA-02/GROWTH-01/el resto
+de SEC-01/OPS-01 en esta sesión — son esfuerzos grandes y transversales o requieren una decisión
+de producto/legal previa.
 
 ## Cierre de esta sesión (2026-07-12)
 
