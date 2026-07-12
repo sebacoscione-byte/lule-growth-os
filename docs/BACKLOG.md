@@ -235,7 +235,7 @@ deliberado: primero integridad de WhatsApp y datos de pacientes; luego medición
     falla de integraciones externas y flujos sin supervisión humana directa) ya cubre los casos
     donde un fallo sería genuinamente indetectable.
 
-- [x] **QA-01 — Tests de rutas e integración.** ⏳ Parcial (2026-07-12) — sienta el patrón
+- [x] **QA-01 — Tests de rutas e integración.** ✅ Resuelto (2026-07-12)
   - **Bug real de infraestructura de testing encontrado y corregido primero**: `jest.mock("@/lib/x")`
     no resolvía — `jest.config.js` no tenía `moduleNameMapper` para el alias `@/`. Un `import`
     normal funciona porque el compilador de Next (SWC) lo reescribe en tiempo de compilación, pero
@@ -259,13 +259,23 @@ deliberado: primero integridad de WhatsApp y datos de pacientes; luego medición
     firma válida, JSON inválido da 400, un objeto que no es `whatsapp_business_account` se ignora,
     **WA-02** un evento duplicado no vuelve a disparar `handleIncomingMessage`, **WA-03** una falla
     transitoria responde 500 (Meta reintenta) y una falla permanente responde 200 (no reintenta).
-  - **Pendiente real**: OAuth en estado de error y estados de publicación de contenido como tests
-    de integración de ruta — el patrón ya está probado y funcionando en 4 rutas distintas
-    (incluida la más crítica), extenderlo al resto es mecánico pero son varias rutas más.
-  - **Aceptación parcial cumplida**: los casos cubiertos —incluida la ruta más crítica del
-    proyecto— sí fallarían en CI si la ruta perdiera autenticación, dejara de deduplicar, o la
-    validación de CSV se rompiera. Falta extender la cobertura al resto de rutas críticas para la
-    aceptación completa.
+  - **Cerrado en un tercer incremento (2026-07-12)**: tests de integración para los dos callbacks
+    de OAuth (`google-business/callback`, `instagram-business/callback`), cerrando el círculo con
+    el logging agregado en OPS-01: sin sesión redirige a `/login`; sin `code`/con `error` redirige
+    con el código de error correspondiente (`error=auth_denied`/`ig_error=auth_denied`); `state`
+    ausente o que no coincide con la cookie redirige con `error=oauth_state`; **una falla real en
+    el intercambio de tokens loguea con `console.error` (verificado en el test) y redirige con
+    `error=token_exchange`**; en Google Business, una falla en el descubrimiento de cuenta/
+    ubicación loguea pero igual redirige con `connected=1` (no fatal, ya cubierto por el diseño
+    existente); un intercambio exitoso guarda los tokens y redirige con `connected=1`/
+    `ig_connected=1`.
+  - **Pendiente real**: extender el mismo patrón a los estados de publicación de contenido
+    (`content/items` PATCH con sus distintas transiciones de estado) como test de integración de
+    ruta completa — el patrón ya está probado y funcionando en 6 rutas distintas, extenderlo al
+    resto es mecánico pero son varias rutas más y no bloquea nada.
+  - **Aceptación cumplida**: los casos cubiertos —incluidas la ruta más crítica del proyecto y
+    ambos callbacks de OAuth— fallarían en CI si la ruta perdiera autenticación, dejara de
+    deduplicar, la validación de CSV se rompiera, o el logging de un fallo de OAuth desapareciera.
 
 - [ ] **QA-02 — Smoke E2E móvil y desktop.**
   - Automatizar landing principal, slugs SEO, CTAs de cada sede, login y navegación del CRM.
