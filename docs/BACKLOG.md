@@ -1,5 +1,57 @@
 # Backlog — Lule Growth OS
-**Actualizado:** 2026-07-11 | **Basado en:** PRD Estrategia de Captación v2.1
+**Actualizado:** 2026-07-12 | **Basado en:** PRD Estrategia de Captación v2.1
+
+---
+
+## 📌 Pendientes tuyos (2026-07-12)
+
+Todo lo técnico que se podía resolver sin vos ya está resuelto. Esto es lo que queda — agrupado
+por qué tipo de acción es, para que sepas qué esperar de cada uno. El detalle completo de cada
+ítem está más abajo, en la sección que corresponda.
+
+### 🚨 Lo más importante — bloquea que el bot hable con pacientes reales
+- [ ] **Resolver el rechazo de la verificación de negocio de Meta.** Mientras siga rechazada, el
+  bot de WhatsApp probablemente solo puede conversar con números agregados como tester en el Meta
+  Developer Console — no con pacientes reales. Hay que revisar qué dato no cruzó bien contra AFIP
+  antes de volver a mandar documentos (ver Etapa 7 más abajo).
+
+### ⚖️ Revisión legal (dato de salud)
+- [ ] Mandarle `docs/REVISION_LEGAL_PRIVACIDAD.md` a un abogado — ya tiene las 3 preguntas
+  concretas redactadas y listas para copiar/pegar (DATA-01/03).
+
+### 🔑 Trámites en cuentas externas (Meta/Google) que solo vos podés hacer
+- [ ] **2FA del Business Manager**: Facebook te bloqueó activarlo en tu cuenta personal ("no
+  usaste mucho tiempo este dispositivo"). Probá desde la app de Facebook en el celular (más
+  historial de uso), o esperá 24-48hs y reintentá.
+- [ ] **Aumento de cuota en Google Cloud** (proyecto `app-lule`) para las APIs de Google Business
+  Information/Account Management — es gratis, solo hay que pedirlo en
+  `cloud.google.com/docs/quotas/help/request_increase`. Mientras tanto, edita perfil/
+  publicaciones/reseñas desde el panel oficial de Google Business (Etapa 4).
+- [ ] **Google Search Console**: configurar con el sitemap (ahora sí es alcanzable — un bug lo
+  bloqueaba antes) y verificar que las 8 páginas públicas queden indexadas (Etapa 3).
+- [ ] **Google Cloud (reseñas)**: revisar antes de octubre 2026 si se activa la cuenta completa o
+  se deja pausar la prueba gratuita (Etapa 2).
+
+### 🤔 Decisiones tuyas (o de Lucía)
+- [ ] Agregar a Lucía como administradora del Business Manager de Meta — falta decidir el rol
+  (administrador completo vs. acceso acotado).
+- [ ] Definir estrategia de reseñas de Google: cómo y cuándo pedirlas a pacientes actuales.
+- [ ] Evaluar si crear una ficha de Google Business separada para Swiss Medical Lomas.
+
+### ✍️ Contenido para cargar/publicar (no requiere código)
+- [ ] Publicar los 3 posts fijados de Instagram (ya generados en Estudio de contenido).
+- [ ] Crear las 7 historias destacadas de Instagram (Turnos · CIMEL · Hospital Británico · Swiss
+  · Ecocardiograma · Cardiología · FAQ).
+- [ ] Cargar las obras sociales reales por sede en Configuración (hoy están vacías).
+- [ ] Cargar el link de Google Maps del Hospital Británico en Configuración.
+- [ ] Confirmar que el `$0` (tarifa pública de Meta para Argentina) haya quedado guardado en
+  `Configuración → Precios de WhatsApp` — los 9 templates ya están aprobados, esto es lo único
+  que faltaría para que el seguimiento automático funcione de punta a punta con costo real.
+
+### 🕐 Cuando tengas tiempo (no urgente)
+- [ ] Crear un usuario de prueba en Supabase Auth (nunca tu cuenta ni la de Lucía) y cargar
+  `E2E_TEST_EMAIL`/`E2E_TEST_PASSWORD` para correr los tests automáticos de dashboard/leads/inbox
+  al menos una vez (QA-02).
 
 ---
 
@@ -757,19 +809,21 @@ público para pedir turno.
 
 - [x] Arquitectura de costos de WhatsApp Business Platform (2026-07-04): tracking de mensajes/costo
       por categoría (`whatsapp_pricing_rules`, `whatsapp_cost_events`), ventana de 24h + Free Entry
-      Point (Click-to-WhatsApp), gate de template fuera de ventana, `templates` (9 obligatorios),
-      `consent_records`, `handoff_events`, intents cerrados con reglas primero e IA de respaldo
-      opcional, modo ahorro y flag de simulación del cobro de octubre 2026, dashboard `/costos`,
-      suite de tests con Jest (nueva en el proyecto). Detalle de setup pendiente (montos reales de
-      precios + aprobación de templates en Meta) en `CLAUDE.md` → "Costos de WhatsApp y templates".
+      Point (Click-to-WhatsApp), gate de template fuera de ventana, `templates` (9 obligatorios,
+      **ya aprobados en Meta**), `consent_records`, `handoff_events`, intents cerrados con reglas
+      primero e IA de respaldo opcional, modo ahorro y flag de simulación del cobro de octubre
+      2026, dashboard `/costos`, suite de tests con Jest (nueva en el proyecto). Detalle en
+      `CLAUDE.md` → "Costos de WhatsApp y templates" — **falta confirmar** que el `$0` (tarifa
+      pública de Meta para Argentina) haya quedado guardado en `Configuración → Precios de
+      WhatsApp` (se cargó de forma provisoria el 2026-07-07, sin confirmar si se llegó a guardar).
 - [x] WhatsApp Business API: envío automático de mensajes de seguimiento (2026-07-07) — leads sin
       confirmar turno reciben el template `recontacto_incompleto` vía `sendTemplate`, corriendo dentro
       del cron de `publish-content` (sin cron propio, para no superar el límite de 2 crons del plan
       Hobby de Vercel). Ver `src/lib/whatsapp-followup.ts` y `CLAUDE.md` → "Seguimiento automático de
-      leads por WhatsApp". *Requiere aprobar el template `recontacto_incompleto` en Meta antes de que
-      mande algo real — mientras tanto el cron lo reporta como pendiente sin hacer nada.* Los demás
-      templates (`recordatorio_turno`, `seguimiento_post_consulta`, etc.) siguen sin automatizar porque
-      necesitan una fecha de turno real que la app no gestiona.
+      leads por WhatsApp". Los 9 templates obligatorios (incluido `recontacto_incompleto`) ya están
+      **aprobados en Meta** desde el 2026-07-07 — este flujo ya puede mandar mensajes reales, no
+      sigue bloqueado. Los demás templates (`recordatorio_turno`, `seguimiento_post_consulta`, etc.)
+      siguen sin automatizar porque necesitan una fecha de turno real que la app no gestiona.
 - [ ] Configurar `WHATSAPP_VERIFY_TOKEN` en `.env.local` + webhook de prueba separado (vía ngrok) para poder testear localmente cambios en la lógica de recepción de mensajes (`src/lib/whatsapp-bot.ts`) sin tocar el webhook de producción. Sin esto, cualquier cambio en cómo el bot procesa mensajes entrantes solo se puede probar directo en producción. No es urgente mientras no se toque esa lógica.
 - [x] Instagram Graph API: publicación directa desde la app del contenido aprobado (2026-07-06/07) —
       manual ("Publicar ahora" y botones por canal en el editor) y automática (Vercel Cron diario,
