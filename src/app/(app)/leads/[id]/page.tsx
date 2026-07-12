@@ -79,6 +79,11 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
               {l.confirmed_booked && (
                 <p className="text-green-600 font-medium">✅ Confirmó turno</p>
               )}
+              {l.retention_hold && (
+                <p className="text-blue-600 font-medium" title="DATA-02: datos de protocolo/investigación retenidos por obligación legal — no se vuelve a contactar, pero el dato no se borra">
+                  🔒 En resguardo legal — no se contacta más
+                </p>
+              )}
             </CardContent>
           </Card>
 

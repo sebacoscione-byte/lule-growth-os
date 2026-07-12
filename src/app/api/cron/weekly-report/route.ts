@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { getServiceDb } from "@/lib/supabase/service"
 import { sendCronFailureAlert } from "@/lib/alert-email"
+import { runDataRetentionSweep } from "@/lib/data-retention"
 
 export const maxDuration = 60
 
@@ -96,5 +97,20 @@ async function buildAndSaveWeeklyReport() {
     await sendCronFailureAlert("weekly-report", error.message)
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
-  return NextResponse.json({ ok: true, metrics })
+
+  // Barrida de retención de datos (DATA-02) — corre acá adentro para no sumar un tercer cron job
+  // de Vercel (el plan Hobby limita a 2, ver whatsapp-followup.ts para el mismo patrón). Cadencia
+  // semanal de sobra para un umbral de 24 meses de inactividad.
+  let retention: Awaited<ReturnType<typeof runDataRetentionSweep>> | { errors: string[] }
+  try {
+    retention = await runDataRetentionSweep(supabase)
+  } catch (retentionError) {
+    const message = retentionError instanceof Error ? retentionError.message : String(retentionError)
+    retention = { errors: [message] }
+  }
+  if (retention.errors.length > 0) {
+    await sendCronFailureAlert("weekly-report", `Barrida de retención de datos: ${retention.errors.join("; ")}`)
+  }
+
+  return NextResponse.json({ ok: true, metrics, retention })
 }

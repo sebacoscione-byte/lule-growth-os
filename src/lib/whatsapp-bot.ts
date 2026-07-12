@@ -1,7 +1,7 @@
 import { getServiceDb } from "@/lib/supabase/service"
 import { sendText, sendButtons, sendList, type SendContext } from "@/lib/whatsapp"
 import { getWindowState, detectEntryPoint, type WhatsAppReferral } from "@/lib/whatsapp-window"
-import { extractIntake, classifyIntent, classifyProtocolButtonReply, INTENT_REPLIES, type IntakeExtraction } from "@/lib/whatsapp-intents"
+import { extractIntake, classifyIntent, classifyProtocolButtonReply, isMarketingOptOutMessage, INTENT_REPLIES, type IntakeExtraction } from "@/lib/whatsapp-intents"
 import { isEmergencyMessage, EMERGENCY_REPLY } from "@/lib/medical-safety"
 import { CONSENT_TEXT, interpretConsentReply, recordConsent, hasConsented } from "@/lib/whatsapp-consent"
 import { buildHandoffSummary, escalateToHuman, type HandoffLeadInfo } from "@/lib/whatsapp-handoff"
@@ -429,6 +429,21 @@ export async function handleIncomingMessage(params: {
 
   if (messageType === "text" && isEmergencyMessage(text)) {
     await escalateEmergency(session, phone, ctx)
+    return
+  }
+
+  // DATA-02: la baja de contacto comercial tiene que ser inmediata (no esperar a la barrida
+  // semanal de retención) — chequeada antes que cualquier otra lógica de estado, para que
+  // funcione sin importar en qué parte de la conversación esté el paciente.
+  if (messageType === "text" && isMarketingOptOutMessage(text)) {
+    const leadId = await ensureLeadId(session, phone)
+    const db = getDb()
+    await db.from("leads").update({ consent_to_contact: false }).eq("id", leadId)
+    await sendText(
+      phone,
+      "Listo, no te vamos a volver a escribir. Si en algún momento querés retomar el contacto, podés escribirnos vos cuando quieras.",
+      { ...ctx, leadId, flowIntent: "baja_contacto" }
+    )
     return
   }
 

@@ -105,3 +105,15 @@ export function classifyProtocolButtonReply(text: string): ProtocolButtonReply |
   if (lower === PROTOCOL_OPT_IN_BUTTON_TEXT) return "opt_in"
   return null
 }
+
+// DATA-02: la baja de contacto comercial/marketing tiene que ser inmediata (no esperar a la
+// barrida semanal de retención) — palabras clave deterministas, chequeadas antes que cualquier
+// otra cosa en el mensaje entrante. "BAJA"/"STOP" son las convenciones estándar de opt-out en
+// Argentina (mismo patrón que un SMS masivo). No confundir con protocol_opt_out (ese es solo para
+// la invitación puntual a un protocolo de investigación, ver classifyProtocolButtonReply).
+const MARKETING_OPT_OUT_PATTERN =
+  /\bbaja\b|\bstop\b|no (me )?(escriban|contacten|molesten) m[aá]s|dejen de (escribirme|contactarme)|no quiero (m[aá]s )?mensajes|\bunsubscribe\b/
+
+export function isMarketingOptOutMessage(text: string): boolean {
+  return MARKETING_OPT_OUT_PATTERN.test(text.toLowerCase())
+}
