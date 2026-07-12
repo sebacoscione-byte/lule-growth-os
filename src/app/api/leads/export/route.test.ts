@@ -8,7 +8,9 @@ function mockClient(user: { id: string } | null, leadsResult: { data: unknown; e
     auth: { getUser: jest.fn().mockResolvedValue({ data: { user } }) },
     from: jest.fn(() => ({
       select: jest.fn(() => ({
-        order: jest.fn().mockResolvedValue(leadsResult),
+        order: jest.fn(() => ({
+          range: jest.fn().mockResolvedValue(leadsResult),
+        })),
       })),
     })),
   }
@@ -75,5 +77,31 @@ describe("GET /api/leads/export", () => {
     const text = await res.text()
     expect(text).toContain("María José")
     expect(text).not.toContain("'María José")
+  })
+
+  it("PERF-01: pagina con range() hasta agotar los resultados en vez de truncar en silencio", async () => {
+    const fullPage = Array.from({ length: 1000 }, (_, i) => ({ ...BASE_LEAD, id: `page1-${i}` }))
+    const secondPage = [{ ...BASE_LEAD, id: "page2-0" }]
+    const rangeSpy = jest.fn()
+      .mockResolvedValueOnce({ data: fullPage, error: null })
+      .mockResolvedValueOnce({ data: secondPage, error: null })
+    const fakeClient = {
+      auth: { getUser: jest.fn().mockResolvedValue({ data: { user: { id: "u1" } } }) },
+      from: jest.fn(() => ({
+        select: jest.fn(() => ({
+          order: jest.fn(() => ({ range: rangeSpy })),
+        })),
+      })),
+    }
+    ;(createClient as jest.Mock).mockResolvedValue(fakeClient)
+
+    const res = await GET()
+    expect(res.status).toBe(200)
+    expect(rangeSpy).toHaveBeenCalledTimes(2)
+    expect(rangeSpy).toHaveBeenNthCalledWith(1, 0, 999)
+    expect(rangeSpy).toHaveBeenNthCalledWith(2, 1000, 1999)
+    const text = await res.text()
+    expect(text).toContain("page1-0")
+    expect(text).toContain("page2-0")
   })
 })

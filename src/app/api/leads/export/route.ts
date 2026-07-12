@@ -3,19 +3,37 @@ import { NextResponse } from "next/server"
 import { CHANNEL_LABELS, SERVICE_LABELS, STATUS_LABELS, LOCATION_LABELS, type Lead } from "@/types"
 import { escapeCsvCell } from "@/lib/csv"
 
+// PostgREST (la API REST de Supabase) tiene un tope de filas por respuesta (db-max-rows, 1000 por
+// default) que un select("*") sin range() respeta en silencio — si los leads reales superaran ese
+// número, la exportación se truncaba sin ningún aviso. Se pagina con range() hasta agotar los
+// resultados para que el CSV siempre incluya todos los leads, sin importar cuántos haya.
+const EXPORT_PAGE_SIZE = 1000
+
+async function fetchAllLeads(supabase: Awaited<ReturnType<typeof createClient>>): Promise<{ leads: Lead[]; error: string | null }> {
+  const leads: Lead[] = []
+  let from = 0
+  while (true) {
+    const { data, error } = await supabase
+      .from("leads")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .range(from, from + EXPORT_PAGE_SIZE - 1)
+
+    if (error) return { leads, error: error.message }
+    leads.push(...((data ?? []) as Lead[]))
+    if (!data || data.length < EXPORT_PAGE_SIZE) break
+    from += EXPORT_PAGE_SIZE
+  }
+  return { leads, error: null }
+}
+
 export async function GET() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
-  const { data, error } = await supabase
-    .from("leads")
-    .select("*")
-    .order("created_at", { ascending: false })
-
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-
-  const leads = (data ?? []) as Lead[]
+  const { leads, error } = await fetchAllLeads(supabase)
+  if (error) return NextResponse.json({ error }, { status: 500 })
 
   const headers = [
     "ID", "Nombre", "Teléfono", "Instagram", "Canal", "Servicio", "Ubicación", "Día",
