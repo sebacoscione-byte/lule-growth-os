@@ -171,6 +171,19 @@ parcial hasta que eso pase.
 
 Siguiente: GROWTH-01 → revisión legal de DATA-01/03.
 
+Seguimos con **GROWTH-01**. Le pregunté a Seba si aprobaba agregar una referencia visible al
+mensaje prellenado de WhatsApp (única forma técnica real de atribuir, ya que WhatsApp no manda
+ningún dato del origen del click) — confirmó con un formato concreto y estandarizado
+(`Ref: LAN-CARD-01`, sede+especialidad+secuencia). Implementado punta a punta: registro de
+códigos (`landing-referral-codes.ts`), extracción en el bot (`whatsapp-bot.ts`, vía sesión hasta
+que el lead se crea), atribución en `leads.utm_content`/`landing_page`, y un panel nuevo en
+`/dashboard` con el embudo completo. Migración corrida contra producción. **Bug real encontrado
+verificando en vivo antes de mergear**: Swiss Medical usa un WhatsApp propio ("Swity") que nunca
+llega a nuestro webhook — se corrigió para no agregar la referencia en ese caso (sería inútil y
+ensuciaría el mensaje). GROWTH-01 queda resuelto.
+
+Siguiente: revisión legal de DATA-01/03 (preparar material, no algo que se resuelva en el chat).
+
 ## Reglas a mantener
 - Nunca tocar lógica médica sin avisar y esperar aprobación.
 - Rama + PR por cada item, nunca push directo a `main`.

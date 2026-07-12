@@ -343,13 +343,46 @@ deliberado: primero integridad de WhatsApp y datos de pacientes; luego medición
     mensaje más nuevo queda al final del contexto, nunca se omite) — verificado con test para una
     conversación simulada de 25 mensajes.
 
-- [ ] **GROWTH-01 — Atribución de conversión de punta a punta.**
-  - Diseñar un identificador corto por visita/campaña/pieza que sobreviva al salto a WhatsApp o al
-    canal de reserva sin incluir datos personales.
-  - Propagarlo al lead y vincularlo con `confirmo_que_pidio_turno`.
-  - Mostrar embudo real: visita → CTA → conversación/lead → pidió turno, por slug, UTM y contenido.
-  - **Aceptación:** un caso de prueba completo atribuye el turno al origen correcto; el dashboard
-    diferencia claramente clic, lead y turno confirmado.
+- [x] **GROWTH-01 — Atribución de conversión de punta a punta.** ✅ Resuelto (2026-07-12)
+  - **Decisión de diseño confirmada por Seba**: WhatsApp no manda ningún dato del origen de un
+    click al webhook (a diferencia de un formulario web con query params) — la única forma real de
+    atribuir una conversación a una landing/sede puntual es que el propio mensaje prellenado lleve
+    una referencia corta y visible. Formato acordado: `Ref: LAN-CARD-01` al final del mensaje
+    (prefijo de sede + prefijo de especialidad + secuencia), sin ningún dato personal, editable por
+    el paciente antes de enviar.
+  - **`src/lib/landing-referral-codes.ts`** (nuevo, con tests): registro código ↔ landing/sede/
+    especialidad (vive en código, no en una tabla de Supabase con UI de admin — mismo criterio que
+    `public-landings.ts`, agregar una landing ya requiere una PR). `withReferralCode()` arma el
+    mensaje con la referencia; `extractReferralCode()` la detecta y la separa del resto del texto,
+    tolerante a mayúsculas/espaciado (el paciente puede editar el mensaje).
+  - **`src/lib/whatsapp-bot.ts`**: el código se extrae del primer mensaje entrante en el estado
+    `"nuevo"` y se guarda en la sesión (`whatsapp_sessions.referral_code`, columna nueva) hasta que
+    el lead se crea de verdad en `"intake_pendiente"` — recién ahí se copia a `leads.utm_content`
+    (el código) y `leads.landing_page` (el slug), reusando columnas ya existentes. Si el paciente
+    borró la referencia (mensaje orgánico), esos campos quedan `null` — el dashboard los muestra
+    como "sin atribuir" en vez de inventar un valor "unknown".
+  - **Bug real encontrado y corregido verificando esto en vivo, antes de mergear**: Swiss Medical
+    Lomas tiene su propio WhatsApp cargado en Configuración ("Swity", un número distinto al del
+    bot) — un mensaje a ese número **nunca llega a nuestro webhook**, así que agregarle una
+    referencia hubiera sido inútil (y hubiera ensuciado el mensaje que ve la recepción de Swiss
+    Medical con un código que nunca vamos a poder leer). Se agregó `resolvesToBotNumber()` en
+    `public-landings.ts` (con tests) que compara el número ya resuelto contra el del bot, no solo
+    si hay un override cargado — solo se agrega la referencia cuando el mensaje realmente va a
+    llegar a nuestro bot.
+  - **Panel nuevo en `/dashboard`**: "Embudo de atribución por landing/sede" — visita → clic a
+    WhatsApp → lead → turno confirmado, por código, para los últimos 90 días. Visitas/clicks
+    agregados en SQL (RPC `landing_referral_events`, migración
+    `20260712_growth_01_referral_attribution.sql`, mismo criterio que PERF-01: `landing_events` ya
+    mostró que contar en JS no escala); leads se agrega en JS (tabla chica, sin ese problema).
+  - **Verificado en vivo contra un build de producción real**: el CTA de WhatsApp de una landing
+    con sede propia agrega `Ref: LAN-CARD-01`/`LOM-CARD-01` correctamente codificado en la URL; el
+    CTA hacia Swity (Swiss Medical) NO lleva referencia (confirmado antes y después del fix). No se
+    pudo probar el flujo completo con un mensaje real entrante (requeriría mandar un WhatsApp real
+    al número de producción) ni ver el panel del dashboard (sin credenciales de login) — validado
+    por revisión de código, tests unitarios de cada función pura, y build/tests.
+  - **Aceptación cumplida**: el dashboard diferencia visitas, clics de WhatsApp, leads y turnos
+    confirmados por código de referencia; un lead que llega con una referencia real queda atribuido
+    a la landing/sede exacta, incluyendo cuando confirma el turno (`confirmed_booked`).
 
 - [x] **GROWTH-02 — Guardrails estadísticos para experimentos A/B.** ✅ Resuelto (2026-07-11)
   - El motor de recomendaciones (`checkHeroAbTestSignal`) ya exigía un mínimo de 150 visitas por

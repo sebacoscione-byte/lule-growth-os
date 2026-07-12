@@ -2,6 +2,7 @@ import { getServiceDb } from "@/lib/supabase/service"
 import { sendText, sendButtons, sendList, type SendContext } from "@/lib/whatsapp"
 import { getWindowState, detectEntryPoint, type WhatsAppReferral } from "@/lib/whatsapp-window"
 import { extractIntake, classifyIntent, classifyProtocolButtonReply, isMarketingOptOutMessage, INTENT_REPLIES, type IntakeExtraction } from "@/lib/whatsapp-intents"
+import { extractReferralCode, findReferralCodeInfo } from "@/lib/landing-referral-codes"
 import { isEmergencyMessage, EMERGENCY_REPLY } from "@/lib/medical-safety"
 import { CONSENT_TEXT, interpretConsentReply, recordConsent, hasConsented } from "@/lib/whatsapp-consent"
 import { buildHandoffSummary, escalateToHuman, type HandoffLeadInfo } from "@/lib/whatsapp-handoff"
@@ -24,6 +25,9 @@ interface WhatsAppSession {
   entry_point: WhatsAppEntryPoint | null
   ctwa_clid: string | null
   messages_sent_count: number
+  /** GROWTH-01: código detectado en el primer mensaje (ej. "LAN-CARD-01") — se aplica al lead
+   * recién cuando se crea, en upsertLeadFromIntake. */
+  referral_code: string | null
   updated_at?: string
 }
 
@@ -129,6 +133,17 @@ async function upsertLeadFromIntake(session: WhatsAppSession, waName: string | u
   if (session.lead_id) {
     await db.from("leads").update(patch).eq("id", session.lead_id)
     return session.lead_id
+  }
+
+  // GROWTH-01: si el primer mensaje traía un código de referencia real (ver
+  // landing-referral-codes.ts), atribuye el lead a la landing/sede exacta que lo generó. Si el
+  // paciente borró o nunca tuvo un código (mensaje orgánico), utm_content/landing_page quedan
+  // null -- el embudo del dashboard los muestra como "sin atribuir", no hace falta un valor
+  // literal "unknown".
+  const referralInfo = session.referral_code ? findReferralCodeInfo(session.referral_code) : null
+  if (referralInfo) {
+    patch.utm_content = referralInfo.code
+    patch.landing_page = referralInfo.landingSlug
   }
 
   const { data, error } = await db
@@ -500,8 +515,13 @@ export async function handleIncomingMessage(params: {
         ? "Hola, soy el asistente de la Dra. Lucía Chahin, cardióloga."
         : "¡Hola! 👋 Soy el asistente de la *Dra. Lucía Chahin*, cardióloga."
 
+      // GROWTH-01: el primer mensaje (el prellenado por la landing) puede traer "Ref: LAN-CARD-01"
+      // al final -- se guarda en la sesión ahora porque el lead recién se crea más adelante, en
+      // "intake_pendiente" (ver upsertLeadFromIntake).
+      const referralCode = messageType === "text" ? extractReferralCode(text).code : null
+
       await sendText(phone, `${intro}${consentLine}${questions}`, { ...ctx, flowIntent: "pedir_turno" })
-      await updateSession(phone, { state: "intake_pendiente", wa_name: waName ?? null })
+      await updateSession(phone, { state: "intake_pendiente", wa_name: waName ?? null, referral_code: referralCode })
       return
     }
 

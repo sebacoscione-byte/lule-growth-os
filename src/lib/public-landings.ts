@@ -143,6 +143,15 @@ export function buildWhatsAppUrl(message: string, rawNumber?: string): string {
   return `https://wa.me/${number}?text=${encodeURIComponent(message)}`
 }
 
+// GROWTH-01: un código de referencia (ver landing-referral-codes.ts) solo sirve si el mensaje
+// realmente llega al número del bot (src/lib/whatsapp-bot.ts) — a cualquier otro número (ej.
+// Swity de Swiss Medical) nunca lo vamos a poder leer. Compara el número ya resuelto, no solo si
+// hay un override cargado, por si alguna vez el override coincidiera con el número del bot.
+export function resolvesToBotNumber(rawNumber?: string): boolean {
+  const number = rawNumber ? normalizeArWhatsAppNumber(rawNumber) : WHATSAPP_NUMBER
+  return number === WHATSAPP_NUMBER
+}
+
 export const WHATSAPP_MESSAGES = {
   general: "Hola, me gustaría consultar cómo pedir turno con la Dra. Lucía Chahin.",
   cimel: "Hola, me gustaría pedir turno con la Dra. Lucía Chahin en CIMEL Lanús (martes). ¿Me pueden ayudar?",

@@ -9,8 +9,9 @@ import {
 } from "lucide-react"
 import {
   LANDING_DATA, WHATSAPP_MESSAGES, whatsAppKeyForLocation, SERVICE_MICROCOPY,
-  RELATED_LANDING_SLUGS, buildWhatsAppUrl, type PublicLandingLocation,
+  RELATED_LANDING_SLUGS, buildWhatsAppUrl, resolvesToBotNumber, type PublicLandingLocation,
 } from "@/lib/public-landings"
+import { withReferralCode, withGeneralFallbackCode } from "@/lib/landing-referral-codes"
 import { getServiceDb } from "@/lib/supabase/service"
 import { getGooglePlaceReviews } from "@/lib/google-places"
 import { HERO_VARIANT_COOKIE } from "@/lib/landing-track"
@@ -207,7 +208,7 @@ function matchConfigLocation(locName: string, configLocations: ConfigLocation[])
   })
 }
 
-function buildSedeActions(locations: PublicLandingLocation[], configLocations: ConfigLocation[]): SedeAction[] {
+function buildSedeActions(locations: PublicLandingLocation[], configLocations: ConfigLocation[], slug: string): SedeAction[] {
   return locations.map(loc => {
     const cfg = matchConfigLocation(loc.name, configLocations)
     const key = whatsAppKeyForLocation(loc.name)
@@ -221,7 +222,15 @@ function buildSedeActions(locations: PublicLandingLocation[], configLocations: C
       mapsUrl: cfg?.google_maps_link || loc.mapsUrl,
       bookingUrl: cfg?.booking_url || undefined,
       instruction: cfg?.booking_instruction || loc.instruction,
-      whatsappMessage: WHATSAPP_MESSAGES[key],
+      // GROWTH-01: agrega "Ref: <código>" al final del mensaje prellenado -- es la única forma de
+      // saber qué landing/sede generó la conversación de WhatsApp (ver landing-referral-codes.ts).
+      // Solo tiene sentido cuando el mensaje realmente llega al número del bot: si la sede tiene su
+      // propio WhatsApp cargado (cfg?.whatsapp, ej. "Swity" de Swiss Medical), ese mensaje nunca
+      // llega a nuestro webhook -- el código no se podría leer nunca, y solo ensuciaría el mensaje
+      // que ve la recepción de esa institución.
+      whatsappMessage: resolvesToBotNumber(cfg?.whatsapp)
+        ? withReferralCode(WHATSAPP_MESSAGES[key], slug, key)
+        : WHATSAPP_MESSAGES[key],
       whatsapp: cfg?.whatsapp || undefined,
       color: SEDE_COLOR[key] ?? "blue",
       preferredLocationValue: PREFERRED_LOCATION_BY_KEY[key] ?? "sin_definir",
@@ -289,7 +298,7 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
   const conditionsTreated = configDoctor.conditions_treated ?? []
   const base = getBaseUrl()
 
-  const sedeActions = buildSedeActions(data.locations, configLocations)
+  const sedeActions = buildSedeActions(data.locations, configLocations, slug)
   const faq = isMain ? MAIN_FAQ : buildSubpageFaq(data)
   const faqJsonLd = buildFaqJsonLd(faq)
 
@@ -752,7 +761,7 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
                   Cada sede acepta distintas coberturas médicas. Para confirmar si tu obra social o prepaga tiene
                   convenio, comunicate directamente con la sede elegida o{" "}
                   <a
-                    href={buildWhatsAppUrl(WHATSAPP_MESSAGES.general)}
+                    href={buildWhatsAppUrl(withGeneralFallbackCode(WHATSAPP_MESSAGES.general))}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="font-medium text-cardiac hover:underline"
