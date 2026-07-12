@@ -51,7 +51,9 @@ pedir confirmación, salvo que toque lógica médica — ver CLAUDE.md).
   resolvía nunca. Con eso arreglado, se agregó el patrón de test de integración de rutas
   (mockeando `@/lib/supabase/server`) en 3 rutas de referencia: `leads/[id]` (auth + allowlist
   anti mass-assignment), `cron/weekly-report` (fail-closed), `leads/export` (auth + SEC-02
-  end-to-end). Falta extender a más rutas — el patrón ya funciona, es mecánico.
+  end-to-end). Extendido después a `webhooks/whatsapp` (la ruta más crítica: firma WA-01,
+  idempotencia WA-02, clasificación de error WA-03) — 4 rutas cubiertas en total. Falta extender
+  a más rutas — el patrón ya funciona, es mecánico.
 - [ ] **QA-02** — Smoke E2E (evaluar si vale la pena sumar Playwright dado el alcance del proyecto).
 - [ ] **GROWTH-01** — Evaluar si hay un camino real y acotado (ej. propagar un id de tracking vía
   el link de WhatsApp) antes de construir nada; si no, documentar por qué sigue bloqueado.
@@ -73,6 +75,14 @@ SEC-01 (resto)/OPS-01/QA-01/QA-02/GROWTH-01 en esta misma sesión — son esfuer
 transversales (decenas de rutas, infraestructura de testing nueva, o requieren una decisión de
 producto/legal previa) que ameritan su propia sesión con foco, no apurarlos al final de una ya
 muy larga. Retomar desde acá cuando se pida seguir.
+
+## Segunda continuación (2026-07-12, misma sesión)
+
+El usuario siguió pidiendo continuar. Se mergeó QA-01 (patrón + 3 rutas, PR #48) y se sumó un
+segundo incremento del mismo ticket: test de integración de ruta completa para
+`webhooks/whatsapp` (la ruta más crítica del proyecto — única con tráfico no autenticado de Meta).
+Mismo criterio que antes: bounded, mecánico, sin requerir decisión de producto/legal. Sigue en pie
+no encarar QA-02/GROWTH-01/el resto de SEC-01/OPS-01 en esta sesión.
 
 ## Reglas a mantener
 - Nunca tocar lógica médica sin avisar y esperar aprobación.

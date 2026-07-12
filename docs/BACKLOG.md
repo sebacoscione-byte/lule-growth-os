@@ -199,14 +199,21 @@ deliberado: primero integridad de WhatsApp y datos de pacientes; luego medición
     - `GET /api/leads/export` — rechaza sin sesión; **la neutralización de fórmulas de SEC-02 sigue
       funcionando** end-to-end en la respuesta real de la ruta (no solo en el test unitario de
       `csv.ts`), y el texto normal no se toca.
-  - **Pendiente real**: el resto de las rutas que pide el ticket (webhook firmado/duplicado —ya
-    cubierto indirectamente por los tests unitarios de `whatsapp-idempotency`/
-    `whatsapp-webhook-signature`, pero no como test de integración de la ruta completa—, OAuth en
-    error, estados de publicación de contenido) — el patrón ya está probado y funcionando, así que
-    extenderlo es mecánico, pero son varias rutas más.
-  - **Aceptación parcial cumplida**: los 3 casos cubiertos sí fallarían en CI si la ruta perdiera
-    autenticación o la validación de CSV se rompiera. Falta extender la cobertura al resto de
-    rutas críticas para la aceptación completa.
+  - **Extendido (2026-07-12)**: `GET/POST /api/webhooks/whatsapp` (la ruta más crítica del
+    proyecto — la única que recibe tráfico no autenticado de Meta y dispara al bot real) ahora
+    tiene test de integración de ruta completa, mockeando `whatsapp-webhook-signature`,
+    `whatsapp-idempotency`, `whatsapp-bot` y `alert-email` (sin pegarle a Supabase real):
+    verificación GET de Meta (challenge correcto / token incorrecto), **WA-01** rechaza con 401 sin
+    firma válida, JSON inválido da 400, un objeto que no es `whatsapp_business_account` se ignora,
+    **WA-02** un evento duplicado no vuelve a disparar `handleIncomingMessage`, **WA-03** una falla
+    transitoria responde 500 (Meta reintenta) y una falla permanente responde 200 (no reintenta).
+  - **Pendiente real**: OAuth en estado de error y estados de publicación de contenido como tests
+    de integración de ruta — el patrón ya está probado y funcionando en 4 rutas distintas
+    (incluida la más crítica), extenderlo al resto es mecánico pero son varias rutas más.
+  - **Aceptación parcial cumplida**: los casos cubiertos —incluida la ruta más crítica del
+    proyecto— sí fallarían en CI si la ruta perdiera autenticación, dejara de deduplicar, o la
+    validación de CSV se rompiera. Falta extender la cobertura al resto de rutas críticas para la
+    aceptación completa.
 
 - [ ] **QA-02 — Smoke E2E móvil y desktop.**
   - Automatizar landing principal, slugs SEO, CTAs de cada sede, login y navegación del CRM.
