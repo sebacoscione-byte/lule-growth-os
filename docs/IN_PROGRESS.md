@@ -26,6 +26,9 @@ nativas más enlaces de atribución propios, sin sumar cron jobs ni tocar lógic
 - Lint, 35 suites / 303 tests y build de Next.js 16.2.9 aprobados.
 - La migración y el merge forman parte del cierre automatizado de esta tarea; no se tocó lógica
   médica ni se agregó un tercer cron.
+- El primer intento de migración detectó que la tabla histórica `landing_events` de producción no
+  tenía `utm_source`/`utm_medium`/`utm_campaign`: se corrigió la migración para reconciliar esas
+  columnas de forma idempotente antes de crear las RPCs, sin dejar cambios parciales.
 
 ## Riesgo y alcance
 
