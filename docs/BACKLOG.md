@@ -58,6 +58,17 @@ por qué tipo de acción es, para que sepas qué esperar de cada uno. El detalle
 - [ ] Crear un usuario de prueba en Supabase Auth (nunca tu cuenta ni la de Lucía) y cargar
   `E2E_TEST_EMAIL`/`E2E_TEST_PASSWORD` para correr los tests automáticos de dashboard/leads/inbox
   al menos una vez (QA-02).
+- [ ] **Aplicar en producción las 2 migraciones del PR #64** (métricas más allá del bot de
+  WhatsApp, 2026-07-13) — `npm run migrate` desde la notebook (necesita `SUPABASE_DB_PASSWORD`,
+  no disponible en el entorno remoto donde se armó el PR):
+  - `20260713_landing_clicks_by_location.sql` — sin esto, la card nueva "Clicks por sede: llamada
+    y WhatsApp" del dashboard no va a mostrar datos (falla en silencio, no rompe el resto).
+  - `20260713_instagram_follower_snapshots.sql` — sin esto, el snapshot diario de seguidores de
+    Instagram (corre dentro del cron de `publish-content`) no tiene dónde guardar el dato.
+  - Después de migrar, revisar en `/dashboard` que ambas cards muestren datos reales, y confirmar
+    en la primera corrida real del cron que `getFollowerCount()` devuelve un valor válido para la
+    cuenta conectada (no se pudo verificar contra la API real de Meta en el entorno donde se
+    escribió el código — ver CLAUDE.md, entrada 2026-07-13).
 
 ---
 
