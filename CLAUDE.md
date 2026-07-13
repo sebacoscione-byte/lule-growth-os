@@ -29,6 +29,16 @@
 - 2026-07-11 (DATA-02 de `docs/BACKLOG.md`): botón **"Eliminar datos de este paciente"** en `/leads/[id]` (confirmación explícita, irreversible) → `POST /api/leads/[id]/erase` → `eraseLead()` (`src/lib/data-erasure.ts`) → RPC `erase_lead` (migración `20260711_data_erasure.sql`), todo en una transacción SQL: borra `messages`/`handoff_events` del lead (tienen texto/resumen identificable), anonimiza `wa_id` en `whatsapp_cost_events`/`consent_records` (no se puede dejar null, son `not null` — preserva la fila para no perder agregados de costo/consentimiento históricos), borra la sesión de WhatsApp de ese teléfono (solo si no pertenece a otro lead — `leads.phone` no es unique) y la fila de `leads`, y deja registro en `data_erasure_log` (quién/cuándo, sin PII). Se eliminó de paso el `DELETE /api/leads/[id]` genérico que ya existía: no tenía ningún llamador y no limpiaba las tablas relacionadas — quedaba código muerto con riesgo real de borrado incompleto. **Sigue pendiente**: definir plazos de retención automática por tipo de dato (decisión de política, no técnica) — hoy el borrado es siempre manual, bajo pedido.
 - 2026-07-11 (TECH-01 de `docs/BACKLOG.md`): `src/middleware.ts` renombrado a `src/proxy.ts` (convención de Next.js 16 — función `middleware()` → `proxy()`). **Corrección importante sobre la guía inicial**: la skill `vercel:nextjs` sugiere `export const proxyConfig` para el matcher, pero eso es **incorrecto para Next.js 16.2.9** — el export del matcher sigue llamándose literalmente `config` (verificado leyendo `node_modules/next/dist/build/analysis/get-page-static-info.js`, que busca ese identificador exacto incluso dentro de `proxy.ts`; solo el nombre de la función exportada cambia). Usar `proxyConfig` hace que el matcher no se reconozca — el proxy corre sin filtro sobre *todas* las rutas, incluidos los assets de `_next/static`, rompiendo el CSS de todo el sitio (redirect 307 a `/login` en cada request de CSS/JS). Esto se detectó recién al verificar visualmente con un screenshot real del dev server (no alcanzaba con `npm run build`/`npm test`, que no lo detectan) — quedó corregido en el mismo PR antes de mergear. De paso se corrigió otro bug real: `isPublicRoute` comparaba el pathname completo contra `PUBLIC_ROOT_PATHS` con match exacto, así que un archivo de metadata anidado bajo una landing (ej. `/cardiologa-lanus/opengraph-image`) no matcheaba y redirigía a `/login` sin sesión — ahora compara contra el primer segmento del path. `npm run lint` quedó en 0 problemas (se sacó un import de tipo sin usar, `ContentChannel`). Se re-chequeó la vulnerabilidad moderada de PostCSS (transitiva de `next`) — sigue sin solución real, no existe ningún `16.3.0` estable todavía. **Queda pendiente** la parte de headers de seguridad (CSP, etc.) que también pedía este ticket — no se tocó por el riesgo real de romper un flujo de OAuth en silencio sin poder probarlo de punta a punta en este entorno (sin credenciales de login).
 - 2026-07-11 (SEO-01 de `docs/BACKLOG.md`): nueva landing `/cardiologa-caba` para Hospital Británico (mismo patrón data-driven que las 6 existentes, `src/lib/public-landings.ts`), cross-linkeada en `RELATED_LANDING_SLUGS`. Se agregó imagen Open Graph dinámica (`src/app/[slug]/opengraph-image.tsx`, `next/og`) — antes ninguna landing tenía OG image. **No se reusó `lucia-chahin.jpg`** para la placa: tiene relleno negro en las esquinas pensado solo para uso circular (`rounded-full`), se hubiera visto roto en un preview rectangular de WhatsApp/Instagram — se generó una placa con el nombre + `h1` de cada landing en su lugar. `robots.ts` dejó de tener la lista de slugs hardcodeada (ahora deriva de `PUBLIC_LANDING_SLUGS`, igual que `sitemap.ts` y `proxy.ts`) para que agregar una landing nueva no vuelva a requerir tocarlo a mano. **Bug real corregido de paso**: `buildSubpageFaq()` tenía un ternario binario hardcodeado (CIMEL/Swiss) para la pregunta "¿atendés en otra sede?" — con una tercera sede real hubiera respondido mal; se generalizó calculando "las otras sedes" desde la landing principal. **Otro bug real, preexistente (no de hoy)**: `/sitemap.xml` y `/robots.txt` quedaban atrapados por el auth gate de `proxy.ts` (mismo problema de match exacto que el de `opengraph-image` en TECH-01) y redirigían a `/login` — probablemente la razón real por la que "verificar indexación en Search Console" seguía pendiente en el backlog. Corregido agregando ambas rutas a `isPublicRoute`.
+- 2026-07-12 (fix 911→107 + cambio de política de merge): `medical-safety.ts` decía "911" en
+  `EMERGENCY_REPLY` mientras el resto del sitio ya decía 107 (SAME) — Seba confirmó explícitamente
+  "107 en todos lados". Como tocaba lógica médica, se pausó y se esperó su "dale" antes de mergear
+  (PR #61), siguiendo la regla vigente hasta ese momento. Inmediatamente después, Seba pidió sacar
+  esa excepción por completo: a partir de ahora los cambios a lógica médica se auto-mergean igual
+  que todo lo demás, sin esperar confirmación — la regla y las tres secciones que la mencionaban
+  (Reglas obligatorias, Preferencias de interacción, Instrucciones específicas para Claude Code)
+  quedaron actualizadas más abajo en este mismo archivo. Sigue siendo la categoría de mayor riesgo
+  directo sobre una persona real, así que verificarla con más cuidado antes de mergear, aunque ya
+  no haya pausa humana después.
 - 2026-07-11 (Ola 0 de `docs/BACKLOG.md`, blindaje de WhatsApp): **`WHATSAPP_APP_SECRET` ahora es fail-closed, no fail-open** — si esa variable no está cargada, `isValidWhatsAppSignature()` rechaza todo POST entrante al webhook (antes dejaba pasar sin validar para no cortar el bot de un día para el otro). Confirmado que la variable ya está cargada en Vercel (activa desde la auditoría de seguridad del 2026-07-07), así que este cambio no corta nada en producción hoy — pero si alguna vez se borra esa env var, el bot deja de recibir mensajes por completo en vez de aceptarlos sin verificar. Hay un aviso crítico en `/dashboard` (`checkWhatsAppWebhookSignatureMissing`) por si eso pasa. Además, el webhook ahora es **idempotente por `wa_message_id`** (tabla `whatsapp_webhook_events`, migración `20260711_whatsapp_webhook_idempotency.sql`, lógica en `src/lib/whatsapp-idempotency.ts`): un reenvío de Meta del mismo evento ya no duplica mensajes, respuestas del bot ni eventos de costo. Y **ya no devuelve `200` incondicional**: si el procesamiento de un mensaje falla de forma transitoria, el webhook responde `500` para que Meta reintente la entrega completa (la idempotencia hace que ese reintento sea seguro); si falla de forma definitiva (`WindowClosedError`, `TemplateNotApprovedError` — van a volver a fallar igual), sigue respondiendo `200` pero manda una alerta por email (reusa `sendCronFailureAlert`, mismo mecanismo que los cron jobs). Detalle completo en `docs/BACKLOG.md` → "Ola 0".
 
 ## Qué es esta app
@@ -46,15 +56,15 @@ y hacer seguimiento hasta que el paciente confirme que pidió turno.
   quiere que se le pida confirmación para mergear** — es responsabilidad del agente verificar
   que el build/tests pasen y el preview cargue bien, y mergear directamente.
 - **Mergear el PR sin pedir aprobación, siempre que build/tests pasen** — incluye webhooks de
-  WhatsApp, cron jobs, RLS/auth y cualquier otro riesgo legal/privacidad/producción. No
-  esperar un "dale": mergear y listo. Mergear a `main` dispara el deploy automático de Vercel.
-- **Única excepción: cambios a lógica médica** (clasificación de síntomas de alarma en
-  `medical-safety.ts`, guardrails, qué le dice el bot a un paciente sobre su salud). Ahí sí
-  avisar con el link de preview y esperar el "dale" del usuario antes de mergear — es la
-  única categoría con riesgo directo sobre una persona real, y el usuario decidió mantener
-  la pausa específicamente para esto (2026-07-07).
-- **"Avisar" en cualquier otro caso significa informar en el resumen de la tarea, no
-  preguntar ni esperar respuesta.** Si el cambio tocó webhooks, cron o RLS/auth, contarlo
+  WhatsApp, cron jobs, RLS/auth, lógica médica (guardrails, síntomas de alarma, mensajes al
+  paciente) y cualquier otro riesgo legal/privacidad/producción. No esperar un "dale": mergear
+  y listo. Mergear a `main` dispara el deploy automático de Vercel.
+  - **Historial**: hasta el 2026-07-12 los cambios a lógica médica eran la única excepción con
+    pausa obligatoria antes de mergear (decisión del 2026-07-07). Ese mismo día el usuario pidió
+    sacar la excepción — ahora se auto-mergean igual que todo lo demás, pero con el punto de
+    abajo (avisar con claridad qué cambió) aplicado con más cuidado todavía en esta categoría.
+- **"Avisar" en cualquier caso significa informar en el resumen de la tarea, no preguntar ni
+  esperar respuesta.** Si el cambio tocó webhooks, cron, RLS/auth o lógica médica, contarlo
   igual de claro en el resumen técnico — pero después de haber mergeado, no antes.
 - Priorizar siempre: seguridad, privacidad, Supabase RLS, integridad de los webhooks de
   WhatsApp, y los límites del plan Vercel Hobby (2 cron jobs máximo, ver `vercel.json`).
@@ -465,15 +475,16 @@ powershell.exe -NoProfile -Command "[System.Environment]::SetEnvironmentVariable
 
 ## Preferencias de interacción
 - **No pedir confirmación antes de actuar** — ni para pasos de bajo riesgo ni para mergear un
-  PR. El usuario lo pidió explícitamente (2026-07-07): "no quiero tener que confirmarte".
-  Explicar el plan/riesgos como información, no como pregunta que espera respuesta.
-- **Excepción**: cambios a lógica médica (guardrails, síntomas de alarma, mensajes al
-  paciente) — ahí sí esperar confirmación antes de mergear, ver "Reglas obligatorias" arriba.
+  PR, incluidos los que tocan lógica médica (guardrails, síntomas de alarma, mensajes al
+  paciente). El usuario lo pidió explícitamente (2026-07-07, y reafirmado sin excepciones el
+  2026-07-12): "no quiero tener que confirmarte". Explicar el plan/riesgos como información,
+  no como pregunta que espera respuesta.
 - **Nunca pushear directo a `main`.** Trabajar siempre en rama + Pull Request (la rama+PR es
   para tener preview de Vercel como red de seguridad, no para pedir aprobación humana).
 - **Mergear (y por lo tanto deployar) sin pedir aprobación siempre que build/tests pasen**,
-  salvo la excepción de lógica médica de arriba. Es responsabilidad del agente verificar el
-  preview antes de mergear, no del usuario.
+  sin excepciones. Es responsabilidad del agente verificar el preview antes de mergear, no
+  del usuario — y ser especialmente cuidadoso verificando cambios a lógica médica antes de
+  ese merge, ya que ahí no hay una segunda revisión humana antes del deploy.
 - **Solo preguntar cuando hay una decisión real entre múltiples opciones** con consecuencias
   distintas que no se pueden inferir del contexto — no para pedir permiso de ejecutar algo que
   ya se decidió hacer.
@@ -547,12 +558,14 @@ plano, sin cookies, que siempre autentica como `service_role` real.
 
 ## Instrucciones específicas para Claude Code
 - El usuario (Seba) hace vibe coding, no revisa diffs de código y pidió explícitamente no
-  tener que confirmar nada para mergear — con una sola excepción: cambios a lógica médica
-  (guardrails, síntomas de alarma, mensajes al paciente). Para todo lo demás (webhooks, cron,
-  RLS/auth, producción en general), verificar vos mismo que el build/tests pasen y el preview
-  cargue bien, y **mergear directamente, sin esperar un "dale"** (mergear a `main` = deploy
-  automático a producción). Si el cambio toca lógica médica, avisar con el link de preview y
-  esperar confirmación antes de mergear ese caso puntual.
+  tener que confirmar nada para mergear — **sin excepciones, incluidos cambios a lógica
+  médica** (guardrails, síntomas de alarma, mensajes al paciente; esta excepción existió entre
+  el 2026-07-07 y el 2026-07-12, el usuario pidió sacarla). Para todo (webhooks, cron,
+  RLS/auth, lógica médica, producción en general), verificar vos mismo que el build/tests
+  pasen y el preview cargue bien, y **mergear directamente, sin esperar un "dale"** (mergear a
+  `main` = deploy automático a producción). Sí prestar atención extra al verificar cambios de
+  lógica médica antes de ese merge — es la única categoría con riesgo directo sobre una
+  persona real y ya no hay pausa humana después del merge.
 - Nunca tocar `.env`/`.env.local`/secrets, ni exponerlos en output, commits o logs.
 - Nunca pushear directo a `main` — usar rama + PR, incluso si el usuario no lo pide
   explícitamente en el mensaje. El PR genera un preview en Vercel; es la red de seguridad
