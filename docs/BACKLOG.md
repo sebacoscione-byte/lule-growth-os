@@ -27,10 +27,12 @@ por qué tipo de acción es, para que sepas qué esperar de cada uno. El detalle
 - [ ] **2FA del Business Manager**: Facebook te bloqueó activarlo en tu cuenta personal ("no
   usaste mucho tiempo este dispositivo"). Probá desde la app de Facebook en el celular (más
   historial de uso), o esperá 24-48hs y reintentá.
-- [ ] **Aumento de cuota en Google Cloud** (proyecto `app-lule`) para las APIs de Google Business
-  Information/Account Management — es gratis, solo hay que pedirlo en
-  `cloud.google.com/docs/quotas/help/request_increase`. Mientras tanto, edita perfil/
-  publicaciones/reseñas desde el panel oficial de Google Business (Etapa 4).
+- [x] **Acceso a las APIs de Google Business Profile** (proyecto `app-lule`) — **solicitud enviada
+  el 2026-07-12**, caso de asistencia de Google **`2-7574000041506`**, tiempo de revisión
+  informado por Google: 7-10 días hábiles (no es instantáneo, y con volumen chico existe la
+  posibilidad de que la rechacen — ver [[reference_google_business_api_surface]] si se retoma).
+  Mientras se resuelve, seguí editando perfil/publicaciones/reseñas desde el panel oficial de
+  Google Business (Etapa 4).
 - [ ] **Google Search Console**: configurar con el sitemap (ahora sí es alcanzable — un bug lo
   bloqueaba antes) y verificar que las 8 páginas públicas queden indexadas (Etapa 3).
 - [ ] **Google Cloud (reseñas)**: revisar antes de octubre 2026 si se activa la cuenta completa o
@@ -757,11 +759,16 @@ Las pestañas **Perfil**, **Publicaciones** y **Reseñas** de Google Local muest
 "Falta Account ID". Confirmado 2026-07-05: el proyecto de Google Cloud (`app-lule`) tiene cuota 0 por
 defecto en `mybusinessbusinessinformation.googleapis.com` y `mybusinessaccountmanagement.googleapis.com`
 (`RESOURCE_EXHAUSTED`, `quota_limit_value: "0"`) — es una restricción anti-abuso de Google en todos los
-proyectos nuevos, **no tiene costo**, solo requiere pedir el aumento de cuota.
-- [ ] Solicitar aumento de cuota en `https://cloud.google.com/docs/quotas/help/request_increase`
-      (proyecto `app-lule`) para `My Business Business Information API` y
-      `My Business Account Management API`. Mientras tanto, editar perfil/posts/reseñas desde el
-      panel oficial de Google Business directamente (los links "Ir a Google Business" en cada tab).
+proyectos nuevos, **no tiene costo**, solo requiere pedir acceso.
+- [x] **Corregido y solicitado 2026-07-12**: no se pide desde Cloud Console → Cuotas (ese
+      formulario de "Editar cuota" redirige a una página de Google que confirma que el formulario
+      legacy de aumento de cuota está cerrado). El camino real fue
+      `support.google.com/business/contact/api_default` → **"Application for Basic API Access"**
+      → un formulario dedicado de Google (`developers.google.com/my-business`, no el de contacto)
+      con datos del proyecto (`app-lule`) y de la empresa. Solicitud enviada, caso de asistencia
+      **`2-7574000041506`**, revisión estimada 7-10 días hábiles. Mientras se resuelve, editar
+      perfil/posts/reseñas desde el panel oficial de Google Business directamente (los links "Ir a
+      Google Business" en cada tab).
 
 ---
 
