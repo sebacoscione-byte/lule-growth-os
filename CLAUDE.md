@@ -40,6 +40,31 @@
   directo sobre una persona real, así que verificarla con más cuidado antes de mergear, aunque ya
   no haya pausa humana después.
 - 2026-07-11 (Ola 0 de `docs/BACKLOG.md`, blindaje de WhatsApp): **`WHATSAPP_APP_SECRET` ahora es fail-closed, no fail-open** — si esa variable no está cargada, `isValidWhatsAppSignature()` rechaza todo POST entrante al webhook (antes dejaba pasar sin validar para no cortar el bot de un día para el otro). Confirmado que la variable ya está cargada en Vercel (activa desde la auditoría de seguridad del 2026-07-07), así que este cambio no corta nada en producción hoy — pero si alguna vez se borra esa env var, el bot deja de recibir mensajes por completo en vez de aceptarlos sin verificar. Hay un aviso crítico en `/dashboard` (`checkWhatsAppWebhookSignatureMissing`) por si eso pasa. Además, el webhook ahora es **idempotente por `wa_message_id`** (tabla `whatsapp_webhook_events`, migración `20260711_whatsapp_webhook_idempotency.sql`, lógica en `src/lib/whatsapp-idempotency.ts`): un reenvío de Meta del mismo evento ya no duplica mensajes, respuestas del bot ni eventos de costo. Y **ya no devuelve `200` incondicional**: si el procesamiento de un mensaje falla de forma transitoria, el webhook responde `500` para que Meta reintente la entrega completa (la idempotencia hace que ese reintento sea seguro); si falla de forma definitiva (`WindowClosedError`, `TemplateNotApprovedError` — van a volver a fallar igual), sigue respondiendo `200` pero manda una alerta por email (reusa `sendCronFailureAlert`, mismo mecanismo que los cron jobs). Detalle completo en `docs/BACKLOG.md` → "Ola 0".
+- 2026-07-13 (métricas más allá del bot de WhatsApp): Seba marcó que el dashboard parecía medir
+  solo contactos por el bot de Lucía, dejando afuera pacientes que llaman/escriben directo a Swiss
+  Medical o al Hospital Británico (ninguna de las dos sedes pasa por el bot: Swiss usa su propio
+  WhatsApp "Swity", Británico deriva a teléfono/central de turnos) y el crecimiento de seguidores de
+  Instagram. Investigado a fondo: las visitas de landing y los clicks por sede **ya se capturaban**
+  en `landing_events` (`click_call`/`click_whatsapp` + `location_key` desde el 2026-07-06), pero no
+  se veían en ningún lado — la card "Métricas de landings" del dashboard medía `cta_cimel`/
+  `cta_swiss`/`cta_britanico`/`form_submitted`, tipos de evento que **ningún componente dispara desde
+  ese mismo rediseño**: mostraba 0/0/0/0 permanentemente, una métrica muerta que aparentaba medir
+  algo. Se reemplazó por una card real, "Clicks por sede: llamada y WhatsApp" (RPC
+  `landing_clicks_by_location`, migración `20260713_landing_clicks_by_location.sql`), que sí cubre
+  Swiss y Británico — deja explícito que mide el click, no si ese contacto externo (invisible para la
+  app) terminó en un turno. Para Instagram, no existía ningún tracking histórico de seguidores —
+  `getBusinessDiscovery()` (para consultar OTRAS cuentas) está confirmado que no funciona en
+  `graph.instagram.com`, pero el conteo de la **cuenta propia conectada** es un campo normal
+  (`/me?fields=followers_count`, ya alcanza con el scope `instagram_business_manage_insights`
+  cargado desde el 2026-07-10) que no tiene esa limitación. Se agregó `getFollowerCount()`
+  (`src/lib/instagram-business.ts`) y un snapshot diario (`src/lib/instagram-followers.ts`, tabla
+  `instagram_follower_snapshots`, migración `20260713_instagram_follower_snapshots.sql`) que corre
+  dentro del cron ya existente de `publish-content` (no suma un cron job nuevo). Nueva card
+  "Instagram: seguidores" en `/dashboard` con el total actual y la variación de 7/30 días. **No
+  verificado contra la API real de Instagram en este entorno** (sin credenciales de Meta ni de
+  Supabase acá) — si `followers_count` resultara no estar disponible para esta cuenta/token, el
+  snapshot falla en silencio hacia el cron (no lo rompe) y queda logueado como el resto de fallos de
+  publicación (ver OPS-01); revisar el resultado real de la primera corrida en producción.
 
 ## Qué es esta app
 Sistema de adquisición de pacientes para la Dra. Lucía Chahin, cardióloga.
