@@ -255,6 +255,14 @@ booking_instruction_viewed — vio instrucciones de turno
 6. Confirmaciones de turno pedido
 7. Leads que no pudieron pedir turno
 8. Leads que requieren atención humana
+9. Evolución diaria y comparación 7/30/90/365 días del embudo completo
+10. Visitas, leads y turnos por canal atribuido (incluido directo/sin UTM)
+11. Instagram: seguidores, alcance, visitas al perfil, taps en enlaces e interacciones
+12. Google Business: impresiones Search/Maps, clicks al sitio, llamadas, direcciones, rating y reseñas
+
+Los perfiles externos usan enlaces canónicos medibles: `/go/instagram` para la bio y `/go/google`
+para el sitio web de Google Business. Ambos redirigen a `/dra-lucia-chahin` con UTMs propias; así la
+app conserva atribución aunque una API externa no esté disponible temporalmente.
 
 ---
 

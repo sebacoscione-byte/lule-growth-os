@@ -11,6 +11,7 @@ import { generateContentVisual } from "@/lib/ai"
 import { publishApprovedItem } from "@/lib/content-publish"
 import { runWhatsAppFollowup } from "@/lib/whatsapp-followup"
 import { snapshotInstagramFollowers } from "@/lib/instagram-followers"
+import { snapshotGoogleBusinessMetrics } from "@/lib/google-performance"
 import { sendCronFailureAlert } from "@/lib/alert-email"
 import type { AutoPublishTrackSettings, ContentChannel } from "@/types"
 
@@ -148,6 +149,11 @@ export async function GET(request: Request) {
     // contenido -- ver src/lib/instagram-followers.ts.
     const instagramFollowers = await snapshotInstagramFollowers(supabase, now)
 
+    // Insights de Google (Places + Business Performance) comparten este cron diario para respetar
+    // el limite de 2 cron jobs de Vercel Hobby. La cuota 0 de GBP es un estado esperado y se guarda
+    // como quota_blocked; no frena publicaciones ni genera una falsa alarma diaria.
+    const googleBusinessMetrics = await snapshotGoogleBusinessMetrics(supabase, now)
+
     // Alerta por email (ver src/lib/alert-email.ts) solo ante fallos reales -- no ante estados
     // esperados (skipped_*, quota_exceeded) ni ante el aviso ya conocido de template sin aprobar.
     const failures: string[] = []
@@ -157,6 +163,7 @@ export async function GET(request: Request) {
     const realWhatsappErrors = whatsappFollowup.errors.filter(e => !e.includes("todavía no está aprobado"))
     if (realWhatsappErrors.length > 0) failures.push(`Seguimiento WhatsApp: ${realWhatsappErrors.join("; ")}`)
     if (instagramFollowers.error) failures.push(`Seguidores de Instagram: ${instagramFollowers.error}`)
+    if (googleBusinessMetrics.error) failures.push(`Métricas de Google Business: ${googleBusinessMetrics.error}`)
     if (failures.length > 0) {
       await sendCronFailureAlert("publish-content", failures.join("\n"))
     }
@@ -164,6 +171,7 @@ export async function GET(request: Request) {
     return NextResponse.json({
       post: post.last_run_result, historia: historia.last_run_result, carrusel: carrusel.last_run_result,
       whatsappFollowup, instagramFollowers,
+      googleBusinessMetrics,
     })
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)

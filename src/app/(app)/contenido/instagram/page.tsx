@@ -9,6 +9,7 @@ import {
   ImageIcon, Plus, Save, Search, Send, ShieldCheck, Sparkles, Pin, Undo2, Unlink, WandSparkles, X,
 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
+import { TrackedProfileLink } from "@/components/tracked-profile-link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -467,6 +468,13 @@ function BioYFijadosTab() {
 
       <div>
         <h3 className="text-base font-semibold text-gray-900 mb-3">Bio de Instagram</h3>
+        <div className="mb-3">
+          <TrackedProfileLink
+            channel="instagram"
+            title="Enlace medible para la bio"
+            description="Pegalo en el campo Enlaces del perfil. Cada apertura aparecerá en el dashboard como visita desde Instagram; además se compara con los taps nativos que informa Meta."
+          />
+        </div>
         <CopyBlock
           title="Bio sugerida"
           subtitle="Pegala en Editar perfil → Biografía (reemplazá todo el texto actual)"

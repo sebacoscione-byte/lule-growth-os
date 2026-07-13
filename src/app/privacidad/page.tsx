@@ -83,6 +83,11 @@ export default function PrivacidadPage() {
             Datos de navegación agregados de este sitio (páginas vistas, clics en los botones
             de &quot;Pedir turno&quot;/&quot;Llamar&quot;/&quot;WhatsApp&quot;) — no incluyen tu nombre ni tu teléfono.
           </li>
+          <li>
+            Un identificador aleatorio de sesión por pestaña, usado únicamente para no contar a la
+            misma visita varias veces si toca más de un botón. Se guarda en <code>sessionStorage</code>,
+            no identifica a la persona y se elimina al cerrar la pestaña.
+          </li>
         </ul>
         <p>
           <strong>No recolectamos ni pedimos</strong> resultados de estudios médicos, historia
@@ -187,9 +192,10 @@ export default function PrivacidadPage() {
           carga. Podés cambiar tu decisión borrando las cookies del sitio en tu navegador.
         </p>
         <p>
-          Ninguna de las dos cookies incluye tu nombre, teléfono ni el contenido de tu consulta, y
-          ambas se cargan solo en las páginas públicas de este sitio, nunca en el sistema de
-          gestión interno.
+          El identificador anónimo de sesión mencionado arriba no es una cookie, no persiste entre
+          pestañas y se usa para analítica propia agregada aun cuando Google Analytics esté rechazado.
+          Ninguna cookie ni ese identificador incluye tu nombre, teléfono o el contenido de tu
+          consulta; se usan solo en las páginas públicas, nunca en el sistema de gestión interno.
         </p>
       </Section>
 

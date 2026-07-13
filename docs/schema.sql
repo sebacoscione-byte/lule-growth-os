@@ -169,10 +169,15 @@ create table if not exists landing_events (
   event_type text not null
     check (event_type in (
       'cta_cimel', 'cta_swiss', 'cta_britanico', 'instructions_viewed', 'form_started', 'form_submitted',
-      'page_view', 'click_booking', 'click_call', 'click_whatsapp', 'click_maps'
+      'page_view', 'click_booking', 'click_call', 'click_whatsapp', 'click_maps',
+      'click_hero_primary', 'click_hero_secondary'
     )),
   slug text not null,
   location_key text check (location_key is null or location_key in ('cimel', 'swiss', 'britanico')),
+  variant text check (variant is null or variant in ('a', 'b')),
+  -- UUID aleatorio por pestaña/sesión (sessionStorage), sin cookie ni PII. Permite deduplicar
+  -- varias acciones de una misma visita en las tasas del dashboard.
+  session_id uuid,
   utm_source text,
   utm_medium text,
   utm_campaign text,
@@ -189,6 +194,36 @@ create table if not exists weekly_reports (
   week_end date not null,
   metrics jsonb not null,
   created_at timestamptz not null default now()
+);
+
+-- ============================================================
+-- SNAPSHOTS MULTICANAL (cron diario publish-content)
+-- ============================================================
+create table if not exists instagram_follower_snapshots (
+  id uuid default uuid_generate_v4() primary key,
+  captured_on date not null,
+  followers_count int not null,
+  reach int,
+  profile_views int,
+  link_taps int,
+  total_interactions int,
+  created_at timestamptz not null default now()
+);
+
+create table if not exists google_business_snapshots (
+  id uuid default uuid_generate_v4() primary key,
+  captured_on date not null,
+  rating numeric(2, 1),
+  review_count int,
+  impressions_search int,
+  impressions_maps int,
+  website_clicks int,
+  call_clicks int,
+  direction_requests int,
+  performance_status text not null default 'pending'
+    check (performance_status in ('available', 'quota_blocked', 'not_connected', 'pending', 'error')),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
 );
 
 -- ============================================================
@@ -336,7 +371,11 @@ create index if not exists landing_events_event_type_idx on landing_events(event
 create index if not exists landing_events_created_at_idx on landing_events(created_at desc);
 create index if not exists landing_events_location_key_idx on landing_events(location_key);
 create index if not exists landing_events_utm_content_idx on landing_events(utm_content);
+create index if not exists landing_events_session_id_idx on landing_events(session_id);
+create index if not exists landing_events_created_type_session_idx on landing_events(created_at desc, event_type, session_id);
 create unique index if not exists weekly_reports_week_start_idx on weekly_reports(week_start);
+create unique index if not exists instagram_follower_snapshots_captured_on_idx on instagram_follower_snapshots(captured_on);
+create unique index if not exists google_business_snapshots_captured_on_idx on google_business_snapshots(captured_on);
 
 -- ============================================================
 -- UPDATED_AT trigger
@@ -419,6 +458,22 @@ create policy "service_role_write_weekly_reports"
 
 create policy "authenticated_read_weekly_reports"
   on weekly_reports for select to authenticated using (true);
+
+alter table instagram_follower_snapshots enable row level security;
+
+create policy "service_role_write_instagram_follower_snapshots"
+  on instagram_follower_snapshots for all to service_role using (true) with check (true);
+
+create policy "authenticated_read_instagram_follower_snapshots"
+  on instagram_follower_snapshots for select to authenticated using (true);
+
+alter table google_business_snapshots enable row level security;
+
+create policy "service_role_write_google_business_snapshots"
+  on google_business_snapshots for all to service_role using (true) with check (true);
+
+create policy "authenticated_read_google_business_snapshots"
+  on google_business_snapshots for select to authenticated using (true);
 
 -- ============================================================
 -- SEED: Configuración inicial

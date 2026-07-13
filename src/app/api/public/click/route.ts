@@ -20,6 +20,7 @@ const clickEventSchema = z.object({
   utm_medium: z.string().trim().max(200).optional().nullable(),
   utm_campaign: z.string().trim().max(200).optional().nullable(),
   utm_content: z.string().trim().max(200).optional().nullable(),
+  session_id: z.string().uuid().optional().nullable(),
 })
 
 export async function POST(request: Request) {
@@ -36,7 +37,10 @@ export async function POST(request: Request) {
   if (!result.success) {
     return NextResponse.json({ error: formatZodError(result.error) }, { status: 400 })
   }
-  const { event_type, slug, location_key, variant, utm_source, utm_medium, utm_campaign, utm_content } = result.data
+  const {
+    event_type, slug, location_key, variant,
+    utm_source, utm_medium, utm_campaign, utm_content, session_id,
+  } = result.data
 
   const supabase = getServiceDb()
   const { error } = await supabase.from("landing_events").insert({
@@ -48,6 +52,7 @@ export async function POST(request: Request) {
     utm_medium: utm_medium ?? null,
     utm_campaign: utm_campaign ?? null,
     utm_content: utm_content ?? null,
+    session_id: session_id ?? null,
   })
 
   if (error) return NextResponse.json({ error: "No se pudo registrar el evento" }, { status: 500 })

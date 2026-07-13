@@ -126,6 +126,78 @@ export async function getFollowerCount(token: string): Promise<number> {
   return data.followers_count
 }
 
+export type InstagramAccountInsightMetric =
+  | "reach"
+  | "profile_views"
+  | "profile_links_taps"
+  | "total_interactions"
+
+export interface InstagramAccountInsights {
+  reach: number | null
+  profileViews: number | null
+  linkTaps: number | null
+  totalInteractions: number | null
+}
+
+interface InstagramInsightResponse {
+  data?: Array<{
+    values?: Array<{ value?: number }>
+    total_value?: { value?: number }
+  }>
+  error?: { message?: string }
+}
+
+export function parseInstagramInsightValue(data: InstagramInsightResponse): number | null {
+  const metric = data.data?.[0]
+  const latestValue = metric?.values?.at(-1)?.value
+  if (typeof latestValue === "number") return latestValue
+  const totalValue = metric?.total_value?.value
+  return typeof totalValue === "number" ? totalValue : null
+}
+
+async function getAccountInsightMetric(
+  token: string,
+  metric: InstagramAccountInsightMetric
+): Promise<number | null> {
+  const params = new URLSearchParams({
+    metric,
+    period: "day",
+    access_token: token,
+  })
+  const res = await fetch(`${GRAPH_BASE}/me/insights?${params}`)
+  const data = await res.json() as InstagramInsightResponse
+  if (!res.ok || data.error) {
+    throw new Error(data.error?.message || `IG account insights error ${res.status}`)
+  }
+  return parseInstagramInsightValue(data)
+}
+
+/**
+ * Métricas diarias nativas de la cuenta profesional. Se consultan por separado porque Meta puede
+ * no habilitar una métrica puntual (por tipo/tamaño de cuenta) sin que eso deba ocultar las demás.
+ */
+export async function getInstagramAccountInsights(token: string): Promise<InstagramAccountInsights> {
+  const metrics: InstagramAccountInsightMetric[] = [
+    "reach", "profile_views", "profile_links_taps", "total_interactions",
+  ]
+  const results = await Promise.all(metrics.map(async metric => {
+    try {
+      return await getAccountInsightMetric(token, metric)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      console.error(`[instagram-insights] metric=${metric}: ${message}`)
+      return null
+    }
+  }))
+
+  return {
+    reach: results[0],
+    profileViews: results[1],
+    linkTaps: results[2],
+    totalInteractions: results[3],
+  }
+}
+
 interface BusinessDiscoveryData {
   username: string
   name?: string

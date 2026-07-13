@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
+import { TrackedProfileLink } from "@/components/tracked-profile-link"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -592,18 +593,25 @@ function ProfileTab({ onRefresh }: { status: StatusData; onRefresh: () => void }
   if (profileError) {
     const isQuota = profileError.includes("429") || profileError.includes("RATE_LIMIT") || profileError.includes("Quota")
     return (
-      <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 text-sm text-amber-800">
-        <p className="font-medium mb-1">{isQuota ? "Perfil no disponible (cuota API = 0)" : "Error al cargar perfil"}</p>
-        <p className="text-xs mb-3">
-          {isQuota
-            ? "Google requiere solicitar acceso a la Business Profile API. Editá el perfil directamente en:"
-            : profileError}
-        </p>
-        {isQuota && (
-          <a href="https://business.google.com/" target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-xs font-medium text-blue-600 underline">
-            Ir a Google Business <ExternalLink className="h-3 w-3" />
-          </a>
-        )}
+      <div className="space-y-4">
+        <TrackedProfileLink
+          channel="google"
+          title="Enlace medible para Google Business"
+          description="Aunque la API siga con cuota 0, este enlace permite medir en la web cuántas personas llegan desde la ficha. Copialo en Sitio web desde el panel oficial de Google."
+        />
+        <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 text-sm text-amber-800">
+          <p className="font-medium mb-1">{isQuota ? "Perfil no disponible (cuota API = 0)" : "Error al cargar perfil"}</p>
+          <p className="text-xs mb-3">
+            {isQuota
+              ? "Google requiere solicitar acceso a la Business Profile API. Editá el perfil directamente en:"
+              : profileError}
+          </p>
+          {isQuota && (
+            <a href="https://business.google.com/" target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-xs font-medium text-blue-600 underline">
+              Ir a Google Business <ExternalLink className="h-3 w-3" />
+            </a>
+          )}
+        </div>
       </div>
     )
   }
@@ -641,6 +649,12 @@ function ProfileTab({ onRefresh }: { status: StatusData; onRefresh: () => void }
       <Card>
         <CardHeader><CardTitle className="text-sm font-medium text-gray-700">Sitio web</CardTitle></CardHeader>
         <CardContent className="space-y-3">
+          <TrackedProfileLink
+            channel="google"
+            title="Enlace medible recomendado"
+            description="Usalo como Sitio web de la ficha. Registra las llegadas con origen Google Maps y permite compararlas con los clicks nativos de Google Business."
+            onUse={setWebsite}
+          />
           <Input value={website} onChange={e => setWebsite(e.target.value)} placeholder="https://..." />
           <SaveButton saving={savingWeb} saved={savedWeb} onClick={saveWebsite} />
         </CardContent>

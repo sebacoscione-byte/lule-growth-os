@@ -1,3 +1,42 @@
+# EN CURSO (2026-07-13) — dashboard de crecimiento y métricas multicanal
+
+## Objetivo
+
+Convertir `/dashboard` en una vista de seguimiento temporal y accionable del embudo completo
+(web → contacto → lead → turno confirmado), y cerrar la medición de Instagram/Google con métricas
+nativas más enlaces de atribución propios, sin sumar cron jobs ni tocar lógica médica.
+
+## Plan
+
+- [x] Auditar eventos, UTMs, métricas nativas y visualización actual del dashboard.
+- [x] Agregar selector de período, comparación contra período anterior y series temporales.
+- [x] Incorporar enlaces medibles para bio de Instagram y sitio web de Google Business.
+- [x] Guardar snapshots de insights de Instagram y Google dentro del cron existente
+      `publish-content` (Vercel Hobby sigue en 2 crons).
+- [x] Reorganizar el dashboard por embudo/canales y agregar visualizaciones accesibles sin una
+      dependencia nueva de gráficos.
+- [x] Actualizar documentación, correr lint/tests/build y verificar visualmente.
+- [x] Abrir PR, validar preview de Vercel y mergear a `main` si todo pasa.
+
+## Resultado
+
+- PR #70 con checks de GitHub Actions y Vercel aprobados; el preview conserva la protección SSO
+  esperada. La misma compilación de producción se verificó localmente en desktop (1440 px) y
+  mobile (390 px), además de comprobar auth y redirecciones UTM.
+- Lint, 35 suites / 303 tests y build de Next.js 16.2.9 aprobados.
+- La migración y el merge forman parte del cierre automatizado de esta tarea; no se tocó lógica
+  médica ni se agregó un tercer cron.
+
+## Riesgo y alcance
+
+- No se modifica `medical-safety.ts`, guardrails ni ningún texto médico para pacientes.
+- Se agregan solamente métricas agregadas y un identificador anónimo de sesión por pestaña para
+  evitar contar varios clicks de una misma visita como varias conversiones; no se guarda PII nueva.
+- Google Business Performance puede seguir devolviendo cuota 0: el dashboard debe mostrarlo con
+  claridad y mantener la atribución propia por UTM como respaldo.
+
+---
+
 # EN CURSO (2026-07-11) — continuación del plan de corrección de auditoría
 
 Contexto: `docs/BACKLOG.md` → "Plan de corrección — auditoría integral". Ola 0 (WA-01/02/03),

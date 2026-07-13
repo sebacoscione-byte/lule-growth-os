@@ -1,0 +1,31 @@
+import {
+  buildGrowthPeriodSummary,
+  parseDashboardPeriod,
+  type GrowthTrendPoint,
+} from "@/lib/dashboard-growth"
+
+function point(values: Partial<GrowthTrendPoint>): GrowthTrendPoint {
+  return {
+    date: "2026-07-13", visits: 0, engagedVisits: 0, contactActions: 0,
+    leads: 0, confirmed: 0, ...values,
+  }
+}
+
+describe("dashboard growth", () => {
+  it("acepta solo periodos soportados", () => {
+    expect(parseDashboardPeriod("7")).toBe(7)
+    expect(parseDashboardPeriod("365")).toBe(365)
+    expect(parseDashboardPeriod("999")).toBe(30)
+    expect(parseDashboardPeriod(undefined)).toBe(30)
+  })
+
+  it("compara el embudo actual con el periodo anterior", () => {
+    const summary = buildGrowthPeriodSummary(
+      [point({ visits: 100, engagedVisits: 30, contactActions: 42, leads: 10, confirmed: 4 })],
+      [point({ visits: 80, engagedVisits: 20, contactActions: 25, leads: 8, confirmed: 2 })],
+    )
+    expect(summary.visits).toEqual({ current: 100, previous: 80 })
+    expect(summary.visitToLeadRate).toEqual({ current: 10, previous: 10 })
+    expect(summary.leadToConfirmedRate).toEqual({ current: 40, previous: 25 })
+  })
+})
