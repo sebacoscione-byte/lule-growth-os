@@ -65,6 +65,24 @@
   Supabase acá) — si `followers_count` resultara no estar disponible para esta cuenta/token, el
   snapshot falla en silencio hacia el cron (no lo rompe) y queda logueado como el resto de fallos de
   publicación (ver OPS-01); revisar el resultado real de la primera corrida en producción.
+- 2026-07-13 (mismo día, continuación): las 2 migraciones de arriba quedaron sin aplicar en
+  producción (el entorno del celular no tiene `SUPABASE_DB_PASSWORD`) — corridas después desde la
+  notebook, `npm run migrate` las aplicó sin problema. Con la card ya mostrando datos reales, Seba
+  marcó que los números eran sospechosamente bajos: "Llamar" daba **0 en las tres sedes** y
+  WhatsApp daba apenas 1 en Swiss y 1 en Británico — "es imposible que solo haya sido 1 persona".
+  **Bug real encontrado**: `trackLandingEvent()` (`src/lib/landing-track.ts`) mandaba el evento con
+  un `fetch()` sin `keepalive`. El botón "Llamar" navega en la **misma pestaña** (`href="tel:..."`,
+  sin `target="_blank"`) y los de WhatsApp/Maps pueden pausar la pestaña de origen al abrir la app
+  nativa en mobile — en ambos casos el navegador puede cancelar un `fetch` en vuelo si la página se
+  descarga/pausa antes de que el request salga, más probable todavía en conexión mobile. Esto
+  explica el patrón: "Llamar" en 0 por igual en las tres sedes no era casualidad, era sistemático.
+  Corregido con `keepalive: true` (fix de una línea, el estándar del navegador para este patrón
+  exacto de beacon-antes-de-navegar). **Aclaración importante que no es un bug**: este contador solo
+  mide clicks en el botón de la landing — un paciente que consigue el WhatsApp de Swiss o el
+  teléfono del Británico por otro canal (Google Maps, Instagram, de memoria) y nunca pasa por la
+  landing sigue siendo invisible para la app, ya aclarado en el subtítulo de la card. No se pudo
+  verificar en vivo que el fix sube los números reales (sin credenciales de login en este entorno)
+  — seguir el número de "Llamar" en los próximos días en `/dashboard`, debería dejar de ser 0.
 
 ## Qué es esta app
 Sistema de adquisición de pacientes para la Dra. Lucía Chahin, cardióloga.
