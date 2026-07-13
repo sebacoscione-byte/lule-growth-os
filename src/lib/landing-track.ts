@@ -14,9 +14,14 @@ export function trackLandingEvent(
   slug: string,
   extra?: Record<string, string>
 ) {
+  // keepalive: los CTAs de "Llamar" navegan en la misma pestaña (tel:) y los de WhatsApp/Maps
+  // pueden pausar la pestaña de origen al abrir la app nativa en mobile -- sin esto, el navegador
+  // puede cancelar este fetch a mitad de camino cuando la página se descarga/pausa justo después
+  // del click, subcontando clicks reales. keepalive garantiza que el request sobreviva.
   fetch("/api/public/click", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ event_type, slug, ...extra }),
+    keepalive: true,
   }).catch(() => {})
 }
