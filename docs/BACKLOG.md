@@ -43,6 +43,22 @@ por qué tipo de acción es, para que sepas qué esperar de cada uno. El detalle
   (administrador completo vs. acceso acotado).
 - [ ] Definir estrategia de reseñas de Google: cómo y cuándo pedirlas a pacientes actuales.
 - [ ] Evaluar si crear una ficha de Google Business separada para Swiss Medical Lomas.
+- [ ] **Evaluar separar `lule-chahin` a su propio team de Vercel en plan Pro (2026-07-13).** No
+  es por aislamiento de datos entre proyectos — Vercel ya aísla cada proyecto por completo (env
+  vars, dominios, deployments) sin importar si comparten cuenta/team con `gastos-personales`. El
+  motivo real es que el plan Hobby de Vercel está pensado para uso personal/no comercial, y este
+  es un producto comercial (captación de pacientes para una doctora real, con datos de salud) —
+  por los términos de uso de Vercel, probablemente ya debería estar en Pro independientemente del
+  otro proyecto. Nota aparte: "HIPAA BAA" que aparece en las features de Pro es en realidad
+  add-on de Enterprise, y de todas formas HIPAA no aplica (es ley de EE.UU.) — lo que aplica acá
+  es la Ley 25.326 argentina, y ahí lo que importa es la política de privacidad propia
+  (`docs/REVISION_LEGAL_PRIVACIDAD.md`, ya pendiente arriba), no una certificación de Vercel.
+- [ ] **Evaluar pagar Supabase Pro, $25/mes (2026-07-13).** El beneficio con más peso real acá es
+  backups automáticos diarios (7 días de retención) — Free no los tiene, y este proyecto maneja
+  dato de salud. También evita que el proyecto se pause por inactividad tras una semana sin uso
+  (poco probable con tráfico real, pero posible). El resto de los beneficios de Pro (más storage,
+  más usuarios de Auth, logs con más retención) hoy no son un cuello de botella real dado el
+  volumen del proyecto.
 
 ### ✍️ Contenido para cargar/publicar (no requiere código)
 - [ ] Publicar los 3 posts fijados de Instagram (ya generados en Estudio de contenido).
