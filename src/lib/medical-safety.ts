@@ -22,4 +22,4 @@ export function isEmergencyMessage(text: string): boolean {
 }
 
 export const EMERGENCY_REPLY =
-  "🚨 Por los síntomas que mencionás, esto puede requerir atención urgente. No esperes la respuesta del bot: andá a una guardia o llamá al *911* ahora mismo.\n\nDejamos registrado tu mensaje para que el equipo de la Dra. Lucía Chahin lo revise."
+  "🚨 Por los síntomas que mencionás, esto puede requerir atención urgente. No esperes la respuesta del bot: andá a una guardia o llamá al *107* (SAME) ahora mismo.\n\nDejamos registrado tu mensaje para que el equipo de la Dra. Lucía Chahin lo revise."
