@@ -9,11 +9,28 @@
 --    ya existente (Vercel Hobby sigue en 2 crons).
 -- ============================================================
 
-alter table landing_events add column if not exists session_id uuid;
+-- `landing_events` existia antes del historial de migraciones en algunos entornos. La migracion
+-- 20260620 usa `create table if not exists`, por lo que no agregaba estas columnas a esa tabla
+-- historica. Declararlas aca mantiene este cambio autocontenido e idempotente.
+alter table landing_events
+  add column if not exists session_id uuid,
+  add column if not exists utm_source text,
+  add column if not exists utm_medium text,
+  add column if not exists utm_campaign text,
+  add column if not exists utm_content text;
+
+-- Defensa equivalente para instalaciones historicas cuyo registro de migraciones y esquema real
+-- pudieran no coincidir. Las columnas ya existen en instalaciones nuevas.
+alter table leads
+  add column if not exists utm_source text,
+  add column if not exists utm_medium text,
+  add column if not exists utm_campaign text,
+  add column if not exists utm_content text;
 
 create index if not exists landing_events_session_id_idx on landing_events(session_id);
 create index if not exists landing_events_created_type_session_idx
   on landing_events(created_at desc, event_type, session_id);
+create index if not exists landing_events_utm_source_idx on landing_events(utm_source);
 
 -- Mantiene la firma existente, pero "interactions" pasa a significar visitas que hicieron al
 -- menos una accion. Para datos historicos sin session_id se limita al total de visitas para evitar
