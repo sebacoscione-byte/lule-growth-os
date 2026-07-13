@@ -104,6 +104,24 @@
   sin acceso hoy fallaría en silencio para siempre hasta que se resuelva la cuota. Ambos quedan
   como ideas concretas para retomar, no implementadas. No se pudo verificar visualmente en este
   entorno (sin credenciales de login) — validado por build, lint y tests.
+- 2026-07-13 (dashboard de crecimiento multicanal): la revisión anterior quedó superada para las
+  métricas de **cuenta**. `/dashboard` ahora tiene selector 7/30/90/365 días, comparación contra el
+  período anterior, serie diaria y embudo visita → acción → lead → turno, tabla de canales, desglose
+  de acciones web y visualizaciones históricas de Instagram/Google. La migración
+  `20260713_dashboard_growth_metrics.sql` agrega `landing_events.session_id` (UUID anónimo por
+  pestaña en `sessionStorage`, sin cookie ni PII) y RPCs agregadas; así una persona que toca varios
+  botones cuenta una sola vez como visita con acción. Se agregaron enlaces públicos estables
+  `https://draluciachahin.ar/go/instagram` y `/go/google`: redirigen a la landing con UTMs propias y
+  se muestran listos para copiar en "Bio y Fijados" y "Google Local". Instagram guarda diariamente
+  `reach`, `profile_views`, `profile_links_taps` y `total_interactions` junto al snapshot de
+  seguidores. Google guarda rating/reseñas desde Places API y, cuando Google habilite la cuota,
+  impresiones/clicks/llamadas/direcciones desde Business Profile Performance API; una respuesta de
+  cuota 0 queda como `quota_blocked` (estado visible, no falsa alarma diaria). Todo corre dentro de
+  `publish-content`: `vercel.json` sigue con exactamente 2 crons. Los insights nativos **por post**
+  de Instagram siguen pendientes porque todavía no se persiste el `mediaId`; el dashboard sí muestra
+  qué piezas llevaron visitas/acciones a la web mediante el link `utm_content` ya existente. La UI
+  se verificó localmente en escritorio (1440 px) y móvil (390 px) con navegador real; los únicos
+  errores de consola fueron reconexiones HMR del servidor de desarrollo, no errores de la app.
 
 ## Qué es esta app
 Sistema de adquisición de pacientes para la Dra. Lucía Chahin, cardióloga.

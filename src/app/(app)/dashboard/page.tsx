@@ -1,14 +1,16 @@
 import { createClient } from "@/lib/supabase/server"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import {
-  Users, CheckCircle2, AlertTriangle, Clock,
-  MapPin, Camera, Search, MessageSquare, Globe, Lightbulb, DollarSign, Eye
+  Users, CheckCircle2, Clock,
+  MapPin, Camera, Search, MessageSquare, Globe, Lightbulb, DollarSign, Eye,
+  MousePointerClick, TrendingUp, ArrowUpRight, ArrowDownRight, Minus,
+  CalendarDays, PhoneCall, Navigation, Star, BarChart3,
 } from "lucide-react"
 import { STATUS_LABELS, STATUS_COLORS, type Lead } from "@/types"
 import { timeAgo } from "@/lib/utils"
 import { LANDING_DATA, PUBLIC_LANDING_SLUGS } from "@/lib/public-landings"
 import { allReferralCodes } from "@/lib/landing-referral-codes"
-import { readAutoPublishSettings } from "@/lib/content-pipeline"
+import { readAutoPublishSettings, readContentItems } from "@/lib/content-pipeline"
 import { getGooglePlaceReviews } from "@/lib/google-places"
 import { getWhatsAppSettings } from "@/lib/whatsapp-settings"
 import { getWhatsAppCostSummary } from "@/lib/whatsapp-cost-tracking"
@@ -18,6 +20,14 @@ import {
   type GrowthRecommendation, type RecommendationChannel,
 } from "@/lib/growth-recommendations"
 import Link from "next/link"
+import { TrendChart } from "@/components/dashboard/trend-chart"
+import {
+  getDashboardGrowthData,
+  parseDashboardPeriod,
+  DASHBOARD_PERIODS,
+  type DashboardPeriod,
+  type PeriodValue,
+} from "@/lib/dashboard-growth"
 
 const CHANNEL_ICON: Record<RecommendationChannel, typeof Globe> = {
   web: Globe, whatsapp: MessageSquare, instagram: Camera, google: MapPin,
@@ -43,11 +53,12 @@ type LandingRankingRow = {
 // en vez de traer filas crudas y contar en JS — antes tenía un tope de 20.000 filas que, superado,
 // subestimaba los conteos en silencio sin ningún error visible.
 async function getLandingRanking(
-  supabase: Awaited<ReturnType<typeof createClient>>
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  period: DashboardPeriod
 ): Promise<{ rows: LandingRankingRow[]; available: boolean }> {
   try {
-    const ninetyDaysAgo = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString()
-    const { data, error } = await supabase.rpc("landing_events_ranking", { p_since: ninetyDaysAgo })
+    const since = new Date(Date.now() - period * 24 * 60 * 60 * 1000).toISOString()
+    const { data, error } = await supabase.rpc("landing_events_ranking", { p_since: since })
     if (error) throw error
 
     const bySlug = new Map<string, { visits: number; interactions: number }>()
@@ -90,10 +101,11 @@ const CLICK_LOCATION_LABEL: Record<string, string> = {
 // de WhatsApp de Lucía -- el click en sí se puede medir igual, lo que no se puede saber es si ese
 // contacto externo (Swity, o el teléfono/central de turnos del Británico) terminó en un turno.
 async function getClicksByLocation(
-  supabase: Awaited<ReturnType<typeof createClient>>
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  period: DashboardPeriod
 ): Promise<{ rows: ClicksByLocationRow[]; available: boolean }> {
   try {
-    const { data, error } = await supabase.rpc("landing_clicks_by_location", { p_days: 90 })
+    const { data, error } = await supabase.rpc("landing_clicks_by_location", { p_days: period })
     if (error) throw error
 
     const byLocation = new Map<string, { call: number; whatsapp: number }>()
@@ -120,53 +132,6 @@ async function getClicksByLocation(
   }
 }
 
-type InstagramFollowerTrend = {
-  current: number
-  deltaLast7Days: number | null
-  deltaLast30Days: number | null
-  firstSnapshotAt: string | null
-}
-
-// Snapshot diario (ver src/lib/instagram-followers.ts, corre dentro del cron de publish-content).
-// Sin datos todavía -- p. ej. recién agregado, o Instagram nunca se conectó -- muestra el mismo
-// placeholder honesto que Google Analytics/Places: no rompe nada, solo no hay nada que mostrar.
-async function getInstagramFollowerTrend(
-  supabase: Awaited<ReturnType<typeof createClient>>
-): Promise<{ trend: InstagramFollowerTrend | null; available: boolean }> {
-  try {
-    const { data, error } = await supabase
-      .from("instagram_follower_snapshots")
-      .select("captured_on, followers_count")
-      .order("captured_on", { ascending: false })
-      .limit(31)
-    if (error) throw error
-
-    const rows = (data ?? []) as { captured_on: string; followers_count: number }[]
-    if (rows.length === 0) return { trend: null, available: true }
-
-    const current = rows[0].followers_count
-    const findClosestTo = (daysAgo: number) => {
-      const target = new Date(Date.now() - daysAgo * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
-      const older = rows.find(r => r.captured_on <= target)
-      return older ? older.followers_count : null
-    }
-    const sevenDaysAgo = findClosestTo(7)
-    const thirtyDaysAgo = findClosestTo(30)
-
-    return {
-      trend: {
-        current,
-        deltaLast7Days: sevenDaysAgo !== null ? current - sevenDaysAgo : null,
-        deltaLast30Days: thirtyDaysAgo !== null ? current - thirtyDaysAgo : null,
-        firstSnapshotAt: rows[rows.length - 1].captured_on,
-      },
-      available: true,
-    }
-  } catch {
-    return { trend: null, available: false }
-  }
-}
-
 type HeroVariantRow = {
   variant: "a" | "b"
   visits: number
@@ -180,11 +145,12 @@ type HeroVariantRow = {
 // primario ("Pedir turno" vs "Ver sedes y horarios"). Ver src/app/landings/[slug]/page.tsx.
 // Agregado en SQL (RPC landing_hero_variant_results) por el mismo motivo que getLandingRanking.
 async function getHeroVariantResults(
-  supabase: Awaited<ReturnType<typeof createClient>>
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  period: DashboardPeriod
 ): Promise<{ rows: HeroVariantRow[]; available: boolean }> {
   try {
-    const ninetyDaysAgo = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString()
-    const { data, error } = await supabase.rpc("landing_hero_variant_results", { p_since: ninetyDaysAgo })
+    const since = new Date(Date.now() - period * 24 * 60 * 60 * 1000).toISOString()
+    const { data, error } = await supabase.rpc("landing_hero_variant_results", { p_since: since })
     if (error) throw error
 
     const byVariant = new Map<"a" | "b", { visits: number; heroPrimaryClicks: number; heroSecondaryClicks: number; interactions: number }>()
@@ -251,10 +217,11 @@ const REFERRAL_LOCATION_LABEL: Record<string, string> = {
 // El código de respaldo compartido "WEB-GRAL-01" (no atado a una sola landing) queda afuera de
 // esta tabla a propósito: mostrar "0 visitas" sería engañoso para un link que no se trackea por slug.
 async function getReferralFunnel(
-  supabase: Awaited<ReturnType<typeof createClient>>
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  period: DashboardPeriod
 ): Promise<{ rows: ReferralFunnelRow[]; available: boolean }> {
   try {
-    const { data: events, error } = await supabase.rpc("landing_referral_events", { p_days: 90 })
+    const { data: events, error } = await supabase.rpc("landing_referral_events", { p_days: period })
     if (error) throw error
 
     const visitsBySlug = new Map<string, number>()
@@ -268,12 +235,12 @@ async function getReferralFunnel(
       }
     }
 
-    const ninetyDaysAgo = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString()
+    const since = new Date(Date.now() - period * 24 * 60 * 60 * 1000).toISOString()
     const { data: leadsData, error: leadsError } = await supabase
       .from("leads")
       .select("utm_content, confirmed_booked")
       .not("utm_content", "is", null)
-      .gte("created_at", ninetyDaysAgo)
+      .gte("created_at", since)
     if (leadsError) throw leadsError
 
     const leadsByCode = new Map<string, { total: number; confirmed: number }>()
@@ -314,7 +281,8 @@ async function getReferralFunnel(
 async function getGrowthRecommendationsData(
   supabase: Awaited<ReturnType<typeof createClient>>,
   landingRanking: LandingRankingRow[],
-  heroVariantRows: HeroVariantRow[]
+  heroVariantRows: HeroVariantRow[],
+  period: DashboardPeriod
 ): Promise<{ recommendations: GrowthRecommendation[]; available: boolean }> {
   try {
     const now = new Date()
@@ -356,6 +324,7 @@ async function getGrowthRecommendationsData(
 
     const recommendations = buildGrowthRecommendations({
       now,
+      windowDays: period,
       landingRanking: landingRanking.map(r => ({ slug: r.slug, label: r.label, visits: r.visits, rate: r.rate })),
       heroVariantResults: heroVariantRows.map(r => ({ variant: r.variant, visits: r.visits, interactionRate: r.interactionRate })),
       locations,
@@ -423,7 +392,7 @@ async function count(supabase: Awaited<ReturnType<typeof createClient>>, filter:
   return n ?? 0
 }
 
-async function getDashboardData() {
+async function getDashboardData(period: DashboardPeriod) {
   const supabase = await createClient()
 
   const [
@@ -472,29 +441,65 @@ async function getDashboardData() {
     eco,
   }
 
-  const conversionRate = totalLeads > 0
-    ? Math.round((confirmed / totalLeads) * 100)
-    : 0
-
-  const landingRanking = await getLandingRanking(supabase)
-  const heroVariantResults = await getHeroVariantResults(supabase)
-  const referralFunnel = await getReferralFunnel(supabase)
-  const clicksByLocation = await getClicksByLocation(supabase)
-  const instagramFollowerTrend = await getInstagramFollowerTrend(supabase)
-  const whatsappCostSummary = await getWhatsAppCostSummary(supabase)
-  const growthRecommendations = await getGrowthRecommendationsData(supabase, landingRanking.rows, heroVariantResults.rows)
-  const weeklyReports = await getWeeklyReports(supabase)
-
-  // Total de visitas al sitio (últimos 90 días) para mostrar como KPI único -- antes solo se veía
-  // desglosado por landing en "Ranking de landings", sin ningún número consolidado a simple vista.
-  const totalVisits = landingRanking.available
-    ? landingRanking.rows.reduce((sum, row) => sum + row.visits, 0)
-    : null
+  const [
+    landingRanking,
+    heroVariantResults,
+    referralFunnel,
+    clicksByLocation,
+    whatsappCostSummary,
+    weeklyReports,
+    growth,
+    contentPerformance,
+  ] = await Promise.all([
+    getLandingRanking(supabase, period),
+    getHeroVariantResults(supabase, period),
+    getReferralFunnel(supabase, period),
+    getClicksByLocation(supabase, period),
+    getWhatsAppCostSummary(supabase),
+    getWeeklyReports(supabase),
+    getDashboardGrowthData(supabase, period),
+    getContentPerformance(supabase, period),
+  ])
+  const growthRecommendations = await getGrowthRecommendationsData(supabase, landingRanking.rows, heroVariantResults.rows, period)
 
   return {
-    metrics, conversionRate, recentLeads: (recentLeads ?? []) as Lead[], totalVisits,
-    landingRanking, heroVariantResults, referralFunnel, clicksByLocation, instagramFollowerTrend,
-    whatsappCostSummary, growthRecommendations, weeklyReports,
+    metrics, recentLeads: (recentLeads ?? []) as Lead[],
+    landingRanking, heroVariantResults, referralFunnel, clicksByLocation,
+    whatsappCostSummary, growthRecommendations, weeklyReports, growth, contentPerformance,
+  }
+}
+
+type ContentPerformanceRow = {
+  itemId: string
+  topic: string
+  format: string
+  visits: number
+  engagedVisits: number
+}
+
+async function getContentPerformance(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  period: DashboardPeriod
+): Promise<{ rows: ContentPerformanceRow[]; available: boolean }> {
+  try {
+    const [{ data, error }, items] = await Promise.all([
+      supabase.rpc("dashboard_content_performance", { p_days: period }),
+      readContentItems(supabase),
+    ])
+    if (error) throw error
+    const itemById = new Map(items.map(item => [item.id, item]))
+    const rows = ((data ?? []) as Array<{ item_id: string; visits: number | string; engaged_visits: number | string }>)
+      .map(row => ({
+        itemId: row.item_id,
+        topic: itemById.get(row.item_id)?.topic ?? "Pieza sin título",
+        format: itemById.get(row.item_id)?.format ?? "contenido",
+        visits: Number(row.visits),
+        engagedVisits: Number(row.engaged_visits),
+      }))
+      .slice(0, 5)
+    return { rows, available: true }
+  } catch {
+    return { rows: [], available: false }
   }
 }
 
@@ -516,85 +521,238 @@ function Money({ amount, currency, pending }: { amount: number; currency: string
   )
 }
 
-export default async function DashboardPage() {
+function Comparison({ value, rate = false }: { value: PeriodValue; rate?: boolean }) {
+  const difference = value.current - value.previous
+  if (difference === 0) {
+    return <span className="inline-flex items-center gap-1 text-xs text-gray-400"><Minus className="h-3 w-3" /> sin cambio</span>
+  }
+  if (value.previous === 0 && !rate) {
+    return <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-600"><ArrowUpRight className="h-3 w-3" /> nuevo</span>
+  }
+  const label = rate
+    ? `${difference > 0 ? "+" : ""}${difference.toLocaleString("es-AR", { maximumFractionDigits: 1 })} pp`
+    : `${difference > 0 ? "+" : ""}${Math.round((difference / Math.max(value.previous, 1)) * 100)}%`
+  const positive = difference > 0
+  return (
+    <span className={`inline-flex items-center gap-1 text-xs font-medium ${positive ? "text-emerald-600" : "text-rose-600"}`}>
+      {positive ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownRight className="h-3 w-3" />}
+      {label}
+    </span>
+  )
+}
+
+function KpiCard({
+  title,
+  value,
+  comparison,
+  icon: Icon,
+  iconClass,
+  note,
+  rate = false,
+}: {
+  title: string
+  value: number | string
+  comparison?: PeriodValue
+  icon: typeof Globe
+  iconClass: string
+  note?: string
+  rate?: boolean
+}) {
+  return (
+    <Card className="overflow-hidden">
+      <CardContent className="p-3 md:p-4">
+        <div className="mb-2 flex items-start justify-between gap-2 md:mb-4 md:gap-3">
+          <p className="text-sm font-medium text-gray-600">{title}</p>
+          <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg md:h-9 md:w-9 md:rounded-xl ${iconClass}`}>
+            <Icon className="h-4 w-4" />
+          </span>
+        </div>
+        <p className="text-2xl font-bold tracking-tight text-gray-950 md:text-3xl">{value}</p>
+        <div className="mt-0.5 min-h-4 md:mt-1 md:min-h-5">
+          {comparison ? <Comparison value={comparison} rate={rate} /> : note ? <p className="text-xs text-gray-400">{note}</p> : null}
+          {comparison && <span className="ml-1 text-xs text-gray-400">vs. período anterior</span>}
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
+
+function MetricTile({ label, value, helper }: { label: string; value: number | string | null; helper?: string }) {
+  return (
+    <div className="rounded-xl border border-gray-100 bg-gray-50 p-3">
+      <p className="text-xs font-medium text-gray-500">{label}</p>
+      <p className="mt-1 text-xl font-bold text-gray-950">{value === null ? "—" : value}</p>
+      {helper && <p className="mt-0.5 text-[11px] text-gray-400">{helper}</p>}
+    </div>
+  )
+}
+
+const CHANNEL_META: Record<string, { label: string; icon: typeof Globe; className: string }> = {
+  google_maps: { label: "Google Maps", icon: MapPin, className: "bg-blue-50 text-blue-700" },
+  google_search: { label: "Google Search", icon: Search, className: "bg-violet-50 text-violet-700" },
+  instagram: { label: "Instagram", icon: Camera, className: "bg-pink-50 text-pink-700" },
+  whatsapp: { label: "WhatsApp", icon: MessageSquare, className: "bg-emerald-50 text-emerald-700" },
+  referral: { label: "Referidos", icon: Users, className: "bg-amber-50 text-amber-700" },
+  landing_page: { label: "Landing / directo", icon: Globe, className: "bg-gray-100 text-gray-700" },
+  direct: { label: "Directo / sin UTM", icon: Globe, className: "bg-gray-100 text-gray-700" },
+  manual: { label: "Carga manual", icon: Users, className: "bg-gray-100 text-gray-700" },
+}
+
+const ACTION_META: Record<string, { label: string; icon: typeof Globe; className: string }> = {
+  click_booking: { label: "Turno online", icon: CalendarDays, className: "bg-indigo-50 text-indigo-700" },
+  click_whatsapp: { label: "WhatsApp", icon: MessageSquare, className: "bg-emerald-50 text-emerald-700" },
+  click_call: { label: "Llamadas", icon: PhoneCall, className: "bg-sky-50 text-sky-700" },
+  click_maps: { label: "Cómo llegar", icon: Navigation, className: "bg-amber-50 text-amber-700" },
+}
+
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ period?: string | string[] }>
+}) {
+  const period = parseDashboardPeriod((await searchParams).period)
   const {
-    metrics, conversionRate, recentLeads, totalVisits, landingRanking,
-    heroVariantResults, referralFunnel, clicksByLocation, instagramFollowerTrend,
-    whatsappCostSummary, growthRecommendations, weeklyReports,
-  } = await getDashboardData()
+    metrics, recentLeads, landingRanking,
+    heroVariantResults, referralFunnel, clicksByLocation,
+    whatsappCostSummary, growthRecommendations, weeklyReports, growth, contentPerformance,
+  } = await getDashboardData(period)
+
+  const maxFunnel = Math.max(growth.summary.visits.current, 1)
+  const instagramChannel = growth.channels.find(channel => channel.channel === "instagram")
+  const googleChannel = growth.channels.find(channel => channel.channel === "google_maps")
 
   return (
-    <div className="p-4 md:p-6 space-y-4 md:space-y-6">
-      <div>
-        <h1 className="text-xl md:text-2xl font-bold text-gray-900">Dashboard</h1>
-        <p className="text-sm text-gray-500">Resumen de adquisición de pacientes</p>
+    <div className="space-y-5 bg-gray-50/60 p-4 md:space-y-7 md:p-6">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+        <div>
+          <p className="mb-1 text-xs font-semibold uppercase tracking-[0.18em] text-indigo-600">Growth OS</p>
+          <h1 className="text-2xl font-bold tracking-tight text-gray-950 md:text-3xl">Dashboard de crecimiento</h1>
+          <p className="mt-1 text-sm text-gray-500">De la visita al turno confirmado, con evolución y atribución por canal.</p>
+        </div>
+        <div className="flex w-fit rounded-xl border border-gray-200 bg-white p-1 shadow-sm" aria-label="Período del dashboard">
+          {DASHBOARD_PERIODS.map(value => (
+            <Link
+              key={value}
+              href={`/dashboard?period=${value}`}
+              className={`rounded-lg px-3 py-2 text-xs font-semibold transition-colors ${period === value ? "bg-gray-950 text-white" : "text-gray-500 hover:bg-gray-100 hover:text-gray-900"}`}
+            >
+              {value === 365 ? "1 año" : `${value} días`}
+            </Link>
+          ))}
+        </div>
       </div>
 
       {/* KPIs principales */}
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:gap-4 lg:grid-cols-5">
+      <div className="grid grid-cols-2 gap-3 xl:grid-cols-6">
+        <KpiCard title="Visitas web" value={growth.available ? growth.summary.visits.current : "—"} comparison={growth.available ? growth.summary.visits : undefined} icon={Eye} iconClass="bg-indigo-50 text-indigo-700" />
+        <KpiCard title="Visitas con acción" value={growth.available ? growth.summary.engagedVisits.current : "—"} comparison={growth.available ? growth.summary.engagedVisits : undefined} icon={MousePointerClick} iconClass="bg-cyan-50 text-cyan-700" />
+        <KpiCard title="Leads nuevos" value={growth.available ? growth.summary.leads.current : "—"} comparison={growth.available ? growth.summary.leads : undefined} icon={Users} iconClass="bg-violet-50 text-violet-700" />
+        <KpiCard title="Turnos confirmados" value={growth.available ? growth.summary.confirmed.current : "—"} comparison={growth.available ? growth.summary.confirmed : undefined} icon={CheckCircle2} iconClass="bg-emerald-50 text-emerald-700" />
+        <KpiCard title="Lead → turno" value={growth.available ? `${growth.summary.leadToConfirmedRate.current}%` : "—"} comparison={growth.available ? growth.summary.leadToConfirmedRate : undefined} rate icon={TrendingUp} iconClass="bg-green-50 text-green-700" />
+        <KpiCard title="Seguimientos pendientes" value={metrics.followup_pending} icon={Clock} iconClass="bg-amber-50 text-amber-700" note="estado actual" />
+      </div>
+
+      {!growth.available && (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+          La nueva serie temporal todavía no está disponible. Se habilita al aplicar la migración de métricas; el resto del dashboard sigue operativo.
+        </div>
+      )}
+
+      {/* Evolución + embudo */}
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,1.7fr)_minmax(300px,0.8fr)]">
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-gray-500 flex items-center gap-2">
-              <Eye className="h-4 w-4 text-indigo-500" /> Visitas al sitio
-            </CardTitle>
+            <CardTitle className="flex items-center gap-2 text-base"><BarChart3 className="h-4 w-4 text-indigo-600" /> Evolución del embudo</CardTitle>
+            <p className="text-xs text-gray-500">Datos diarios de los últimos {period === 365 ? "12 meses" : `${period} días`}. Los turnos se atribuyen a la fecha de entrada del lead.</p>
           </CardHeader>
           <CardContent>
-            {totalVisits === null ? (
-              <p className="text-sm text-gray-400">Sin datos</p>
-            ) : (
-              <>
-                <p className="text-3xl font-bold text-gray-900">{totalVisits}</p>
-                <p className="text-xs text-gray-400">Últimos 90 días, todas las landings</p>
-              </>
-            )}
+            <TrendChart
+              points={growth.trend}
+              series={[
+                { key: "visits", label: "Visitas", color: "#4f46e5" },
+                { key: "engagedVisits", label: "Con acción", color: "#0891b2" },
+                { key: "leads", label: "Leads", color: "#7c3aed" },
+                { key: "confirmed", label: "Turnos", color: "#059669" },
+              ]}
+            />
           </CardContent>
         </Card>
-
         <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-gray-500 flex items-center gap-2">
-              <Users className="h-4 w-4" /> Total leads
-            </CardTitle>
+          <CardHeader>
+            <CardTitle className="text-base">Embudo del período</CardTitle>
+            <p className="text-xs text-gray-500">Personas, no cantidad de botones tocados.</p>
           </CardHeader>
-          <CardContent>
-            <p className="text-3xl font-bold text-gray-900">{metrics.total}</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-gray-500 flex items-center gap-2">
-              <CheckCircle2 className="h-4 w-4 text-green-500" /> Confirmaron turno
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-3xl font-bold text-green-600">{metrics.confirmed}</p>
-            <p className="text-xs text-gray-400">{conversionRate}% conversión</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-gray-500 flex items-center gap-2">
-              <Clock className="h-4 w-4 text-orange-500" /> Seguimiento pendiente
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-3xl font-bold text-orange-500">{metrics.followup_pending}</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-gray-500 flex items-center gap-2">
-              <AlertTriangle className="h-4 w-4 text-red-500" /> Requieren atención
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-3xl font-bold text-red-500">{metrics.requires_human + metrics.emergencies}</p>
+          <CardContent className="space-y-5">
+            {[
+              { label: "Visitas", value: growth.summary.visits.current, color: "bg-indigo-500" },
+              { label: "Hicieron una acción", value: growth.summary.engagedVisits.current, color: "bg-cyan-500" },
+              { label: "Se convirtieron en lead", value: growth.summary.leads.current, color: "bg-violet-500" },
+              { label: "Confirmaron que pidieron turno", value: growth.summary.confirmed.current, color: "bg-emerald-500" },
+            ].map(item => (
+              <div key={item.label}>
+                <div className="mb-1.5 flex items-center justify-between gap-3 text-sm">
+                  <span className="text-gray-600">{item.label}</span>
+                  <span className="font-semibold text-gray-950">{item.value}</span>
+                </div>
+                <div className="h-2.5 overflow-hidden rounded-full bg-gray-100">
+                  <div className={`h-full rounded-full ${item.color}`} style={{ width: `${Math.max(item.value > 0 ? 4 : 0, (item.value / maxFunnel) * 100)}%` }} />
+                </div>
+              </div>
+            ))}
+            <div className="grid grid-cols-2 gap-2 border-t border-gray-100 pt-4">
+              <MetricTile label="Visita → lead" value={`${growth.summary.visitToLeadRate.current}%`} />
+              <MetricTile label="Lead → turno" value={`${growth.summary.leadToConfirmedRate.current}%`} />
+            </div>
           </CardContent>
         </Card>
       </div>
+
+      {/* Canales del período */}
+      {growth.channels.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Canales que generan pacientes</CardTitle>
+            <p className="text-xs text-gray-500">Visitas atribuidas por UTM y leads del período. “Directo / sin UTM” señala enlaces que conviene reemplazar por los medibles de Instagram y Google.</p>
+          </CardHeader>
+          <CardContent>
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[680px] text-sm">
+                <thead>
+                  <tr className="border-b text-left text-xs text-gray-500">
+                    <th className="pb-3 font-medium">Canal</th>
+                    <th className="pb-3 text-right font-medium">Visitas</th>
+                    <th className="pb-3 text-right font-medium">Leads</th>
+                    <th className="pb-3 text-right font-medium">Visita → lead</th>
+                    <th className="pb-3 text-right font-medium">Turnos</th>
+                    <th className="pb-3 text-right font-medium">Lead → turno</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {growth.channels.map(channel => {
+                    const meta = CHANNEL_META[channel.channel] ?? { label: channel.channel, icon: Globe, className: "bg-gray-100 text-gray-700" }
+                    const Icon = meta.icon
+                    return (
+                      <tr key={channel.channel} className="border-b border-gray-50 last:border-0">
+                        <td className="py-3 pr-4">
+                          <span className="flex items-center gap-2 font-medium text-gray-900">
+                            <span className={`flex h-8 w-8 items-center justify-center rounded-lg ${meta.className}`}><Icon className="h-4 w-4" /></span>
+                            {meta.label}
+                          </span>
+                        </td>
+                        <td className="py-3 text-right text-gray-700">{channel.visits}</td>
+                        <td className="py-3 text-right font-semibold text-gray-900">{channel.leads}</td>
+                        <td className="py-3 text-right text-gray-700">{channel.visitToLeadRate}%</td>
+                        <td className="py-3 text-right font-semibold text-emerald-700">{channel.confirmed}</td>
+                        <td className="py-3 text-right text-gray-700">{channel.leadToConfirmedRate}%</td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Recomendaciones de crecimiento */}
       {growthRecommendations.available && growthRecommendations.recommendations.length > 0 && (
@@ -641,7 +799,7 @@ export default async function DashboardPage() {
         {/* Por canal */}
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Leads por canal</CardTitle>
+            <CardTitle className="text-base">Leads por canal · histórico</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
             {[
@@ -724,13 +882,37 @@ export default async function DashboardPage() {
 
       <SectionHeader icon={Globe} title="Sitio web y landings" />
 
+      {/* Acciones web del período */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Qué hacen las personas en la web</CardTitle>
+          <p className="text-xs text-gray-500">Clicks reales en los canales de pedido de turno durante el período seleccionado. Una misma visita puede hacer más de una acción.</p>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+            {Object.entries(ACTION_META).map(([eventType, meta]) => {
+              const row = growth.actions.find(action => action.eventType === eventType)
+              const Icon = meta.icon
+              return (
+                <div key={eventType} className="rounded-xl border border-gray-100 p-4">
+                  <span className={`mb-3 flex h-9 w-9 items-center justify-center rounded-lg ${meta.className}`}><Icon className="h-4 w-4" /></span>
+                  <p className="text-2xl font-bold text-gray-950">{row?.actions ?? 0}</p>
+                  <p className="text-sm text-gray-600">{meta.label}</p>
+                  {row && <div className="mt-1"><Comparison value={{ current: row.actions, previous: row.previousActions }} /></div>}
+                </div>
+              )
+            })}
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Ranking de landings */}
       {landingRanking.available && (
         <Card>
           <CardHeader>
             <CardTitle className="text-base">Ranking de landings</CardTitle>
             <p className="text-xs text-gray-500">
-              Visitas e interacciones con los botones de pedir turno (últimos 90 días). La tasa de
+              Visitas e interacciones con los botones de pedir turno (últimos {period}{" "}días). La tasa de
               interacción es la proporción de visitas que hicieron click en pedir turno online, llamar,
               WhatsApp o cómo llegar — no confirma que hayan pedido turno.
             </p>
@@ -779,7 +961,7 @@ export default async function DashboardPage() {
           <CardHeader>
             <CardTitle className="text-base">Clicks por sede: llamada y WhatsApp</CardTitle>
             <p className="text-xs text-gray-500">
-              Últimos 90 días. Incluye Swiss Medical y Hospital Británico aunque ninguna de las dos
+              Últimos {period}{" "}días. Incluye Swiss Medical y Hospital Británico aunque ninguna de las dos
               sedes pase por el bot de WhatsApp de Lucía (Swiss usa su propio WhatsApp, &quot;Swity&quot;;
               Británico deriva a teléfono/central de turnos) — se puede medir el click, pero no si ese
               contacto externo terminó en un turno confirmado.
@@ -821,7 +1003,7 @@ export default async function DashboardPage() {
             <CardTitle className="text-base">Embudo de atribución por landing/sede</CardTitle>
             <p className="text-xs text-gray-500">
               Visita → clic a WhatsApp → lead → turno confirmado, por código de referencia (últimos
-              90 días). El código va al final del mensaje prellenado de cada CTA de WhatsApp — si el
+               {period}{" "}días). El código va al final del mensaje prellenado de cada CTA de WhatsApp — si el
               paciente lo borra antes de enviar, ese lead no queda atribuido a ninguna landing (no
               afecta la conversación, solo la atribución).
             </p>
@@ -878,7 +1060,7 @@ export default async function DashboardPage() {
             <CardTitle className="text-base">Test A/B: hero de la landing principal</CardTitle>
             <p className="text-xs text-gray-500">
               La variante B invierte cuál botón del hero es primario (&quot;Pedir turno&quot; vs
-              &quot;Ver sedes y horarios&quot;), asignada automáticamente 50/50 por cookie (últimos 90
+               &quot;Ver sedes y horarios&quot;), asignada automáticamente 50/50 por cookie (últimos {period}{" "}
               días). No hay ganador automático — mirá la tasa de interacción y decidí manualmente
               cuándo cortar el test.
             </p>
@@ -994,42 +1176,101 @@ export default async function DashboardPage() {
 
       <SectionHeader icon={Camera} title="Instagram" />
 
-      {/* Instagram: seguidores (snapshot diario, ver src/lib/instagram-followers.ts) */}
-      {instagramFollowerTrend.available && (
+      {growth.instagram.available && (
         <Card>
           <CardHeader>
             <CardTitle className="text-base flex items-center gap-2">
-              <Camera className="h-4 w-4" /> Instagram: seguidores
+              <Camera className="h-4 w-4 text-pink-600" /> Instagram: alcance y tráfico
             </CardTitle>
+            <p className="text-xs text-gray-500">Insights nativos de Meta más las visitas y leads que llegaron por el enlace medible de la bio.</p>
           </CardHeader>
-          <CardContent>
-            {instagramFollowerTrend.trend === null ? (
+          <CardContent className="space-y-5">
+            {growth.instagram.followers === null ? (
               <p className="text-sm text-gray-400">
-                Todavía no hay datos. Se registra un snapshot por día desde que se agregó este
-                tracking (2026-07-13) — hace falta Instagram conectado y al menos una corrida del cron.
+                Todavía no hay snapshots. Hace falta Instagram conectado y al menos una corrida del cron diario.
               </p>
             ) : (
-              <div className="grid grid-cols-1 gap-4 text-center sm:grid-cols-3">
-                <div>
-                  <p className="text-2xl font-bold text-gray-900">{instagramFollowerTrend.trend.current}</p>
-                  <p className="text-xs text-gray-500 mt-1">Seguidores actuales</p>
+              <div className="grid gap-5 xl:grid-cols-[minmax(0,1.35fr)_minmax(320px,0.65fr)]">
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                  <MetricTile label="Seguidores" value={growth.instagram.followers} helper={growth.instagram.followersDelta === null ? "sin comparación todavía" : `${growth.instagram.followersDelta >= 0 ? "+" : ""}${growth.instagram.followersDelta} en el período`} />
+                  <MetricTile label="Alcance" value={growth.instagram.reach} helper="cuentas alcanzadas" />
+                  <MetricTile label="Visitas al perfil" value={growth.instagram.profileViews} />
+                  <MetricTile label="Taps en enlaces" value={growth.instagram.linkTaps} helper="métrica nativa de Meta" />
+                  <MetricTile label="Interacciones" value={growth.instagram.totalInteractions} helper="métrica nativa de Meta" />
+                  <MetricTile label="Visitas web atribuidas" value={instagramChannel?.visits ?? 0} helper="utm_source=instagram" />
+                  <MetricTile label="Leads atribuidos" value={instagramChannel?.leads ?? 0} helper={`${instagramChannel?.confirmed ?? 0} turnos confirmados`} />
                 </div>
-                <div>
-                  <p className={`text-2xl font-bold ${(instagramFollowerTrend.trend.deltaLast7Days ?? 0) >= 0 ? "text-green-600" : "text-red-600"}`}>
-                    {instagramFollowerTrend.trend.deltaLast7Days === null ? "—" : (
-                      `${instagramFollowerTrend.trend.deltaLast7Days >= 0 ? "+" : ""}${instagramFollowerTrend.trend.deltaLast7Days}`
-                    )}
-                  </p>
-                  <p className="text-xs text-gray-500 mt-1">Últimos 7 días</p>
+                <TrendChart
+                  points={growth.instagram.series}
+                  height={190}
+                  series={[{ key: "followers", label: "Seguidores", color: "#db2777" }]}
+                  emptyMessage="La evolución aparece al acumular al menos dos snapshots diarios."
+                />
+              </div>
+            )}
+            {contentPerformance.available && contentPerformance.rows.length > 0 && (
+              <div className="border-t border-gray-100 pt-4">
+                <div className="mb-3 flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-semibold text-gray-900">Contenido que llevó personas a la web</p>
+                    <p className="text-xs text-gray-500">Atribución del link de seguimiento de historias, bio o Linktree.</p>
+                  </div>
+                  <Link href="/contenido/instagram" className="text-xs font-semibold text-pink-700 hover:underline">Abrir estudio</Link>
                 </div>
-                <div>
-                  <p className={`text-2xl font-bold ${(instagramFollowerTrend.trend.deltaLast30Days ?? 0) >= 0 ? "text-green-600" : "text-red-600"}`}>
-                    {instagramFollowerTrend.trend.deltaLast30Days === null ? "—" : (
-                      `${instagramFollowerTrend.trend.deltaLast30Days >= 0 ? "+" : ""}${instagramFollowerTrend.trend.deltaLast30Days}`
-                    )}
-                  </p>
-                  <p className="text-xs text-gray-500 mt-1">Últimos 30 días</p>
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[520px] text-sm">
+                    <thead><tr className="border-b text-left text-xs text-gray-500"><th className="pb-2 font-medium">Pieza</th><th className="pb-2 text-right font-medium">Visitas</th><th className="pb-2 text-right font-medium">Con acción</th><th className="pb-2 text-right font-medium">Tasa</th></tr></thead>
+                    <tbody>
+                      {contentPerformance.rows.map(row => (
+                        <tr key={row.itemId} className="border-b border-gray-50 last:border-0">
+                          <td className="py-2 pr-3 text-gray-900"><span className="font-medium">{row.topic}</span><span className="ml-2 text-xs capitalize text-gray-400">{row.format}</span></td>
+                          <td className="py-2 text-right text-gray-700">{row.visits}</td>
+                          <td className="py-2 text-right text-gray-700">{row.engagedVisits}</td>
+                          <td className="py-2 text-right font-semibold text-gray-900">{row.visits > 0 ? Math.round((row.engagedVisits / row.visits) * 100) : 0}%</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      <SectionHeader icon={MapPin} title="Google" />
+
+      {growth.google.available && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base"><MapPin className="h-4 w-4 text-blue-600" /> Google Business y Maps</CardTitle>
+            <p className="text-xs text-gray-500">Rendimiento nativo de la ficha, reputación en Google y tráfico que llegó a la web por el enlace medible.</p>
+          </CardHeader>
+          <CardContent className="space-y-5">
+            {growth.google.status === "quota_blocked" && (
+              <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs leading-relaxed text-amber-800">
+                Google todavía mantiene la Business Profile Performance API con cuota 0. Las impresiones, llamadas y direcciones nativas se activarán automáticamente cuando Google habilite el acceso; mientras tanto, las visitas y leads desde la ficha sí se miden con <span className="font-mono">/go/google</span>.
+              </div>
+            )}
+            {growth.google.status === "not_connected" && (
+              <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 text-xs text-blue-800">
+                Conectá Google Business en <Link href="/google-local" className="font-semibold underline">Google Local</Link> para traer métricas nativas. El enlace medible funciona aunque la API no esté conectada.
+              </div>
+            )}
+            <div className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-8">
+              <MetricTile label="Impresiones Search" value={growth.google.impressionsSearch} />
+              <MetricTile label="Impresiones Maps" value={growth.google.impressionsMaps} />
+              <MetricTile label="Clicks al sitio" value={growth.google.websiteClicks} helper="métrica nativa" />
+              <MetricTile label="Clicks en llamar" value={growth.google.callClicks} />
+              <MetricTile label="Cómo llegar" value={growth.google.directionRequests} />
+              <MetricTile label="Visitas web atribuidas" value={googleChannel?.visits ?? 0} helper="utm_source=google_maps" />
+              <MetricTile label="Leads atribuidos" value={googleChannel?.leads ?? 0} helper={`${googleChannel?.confirmed ?? 0} turnos`} />
+              <MetricTile label="Rating y reseñas" value={growth.google.rating === null ? null : `${growth.google.rating.toFixed(1)} ★`} helper={growth.google.reviewCount === null ? "sin datos" : `${growth.google.reviewCount} reseñas${growth.google.reviewDelta === null ? "" : ` · ${growth.google.reviewDelta >= 0 ? "+" : ""}${growth.google.reviewDelta}`}`} />
+            </div>
+            {growth.google.series.length > 1 && (
+              <div className="border-t border-gray-100 pt-4">
+                <div className="mb-2 flex items-center gap-2 text-sm font-medium text-gray-700"><Star className="h-4 w-4 text-amber-500" /> Evolución de reseñas</div>
+                <TrendChart points={growth.google.series} height={180} series={[{ key: "reviews", label: "Reseñas", color: "#d97706" }]} />
               </div>
             )}
           </CardContent>

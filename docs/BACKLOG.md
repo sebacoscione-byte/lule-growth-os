@@ -858,6 +858,12 @@ público para pedir turno.
       ("Pacientes y leads", "Sitio web y landings", "WhatsApp", "Instagram", "Reportes"), más
       "Visitas al sitio" (KPI consolidado) y "Costo de WhatsApp" (7d/30d + link a `/costos`) —
       ver CLAUDE.md para el detalle completo.
+- [x] Dashboard de crecimiento temporal y atribución multicanal (2026-07-13): selector
+      7/30/90/365 días, comparación contra período anterior, serie visita → acción → lead → turno,
+      embudo, canales, acciones web, ranking/experimentos en la misma ventana, insights de cuenta de
+      Instagram, métricas/reputación de Google y enlaces medibles `/go/instagram` + `/go/google`.
+      `landing_events.session_id` deduplica acciones por sesión anónima; las RPC agregan en SQL sin
+      descargar eventos crudos. Los snapshots nuevos comparten `publish-content`, sin tercer cron.
 - [ ] **Insights por post de Instagram** (reach, likes, comments) — evaluado el 2026-07-13, no
       implementado: `publishContainer()` en `src/lib/instagram-business.ts` devuelve el `mediaId`
       de Meta pero **no se persiste en ninguna tabla** hoy (se pierde apenas termina el request de
@@ -866,11 +872,12 @@ público para pedir turno.
       (cambio de esquema), después sí una función de insights análoga a `getFollowerCount()`. El
       scope de OAuth (`instagram_business_manage_insights`) ya está cargado, no hace falta
       reconectar nada para esto.
-- [ ] **Tendencia de rating/reseñas de Google** (snapshot diario, mismo patrón que seguidores de
-      Instagram) — evaluado el 2026-07-13, no implementado a propósito: depende de la GBP API,
-      que sigue con cuota 0 (ver más abajo, "Pendiente: cuota 0 en la GBP API") — un snapshot que
-      dependa de esa API fallaría en silencio todos los días hasta que Google resuelva el caso de
-      soporte en trámite. Retomar cuando se confirme el acceso.
+- [x] **Tendencia de rating/reseñas de Google + Performance API** (2026-07-13): rating y cantidad
+      de reseñas se toman de Places API, que ya funcionaba y no depende de la cuota de GBP. La tabla
+      `google_business_snapshots` también está preparada para impresiones Search/Maps, clicks al
+      sitio, llamadas y direcciones de Business Profile Performance API. Mientras Google mantenga
+      cuota 0 guarda `quota_blocked` y lo explica en el dashboard; cuando habilite acceso, comienza a
+      poblar las métricas automáticamente sin otro cambio ni otro cron.
 
 ---
 

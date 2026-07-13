@@ -156,7 +156,9 @@ export function computeChecklistAutoStatus(location: GoogleLocationProfile): Rec
     nombre_correcto: title.includes("lucia chahin") && !keywordStuffing.some(k => title.includes(k)),
     descripcion_cargada: Boolean(location.profile?.description && location.profile.description.trim().length > 20),
     horario_real: Boolean(location.regularHours?.periods?.some(p => p.openDay === "TUESDAY")),
-    link_landing: Boolean(location.websiteUri?.includes("dra-lucia-chahin")),
+    link_landing: Boolean(
+      location.websiteUri?.includes("dra-lucia-chahin") || location.websiteUri?.includes("/go/google")
+    ),
     telefono_configurado: Boolean(location.phoneNumbers?.primaryPhone?.trim()),
   }
 }

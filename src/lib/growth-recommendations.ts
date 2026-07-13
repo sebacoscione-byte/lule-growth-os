@@ -33,26 +33,26 @@ export interface LandingRankingRowInput {
   rate: number
 }
 
-export function checkLowInteractionLanding(row: LandingRankingRowInput): GrowthRecommendation | null {
+export function checkLowInteractionLanding(row: LandingRankingRowInput, windowDays = 90): GrowthRecommendation | null {
   if (row.visits >= LOW_INTERACTION_MIN_VISITS && row.rate < LOW_INTERACTION_RATE_THRESHOLD) {
     return {
       id: `web-low-rate-${row.slug}`,
       channel: "web",
       severity: "warning",
-      message: `"${row.label}" tuvo ${row.visits} visitas pero solo ${row.rate}% de interacción en los últimos 90 días — revisá el copy o el orden de los botones.`,
+      message: `"${row.label}" tuvo ${row.visits} visitas pero solo ${row.rate}% de interacción en los últimos ${windowDays} días — revisá el copy o el orden de los botones.`,
       href: `/${row.slug}`,
     }
   }
   return null
 }
 
-export function checkZeroVisitLanding(row: LandingRankingRowInput): GrowthRecommendation | null {
+export function checkZeroVisitLanding(row: LandingRankingRowInput, windowDays = 90): GrowthRecommendation | null {
   if (row.visits === 0) {
     return {
       id: `web-zero-visits-${row.slug}`,
       channel: "web",
       severity: "info",
-      message: `"${row.label}" no tuvo ninguna visita en los últimos 90 días — revisá que esté bien linkeada e indexada.`,
+      message: `"${row.label}" no tuvo ninguna visita en los últimos ${windowDays} días — revisá que esté bien linkeada e indexada.`,
       href: `/${row.slug}`,
     }
   }
@@ -291,6 +291,7 @@ export function checkGoogleBusinessNotConnected(connected: boolean): GrowthRecom
 
 export interface GrowthRecommendationsInput {
   now: Date
+  windowDays?: number
   landingRanking: LandingRankingRowInput[]
   heroVariantResults: HeroVariantRowInput[]
   locations: { name: string; obrasSociales: string[] }[]
@@ -316,8 +317,8 @@ export function buildGrowthRecommendations(input: GrowthRecommendationsInput): G
   const recs: (GrowthRecommendation | null)[] = []
 
   for (const row of input.landingRanking) {
-    recs.push(checkLowInteractionLanding(row))
-    recs.push(checkZeroVisitLanding(row))
+    recs.push(checkLowInteractionLanding(row, input.windowDays ?? 90))
+    recs.push(checkZeroVisitLanding(row, input.windowDays ?? 90))
   }
   for (const loc of input.locations) {
     recs.push(checkMissingObrasSociales(loc.name, loc.obrasSociales))

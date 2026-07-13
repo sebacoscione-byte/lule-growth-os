@@ -48,6 +48,11 @@ describe("computeChecklistAutoStatus", () => {
     expect(result.link_landing).toBe(false)
   })
 
+  it("link_landing acepta el enlace corto medible de Google", () => {
+    const result = computeChecklistAutoStatus(loc({ websiteUri: "https://draluciachahin.ar/go/google" }))
+    expect(result.link_landing).toBe(true)
+  })
+
   it("telefono_configurado es false si no hay teléfono primario", () => {
     const result = computeChecklistAutoStatus(loc({ phoneNumbers: undefined }))
     expect(result.telefono_configurado).toBe(false)

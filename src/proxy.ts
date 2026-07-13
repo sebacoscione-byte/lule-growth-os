@@ -39,6 +39,7 @@ export async function proxy(request: NextRequest) {
   const isAuthRoute = request.nextUrl.pathname.startsWith("/login")
   const isPublicRoute =
     request.nextUrl.pathname.startsWith("/landings") ||
+    request.nextUrl.pathname.startsWith("/go/") ||
     request.nextUrl.pathname.startsWith("/api") ||
     request.nextUrl.pathname === "/" ||
     request.nextUrl.pathname === "/privacidad" ||

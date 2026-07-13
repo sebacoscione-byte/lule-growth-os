@@ -1,8 +1,13 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
-import { getValidToken, getFollowerCount } from "@/lib/instagram-business"
+import {
+  getValidToken,
+  getFollowerCount,
+  getInstagramAccountInsights,
+} from "@/lib/instagram-business"
 
 export interface InstagramFollowerSnapshotResult {
   skipped: boolean
+  insightsAvailable?: boolean
   error?: string
 }
 
@@ -19,13 +24,26 @@ export async function snapshotInstagramFollowers(
   if (!token) return { skipped: true }
 
   try {
-    const followersCount = await getFollowerCount(token)
+    const [followersCount, insights] = await Promise.all([
+      getFollowerCount(token),
+      getInstagramAccountInsights(token),
+    ])
     const capturedOn = now.toISOString().slice(0, 10)
     const { error } = await supabase
       .from("instagram_follower_snapshots")
-      .upsert({ captured_on: capturedOn, followers_count: followersCount }, { onConflict: "captured_on" })
+      .upsert({
+        captured_on: capturedOn,
+        followers_count: followersCount,
+        reach: insights.reach,
+        profile_views: insights.profileViews,
+        link_taps: insights.linkTaps,
+        total_interactions: insights.totalInteractions,
+      }, { onConflict: "captured_on" })
     if (error) throw error
-    return { skipped: false }
+    return {
+      skipped: false,
+      insightsAvailable: Object.values(insights).some(value => value !== null),
+    }
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
     console.error(`[instagram-followers] snapshot failed: ${message}`)
