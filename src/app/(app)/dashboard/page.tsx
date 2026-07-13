@@ -71,6 +71,101 @@ async function getLandingRanking(
   }
 }
 
+type ClicksByLocationRow = {
+  locationKey: "cimel" | "swiss" | "britanico"
+  locationLabel: string
+  clickCall: number
+  clickWhatsapp: number
+}
+
+const CLICK_LOCATION_LABEL: Record<string, string> = {
+  cimel: "CIMEL Lanús", swiss: "Swiss Medical Lomas", britanico: "Hospital Británico",
+}
+
+// Reemplaza la vieja card "Métricas de landings" (cta_cimel/cta_swiss/cta_britanico/form_submitted),
+// que quedó midiendo eventos que ya nadie dispara desde el rediseño del tracking del 2026-07-06 y
+// por eso siempre mostraba 0. Esta sí usa los eventos reales (click_call, click_whatsapp +
+// location_key). Cubre Swiss Medical y Hospital Británico aunque ninguno de los dos pase por el bot
+// de WhatsApp de Lucía -- el click en sí se puede medir igual, lo que no se puede saber es si ese
+// contacto externo (Swity, o el teléfono/central de turnos del Británico) terminó en un turno.
+async function getClicksByLocation(
+  supabase: Awaited<ReturnType<typeof createClient>>
+): Promise<{ rows: ClicksByLocationRow[]; available: boolean }> {
+  try {
+    const { data, error } = await supabase.rpc("landing_clicks_by_location", { p_days: 90 })
+    if (error) throw error
+
+    const byLocation = new Map<string, { call: number; whatsapp: number }>()
+    for (const row of (data ?? []) as { location_key: string; event_type: string; event_count: number | string }[]) {
+      const entry = byLocation.get(row.location_key) ?? { call: 0, whatsapp: 0 }
+      if (row.event_type === "click_call") entry.call = Number(row.event_count)
+      else if (row.event_type === "click_whatsapp") entry.whatsapp = Number(row.event_count)
+      byLocation.set(row.location_key, entry)
+    }
+
+    const rows: ClicksByLocationRow[] = (["cimel", "swiss", "britanico"] as const).map(locationKey => {
+      const entry = byLocation.get(locationKey) ?? { call: 0, whatsapp: 0 }
+      return {
+        locationKey,
+        locationLabel: CLICK_LOCATION_LABEL[locationKey],
+        clickCall: entry.call,
+        clickWhatsapp: entry.whatsapp,
+      }
+    })
+
+    return { rows, available: true }
+  } catch {
+    return { rows: [], available: false }
+  }
+}
+
+type InstagramFollowerTrend = {
+  current: number
+  deltaLast7Days: number | null
+  deltaLast30Days: number | null
+  firstSnapshotAt: string | null
+}
+
+// Snapshot diario (ver src/lib/instagram-followers.ts, corre dentro del cron de publish-content).
+// Sin datos todavía -- p. ej. recién agregado, o Instagram nunca se conectó -- muestra el mismo
+// placeholder honesto que Google Analytics/Places: no rompe nada, solo no hay nada que mostrar.
+async function getInstagramFollowerTrend(
+  supabase: Awaited<ReturnType<typeof createClient>>
+): Promise<{ trend: InstagramFollowerTrend | null; available: boolean }> {
+  try {
+    const { data, error } = await supabase
+      .from("instagram_follower_snapshots")
+      .select("captured_on, followers_count")
+      .order("captured_on", { ascending: false })
+      .limit(31)
+    if (error) throw error
+
+    const rows = (data ?? []) as { captured_on: string; followers_count: number }[]
+    if (rows.length === 0) return { trend: null, available: true }
+
+    const current = rows[0].followers_count
+    const findClosestTo = (daysAgo: number) => {
+      const target = new Date(Date.now() - daysAgo * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
+      const older = rows.find(r => r.captured_on <= target)
+      return older ? older.followers_count : null
+    }
+    const sevenDaysAgo = findClosestTo(7)
+    const thirtyDaysAgo = findClosestTo(30)
+
+    return {
+      trend: {
+        current,
+        deltaLast7Days: sevenDaysAgo !== null ? current - sevenDaysAgo : null,
+        deltaLast30Days: thirtyDaysAgo !== null ? current - thirtyDaysAgo : null,
+        firstSnapshotAt: rows[rows.length - 1].captured_on,
+      },
+      available: true,
+    }
+  } catch {
+    return { trend: null, available: false }
+  }
+}
+
 type HeroVariantRow = {
   variant: "a" | "b"
   visits: number
@@ -380,42 +475,26 @@ async function getDashboardData() {
     ? Math.round((confirmed / totalLeads) * 100)
     : 0
 
-  // Landing events (tabla puede no existir todavía — no bloquea el dashboard)
-  const landingMetrics = await (async () => {
-    try {
-      const [
-        { count: cimel },
-        { count: swiss },
-        { count: britanico },
-        { count: forms },
-      ] = await Promise.all([
-        supabase.from("landing_events").select("id", { count: "exact", head: true }).eq("event_type", "cta_cimel"),
-        supabase.from("landing_events").select("id", { count: "exact", head: true }).eq("event_type", "cta_swiss"),
-        supabase.from("landing_events").select("id", { count: "exact", head: true }).eq("event_type", "cta_britanico"),
-        supabase.from("landing_events").select("id", { count: "exact", head: true }).eq("event_type", "form_submitted"),
-      ])
-      return { cimel: cimel ?? 0, swiss: swiss ?? 0, britanico: britanico ?? 0, forms: forms ?? 0, available: true }
-    } catch {
-      return { cimel: 0, swiss: 0, britanico: 0, forms: 0, available: false }
-    }
-  })()
-
   const landingRanking = await getLandingRanking(supabase)
   const heroVariantResults = await getHeroVariantResults(supabase)
   const referralFunnel = await getReferralFunnel(supabase)
+  const clicksByLocation = await getClicksByLocation(supabase)
+  const instagramFollowerTrend = await getInstagramFollowerTrend(supabase)
   const growthRecommendations = await getGrowthRecommendationsData(supabase, landingRanking.rows, heroVariantResults.rows)
   const weeklyReports = await getWeeklyReports(supabase)
 
   return {
-    metrics, conversionRate, recentLeads: (recentLeads ?? []) as Lead[], landingMetrics,
-    landingRanking, heroVariantResults, referralFunnel, growthRecommendations, weeklyReports,
+    metrics, conversionRate, recentLeads: (recentLeads ?? []) as Lead[],
+    landingRanking, heroVariantResults, referralFunnel, clicksByLocation, instagramFollowerTrend,
+    growthRecommendations, weeklyReports,
   }
 }
 
 export default async function DashboardPage() {
   const {
-    metrics, conversionRate, recentLeads, landingMetrics, landingRanking,
-    heroVariantResults, referralFunnel, growthRecommendations, weeklyReports,
+    metrics, conversionRate, recentLeads, landingRanking,
+    heroVariantResults, referralFunnel, clicksByLocation, instagramFollowerTrend,
+    growthRecommendations, weeklyReports,
   } = await getDashboardData()
 
   return (
@@ -598,31 +677,85 @@ export default async function DashboardPage() {
         </Card>
       </div>
 
-      {/* Métricas de landings */}
-      {landingMetrics.available && (
+      {/* Clicks por sede: llamada y WhatsApp (incluye Swiss y Británico, que no pasan por el bot) */}
+      {clicksByLocation.available && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Métricas de landings</CardTitle>
+            <CardTitle className="text-base">Clicks por sede: llamada y WhatsApp</CardTitle>
+            <p className="text-xs text-gray-500">
+              Últimos 90 días. Incluye Swiss Medical y Hospital Británico aunque ninguna de las dos
+              sedes pase por el bot de WhatsApp de Lucía (Swiss usa su propio WhatsApp, &quot;Swity&quot;;
+              Británico deriva a teléfono/central de turnos) — se puede medir el click, pero no si ese
+              contacto externo terminó en un turno confirmado.
+            </p>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-2 gap-4 text-center sm:grid-cols-4">
-              <div>
-                <p className="text-2xl font-bold text-blue-600">{landingMetrics.cimel}</p>
-                <p className="text-xs text-gray-500 mt-1">Instrucciones CIMEL vistas</p>
+            {clicksByLocation.rows.every(row => row.clickCall === 0 && row.clickWhatsapp === 0) ? (
+              <p className="text-sm text-gray-400">Todavía no hay clicks registrados en esta ventana.</p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b text-left text-xs text-gray-500">
+                      <th className="pb-2 font-medium">Sede</th>
+                      <th className="pb-2 font-medium text-right">Llamar</th>
+                      <th className="pb-2 font-medium text-right">WhatsApp</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {clicksByLocation.rows.map(row => (
+                      <tr key={row.locationKey} className="border-b border-gray-50 last:border-0">
+                        <td className="py-2 pr-2 text-gray-900">{row.locationLabel}</td>
+                        <td className="py-2 text-right text-gray-700">{row.clickCall}</td>
+                        <td className="py-2 text-right text-gray-700">{row.clickWhatsapp}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
-              <div>
-                <p className="text-2xl font-bold text-sky-600">{landingMetrics.britanico}</p>
-                <p className="text-xs text-gray-500 mt-1">Instrucciones Británico vistas</p>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Instagram: seguidores (snapshot diario, ver src/lib/instagram-followers.ts) */}
+      {instagramFollowerTrend.available && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2">
+              <Camera className="h-4 w-4" /> Instagram: seguidores
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {instagramFollowerTrend.trend === null ? (
+              <p className="text-sm text-gray-400">
+                Todavía no hay datos. Se registra un snapshot por día desde que se agregó este
+                tracking (2026-07-13) — hace falta Instagram conectado y al menos una corrida del cron.
+              </p>
+            ) : (
+              <div className="grid grid-cols-1 gap-4 text-center sm:grid-cols-3">
+                <div>
+                  <p className="text-2xl font-bold text-gray-900">{instagramFollowerTrend.trend.current}</p>
+                  <p className="text-xs text-gray-500 mt-1">Seguidores actuales</p>
+                </div>
+                <div>
+                  <p className={`text-2xl font-bold ${(instagramFollowerTrend.trend.deltaLast7Days ?? 0) >= 0 ? "text-green-600" : "text-red-600"}`}>
+                    {instagramFollowerTrend.trend.deltaLast7Days === null ? "—" : (
+                      `${instagramFollowerTrend.trend.deltaLast7Days >= 0 ? "+" : ""}${instagramFollowerTrend.trend.deltaLast7Days}`
+                    )}
+                  </p>
+                  <p className="text-xs text-gray-500 mt-1">Últimos 7 días</p>
+                </div>
+                <div>
+                  <p className={`text-2xl font-bold ${(instagramFollowerTrend.trend.deltaLast30Days ?? 0) >= 0 ? "text-green-600" : "text-red-600"}`}>
+                    {instagramFollowerTrend.trend.deltaLast30Days === null ? "—" : (
+                      `${instagramFollowerTrend.trend.deltaLast30Days >= 0 ? "+" : ""}${instagramFollowerTrend.trend.deltaLast30Days}`
+                    )}
+                  </p>
+                  <p className="text-xs text-gray-500 mt-1">Últimos 30 días</p>
+                </div>
               </div>
-              <div>
-                <p className="text-2xl font-bold text-teal-600">{landingMetrics.swiss}</p>
-                <p className="text-xs text-gray-500 mt-1">Instrucciones Swiss vistas</p>
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-green-600">{landingMetrics.forms}</p>
-                <p className="text-xs text-gray-500 mt-1">Formularios enviados</p>
-              </div>
-            </div>
+            )}
           </CardContent>
         </Card>
       )}

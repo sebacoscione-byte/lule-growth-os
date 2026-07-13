@@ -109,6 +109,23 @@ export async function getProfile(token: string) {
   return res.json() as Promise<{ id: string; username: string }>
 }
 
+/**
+ * Cantidad de seguidores de la CUENTA PROPIA conectada. A diferencia de business_discovery (que
+ * consulta OTRA cuenta y no existe en graph.instagram.com, ver getBusinessDiscovery), este es un
+ * campo normal de la cuenta autenticada -- requiere el scope instagram_business_manage_insights
+ * (ya cargado desde el 2026-07-10) pero no requiere ninguna Facebook Page vinculada.
+ */
+export async function getFollowerCount(token: string): Promise<number> {
+  const url = `${GRAPH_BASE}/me?fields=followers_count&access_token=${encodeURIComponent(token)}`
+  const res = await fetch(url)
+  const data = await res.json() as { followers_count?: number; error?: { message: string } }
+  if (!res.ok || data.error) throw new Error(data.error?.message || `IG followers_count error ${res.status}`)
+  if (typeof data.followers_count !== "number") {
+    throw new Error("La API de Instagram no devolvió followers_count para esta cuenta")
+  }
+  return data.followers_count
+}
+
 interface BusinessDiscoveryData {
   username: string
   name?: string

@@ -10,6 +10,7 @@ import type { AutoPublishFormat } from "@/lib/content-pipeline"
 import { generateContentVisual } from "@/lib/ai"
 import { publishApprovedItem } from "@/lib/content-publish"
 import { runWhatsAppFollowup } from "@/lib/whatsapp-followup"
+import { snapshotInstagramFollowers } from "@/lib/instagram-followers"
 import { sendCronFailureAlert } from "@/lib/alert-email"
 import type { AutoPublishTrackSettings, ContentChannel } from "@/types"
 
@@ -142,6 +143,11 @@ export async function GET(request: Request) {
     // sumar un tercer cron job -- el plan Hobby de Vercel limita a 2. Ver src/lib/whatsapp-followup.ts.
     const whatsappFollowup = await runWhatsAppFollowup(supabase, now)
 
+    // Mismo motivo: el snapshot diario de seguidores de Instagram corre acá adentro, no en un cron
+    // propio. Un fallo acá (token vencido, cuenta desconectada) no debe frenar la publicación de
+    // contenido -- ver src/lib/instagram-followers.ts.
+    const instagramFollowers = await snapshotInstagramFollowers(supabase, now)
+
     // Alerta por email (ver src/lib/alert-email.ts) solo ante fallos reales -- no ante estados
     // esperados (skipped_*, quota_exceeded) ni ante el aviso ya conocido de template sin aprobar.
     const failures: string[] = []
@@ -150,12 +156,14 @@ export async function GET(request: Request) {
     if (carrusel.last_run_result?.includes("(error:")) failures.push(`Carruseles: ${carrusel.last_run_result}`)
     const realWhatsappErrors = whatsappFollowup.errors.filter(e => !e.includes("todavía no está aprobado"))
     if (realWhatsappErrors.length > 0) failures.push(`Seguimiento WhatsApp: ${realWhatsappErrors.join("; ")}`)
+    if (instagramFollowers.error) failures.push(`Seguidores de Instagram: ${instagramFollowers.error}`)
     if (failures.length > 0) {
       await sendCronFailureAlert("publish-content", failures.join("\n"))
     }
 
     return NextResponse.json({
-      post: post.last_run_result, historia: historia.last_run_result, carrusel: carrusel.last_run_result, whatsappFollowup,
+      post: post.last_run_result, historia: historia.last_run_result, carrusel: carrusel.last_run_result,
+      whatsappFollowup, instagramFollowers,
     })
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
