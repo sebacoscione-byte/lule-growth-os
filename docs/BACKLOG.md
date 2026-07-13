@@ -838,6 +838,23 @@ público para pedir turno.
       atribuidas a esa pieza. *Limitación real: Instagram no permite links clickeables en posts de feed,
       así que solo sirve para historias (link sticker) o para pegarlo en la bio/Linktree — no hay forma
       de atribuir un post de feed común sin ese link.*
+- [x] Reorganización visual del dashboard (2026-07-13): `/dashboard` agrupado en secciones
+      ("Pacientes y leads", "Sitio web y landings", "WhatsApp", "Instagram", "Reportes"), más
+      "Visitas al sitio" (KPI consolidado) y "Costo de WhatsApp" (7d/30d + link a `/costos`) —
+      ver CLAUDE.md para el detalle completo.
+- [ ] **Insights por post de Instagram** (reach, likes, comments) — evaluado el 2026-07-13, no
+      implementado: `publishContainer()` en `src/lib/instagram-business.ts` devuelve el `mediaId`
+      de Meta pero **no se persiste en ninguna tabla** hoy (se pierde apenas termina el request de
+      publicar). Sin guardar ese ID no se puede pedir `/insights` de un post después de publicado.
+      Requiere primero agregar una tabla/columna que guarde `media_id` + `item_id` al publicar
+      (cambio de esquema), después sí una función de insights análoga a `getFollowerCount()`. El
+      scope de OAuth (`instagram_business_manage_insights`) ya está cargado, no hace falta
+      reconectar nada para esto.
+- [ ] **Tendencia de rating/reseñas de Google** (snapshot diario, mismo patrón que seguidores de
+      Instagram) — evaluado el 2026-07-13, no implementado a propósito: depende de la GBP API,
+      que sigue con cuota 0 (ver más abajo, "Pendiente: cuota 0 en la GBP API") — un snapshot que
+      dependa de esa API fallaría en silencio todos los días hasta que Google resuelva el caso de
+      soporte en trámite. Retomar cuando se confirme el acceso.
 
 ---
 

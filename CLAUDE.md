@@ -83,6 +83,27 @@
   landing sigue siendo invisible para la app, ya aclarado en el subtítulo de la card. No se pudo
   verificar en vivo que el fix sube los números reales (sin credenciales de login en este entorno)
   — seguir el número de "Llamar" en los próximos días en `/dashboard`, debería dejar de ser 0.
+- 2026-07-13 (mismo día, reorganización del dashboard): a pedido de Seba de mejorar la
+  visualización del dashboard de forma integral (no solo Instagram), se reorganizó
+  `/dashboard` en secciones con encabezado ("Pacientes y leads", "Sitio web y landings",
+  "WhatsApp", "Instagram", "Reportes") en vez de una lista larga de cards sin agrupar. Se
+  sumaron dos cosas nuevas, ambas reusando datos que ya se calculaban en algún lado pero
+  nunca se mostraban juntos: **"Visitas al sitio"** como quinto KPI en la fila principal
+  (suma de `landingRanking.rows`, la cifra ya existía desglosada por landing en "Ranking de
+  landings" pero no había un total consolidado a simple vista) y **"Costo de WhatsApp"**
+  (7d/30d, con link a `/costos` para el detalle) — antes el costo era completamente invisible
+  desde el dashboard principal, solo vivía en `/costos`. Nueva función compartida
+  `getWhatsAppCostSummary()` en `src/lib/whatsapp-cost-tracking.ts` (misma lógica de suma que
+  `/costos`, para no arriesgar que los dos números diverjan con el tiempo) — `/costos` en sí
+  no se tocó. **Evaluado y descartado explícitamente, no por falta de esfuerzo**: insights por
+  post de Instagram (reach/likes/comments) — el `mediaId` que devuelve `publishContainer()` no
+  se persiste en ninguna tabla hoy, así que no hay forma de pedir `/insights` de un post
+  después de publicado sin agregar antes esa persistencia (cambio de esquema, no solo de UI);
+  tendencia de rating de Google Business — bloqueado por la cuota 0 de la GBP API (ver
+  `docs/BACKLOG.md`, caso de soporte en trámite), construir un snapshot que dependa de una API
+  sin acceso hoy fallaría en silencio para siempre hasta que se resuelva la cuota. Ambos quedan
+  como ideas concretas para retomar, no implementadas. No se pudo verificar visualmente en este
+  entorno (sin credenciales de login) — validado por build, lint y tests.
 
 ## Qué es esta app
 Sistema de adquisición de pacientes para la Dra. Lucía Chahin, cardióloga.

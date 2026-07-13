@@ -1,6 +1,7 @@
 import { getServiceDb } from "@/lib/supabase/service"
 import { resolvePriceFromDb } from "@/lib/whatsapp-pricing"
 import type { WhatsAppCategory, WhatsAppDirection, WhatsAppEntryPoint, WhatsAppWindowState } from "@/types"
+import type { SupabaseClient } from "@supabase/supabase-js"
 
 export interface LogMessageParams {
   phoneNumberId?: string | null
@@ -91,4 +92,51 @@ export async function incrementMessagesSentCount(phone: string): Promise<number>
 export async function resetMessagesSentCount(phone: string): Promise<void> {
   const db = getServiceDb()
   await db.from("whatsapp_sessions").update({ messages_sent_count: 0 }).eq("phone", phone)
+}
+
+export interface WhatsAppCostSummary {
+  available: boolean
+  currency: string
+  cost7d: { total: number; pending: number }
+  cost30d: { total: number; pending: number }
+}
+
+/**
+ * Resumen liviano de costo para el dashboard principal (hoy el costo de WhatsApp era invisible
+ * ahí, solo vivía en /costos). Misma fuente y misma suma que /costos (whatsapp_cost_events,
+ * solo mensajes salientes) para no arriesgar que los dos números diverjan con el tiempo.
+ */
+export async function getWhatsAppCostSummary(supabase: SupabaseClient): Promise<WhatsAppCostSummary> {
+  try {
+    const now = Date.now()
+    const since30d = new Date(now - 30 * 24 * 60 * 60 * 1000).toISOString()
+    const since7d = new Date(now - 7 * 24 * 60 * 60 * 1000).toISOString()
+
+    const { data, error } = await supabase
+      .from("whatsapp_cost_events")
+      .select("direction, cost_estimated, currency, created_at")
+      .gte("created_at", since30d)
+      .limit(5000)
+    if (error) throw error
+
+    type Row = { direction: string; cost_estimated: number | null; currency: string | null; created_at: string }
+    const outbound = ((data ?? []) as Row[]).filter(r => r.direction === "outbound")
+    const currency = outbound.find(r => r.currency)?.currency ?? "ARS"
+
+    const sum = (rows: Row[]) => rows.reduce(
+      (acc, row) => row.cost_estimated === null
+        ? { total: acc.total, pending: acc.pending + 1 }
+        : { total: acc.total + row.cost_estimated, pending: acc.pending },
+      { total: 0, pending: 0 }
+    )
+
+    return {
+      available: true,
+      currency,
+      cost7d: sum(outbound.filter(r => r.created_at >= since7d)),
+      cost30d: sum(outbound),
+    }
+  } catch {
+    return { available: false, currency: "ARS", cost7d: { total: 0, pending: 0 }, cost30d: { total: 0, pending: 0 } }
+  }
 }

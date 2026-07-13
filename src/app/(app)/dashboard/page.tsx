@@ -2,7 +2,7 @@ import { createClient } from "@/lib/supabase/server"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import {
   Users, CheckCircle2, AlertTriangle, Clock,
-  MapPin, Camera, Search, MessageSquare, Globe, Lightbulb
+  MapPin, Camera, Search, MessageSquare, Globe, Lightbulb, DollarSign, Eye
 } from "lucide-react"
 import { STATUS_LABELS, STATUS_COLORS, type Lead } from "@/types"
 import { timeAgo } from "@/lib/utils"
@@ -11,6 +11,7 @@ import { allReferralCodes } from "@/lib/landing-referral-codes"
 import { readAutoPublishSettings } from "@/lib/content-pipeline"
 import { getGooglePlaceReviews } from "@/lib/google-places"
 import { getWhatsAppSettings } from "@/lib/whatsapp-settings"
+import { getWhatsAppCostSummary } from "@/lib/whatsapp-cost-tracking"
 import {
   buildGrowthRecommendations, evaluateAbTestReadiness,
   AB_TEST_MIN_VISITS_PER_VARIANT, AB_TEST_MIN_RATE_GAP,
@@ -480,21 +481,46 @@ async function getDashboardData() {
   const referralFunnel = await getReferralFunnel(supabase)
   const clicksByLocation = await getClicksByLocation(supabase)
   const instagramFollowerTrend = await getInstagramFollowerTrend(supabase)
+  const whatsappCostSummary = await getWhatsAppCostSummary(supabase)
   const growthRecommendations = await getGrowthRecommendationsData(supabase, landingRanking.rows, heroVariantResults.rows)
   const weeklyReports = await getWeeklyReports(supabase)
 
+  // Total de visitas al sitio (últimos 90 días) para mostrar como KPI único -- antes solo se veía
+  // desglosado por landing en "Ranking de landings", sin ningún número consolidado a simple vista.
+  const totalVisits = landingRanking.available
+    ? landingRanking.rows.reduce((sum, row) => sum + row.visits, 0)
+    : null
+
   return {
-    metrics, conversionRate, recentLeads: (recentLeads ?? []) as Lead[],
+    metrics, conversionRate, recentLeads: (recentLeads ?? []) as Lead[], totalVisits,
     landingRanking, heroVariantResults, referralFunnel, clicksByLocation, instagramFollowerTrend,
-    growthRecommendations, weeklyReports,
+    whatsappCostSummary, growthRecommendations, weeklyReports,
   }
+}
+
+function SectionHeader({ icon: Icon, title }: { icon: typeof Globe; title: string }) {
+  return (
+    <div className="flex items-center gap-2 pt-1">
+      <Icon className="h-4 w-4 text-gray-400" />
+      <h2 className="text-xs font-semibold uppercase tracking-wide text-gray-500">{title}</h2>
+    </div>
+  )
+}
+
+function Money({ amount, currency, pending }: { amount: number; currency: string; pending?: number }) {
+  return (
+    <span>
+      {currency} {amount.toLocaleString("es-AR", { maximumFractionDigits: 2 })}
+      {!!pending && <span className="ml-1 text-xs text-amber-600">(+{pending} sin tarifa)</span>}
+    </span>
+  )
 }
 
 export default async function DashboardPage() {
   const {
-    metrics, conversionRate, recentLeads, landingRanking,
+    metrics, conversionRate, recentLeads, totalVisits, landingRanking,
     heroVariantResults, referralFunnel, clicksByLocation, instagramFollowerTrend,
-    growthRecommendations, weeklyReports,
+    whatsappCostSummary, growthRecommendations, weeklyReports,
   } = await getDashboardData()
 
   return (
@@ -505,7 +531,25 @@ export default async function DashboardPage() {
       </div>
 
       {/* KPIs principales */}
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:gap-4 lg:grid-cols-4">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:gap-4 lg:grid-cols-5">
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-gray-500 flex items-center gap-2">
+              <Eye className="h-4 w-4 text-indigo-500" /> Visitas al sitio
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {totalVisits === null ? (
+              <p className="text-sm text-gray-400">Sin datos</p>
+            ) : (
+              <>
+                <p className="text-3xl font-bold text-gray-900">{totalVisits}</p>
+                <p className="text-xs text-gray-400">Últimos 90 días, todas las landings</p>
+              </>
+            )}
+          </CardContent>
+        </Card>
+
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-gray-500 flex items-center gap-2">
@@ -592,6 +636,7 @@ export default async function DashboardPage() {
         </Card>
       )}
 
+      <SectionHeader icon={Users} title="Pacientes y leads" />
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         {/* Por canal */}
         <Card>
@@ -677,88 +722,7 @@ export default async function DashboardPage() {
         </Card>
       </div>
 
-      {/* Clicks por sede: llamada y WhatsApp (incluye Swiss y Británico, que no pasan por el bot) */}
-      {clicksByLocation.available && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Clicks por sede: llamada y WhatsApp</CardTitle>
-            <p className="text-xs text-gray-500">
-              Últimos 90 días. Incluye Swiss Medical y Hospital Británico aunque ninguna de las dos
-              sedes pase por el bot de WhatsApp de Lucía (Swiss usa su propio WhatsApp, &quot;Swity&quot;;
-              Británico deriva a teléfono/central de turnos) — se puede medir el click, pero no si ese
-              contacto externo terminó en un turno confirmado.
-            </p>
-          </CardHeader>
-          <CardContent>
-            {clicksByLocation.rows.every(row => row.clickCall === 0 && row.clickWhatsapp === 0) ? (
-              <p className="text-sm text-gray-400">Todavía no hay clicks registrados en esta ventana.</p>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b text-left text-xs text-gray-500">
-                      <th className="pb-2 font-medium">Sede</th>
-                      <th className="pb-2 font-medium text-right">Llamar</th>
-                      <th className="pb-2 font-medium text-right">WhatsApp</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {clicksByLocation.rows.map(row => (
-                      <tr key={row.locationKey} className="border-b border-gray-50 last:border-0">
-                        <td className="py-2 pr-2 text-gray-900">{row.locationLabel}</td>
-                        <td className="py-2 text-right text-gray-700">{row.clickCall}</td>
-                        <td className="py-2 text-right text-gray-700">{row.clickWhatsapp}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Instagram: seguidores (snapshot diario, ver src/lib/instagram-followers.ts) */}
-      {instagramFollowerTrend.available && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base flex items-center gap-2">
-              <Camera className="h-4 w-4" /> Instagram: seguidores
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {instagramFollowerTrend.trend === null ? (
-              <p className="text-sm text-gray-400">
-                Todavía no hay datos. Se registra un snapshot por día desde que se agregó este
-                tracking (2026-07-13) — hace falta Instagram conectado y al menos una corrida del cron.
-              </p>
-            ) : (
-              <div className="grid grid-cols-1 gap-4 text-center sm:grid-cols-3">
-                <div>
-                  <p className="text-2xl font-bold text-gray-900">{instagramFollowerTrend.trend.current}</p>
-                  <p className="text-xs text-gray-500 mt-1">Seguidores actuales</p>
-                </div>
-                <div>
-                  <p className={`text-2xl font-bold ${(instagramFollowerTrend.trend.deltaLast7Days ?? 0) >= 0 ? "text-green-600" : "text-red-600"}`}>
-                    {instagramFollowerTrend.trend.deltaLast7Days === null ? "—" : (
-                      `${instagramFollowerTrend.trend.deltaLast7Days >= 0 ? "+" : ""}${instagramFollowerTrend.trend.deltaLast7Days}`
-                    )}
-                  </p>
-                  <p className="text-xs text-gray-500 mt-1">Últimos 7 días</p>
-                </div>
-                <div>
-                  <p className={`text-2xl font-bold ${(instagramFollowerTrend.trend.deltaLast30Days ?? 0) >= 0 ? "text-green-600" : "text-red-600"}`}>
-                    {instagramFollowerTrend.trend.deltaLast30Days === null ? "—" : (
-                      `${instagramFollowerTrend.trend.deltaLast30Days >= 0 ? "+" : ""}${instagramFollowerTrend.trend.deltaLast30Days}`
-                    )}
-                  </p>
-                  <p className="text-xs text-gray-500 mt-1">Últimos 30 días</p>
-                </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      )}
+      <SectionHeader icon={Globe} title="Sitio web y landings" />
 
       {/* Ranking de landings */}
       {landingRanking.available && (
@@ -799,6 +763,47 @@ export default async function DashboardPage() {
                         <td className="py-2 text-right text-gray-700">{row.visits}</td>
                         <td className="py-2 text-right text-gray-700">{row.interactions}</td>
                         <td className="py-2 text-right font-semibold text-gray-900">{row.rate}%</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Clicks por sede: llamada y WhatsApp (incluye Swiss y Británico, que no pasan por el bot) */}
+      {clicksByLocation.available && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Clicks por sede: llamada y WhatsApp</CardTitle>
+            <p className="text-xs text-gray-500">
+              Últimos 90 días. Incluye Swiss Medical y Hospital Británico aunque ninguna de las dos
+              sedes pase por el bot de WhatsApp de Lucía (Swiss usa su propio WhatsApp, &quot;Swity&quot;;
+              Británico deriva a teléfono/central de turnos) — se puede medir el click, pero no si ese
+              contacto externo terminó en un turno confirmado.
+            </p>
+          </CardHeader>
+          <CardContent>
+            {clicksByLocation.rows.every(row => row.clickCall === 0 && row.clickWhatsapp === 0) ? (
+              <p className="text-sm text-gray-400">Todavía no hay clicks registrados en esta ventana.</p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b text-left text-xs text-gray-500">
+                      <th className="pb-2 font-medium">Sede</th>
+                      <th className="pb-2 font-medium text-right">Llamar</th>
+                      <th className="pb-2 font-medium text-right">WhatsApp</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {clicksByLocation.rows.map(row => (
+                      <tr key={row.locationKey} className="border-b border-gray-50 last:border-0">
+                        <td className="py-2 pr-2 text-gray-900">{row.locationLabel}</td>
+                        <td className="py-2 text-right text-gray-700">{row.clickCall}</td>
+                        <td className="py-2 text-right text-gray-700">{row.clickWhatsapp}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -954,6 +959,84 @@ export default async function DashboardPage() {
           </CardContent>
         </Card>
       )}
+
+      <SectionHeader icon={DollarSign} title="WhatsApp" />
+
+      {/* Costo de WhatsApp (mismo cálculo que /costos, resumen liviano) */}
+      {whatsappCostSummary.available && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Costo de WhatsApp</CardTitle>
+            <p className="text-xs text-gray-500">
+              Mensajes salientes con tarifa cargada (últimos 7 y 30 días). Detalle completo, costo
+              por paciente/turno/protocolo y ranking de flows en{" "}
+              <Link href="/costos" className="underline">/costos</Link>.
+            </p>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 gap-4 text-center sm:grid-cols-2">
+              <div>
+                <p className="text-2xl font-bold text-gray-900">
+                  <Money amount={whatsappCostSummary.cost7d.total} currency={whatsappCostSummary.currency} pending={whatsappCostSummary.cost7d.pending} />
+                </p>
+                <p className="text-xs text-gray-500 mt-1">Últimos 7 días</p>
+              </div>
+              <div>
+                <p className="text-2xl font-bold text-gray-900">
+                  <Money amount={whatsappCostSummary.cost30d.total} currency={whatsappCostSummary.currency} pending={whatsappCostSummary.cost30d.pending} />
+                </p>
+                <p className="text-xs text-gray-500 mt-1">Últimos 30 días</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      <SectionHeader icon={Camera} title="Instagram" />
+
+      {/* Instagram: seguidores (snapshot diario, ver src/lib/instagram-followers.ts) */}
+      {instagramFollowerTrend.available && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2">
+              <Camera className="h-4 w-4" /> Instagram: seguidores
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {instagramFollowerTrend.trend === null ? (
+              <p className="text-sm text-gray-400">
+                Todavía no hay datos. Se registra un snapshot por día desde que se agregó este
+                tracking (2026-07-13) — hace falta Instagram conectado y al menos una corrida del cron.
+              </p>
+            ) : (
+              <div className="grid grid-cols-1 gap-4 text-center sm:grid-cols-3">
+                <div>
+                  <p className="text-2xl font-bold text-gray-900">{instagramFollowerTrend.trend.current}</p>
+                  <p className="text-xs text-gray-500 mt-1">Seguidores actuales</p>
+                </div>
+                <div>
+                  <p className={`text-2xl font-bold ${(instagramFollowerTrend.trend.deltaLast7Days ?? 0) >= 0 ? "text-green-600" : "text-red-600"}`}>
+                    {instagramFollowerTrend.trend.deltaLast7Days === null ? "—" : (
+                      `${instagramFollowerTrend.trend.deltaLast7Days >= 0 ? "+" : ""}${instagramFollowerTrend.trend.deltaLast7Days}`
+                    )}
+                  </p>
+                  <p className="text-xs text-gray-500 mt-1">Últimos 7 días</p>
+                </div>
+                <div>
+                  <p className={`text-2xl font-bold ${(instagramFollowerTrend.trend.deltaLast30Days ?? 0) >= 0 ? "text-green-600" : "text-red-600"}`}>
+                    {instagramFollowerTrend.trend.deltaLast30Days === null ? "—" : (
+                      `${instagramFollowerTrend.trend.deltaLast30Days >= 0 ? "+" : ""}${instagramFollowerTrend.trend.deltaLast30Days}`
+                    )}
+                  </p>
+                  <p className="text-xs text-gray-500 mt-1">Últimos 30 días</p>
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      <SectionHeader icon={Clock} title="Reportes" />
 
       {/* Reportes semanales */}
       {weeklyReports.available && (
