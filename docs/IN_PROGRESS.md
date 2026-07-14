@@ -1,3 +1,26 @@
+# EN CURSO (2026-07-14) — claridad de atribución del dashboard
+
+## Objetivo
+
+Unificar aliases históricos de Instagram y mostrar cada landing una sola vez en el embudo de
+atribución, con visitas únicas a nivel landing y el avance desglosado por sede debajo.
+
+## Plan
+
+- [x] Normalizar `ig`/`insta`/`instagram` antes de agregar visitas y leads.
+- [x] Agrupar el embudo por landing sin repetir sus visitas en cada código de sede.
+- [x] Contar sesiones únicas también en el RPC de atribución por referencia.
+- [x] Agregar cobertura de tests y verificar la UI en desktop/mobile.
+- [ ] Correr lint, tests y build; abrir PR, validar preview, mergear y migrar.
+
+## Riesgo y alcance
+
+- Cambia solamente agregación analítica y presentación del dashboard; no modifica leads, mensajes,
+  webhooks, cron jobs ni lógica médica.
+- La migración reemplaza tres RPCs existentes de forma compatible e idempotente; no borra datos.
+
+---
+
 # EN CURSO (2026-07-13) — dashboard de crecimiento y métricas multicanal
 
 ## Objetivo

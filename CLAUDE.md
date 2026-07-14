@@ -122,6 +122,14 @@
   qué piezas llevaron visitas/acciones a la web mediante el link `utm_content` ya existente. La UI
   se verificó localmente en escritorio (1440 px) y móvil (390 px) con navegador real; los únicos
   errores de consola fueron reconexiones HMR del servidor de desarrollo, no errores de la app.
+- 2026-07-14 (claridad de atribución): la tabla de canales normaliza `ig`/`insta`/`instagram` antes
+  de agregar datos, tanto en SQL como defensivamente en la lectura del dashboard; ya no aparecen
+  filas separadas para el mismo canal y las tasas se recalculan sobre el total combinado. El panel
+  de referencias dejó de repetir las visitas de una landing en cada CTA de sede: ahora muestra una
+  tarjeta por landing con visitas únicas y totales, seguida del desglose clic → lead → turno por
+  sede/código. `landing_referral_events` también cuenta sesiones únicas para que una recarga o varios
+  clics de la misma pestaña no inflen el embudo. Migración `20260714_dashboard_attribution_clarity.sql`.
+  Verificado con datos reales en navegador a 1440 px y 390 px; solo hubo errores HMR de desarrollo.
 
 ## Qué es esta app
 Sistema de adquisición de pacientes para la Dra. Lucía Chahin, cardióloga.

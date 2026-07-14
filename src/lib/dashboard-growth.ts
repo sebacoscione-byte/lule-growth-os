@@ -44,6 +44,8 @@ export interface ChannelPerformance {
   leadToConfirmedRate: number
 }
 
+type ChannelCounts = Omit<ChannelPerformance, "visitToLeadRate" | "leadToConfirmedRate">
+
 export interface ActionPerformance {
   eventType: string
   actions: number
@@ -93,6 +95,42 @@ function sum(rows: GrowthTrendPoint[], field: keyof Omit<GrowthTrendPoint, "date
 
 function rate(numerator: number, denominator: number): number {
   return denominator > 0 ? Math.round((numerator / denominator) * 1000) / 10 : 0
+}
+
+export function normalizeDashboardChannel(channel: string): string {
+  const normalized = channel.trim().toLowerCase()
+  return normalized === "ig" || normalized === "insta" ? "instagram" : normalized
+}
+
+export function combineChannelPerformance(rows: ChannelCounts[]): ChannelPerformance[] {
+  const grouped = new Map<string, ChannelCounts>()
+  for (const row of rows) {
+    const channel = normalizeDashboardChannel(row.channel)
+    const current = grouped.get(channel) ?? {
+      channel,
+      visits: 0,
+      previousVisits: 0,
+      leads: 0,
+      previousLeads: 0,
+      confirmed: 0,
+      previousConfirmed: 0,
+    }
+    current.visits += row.visits
+    current.previousVisits += row.previousVisits
+    current.leads += row.leads
+    current.previousLeads += row.previousLeads
+    current.confirmed += row.confirmed
+    current.previousConfirmed += row.previousConfirmed
+    grouped.set(channel, current)
+  }
+
+  return [...grouped.values()]
+    .map(row => ({
+      ...row,
+      visitToLeadRate: rate(row.leads, row.visits),
+      leadToConfirmedRate: rate(row.confirmed, row.leads),
+    }))
+    .sort((a, b) => b.confirmed - a.confirmed || b.leads - a.leads || b.visits - a.visits)
 }
 
 export function buildGrowthPeriodSummary(
@@ -147,22 +185,15 @@ async function readTrend(supabase: SupabaseClient, period: DashboardPeriod) {
 async function readChannels(supabase: SupabaseClient, period: DashboardPeriod): Promise<ChannelPerformance[]> {
   const { data, error } = await supabase.rpc("dashboard_channel_performance", { p_days: period })
   if (error) throw error
-  return (data ?? []).map((row: Record<string, unknown>) => {
-    const visits = Number(row.visits)
-    const leads = Number(row.leads)
-    const confirmed = Number(row.confirmed)
-    return {
+  return combineChannelPerformance((data ?? []).map((row: Record<string, unknown>) => ({
       channel: String(row.channel),
-      visits,
+      visits: Number(row.visits),
       previousVisits: Number(row.previous_visits),
-      leads,
+      leads: Number(row.leads),
       previousLeads: Number(row.previous_leads),
-      confirmed,
+      confirmed: Number(row.confirmed),
       previousConfirmed: Number(row.previous_confirmed),
-      visitToLeadRate: rate(leads, visits),
-      leadToConfirmedRate: rate(confirmed, leads),
-    }
-  })
+  })))
 }
 
 async function readActions(supabase: SupabaseClient, period: DashboardPeriod): Promise<ActionPerformance[]> {

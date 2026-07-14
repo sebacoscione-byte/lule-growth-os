@@ -9,7 +9,12 @@ import {
 import { STATUS_LABELS, STATUS_COLORS, type Lead } from "@/types"
 import { timeAgo } from "@/lib/utils"
 import { LANDING_DATA, PUBLIC_LANDING_SLUGS } from "@/lib/public-landings"
-import { allReferralCodes } from "@/lib/landing-referral-codes"
+import {
+  buildReferralLandingFunnels,
+  type ReferralEventAggregate,
+  type ReferralLandingFunnel,
+  type ReferralLeadAggregate,
+} from "@/lib/referral-funnel"
 import { readAutoPublishSettings, readContentItems } from "@/lib/content-pipeline"
 import { getGooglePlaceReviews } from "@/lib/google-places"
 import { getWhatsAppSettings } from "@/lib/whatsapp-settings"
@@ -192,24 +197,6 @@ async function getHeroVariantResults(
   }
 }
 
-type ReferralFunnelRow = {
-  code: string
-  landingSlug: string
-  locationLabel: string
-  specialty: string
-  visits: number
-  whatsappClicks: number
-  leads: number
-  confirmed: number
-}
-
-const REFERRAL_SPECIALTY_LABEL: Record<string, string> = {
-  general: "General", cardiologia: "Cardiología", ecocardiograma: "Ecocardiograma", consulta_cardiologica: "Consulta cardiológica",
-}
-const REFERRAL_LOCATION_LABEL: Record<string, string> = {
-  cimel: "CIMEL Lanús", swiss: "Swiss Medical Lomas", britanico: "Hospital Británico",
-}
-
 // GROWTH-01: embudo real visita → clic WhatsApp → lead → turno confirmado, por código de
 // referencia (ver src/lib/landing-referral-codes.ts). Visitas/clicks agregados en SQL (RPC
 // landing_referral_events, migración 20260712_growth_01_referral_attribution.sql) — leads es una
@@ -219,21 +206,10 @@ const REFERRAL_LOCATION_LABEL: Record<string, string> = {
 async function getReferralFunnel(
   supabase: Awaited<ReturnType<typeof createClient>>,
   period: DashboardPeriod
-): Promise<{ rows: ReferralFunnelRow[]; available: boolean }> {
+): Promise<{ landings: ReferralLandingFunnel[]; available: boolean }> {
   try {
     const { data: events, error } = await supabase.rpc("landing_referral_events", { p_days: period })
     if (error) throw error
-
-    const visitsBySlug = new Map<string, number>()
-    const clicksBySlugLocation = new Map<string, number>()
-    for (const row of (events ?? []) as { slug: string; location_key: string | null; event_type: string; event_count: number | string }[]) {
-      const count = Number(row.event_count)
-      if (row.event_type === "page_view") {
-        visitsBySlug.set(row.slug, (visitsBySlug.get(row.slug) ?? 0) + count)
-      } else if (row.event_type === "click_whatsapp" && row.location_key) {
-        clicksBySlugLocation.set(`${row.slug}:${row.location_key}`, count)
-      }
-    }
 
     const since = new Date(Date.now() - period * 24 * 60 * 60 * 1000).toISOString()
     const { data: leadsData, error: leadsError } = await supabase
@@ -243,34 +219,15 @@ async function getReferralFunnel(
       .gte("created_at", since)
     if (leadsError) throw leadsError
 
-    const leadsByCode = new Map<string, { total: number; confirmed: number }>()
-    for (const lead of (leadsData ?? []) as { utm_content: string; confirmed_booked: boolean }[]) {
-      const entry = leadsByCode.get(lead.utm_content) ?? { total: 0, confirmed: 0 }
-      entry.total += 1
-      if (lead.confirmed_booked) entry.confirmed += 1
-      leadsByCode.set(lead.utm_content, entry)
+    return {
+      landings: buildReferralLandingFunnels(
+        (events ?? []) as ReferralEventAggregate[],
+        (leadsData ?? []) as ReferralLeadAggregate[],
+      ),
+      available: true,
     }
-
-    const rows: ReferralFunnelRow[] = allReferralCodes()
-      .filter(info => info.landingSlug !== "*")
-      .map(info => {
-        const leadsEntry = leadsByCode.get(info.code) ?? { total: 0, confirmed: 0 }
-        return {
-          code: info.code,
-          landingSlug: info.landingSlug,
-          locationLabel: info.locationKey ? REFERRAL_LOCATION_LABEL[info.locationKey] ?? info.locationKey : "—",
-          specialty: REFERRAL_SPECIALTY_LABEL[info.specialty] ?? info.specialty,
-          visits: visitsBySlug.get(info.landingSlug) ?? 0,
-          whatsappClicks: info.locationKey ? clicksBySlugLocation.get(`${info.landingSlug}:${info.locationKey}`) ?? 0 : 0,
-          leads: leadsEntry.total,
-          confirmed: leadsEntry.confirmed,
-        }
-      })
-      .sort((a, b) => b.leads - a.leads || b.visits - a.visits)
-
-    return { rows, available: true }
   } catch {
-    return { rows: [], available: false }
+    return { landings: [], available: false }
   }
 }
 
@@ -996,57 +953,78 @@ export default async function DashboardPage({
         </Card>
       )}
 
-      {/* Embudo de atribución por código de referencia (GROWTH-01) */}
+      {/* Embudo de atribución agrupado por landing (GROWTH-01) */}
       {referralFunnel.available && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Embudo de atribución por landing/sede</CardTitle>
+            <CardTitle className="text-base">Atribución por landing</CardTitle>
             <p className="text-xs text-gray-500">
-              Visita → clic a WhatsApp → lead → turno confirmado, por código de referencia (últimos
-               {period}{" "}días). El código va al final del mensaje prellenado de cada CTA de WhatsApp — si el
-              paciente lo borra antes de enviar, ese lead no queda atribuido a ninguna landing (no
-              afecta la conversación, solo la atribución).
+              Cada landing aparece una sola vez: visita → clic a WhatsApp → lead → turno confirmado
+              durante los últimos {period} días. Las visitas son únicas por pestaña; el desglose inferior
+              muestra qué sede recibió cada clic y conversión.
             </p>
           </CardHeader>
           <CardContent>
-            {referralFunnel.rows.every(row => row.visits === 0 && row.leads === 0) ? (
+            {referralFunnel.landings.every(row => row.visits === 0 && row.leads === 0) ? (
               <p className="text-sm text-gray-400">
                 Todavía no hay datos para este embudo. Se empieza a acumular desde que se agregó el
                 código de referencia a los mensajes de WhatsApp (2026-07-12).
               </p>
             ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b text-left text-xs text-gray-500">
-                      <th className="pb-2 font-medium">Código</th>
-                      <th className="pb-2 font-medium">Landing</th>
-                      <th className="pb-2 font-medium">Sede</th>
-                      <th className="pb-2 font-medium text-right">Visitas</th>
-                      <th className="pb-2 font-medium text-right">Clics WhatsApp</th>
-                      <th className="pb-2 font-medium text-right">Leads</th>
-                      <th className="pb-2 font-medium text-right">Turnos confirmados</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {referralFunnel.rows.map(row => (
-                      <tr key={row.code} className="border-b border-gray-50 last:border-0">
-                        <td className="py-2 pr-2 font-mono text-xs text-gray-700">{row.code}</td>
-                        <td className="py-2 pr-2 text-gray-900">
-                          <Link href={`/${row.landingSlug}`} target="_blank" className="hover:underline">
-                            {LANDING_DATA[row.landingSlug]?.h1 ?? row.landingSlug}
-                          </Link>
-                          <span className="block text-xs text-gray-400">{row.specialty}</span>
-                        </td>
-                        <td className="py-2 pr-2 text-gray-700">{row.locationLabel}</td>
-                        <td className="py-2 text-right text-gray-700">{row.visits}</td>
-                        <td className="py-2 text-right text-gray-700">{row.whatsappClicks}</td>
-                        <td className="py-2 text-right text-gray-700">{row.leads}</td>
-                        <td className="py-2 text-right font-semibold text-gray-900">{row.confirmed}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+              <div className="space-y-3">
+                {referralFunnel.landings.map(landing => (
+                  <article key={landing.landingSlug} className="overflow-hidden rounded-xl border border-gray-200 bg-white">
+                    <div className="grid gap-4 p-4 lg:grid-cols-[minmax(240px,1fr)_minmax(420px,1.15fr)] lg:items-center">
+                      <div className="min-w-0">
+                        <Link
+                          href={`/${landing.landingSlug}`}
+                          target="_blank"
+                          className="font-semibold text-gray-950 hover:text-indigo-700 hover:underline"
+                        >
+                          {LANDING_DATA[landing.landingSlug]?.h1 ?? landing.landingSlug}
+                        </Link>
+                        <p className="mt-1 text-xs text-gray-400">{landing.specialty} · /{landing.landingSlug}</p>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                        {[
+                          { label: "Visitas únicas", value: landing.visits, className: "text-indigo-700" },
+                          { label: "Clics WhatsApp", value: landing.whatsappClicks, className: "text-emerald-700" },
+                          { label: "Leads atribuidos", value: landing.leads, className: "text-violet-700" },
+                          { label: "Turnos", value: landing.confirmed, className: "text-gray-950" },
+                        ].map(metric => (
+                          <div key={metric.label} className="rounded-lg bg-gray-50 px-3 py-2 text-center">
+                            <p className={`text-lg font-bold ${metric.className}`}>{metric.value}</p>
+                            <p className="text-[11px] text-gray-500">{metric.label}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="border-t border-gray-100 bg-gray-50/70 p-3">
+                      <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-gray-400">Desglose por sede</p>
+                      <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+                        {landing.destinations.map(destination => (
+                          <div key={destination.code} className="rounded-lg border border-gray-100 bg-white p-3">
+                            <div className="flex items-start justify-between gap-3">
+                              <p className="text-xs font-semibold text-gray-800">{destination.locationLabel}</p>
+                              <span className="font-mono text-[10px] text-gray-400">{destination.code}</span>
+                            </div>
+                            <p className="mt-2 text-xs text-gray-600">
+                              <strong className="text-emerald-700">{destination.whatsappClicks}</strong> clics
+                              <span className="mx-1.5 text-gray-300">→</span>
+                              <strong className="text-violet-700">{destination.leads}</strong> leads
+                              <span className="mx-1.5 text-gray-300">→</span>
+                              <strong className="text-gray-900">{destination.confirmed}</strong> turnos
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </article>
+                ))}
+                <p className="px-1 text-[11px] text-gray-400">
+                  La atribución depende del código incluido en el mensaje prellenado. Si la persona abre
+                  WhatsApp pero no envía el mensaje, o borra el código, queda el clic pero no el lead atribuido.
+                </p>
               </div>
             )}
           </CardContent>

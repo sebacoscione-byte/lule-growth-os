@@ -1,5 +1,7 @@
 import {
   buildGrowthPeriodSummary,
+  combineChannelPerformance,
+  normalizeDashboardChannel,
   parseDashboardPeriod,
   type GrowthTrendPoint,
 } from "@/lib/dashboard-growth"
@@ -27,5 +29,22 @@ describe("dashboard growth", () => {
     expect(summary.visits).toEqual({ current: 100, previous: 80 })
     expect(summary.visitToLeadRate).toEqual({ current: 10, previous: 10 })
     expect(summary.leadToConfirmedRate).toEqual({ current: 40, previous: 25 })
+  })
+
+  it("unifica aliases históricos de Instagram y recalcula las tasas", () => {
+    expect(normalizeDashboardChannel("IG")).toBe("instagram")
+    const channels = combineChannelPerformance([
+      { channel: "instagram", visits: 20, previousVisits: 4, leads: 1, previousLeads: 0, confirmed: 0, previousConfirmed: 0 },
+      { channel: "ig", visits: 19, previousVisits: 3, leads: 2, previousLeads: 1, confirmed: 1, previousConfirmed: 0 },
+    ])
+    expect(channels).toEqual([expect.objectContaining({
+      channel: "instagram",
+      visits: 39,
+      previousVisits: 7,
+      leads: 3,
+      confirmed: 1,
+      visitToLeadRate: 7.7,
+      leadToConfirmedRate: 33.3,
+    })])
   })
 })
