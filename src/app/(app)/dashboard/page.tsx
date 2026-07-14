@@ -1235,6 +1235,12 @@ export default async function DashboardPage({
                 Conectá Google Business en <Link href="/google-local" className="font-semibold underline">Google Local</Link> para traer métricas nativas. El enlace medible funciona aunque la API no esté conectada.
               </div>
             )}
+            {growth.google.status === null && (
+              <p className="text-sm text-gray-400">
+                Todavía no hay snapshots. Se generan diariamente dentro del cron de publish-content
+                — hace falta al menos una corrida para que este card muestre datos.
+              </p>
+            )}
             <div className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-8">
               <MetricTile label="Impresiones Search" value={growth.google.impressionsSearch} />
               <MetricTile label="Impresiones Maps" value={growth.google.impressionsMaps} />
