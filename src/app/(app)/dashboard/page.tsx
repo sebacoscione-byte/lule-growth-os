@@ -2,7 +2,7 @@ import { createClient } from "@/lib/supabase/server"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import {
   Users, CheckCircle2, Clock,
-  MapPin, Camera, Search, MessageSquare, Globe, Lightbulb, DollarSign, Eye,
+  MapPin, Camera, Search, MessageSquare, Globe, Lightbulb, Eye,
   MousePointerClick, TrendingUp, ArrowUpRight, ArrowDownRight, Minus,
   CalendarDays, PhoneCall, Navigation, Star, BarChart3,
 } from "lucide-react"
@@ -1120,7 +1120,7 @@ export default async function DashboardPage({
         </Card>
       )}
 
-      <SectionHeader icon={DollarSign} title="WhatsApp" />
+      <SectionHeader icon={MessageSquare} title="WhatsApp" />
 
       {/* Costo de WhatsApp (mismo cálculo que /costos, resumen liviano) */}
       {whatsappCostSummary.available && (
@@ -1263,14 +1263,15 @@ export default async function DashboardPage({
           <CardHeader>
             <CardTitle className="text-base">Reportes semanales</CardTitle>
             <p className="text-xs text-gray-500">
-              Snapshot automático generado todos los lunes (leads nuevos, conversión y canales de la
-              semana anterior). No se envía a ningún lado todavía — se guarda acá para consultar.
+              Snapshot automático generado todos los domingos (leads nuevos, conversión y canales de
+              la semana anterior — Lucía revisa los datos ese día). No se envía a ningún lado todavía
+              — se guarda acá para consultar.
             </p>
           </CardHeader>
           <CardContent>
             {weeklyReports.rows.length === 0 ? (
               <p className="text-sm text-gray-400">
-                Todavía no se generó ningún reporte semanal. El primero se genera el próximo lunes.
+                Todavía no se generó ningún reporte semanal. El primero se genera el próximo domingo.
               </p>
             ) : (
               <div className="overflow-x-auto">

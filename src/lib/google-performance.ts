@@ -147,7 +147,12 @@ export async function snapshotGoogleBusinessMetrics(
 
   if (connection?.google_location_id) {
     try {
-      const token = await getValidToken(supabase)
+      // Mismo patrón que /api/google-business/status: mientras el OAuth consent screen de Google
+      // siga en modo Prueba, el refresh token vence cada ~7 días y getValidToken() rechaza (no
+      // devuelve null). Sin este .catch(), ese vencimiento esperado se colaba como status="error"
+      // y disparaba una alerta de cron por email todos los días hasta que alguien reconectara --
+      // en vez de eso, se trata igual que "nunca conectado" (el banner ya manda a /google-local).
+      const token = await getValidToken(supabase).catch(() => null)
       if (!token) {
         status = "not_connected"
       } else {
