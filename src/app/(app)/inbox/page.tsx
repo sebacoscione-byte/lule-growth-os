@@ -52,6 +52,7 @@ export default function InboxPage() {
   }, [messages])
 
   const selectedLead = leads.find(l => l.id === selectedLeadId)
+  const canSendWhatsApp = !!selectedLead?.phone && selectedLead?.origin_channel === "whatsapp"
 
   async function closeWithStatus(newStatus: "confirmo_que_pidio_turno" | "no_pudo_pedir_turno") {
     if (!selectedLeadId) return
@@ -97,9 +98,16 @@ export default function InboxPage() {
       }),
     })
     const data = await res.json()
+
+    if (!res.ok) {
+      alert(data.error ?? "No se pudo enviar el mensaje.")
+      setSending(false)
+      return
+    }
+
     setMessages(prev => [
       ...prev,
-      data.user_message,
+      ...(data.user_message ? [data.user_message] : []),
       ...(data.assistant_message ? [data.assistant_message] : []),
     ])
     setInput("")
@@ -205,16 +213,18 @@ export default function InboxPage() {
                   </Button>
                 </>
               )}
-              <label className="flex items-center gap-1 text-xs text-gray-500 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={autoReply}
-                  onChange={e => setAutoReply(e.target.checked)}
-                  className="rounded"
-                />
-                <Sparkles className="h-3 w-3 text-blue-500" />
-                <span>IA</span>
-              </label>
+              {!canSendWhatsApp && (
+                <label className="flex items-center gap-1 text-xs text-gray-500 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={autoReply}
+                    onChange={e => setAutoReply(e.target.checked)}
+                    className="rounded"
+                  />
+                  <Sparkles className="h-3 w-3 text-blue-500" />
+                  <span>IA</span>
+                </label>
+              )}
               <Link href={`/leads/${selectedLead.id}`}>
                 <Button variant="outline" size="sm" className="text-xs h-7 px-2">Ver</Button>
               </Link>
@@ -253,6 +263,11 @@ export default function InboxPage() {
                 {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
               </Button>
             </div>
+            <p className="text-xs text-gray-400">
+              {canSendWhatsApp
+                ? "Se manda directo por WhatsApp al paciente."
+                : "Este lead no tiene una conversación de WhatsApp real conectada acá — el mensaje queda solo como registro interno, no se manda a ningún lado automáticamente."}
+            </p>
             <Button
               variant="ghost"
               size="sm"

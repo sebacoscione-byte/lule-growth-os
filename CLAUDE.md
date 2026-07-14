@@ -178,6 +178,32 @@
   fila como visita, sin romper nada), no algo nuevo para arreglar; los números de "visitas únicas"
   de antes del 2026-07-14 son en la práctica conteo de filas, debería autocorregirse con tráfico
   nuevo. npm test (310/310), lint y build sin errores.
+- 2026-07-14 (bug real: responder manual desde el Inbox no llegaba al paciente): Seba reportó que,
+  tras una derivación fallida del bot (el paciente quedó sin poder pedir turno), le escribió una
+  disculpa a mano desde `/inbox` y no funcionó. **Causa real**: `POST /api/messages` (usado por el
+  cuadro de texto del Inbox) nunca llamaba a la API de WhatsApp — solo insertaba el texto en la
+  tabla `messages` local, y encima con `role: "user"` (como si el mensaje lo hubiera escrito el
+  *paciente*, no el equipo). Como el checkbox "IA" viene tildado por defecto, encima disparaba
+  `generateReply()` tratando ese texto de Seba como si fuera el mensaje entrante del paciente,
+  generando una respuesta del bot confundida — visible en la captura que compartió, y que tampoco
+  se mandaba a ningún lado. Ningún mensaje salía nunca del navegador. Corregido en
+  `src/app/api/messages/route.ts`: si el lead tiene teléfono y `origin_channel === "whatsapp"`
+  (o sea, viene de una conversación real del bot), el texto ahora se manda de verdad con
+  `sendText()` (misma función que usa el bot, ver `src/lib/whatsapp.ts`) — respeta la ventana de
+  24h (si está cerrada, devuelve 409 con un mensaje claro en vez de fallar en silencio; todavía no
+  se puede elegir un template desde el Inbox para ese caso, queda pendiente) y el mensaje queda
+  logueado con `role: "assistant"` (saliente) vía el mismo `logWhatsAppMessage` que usa el bot, sin
+  insert duplicado. Para leads sin canal de WhatsApp real conectado (Instagram, manual, etc.) se
+  mantuvo el comportamiento anterior (registro interno + sugerencia opcional de IA), pero ahora
+  con un aviso explícito en la UI de que ese mensaje no se manda a ningún lado automáticamente — y
+  el checkbox "IA" se oculta cuando sí hay envío real, porque ahí no tiene ningún efecto. El
+  frontend (`src/app/(app)/inbox/page.tsx`) también dejaba de chequear `res.ok`: un error del
+  servidor se ignoraba en silencio y podía empujar `undefined` al historial de mensajes — ahora
+  muestra el error con `alert()`. Tests nuevos en `src/app/api/messages/route.test.ts` (envío real,
+  ventana cerrada, error de la API, y que el camino sin WhatsApp real sigue igual). npm test
+  (315/315), lint y build sin errores. **No se pudo verificar visualmente en este entorno** (sin
+  `.env.local`/credenciales de WhatsApp ni de login acá) — seguir de cerca el primer envío manual
+  real en producción.
 
 ## Qué es esta app
 Sistema de adquisición de pacientes para la Dra. Lucía Chahin, cardióloga.

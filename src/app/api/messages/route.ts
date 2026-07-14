@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
+import { getServiceDb } from "@/lib/supabase/service"
 import { generateReply, getPublicAiError } from "@/lib/ai"
+import { sendText, WindowClosedError } from "@/lib/whatsapp"
+import { getWindowState } from "@/lib/whatsapp-window"
+import { getWhatsAppSettings } from "@/lib/whatsapp-settings"
 import { z } from "zod"
 import { parseJsonBody, formatZodError } from "@/lib/api-validation"
 
@@ -43,6 +47,55 @@ export async function POST(request: Request) {
   }
   const { lead_id, content, generate_reply } = result.data
 
+  const { data: lead } = await supabase.from("leads").select("*").eq("id", lead_id).single()
+
+  // El lead vino del bot de WhatsApp: acá "responder" tiene que llegarle de verdad al paciente por
+  // WhatsApp, no solo quedar guardado en esta tabla. Antes de esto, un mensaje escrito acá nunca
+  // salía de la app (se guardaba con role "user", como si lo hubiera escrito el paciente).
+  if (lead?.phone && lead.origin_channel === "whatsapp") {
+    const db = getServiceDb()
+    const { data: session } = await db
+      .from("whatsapp_sessions")
+      .select("last_inbound_at, entry_point")
+      .eq("phone", lead.phone)
+      .maybeSingle()
+
+    const entryPoint = session?.entry_point ?? "organic"
+    const windowState = getWindowState(session?.last_inbound_at ?? null, entryPoint)
+    const settings = await getWhatsAppSettings()
+
+    try {
+      await sendText(lead.phone, content, {
+        windowState,
+        entryPoint,
+        leadId: lead_id,
+        flowIntent: "respuesta_manual",
+        serviceMessageChargingEnabled: settings.enable_service_message_charging,
+      })
+    } catch (error) {
+      if (error instanceof WindowClosedError) {
+        return NextResponse.json({
+          error: "La ventana de 24hs de WhatsApp está cerrada para este paciente. No se puede mandar texto libre — hace falta un template aprobado (Configuración → Templates de WhatsApp), que todavía no se puede elegir desde acá.",
+        }, { status: 409 })
+      }
+      return NextResponse.json({
+        error: error instanceof Error ? error.message : "Error enviando el mensaje por WhatsApp",
+      }, { status: 500 })
+    }
+
+    // sendText ya deja el mensaje guardado (role "assistant", saliente) vía logWhatsAppMessage.
+    const { data: sentMessage } = await supabase
+      .from("messages")
+      .select("*")
+      .eq("lead_id", lead_id)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .single()
+
+    await supabase.from("leads").update({ last_message: content }).eq("id", lead_id)
+    return NextResponse.json({ assistant_message: sentMessage })
+  }
+
   const { data: userMessage } = await supabase
     .from("messages")
     .insert({ lead_id, role: "user", content })
@@ -55,7 +108,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ user_message: userMessage })
   }
 
-  const { data: lead } = await supabase.from("leads").select("*").eq("id", lead_id).single()
   const { data: history } = await supabase
     .from("messages")
     .select("role,content")
