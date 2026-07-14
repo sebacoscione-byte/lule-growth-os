@@ -708,6 +708,14 @@ historial (texto o más capturas), el diagnóstico se puede afinar.
   de verdad por WhatsApp (antes solo quedaba guardado localmente con el rol invertido).
 - [x] **Ya resuelto en esta sesión (PR #79)** — el bot se pausa automáticamente para esa
   conversación al mandar una respuesta manual real, para que no se pisen entre sí.
+- [ ] **Revisar la conversación entera con el paciente (David Portas) en `/inbox`.** El análisis de
+  arriba se armó con un solo fragmento (la captura compartida en el chat) + el código del bot,
+  porque esta sesión no tiene credenciales para leer la base de producción. Falta releer el
+  historial completo (desde el primer mensaje) para confirmar si hubo algo más, antes de ese pedido
+  de "hablar con una persona", que también se podría haber manejado mejor — ej. si el paciente ya
+  había mostrado señales de confusión o de necesitar ayuda antes de llegar a pedir explícitamente
+  un humano. Requiere una sesión con acceso real a `/inbox` (login) o que Seba pegue/exporte el
+  texto completo de la conversación.
 
 ### Secuencia y reglas de ejecución
 
