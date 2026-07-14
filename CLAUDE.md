@@ -149,6 +149,35 @@
   (SQL de las migraciones, RPCs, límites de fechas, agregaciones) sin encontrar errores adicionales.
   npm test (307/307), lint y build sin errores. No se pudo verificar visualmente (sin credenciales
   de login en este entorno).
+- 2026-07-14 (misma sesión, PR #75 — verificación visual real por primera vez): Seba pidió arreglar
+  la limitación de arriba ("conectate a lo que tengas que conectarte") para poder trabajar a la par
+  de Codex. Esta sesión de Claude Code sí corre local en la máquina de Seba (VS Code, con
+  `.env.local` real) — la diferencia con sesiones anteriores no era el entorno sino no haber armado
+  todavía el login automatizado. Con aprobación explícita de Seba: se creó un usuario de prueba
+  dedicado en Supabase Auth (`e2e-agent-test@lule-internal.local`, aislado de leads/pacientes) vía
+  Admin API, y se usó `e2e/authenticated/auth.setup.ts` (ya escrito para QA-02) + Playwright para
+  loguearse y sacar capturas reales de `/dashboard` — primera vez que un agente ve el dashboard con
+  datos reales en vez de solo leer el código. **Recomendación para Seba**: si querés que esto quede
+  permanente (para mí y para Codex, sin tener que crear el usuario de nuevo cada vez), agregá a tu
+  `.env.local` las líneas `E2E_TEST_EMAIL=e2e-agent-test@lule-internal.local` y
+  `E2E_TEST_PASSWORD=` (contraseña que se generó y mostró en el chat de esa sesión) — nunca lo hice
+  yo mismo porque `.env.local` está en la lista de archivos que ningún agente puede tocar. Con eso
+  cargado, `npm run test:e2e` deja de saltar los tests autenticados (QA-02 pasa de parcial a poder
+  correrse de verdad) y cualquier sesión futura puede volver a loguearse sin pedir aprobación de
+  nuevo. Mirando el dashboard real se encontraron y corrigieron 2 problemas más (mismo PR): (1)
+  **local y producción comparten la misma base de Supabase** (no hay proyecto de staging) — cualquier
+  sesión de agente o corrida de `npm run test:e2e:public` contra `localhost` grababa visitas reales
+  en `landing_events` de producción (confirmado con una consulta de solo lectura aprobada por Seba:
+  page_views a las 2-4am ART y picos de 66 visitas/día no encajan con tráfico de pacientes reales de
+  un consultorio recién lanzado). `trackLandingEvent()` ahora no manda nada si el hostname es
+  `localhost`/`127.0.0.1` — no toca el tracking de producción ni de previews de Vercel. (2) La card
+  de Google Business no mostraba ningún aviso cuando todavía no hay snapshots guardados (quedaba en
+  blanco con guiones), a diferencia de la de Instagram que sí lo maneja — mismo mensaje agregado.
+  **Aclaración, no bug**: el `session_id` para deduplicar visitas está en `null` en casi todos los
+  eventos históricos hasta esta fecha — es el fallback ya documentado en la migración (cuenta cada
+  fila como visita, sin romper nada), no algo nuevo para arreglar; los números de "visitas únicas"
+  de antes del 2026-07-14 son en la práctica conteo de filas, debería autocorregirse con tráfico
+  nuevo. npm test (310/310), lint y build sin errores.
 
 ## Qué es esta app
 Sistema de adquisición de pacientes para la Dra. Lucía Chahin, cardióloga.
