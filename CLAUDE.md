@@ -204,6 +204,31 @@
   (315/315), lint y build sin errores. **No se pudo verificar visualmente en este entorno** (sin
   `.env.local`/credenciales de WhatsApp ni de login acá) — seguir de cerca el primer envío manual
   real en producción.
+- 2026-07-14 (mismo día, pausar el bot al responder a mano): Seba pidió una forma explícita de que
+  el bot no le conteste al paciente mientras el equipo está respondiendo manualmente desde el Inbox
+  — hasta ahora, aunque el mensaje manual ya se mandaba de verdad por WhatsApp (punto anterior), el
+  bot seguía activo y podía seguir procesando los siguientes mensajes del paciente y respondiendo
+  por su cuenta, pisando la conversación manual. Se agregó `whatsapp_sessions.bot_paused` (migración
+  `20260714_whatsapp_bot_pause.sql`, default `false`) y un chequeo en
+  `handleIncomingMessage` (`src/lib/whatsapp-bot.ts`): si la sesión tiene `bot_paused = true`, el
+  mensaje entrante se sigue logueando igual (aparece en el Inbox), pero el bot no dispara ninguna
+  respuesta ni derivación automática. **A propósito, el chequeo va después de los guardrails de
+  seguridad** (detección de emergencia médica y baja de contacto "BAJA"/"STOP"), no antes — esos dos
+  siguen funcionando aunque el bot esté pausado, porque son casos donde no corresponde esperar a que
+  el equipo vea el mensaje a mano. Nuevo endpoint `GET/PATCH /api/whatsapp/bot-pause` (por
+  `lead_id`, resuelve el teléfono y lee/escribe la sesión con `getServiceDb()` porque
+  `whatsapp_sessions` solo tiene policy de escritura para `service_role`). `POST /api/messages`
+  ahora pausa el bot automáticamente al mandar un mensaje manual real (no hace falta acordarse de
+  tocar un switch aparte para el caso más común), y el Inbox (`src/app/(app)/inbox/page.tsx`) suma
+  un botón "Bot activo"/"Bot pausado" en el header de la conversación (solo visible en leads con
+  WhatsApp real conectado) para reactivarlo a mano cuando el equipo termina de intervenir. Tests
+  nuevos: `src/lib/whatsapp-bot-pause.test.ts` (el flag corta la respuesta normal del bot pero no
+  los guardrails de emergencia/opt-out; caso de control sin pausa) y
+  `src/app/api/whatsapp/bot-pause/route.test.ts`. npm test (325/325), lint y build sin errores.
+  Migración `20260714_whatsapp_bot_pause.sql` sin aplicar todavía en producción (no hay
+  `SUPABASE_DB_PASSWORD` en este entorno) — correr `npm run migrate` antes de que esto tenga efecto
+  real; hasta entonces, `bot_paused` no existe como columna y el toggle/pausa automática van a
+  fallar. **No se pudo verificar visualmente en este entorno.**
 
 ## Qué es esta app
 Sistema de adquisición de pacientes para la Dra. Lucía Chahin, cardióloga.

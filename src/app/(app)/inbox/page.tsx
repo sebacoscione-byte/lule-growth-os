@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef } from "react"
 import { useSearchParams } from "next/navigation"
-import { Send, Loader2, Sparkles, Users, ArrowLeft, CheckCircle2, XCircle } from "lucide-react"
+import { Send, Loader2, Sparkles, Users, ArrowLeft, CheckCircle2, XCircle, Bot } from "lucide-react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -21,6 +21,8 @@ export default function InboxPage() {
   const [closingAction, setClosingAction] = useState(false)
   const [autoReply, setAutoReply] = useState(true)
   const [suggesting, setSuggesting] = useState(false)
+  const [botPauseState, setBotPauseState] = useState<{ leadId: string; value: boolean } | null>(null)
+  const [togglingBot, setTogglingBot] = useState(false)
   const bottomRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -53,6 +55,34 @@ export default function InboxPage() {
 
   const selectedLead = leads.find(l => l.id === selectedLeadId)
   const canSendWhatsApp = !!selectedLead?.phone && selectedLead?.origin_channel === "whatsapp"
+  // null mientras no se cargó (o cambiamos de lead) el estado real de este lead puntual.
+  const botPaused = selectedLeadId && botPauseState?.leadId === selectedLeadId ? botPauseState.value : null
+
+  useEffect(() => {
+    if (!selectedLeadId || !canSendWhatsApp) return
+    let cancelled = false
+    fetch(`/api/whatsapp/bot-pause?lead_id=${selectedLeadId}`)
+      .then(r => r.json())
+      .then(data => {
+        if (cancelled) return
+        setBotPauseState({ leadId: selectedLeadId, value: typeof data.paused === "boolean" ? data.paused : false })
+      })
+      .catch(() => {})
+    return () => { cancelled = true }
+  }, [selectedLeadId, canSendWhatsApp])
+
+  async function toggleBotPause() {
+    if (!selectedLeadId || botPaused === null) return
+    setTogglingBot(true)
+    const next = !botPaused
+    const res = await fetch("/api/whatsapp/bot-pause", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ lead_id: selectedLeadId, paused: next }),
+    })
+    if (res.ok) setBotPauseState({ leadId: selectedLeadId, value: next })
+    setTogglingBot(false)
+  }
 
   async function closeWithStatus(newStatus: "confirmo_que_pidio_turno" | "no_pudo_pedir_turno") {
     if (!selectedLeadId) return
@@ -110,6 +140,9 @@ export default function InboxPage() {
       ...(data.user_message ? [data.user_message] : []),
       ...(data.assistant_message ? [data.assistant_message] : []),
     ])
+    // El envío real por WhatsApp pausa el bot para esta conversación del lado del servidor —
+    // reflejarlo acá al toque, sin esperar al próximo fetch de estado.
+    if (canSendWhatsApp) setBotPauseState({ leadId: selectedLeadId, value: true })
     setInput("")
     setSending(false)
   }
@@ -213,6 +246,19 @@ export default function InboxPage() {
                   </Button>
                 </>
               )}
+              {canSendWhatsApp && botPaused !== null && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className={`text-xs h-7 px-2 ${botPaused ? "border-amber-300 text-amber-700 hover:bg-amber-50" : "border-gray-300 text-gray-600 hover:bg-gray-50"}`}
+                  disabled={togglingBot}
+                  onClick={toggleBotPause}
+                  title={botPaused ? "El bot no le está respondiendo a este paciente — click para reactivarlo" : "El bot puede seguir respondiendo automáticamente — click para pausarlo"}
+                >
+                  <Bot className="h-3 w-3 mr-1" />
+                  {botPaused ? "Bot pausado" : "Bot activo"}
+                </Button>
+              )}
               {!canSendWhatsApp && (
                 <label className="flex items-center gap-1 text-xs text-gray-500 cursor-pointer">
                   <input
@@ -265,7 +311,9 @@ export default function InboxPage() {
             </div>
             <p className="text-xs text-gray-400">
               {canSendWhatsApp
-                ? "Se manda directo por WhatsApp al paciente."
+                ? botPaused
+                  ? "Se manda directo por WhatsApp al paciente. El bot está pausado para esta conversación: no le va a responder solo."
+                  : "Se manda directo por WhatsApp al paciente. Al enviar, el bot se pausa automáticamente para esta conversación."
                 : "Este lead no tiene una conversación de WhatsApp real conectada acá — el mensaje queda solo como registro interno, no se manda a ningún lado automáticamente."}
             </p>
             <Button

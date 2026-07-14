@@ -83,6 +83,10 @@ export async function POST(request: Request) {
       }, { status: 500 })
     }
 
+    // El equipo tomó la conversación a mano: el bot deja de responderle a este paciente hasta que
+    // alguien lo reactive desde el Inbox (ver /api/whatsapp/bot-pause y el chequeo en whatsapp-bot.ts).
+    await db.from("whatsapp_sessions").update({ bot_paused: true }).eq("phone", lead.phone)
+
     // sendText ya deja el mensaje guardado (role "assistant", saliente) vía logWhatsAppMessage.
     const { data: sentMessage } = await supabase
       .from("messages")
