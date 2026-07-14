@@ -11,7 +11,15 @@ atribución, con visitas únicas a nivel landing y el avance desglosado por sede
 - [x] Agrupar el embudo por landing sin repetir sus visitas en cada código de sede.
 - [x] Contar sesiones únicas también en el RPC de atribución por referencia.
 - [x] Agregar cobertura de tests y verificar la UI en desktop/mobile.
-- [ ] Correr lint, tests y build; abrir PR, validar preview, mergear y migrar.
+- [x] Correr lint, tests y build; abrir PR, validar preview, mergear y migrar.
+
+## Resultado
+
+- PR #72 con CI y preview de Vercel aprobados; el cierre automático incluye merge y migración.
+- SQL validado contra producción en una transacción revertida: `ig` + `instagram` devuelven una
+  sola fila canónica y el RPC de referencias conserva la firma existente.
+- 36 suites / 306 tests, lint y build aprobados. QA visual con datos reales a 1440 px y 390 px;
+  solo se observaron las reconexiones HMR propias del servidor de desarrollo.
 
 ## Riesgo y alcance
 
