@@ -1,5 +1,5 @@
 # Backlog — Lule Growth OS
-**Actualizado:** 2026-07-12 | **Basado en:** PRD Estrategia de Captación v2.1
+**Actualizado:** 2026-07-14 | **Basado en:** PRD Estrategia de Captación v2.1
 
 ---
 
@@ -71,20 +71,23 @@ por qué tipo de acción es, para que sepas qué esperar de cada uno. El detalle
   que faltaría para que el seguimiento automático funcione de punta a punta con costo real.
 
 ### 🕐 Cuando tengas tiempo (no urgente)
-- [ ] Crear un usuario de prueba en Supabase Auth (nunca tu cuenta ni la de Lucía) y cargar
-  `E2E_TEST_EMAIL`/`E2E_TEST_PASSWORD` para correr los tests automáticos de dashboard/leads/inbox
-  al menos una vez (QA-02).
-- [ ] **Aplicar en producción las 2 migraciones del PR #64** (métricas más allá del bot de
-  WhatsApp, 2026-07-13) — `npm run migrate` desde la notebook (necesita `SUPABASE_DB_PASSWORD`,
-  no disponible en el entorno remoto donde se armó el PR):
-  - `20260713_landing_clicks_by_location.sql` — sin esto, la card nueva "Clicks por sede: llamada
-    y WhatsApp" del dashboard no va a mostrar datos (falla en silencio, no rompe el resto).
-  - `20260713_instagram_follower_snapshots.sql` — sin esto, el snapshot diario de seguidores de
-    Instagram (corre dentro del cron de `publish-content`) no tiene dónde guardar el dato.
-  - Después de migrar, revisar en `/dashboard` que ambas cards muestren datos reales, y confirmar
-    en la primera corrida real del cron que `getFollowerCount()` devuelve un valor válido para la
-    cuenta conectada (no se pudo verificar contra la API real de Meta en el entorno donde se
-    escribió el código — ver CLAUDE.md, entrada 2026-07-13).
+- [ ] **Cargar `E2E_TEST_EMAIL`/`E2E_TEST_PASSWORD` en tu `.env.local` (2026-07-14).** El usuario de
+  prueba ya existe (`e2e-agent-test@lule-internal.local`, creado por el agente vía Admin API con tu
+  aprobación explícita, aislado de leads/pacientes reales) y ya se usó una vez para loguearse con
+  Playwright y verificar `/dashboard` con datos reales — ver CLAUDE.md, entrada 2026-07-14. Falta
+  que vos cargues esas dos variables para que quede permanente entre sesiones (mías y de Codex) y
+  para que `npm run test:e2e` corra los tests `authenticated` en vez de saltarlos. La contraseña se
+  generó y se mostró una única vez en el chat de esa sesión — si no la guardaste, hay que rotarla
+  (ver [[reference_e2e_test_account]] en memoria, o pedirle a un agente que la regenere).
+- [ ] **Correr el resto del smoke E2E autenticado al menos una vez** (`e2e/authenticated/*.spec.ts`
+  — dashboard, crear/editar/buscar un lead, abrir una conversación del inbox), no solo el login. Con
+  las credenciales ya cargadas: `npm run test:e2e`. Cierra QA-02 del todo (ver más abajo).
+- [x] ~~Aplicar en producción las 2 migraciones del PR #64~~ **Resuelto** — confirmado en vivo el
+  2026-07-14: "Clicks por sede: llamada y WhatsApp" ya muestra datos reales (Swiss 1 WhatsApp,
+  Británico 2 WhatsApp). El snapshot de seguidores de Instagram todavía no tiene datos, pero no por
+  falta de migración — la tabla existe y el dashboard lo indica con claridad ("Todavía no hay
+  snapshots. Hace falta Instagram conectado y al menos una corrida del cron diario"), pendiente de
+  que Instagram esté conectado.
 
 ---
 
@@ -411,7 +414,7 @@ deliberado: primero integridad de WhatsApp y datos de pacientes; luego medición
     ambos callbacks de OAuth— fallarían en CI si la ruta perdiera autenticación, dejara de
     deduplicar, la validación de CSV se rompiera, o el logging de un fallo de OAuth desapareciera.
 
-- [x] **QA-02 — Smoke E2E móvil y desktop.** ⏳ Parcial (2026-07-12) — falta correr los tests autenticados con un usuario real
+- [x] **QA-02 — Smoke E2E móvil y desktop.** ⏳ Parcial (2026-07-12, actualizado 2026-07-14) — falta correr los `.spec.ts` autenticados con un usuario real (el login en sí ya se probó)
   - Se sumó **Playwright** (`e2e/`, ver CLAUDE.md → "Tests E2E") en dos proyectos:
     - **`public`** (sin sesión): landing principal, las 6 landings SEO, `/login` (validación de
       campos vacíos + error real de Supabase con credenciales inválidas), y que las rutas del CRM
@@ -435,12 +438,19 @@ deliberado: primero integridad de WhatsApp y datos de pacientes; luego medición
     `/login` con credenciales inválidas (pega a Supabase Auth real) fallaba por timeout al
     correrlo varias veces seguidas — Supabase aplica un throttle anti fuerza-bruta que demora la
     respuesta más de los 5s default de Playwright; ese caso puntual ahora usa 20s.
-  - **Pendiente real**: correr los tests `authenticated` con un usuario de prueba real al menos
-    una vez (no dar QA-02 por completamente cerrado hasta entonces), y configurar que corran en
+  - **Actualización 2026-07-14**: se creó el usuario de prueba dedicado
+    (`e2e-agent-test@lule-internal.local`, ver [[reference_e2e_test_account]]) y se corrió
+    `e2e/authenticated/auth.setup.ts` de verdad por primera vez — login exitoso, `storageState`
+    guardado, usado después para verificar `/dashboard` con datos reales (encontró y resolvió 2
+    bugs, ver CLAUDE.md → 2026-07-14). Lo que **todavía no se corrió** es el resto de la suite
+    autenticada (`dashboard.spec.ts`, `leads.spec.ts`, `inbox.spec.ts`) — la sesión se usó para
+    verificación visual manual con un script aparte, no para `npm run test:e2e` completo.
+  - **Pendiente real**: correr `npm run test:e2e` completo con las credenciales cargadas en
+    `.env.local` (no dar QA-02 por completamente cerrado hasta entonces), y configurar que corran en
     CI/GitHub Actions con esas credenciales como secret.
   - **Aceptación parcial cumplida**: el smoke público corre y pasa contra un build de producción,
-    con evidencia (reporte HTML de Playwright). Falta la verificación real del smoke autenticado
-    para la aceptación completa.
+    con evidencia (reporte HTML de Playwright). El login autenticado ya se verificó corriendo de
+    verdad; falta correr los `.spec.ts` que dependen de esa sesión para la aceptación completa.
 
 - [x] **CRM-01 — Contexto reciente correcto en el inbox.** ✅ Resuelto (2026-07-11)
   - `src/app/api/ai/suggest/route.ts` (botón "Sugerir mensaje de seguimiento") pedía
@@ -1167,3 +1177,17 @@ requisito de Meta para cualquier App Review de "Instagram Login" (permisos `inst
 testers/admins. Si en algún momento se decide sacar la app del modo desarrollo, hace falta: página
 pública `/privacidad` con qué datos de leads se recolectan y cómo se usan, y una URL o texto de
 instrucciones de borrado de datos. Ver memoria `project_meta_business_checklist`.
+
+### [TECH] Los previews de Vercel siguen grabando visitas reales en `landing_events` (2026-07-14)
+El PR #75 (ver CLAUDE.md → 2026-07-14) cortó el caso más común de contaminación de analytics
+(`npm run dev` local, incluidos `npm run test:e2e:public` y sesiones de agentes verificando
+visualmente) chequeando que `window.location.hostname` no sea `localhost`/`127.0.0.1`. Un preview
+deploy de Vercel (dominio `*.vercel.app`, no localhost) **no queda cubierto por ese guard** — si
+alguien navega un preview a mano para revisar un PR antes de mergear, esas visitas también se graban
+como reales en la misma base de producción (no hay proyecto de staging separado, ver memoria
+`project_dashboard_data_integrity_2026-07-14`). No se resolvió en el mismo PR porque requiere decidir
+entre: (a) chequear `process.env.VERCEL_ENV !== "production"` server-side antes de insertar el
+evento (más robusto, cubre cualquier dominio no-producción, pero agrega una env var más a la
+superficie del endpoint público), o (b) mantener un allowlist de dominio (`draluciachahin.ar`) en el
+cliente. Bajo impacto real hoy (los previews se navegan poco, casi todo el volumen sospechoso venía
+de local), no urgente.
