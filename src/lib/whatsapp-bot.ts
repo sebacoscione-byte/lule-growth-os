@@ -28,6 +28,10 @@ interface WhatsAppSession {
   /** GROWTH-01: código detectado en el primer mensaje (ej. "LAN-CARD-01") — se aplica al lead
    * recién cuando se crea, en upsertLeadFromIntake. */
   referral_code: string | null
+  /** El equipo tomó la conversación a mano desde el Inbox — el bot deja de responder hasta que
+   * alguien lo reactive (ver /api/whatsapp/bot-pause). No afecta guardrails de emergencia/opt-out,
+   * que se chequean antes de este flag. */
+  bot_paused: boolean
   updated_at?: string
 }
 
@@ -461,6 +465,11 @@ export async function handleIncomingMessage(params: {
     )
     return
   }
+
+  // El equipo tomó la conversación a mano desde el Inbox (ver /api/messages): el mensaje del
+  // paciente ya quedó logueado arriba, pero el bot no contesta nada más hasta que alguien lo
+  // reactive — evita que las dos respuestas (la manual y la del bot) se pisen.
+  if (session.bot_paused) return
 
   const lead = session.lead_id ? await getLead(session.lead_id) : null
 

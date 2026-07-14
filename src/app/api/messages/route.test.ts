@@ -77,17 +77,20 @@ function mockSupabase(opts: { lead: Record<string, unknown> | null; latestMessag
 }
 
 function mockServiceSession(session: Record<string, unknown> | null) {
+  const updateSpy = jest.fn(() => ({ eq: jest.fn().mockResolvedValue({ data: null, error: null }) }))
   const fromSpy = jest.fn((table: string) => {
     if (table === "whatsapp_sessions") {
       return {
         select: jest.fn(() => ({
           eq: jest.fn(() => ({ maybeSingle: jest.fn().mockResolvedValue({ data: session, error: null }) })),
         })),
+        update: updateSpy,
       }
     }
     throw new Error(`tabla de servicio inesperada: ${table}`)
   })
   ;(getServiceDb as jest.Mock).mockReturnValue({ from: fromSpy })
+  return { updateSpy }
 }
 
 function postRequest(body: unknown) {
@@ -104,9 +107,9 @@ beforeEach(() => {
 describe("POST /api/messages — lead con WhatsApp real conectado", () => {
   const lead = { id: "lead-1", phone: "5491100000000", origin_channel: "whatsapp", name: "Paciente" }
 
-  it("manda el mensaje de verdad por la API de WhatsApp, no solo lo guarda en la tabla", async () => {
+  it("manda el mensaje de verdad por la API de WhatsApp, no solo lo guarda en la tabla, y pausa el bot", async () => {
     const { leads, messages } = mockSupabase({ lead, latestMessage: { id: "msg-1", role: "assistant", content: "hola" } })
-    mockServiceSession({ last_inbound_at: new Date().toISOString(), entry_point: "organic" })
+    const { updateSpy } = mockServiceSession({ last_inbound_at: new Date().toISOString(), entry_point: "organic" })
     ;(sendText as jest.Mock).mockResolvedValue({})
 
     const res = await POST(postRequest({ lead_id: "lead-1", content: "hola" }))
@@ -122,11 +125,13 @@ describe("POST /api/messages — lead con WhatsApp real conectado", () => {
     // El mensaje ya queda guardado por sendText -> logWhatsAppMessage; la ruta no debe insertarlo de nuevo.
     expect(messages.insert).not.toHaveBeenCalled()
     expect(leads.update).toHaveBeenCalledWith({ last_message: "hola" })
+    // Al responder a mano, el bot se pausa para esta conversación (no se pisan entre sí).
+    expect(updateSpy).toHaveBeenCalledWith({ bot_paused: true })
   })
 
-  it("con la ventana de 24h cerrada no manda nada y devuelve un error claro (409)", async () => {
+  it("con la ventana de 24h cerrada no manda nada, no pausa el bot, y devuelve un error claro (409)", async () => {
     mockSupabase({ lead })
-    mockServiceSession({ last_inbound_at: null, entry_point: "organic" })
+    const { updateSpy } = mockServiceSession({ last_inbound_at: null, entry_point: "organic" })
     ;(sendText as jest.Mock).mockRejectedValue(new WindowClosedError("5491100000000"))
 
     const res = await POST(postRequest({ lead_id: "lead-1", content: "hola" }))
@@ -134,6 +139,7 @@ describe("POST /api/messages — lead con WhatsApp real conectado", () => {
     expect(res.status).toBe(409)
     const body = await res.json()
     expect(body.error).toMatch(/ventana/i)
+    expect(updateSpy).not.toHaveBeenCalled()
   })
 
   it("un error real de la API de WhatsApp devuelve 500 sin dejarlo pasar en silencio", async () => {
