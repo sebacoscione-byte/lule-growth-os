@@ -70,6 +70,13 @@ por qué tipo de acción es, para que sepas qué esperar de cada uno. El detalle
   `Configuración → Precios de WhatsApp` — los 9 templates ya están aprobados, esto es lo único
   que faltaría para que el seguimiento automático funcione de punta a punta con costo real.
 
+### ⚙️ Migración pendiente de aplicar (bloquea que la pausa del bot funcione)
+- [ ] **Correr `npm run migrate` para aplicar `20260714_whatsapp_bot_pause.sql`** (agrega
+  `whatsapp_sessions.bot_paused`). Sin `SUPABASE_DB_PASSWORD` en este entorno no se pudo aplicar
+  desde acá. Hasta que se corra: el botón "Bot pausado"/"Bot activo" del Inbox y el auto-pausado al
+  responder manual no tienen efecto real (el código no rompe nada, simplemente todavía no hace
+  nada — la columna no existe todavía).
+
 ### 🕐 Cuando tengas tiempo (no urgente)
 - [ ] **Cargar `E2E_TEST_EMAIL`/`E2E_TEST_PASSWORD` en tu `.env.local` (2026-07-14).** El usuario de
   prueba ya existe (`e2e-agent-test@lule-internal.local`, creado por el agente vía Admin API con tu
@@ -638,6 +645,69 @@ deliberado: primero integridad de WhatsApp y datos de pacientes; luego medición
   - **Aceptación cumplida para el alcance decidido**: lint/tests/build limpios, headers de
     seguridad básicos presentes sin romper nada verificable en este entorno. Un CSP completo queda
     como trabajo futuro explícito, a hacerse con acceso para probar OAuth de punta a punta.
+
+### Ola 4 — Derivación a humano sin alerta en tiempo real (P0, incidente real 2026-07-14)
+
+**Caso que originó esta Ola**: Seba compartió una captura del Inbox de un paciente ("David
+Portas...", lead derivado a CIMEL Lanús) mostrando una mala experiencia real — el bot pareció
+"fallar" y la respuesta manual de Seba tampoco le llegó al paciente. **Alcance real de este
+análisis**: esta sesión corre en un entorno en la nube sin `.env.local` ni credenciales de
+Supabase/WhatsApp — no hay forma de leer la conversación completa desde la base de producción,
+solo se pudo trabajar con el fragmento de la captura compartida en el chat más el código real del
+bot. Con eso alcanzó para identificar con precisión qué pasó (el texto del bot coincide
+exactamente con una constante del código, ver abajo), pero si Seba puede pasar el resto del
+historial (texto o más capturas), el diagnóstico se puede afinar.
+
+**Reconstrucción de lo que pasó** (verificado contra el código, no supuesto):
+1. El paciente ya había sido derivado a CIMEL Lanús (`status: derivado_cimel`) y recibió las
+   instrucciones de turno correspondientes.
+2. En algún momento posterior escribió algo que matcheó la regla determinística de
+   `hablar_con_humano` (`/hablar con (alguien|una persona|un humano)|atienda una persona|
+   comunicarme con (la )?(secretaria|recepci[oó]n)/` en `whatsapp-intents.ts`) — es decir, **pidió
+   explícitamente hablar con una persona**. El bot funcionó bien acá: clasificó el intent
+   correctamente y respondió con el texto exacto de `INTENT_REPLIES.hablar_con_humano` ("Te
+   derivamos con una persona del equipo de la Dra. Lucía Chahin, te va a contactar a la
+   brevedad." — coincide carácter por carácter con la captura), y llamó a `escalateToHuman()`.
+3. **El problema real está acá**: `escalateToHuman()` (`src/lib/whatsapp-handoff.ts`) hoy **solo
+   inserta una fila en `handoff_events` y marca `leads.requires_human = true`** — no manda
+   ninguna alerta en tiempo real (ni email, ni push, nada) a nadie del equipo. La única forma de
+   enterarse es abrir `/inbox` o `/dashboard` a mano y ver el contador agregado de
+   "Requiere humano". No hay ningún mecanismo que empuje esa información hacia Seba.
+4. Por eso la respuesta humana llegó ~6.5 horas después (14/07 01:40pm → 08:00pm en la captura) —
+   la promesa del bot ("a la brevedad") no se pudo cumplir porque no hay infraestructura para
+   avisar en tiempo real, no porque el bot "fallara" en el sentido de tener un bug de código en
+   ese tramo puntual.
+5. Cuando Seba finalmente respondió a mano, se topó con el bug real que se corrigió en esta misma
+   sesión (PR #78): el mensaje manual no se mandaba por WhatsApp y se guardaba con `role: "user"`,
+   generando además una respuesta confundida de IA sobre el propio texto de Seba (visible en la
+   captura). Esa parte ya está resuelta.
+
+**Plan de corrección** (nada de esto se implementó todavía — queda para una próxima sesión):
+
+- [ ] **P0 — Alerta en tiempo real al derivar a un humano.** Llamar a `sendCronFailureAlert()` (o
+  una función hermana con mejor nombre, ej. `sendHandoffAlert()`, mismo mecanismo de Resend ya
+  configurado — no suma infraestructura nueva) desde `escalateToHuman()`, con nombre/teléfono/
+  motivo/resumen del `HandoffSummary` que ya se arma hoy. Es el gap que explica la demora real de
+  este incidente. Ojo: `escalateToHuman()` se llama muchas veces por conversación larga — evaluar
+  si conviene un mínimo de tiempo entre alertas por el mismo lead para no saturar el mail.
+- [ ] **P0 — Recordatorio si nadie respondió el handoff.** Un lead con `requires_human = true` sin
+  ningún mensaje `role: assistant` posterior al handoff, pasado cierto tiempo (ej. 30-60 min), no
+  tiene día segunda alerta hoy. Sumar una regla en `growth-recommendations.ts` (o un chequeo dentro
+  del cron ya existente de `weekly-report`/`whatsapp-followup`) que backup la alerta puntual de
+  arriba por si se pierde o se ignora.
+- [ ] **P1 — Fallback inmediato en el mensaje de derivación.** Hoy `INTENT_REPLIES.hablar_con_humano`
+  es un texto genérico sin ningún dato de contacto directo. Ya que el bot conoce la sede asignada
+  (`getSessionPreferredLocation`), sumar el teléfono/instrucción de esa sede como alternativa
+  inmediata mientras se espera la respuesta humana — mismo patrón que ya usa
+  `buildSedeInstructions()`.
+- [ ] **P2 — Visibilidad priorizada en el Inbox/`/leads`.** Hoy no hay forma de ordenar u ordenar
+  visualmente los leads con `requires_human = true` por tiempo de espera — solo existe el contador
+  agregado del dashboard. Sumar un indicador/orden por antigüedad para que el equipo priorice sin
+  tener que revisar lead por lead.
+- [x] **Ya resuelto en esta sesión (PR #78)** — responder manual desde el Inbox ahora sí se manda
+  de verdad por WhatsApp (antes solo quedaba guardado localmente con el rol invertido).
+- [x] **Ya resuelto en esta sesión (PR #79)** — el bot se pausa automáticamente para esa
+  conversación al mandar una respuesta manual real, para que no se pisen entre sí.
 
 ### Secuencia y reglas de ejecución
 
