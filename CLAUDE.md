@@ -130,6 +130,25 @@
   sede/código. `landing_referral_events` también cuenta sesiones únicas para que una recarga o varios
   clics de la misma pestaña no inflen el embudo. Migración `20260714_dashboard_attribution_clarity.sql`.
   Verificado con datos reales en navegador a 1440 px y 390 px; solo hubo errores HMR de desarrollo.
+- 2026-07-14 (revisión del dashboard multicanal de Codex, PR #73): Seba pidió revisar lo que Codex
+  armó en las sesiones anteriores (PRs #70/#71/#72, corridas en su máquina con acceso real al
+  navegador — por eso pudieron verificarse visualmente, algo que estas sesiones en la nube no pueden
+  hacer sin credenciales de login) y mejorarlo. Se encontraron y corrigieron 2 bugs reales: (1) el
+  texto de "Reportes semanales" seguía diciendo "todos los lunes" — el cron corre los **domingos**
+  desde el 2026-07-07 (commit `aadb8c3`, que corrigió `vercel.json`/este archivo/`BACKLOG.md` pero
+  no ese texto de la UI, un desprolijo que quedó dando vueltas 7 días); (2)
+  `snapshotGoogleBusinessMetrics()` (código nuevo del dashboard multicanal) llamaba a
+  `getValidToken()` sin el `.catch(() => null)` que ya usa `/api/google-business/status` — en modo
+  Prueba de Google el refresh token vence cada ~7 días y `getValidToken()` rechaza en vez de
+  devolver `null`, así que ese vencimiento esperado (limitación de Google ya documentada) se colaba
+  como `status="error"` y mandaba una alerta de cron por email todos los días hasta reconectar a
+  mano. Corregido con el mismo criterio ya establecido en el resto del código. Además, ícono de la
+  sección "WhatsApp" del dashboard (`DollarSign` → `MessageSquare`, consistente con `CHANNEL_META`/
+  `ACTION_META`). El resto del dashboard multicanal de Codex (selector de período, embudo, tabla de
+  canales, enlaces `/go/instagram`/`/go/google`, snapshots de Instagram/Google) se revisó a fondo
+  (SQL de las migraciones, RPCs, límites de fechas, agregaciones) sin encontrar errores adicionales.
+  npm test (307/307), lint y build sin errores. No se pudo verificar visualmente (sin credenciales
+  de login en este entorno).
 
 ## Qué es esta app
 Sistema de adquisición de pacientes para la Dra. Lucía Chahin, cardióloga.
