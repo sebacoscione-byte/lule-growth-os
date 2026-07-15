@@ -410,6 +410,9 @@ CRON_SECRET=                  # String secreto elegido por vos. Sin esto seteado
 RESEND_API_KEY=                # API key de resend.com. Sin esto, no se manda ninguna alerta (fail-open, no bloquea el cron)
 ALERT_EMAIL_TO=                # Email que recibe la alerta (ej. el tuyo)
 ALERT_EMAIL_FROM=               # Opcional. Sin esto usa "onboarding@resend.dev" (funciona sin verificar dominio propio)
+# Alerta por WhatsApp (además del email) cuando el bot deriva una conversación a una persona --
+# ver "Alertas de cron por email" abajo, sección "Alerta también por WhatsApp"
+ALERT_WHATSAPP_TO=              # Tu número en formato wa.me (ej. 5491100000000). Sin esto, solo se manda el email
 ```
 
 ## Optimización de tokens / costos de IA
@@ -561,6 +564,29 @@ cargadas, no manda nada y no bloquea el cron.
    `onboarding@resend.dev` — funciona igual, sin verificar nada, pero como remitente es genérico de Resend.
 5. No hay reintentos ni cola: si Resend está caído en el momento exacto de la falla, se pierde esa
    alerta puntual (no vuelve a intentarse), pero nunca hace fallar al cron por esto.
+
+### Alerta también por WhatsApp cuando el bot deriva a una persona (2026-07-15)
+
+A pedido explícito de Seba (más probable de notarse al toque que un email), la alerta en tiempo
+real de `escalateToHuman()` (ver Ola 4 en `docs/BACKLOG.md`) manda **además** un WhatsApp propio,
+sin reemplazar el email — si Meta rechaza el template o vos todavía no lo aprobaste, el email sigue
+funcionando exactamente igual que antes.
+1. Enviá el template **`alerta_interna_derivacion`** a aprobación real en WhatsApp Manager →
+   Administrador de cuenta → Plantillas de mensajes (mismo lugar que los otros 9 templates). Texto
+   exacto (ya cargado en la base, migración `20260715_internal_alert_template.sql`): "🚨 {{1}} pidió
+   hablar con una persona en Lule Growth OS. Motivo: {{2}}. Revisá el email o el Inbox para más
+   detalle." — categoría `utility`, 2 variables (nombre del paciente, motivo).
+2. Una vez que Meta lo apruebe, marcalo "Aprobado" en `Configuración → Templates de WhatsApp` (igual
+   que el resto).
+3. Cargá `ALERT_WHATSAPP_TO` con tu número en formato wa.me (ej. `5491100000000`).
+4. Sin el número cargado, o mientras el template no esté aprobado, no se manda nada por WhatsApp —
+   fail-open, no rompe ni afecta la alerta por email.
+5. **Tiene costo real por mensaje** (a diferencia del email): es un mensaje de negocio iniciado
+   fuera de cualquier ventana de conversación, así que siempre usa template y siempre es facturable
+   según las reglas de Meta — hoy la tarifa pública para Argentina dio `$0` en las 4 categorías
+   (cargado el 2026-07-07 en `Configuración → Precios de WhatsApp`), pero no está garantizado que
+   siga así — re-chequear esa tarifa antes de septiembre 2026 (ver
+   [[project_whatsapp_pricing_zero_ar]] en memoria).
 
 ## Seguimiento automático de leads por WhatsApp — cómo funciona (2026-07-07)
 

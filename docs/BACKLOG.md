@@ -27,6 +27,11 @@ por qué tipo de acción es, para que sepas qué esperar de cada uno. El detalle
 - [ ] **2FA del Business Manager**: Facebook te bloqueó activarlo en tu cuenta personal ("no
   usaste mucho tiempo este dispositivo"). Probá desde la app de Facebook en el celular (más
   historial de uso), o esperá 24-48hs y reintentá.
+- [ ] **Aprobar el template `alerta_interna_derivacion` (2026-07-15)**: para que la derivación a
+  humano te avise también por WhatsApp (además del email que ya funciona) — enviálo a aprobación
+  en WhatsApp Manager (texto exacto en `Configuración → Templates de WhatsApp`, ver CLAUDE.md →
+  "Alerta también por WhatsApp") y después cargá `ALERT_WHATSAPP_TO` con tu número. Sin esto, solo
+  llega el email (que ya funciona sin depender de este trámite).
 - [x] **Acceso a las APIs de Google Business Profile** (proyecto `app-lule`) — **solicitud enviada
   el 2026-07-12**, caso de asistencia de Google **`2-7574000041506`**, tiempo de revisión
   informado por Google: 7-10 días hábiles (no es instantáneo, y con volumen chico existe la

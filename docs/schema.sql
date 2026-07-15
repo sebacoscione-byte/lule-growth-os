@@ -350,7 +350,8 @@ insert into templates (name, category, body_text, variables, variable_samples) v
   ('invitacion_protocolo', 'marketing', 'Hola {{1}}, en el marco de tu atención con la Dra. Lucía Chahin, tu perfil médico podría ser compatible con el protocolo de investigación {{2}}. Es voluntario y requiere tu consentimiento explícito antes de avanzar. Respondé este mensaje si querés que te contactemos con más información, o "BAJA" si no querés recibir este tipo de mensajes.', '["nombre", "protocolo"]', '["Juana", "Estudio de arritmias 2026"]'),
   ('recontacto_incompleto', 'utility', 'Hola {{1}}, notamos que no pudiste terminar de coordinar tu turno con la Dra. Lucía Chahin. ¿Te ayudamos a retomarlo?', '["nombre"]', '["Juana"]'),
   ('aviso_administrativo', 'utility', 'Hola {{1}}, te escribimos desde el consultorio de la Dra. Lucía Chahin con una novedad sobre tu atención: {{2}}. Ante cualquier duda, respondé este mensaje.', '["nombre", "aviso"]', '["Juana", "el consultorio va a cerrar más temprano este viernes"]'),
-  ('derivacion_humano', 'utility', 'Hola {{1}}, tu consulta fue derivada a una persona del equipo de la Dra. Lucía Chahin, te va a contactar a la brevedad.', '["nombre"]', '["Juana"]')
+  ('derivacion_humano', 'utility', 'Hola {{1}}, tu consulta fue derivada a una persona del equipo de la Dra. Lucía Chahin, te va a contactar a la brevedad.', '["nombre"]', '["Juana"]'),
+  ('alerta_interna_derivacion', 'utility', '🚨 {{1}} pidió hablar con una persona en Lule Growth OS. Motivo: {{2}}. Revisá el email o el Inbox para más detalle.', '["nombre_paciente", "motivo"]', '["Juana Pérez", "Pidió hablar con una persona del equipo"]')
 on conflict (name) do nothing;
 
 -- ============================================================

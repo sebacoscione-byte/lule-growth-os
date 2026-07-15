@@ -1,8 +1,19 @@
 import { getServiceDb } from "@/lib/supabase/service"
 import { sendHandoffAlert, sendHandoffReminderAlert } from "@/lib/alert-email"
+import { sendTemplate } from "@/lib/whatsapp"
+import { getApprovedTemplate } from "@/lib/whatsapp-templates"
+import { getWhatsAppSettings } from "@/lib/whatsapp-settings"
 import { PUBLIC_SITE_ORIGIN } from "@/lib/tracked-links"
 import { timeAgo } from "@/lib/utils"
 import type { HandoffReason } from "@/types"
+
+// Segundo canal (además del email) para la alerta en tiempo real -- a pedido explícito de Seba
+// (2026-07-15), más probable de notarse al toque que un mail. Requiere un template aprobado por
+// Meta (`alerta_interna_derivacion`, ver migración `20260715_internal_alert_template.sql`) y el
+// número propio configurado -- sin cualquiera de los dos, no manda nada (fail-open, mismo patrón
+// que el resto de las alertas del proyecto). No reemplaza el email: si Meta rechaza el template o
+// tarda en aprobarlo, el email sigue funcionando igual que antes.
+const INTERNAL_ALERT_TEMPLATE_NAME = "alerta_interna_derivacion"
 
 const HANDOFF_REASON_LABELS: Record<HandoffReason, string> = {
   urgencia_medica: "Posible urgencia médica",
@@ -126,6 +137,31 @@ export async function escalateToHuman(params: {
 
   if (!recentlyAlerted) {
     await sendHandoffAlert(formatHandoffAlertText(params.reason, params.summary, params.leadId))
+    await sendInternalWhatsAppAlert(params.summary.nombre, HANDOFF_REASON_LABELS[params.reason])
+  }
+}
+
+async function sendInternalWhatsAppAlert(nombrePaciente: string, motivo: string): Promise<void> {
+  const to = process.env.ALERT_WHATSAPP_TO
+  if (!to) return // fail-open: sin número configurado, no manda nada (igual que el resto de las alertas)
+
+  const template = await getApprovedTemplate(INTERNAL_ALERT_TEMPLATE_NAME)
+  if (!template) return // fail-open: template todavía no aprobado por Meta
+
+  try {
+    const settings = await getWhatsAppSettings()
+    await sendTemplate(to, INTERNAL_ALERT_TEMPLATE_NAME, template.language, [nombrePaciente, motivo], {
+      windowState: "closed",
+      entryPoint: "organic",
+      leadId: null,
+      serviceMessageChargingEnabled: settings.enable_service_message_charging,
+    })
+  } catch (error) {
+    console.error(
+      `Error mandando alerta interna de WhatsApp a ${to}:`,
+      error instanceof Error ? error.message : error
+    )
+    // No relanza -- el email ya se mandó (o se intentó) arriba, este es un canal adicional.
   }
 }
 

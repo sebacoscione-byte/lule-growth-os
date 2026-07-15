@@ -3,12 +3,19 @@ jest.mock("@/lib/alert-email", () => ({
   sendHandoffAlert: jest.fn().mockResolvedValue(undefined),
   sendHandoffReminderAlert: jest.fn().mockResolvedValue(undefined),
 }))
+jest.mock("@/lib/whatsapp", () => ({ sendTemplate: jest.fn().mockResolvedValue({}) }))
+jest.mock("@/lib/whatsapp-templates", () => ({ getApprovedTemplate: jest.fn() }))
+jest.mock("@/lib/whatsapp-settings", () => ({
+  getWhatsAppSettings: jest.fn().mockResolvedValue({ enable_service_message_charging: false }),
+}))
 
 import {
   buildHandoffSummary, escalateToHuman, resolveHandoffForLead, getOpenHandoffs, runHandoffReminderCheck,
 } from "@/lib/whatsapp-handoff"
 import { getServiceDb } from "@/lib/supabase/service"
 import { sendHandoffAlert, sendHandoffReminderAlert } from "@/lib/alert-email"
+import { sendTemplate } from "@/lib/whatsapp"
+import { getApprovedTemplate } from "@/lib/whatsapp-templates"
 
 /** Chainable mínimo: cualquier método de la cadena devuelve el mismo builder, y tanto
  * `.single()/.maybeSingle()` como awaitear el builder directo resuelven al mismo resultado
@@ -44,7 +51,13 @@ const SUMMARY = buildHandoffSummary({
 })
 
 describe("escalateToHuman", () => {
-  beforeEach(() => jest.clearAllMocks())
+  const originalEnv = { ...process.env }
+
+  beforeEach(() => {
+    jest.clearAllMocks()
+    delete process.env.ALERT_WHATSAPP_TO // ver describe "alerta interna de WhatsApp" más abajo
+  })
+  afterEach(() => { process.env = { ...originalEnv } })
 
   it("inserta el handoff, marca requires_human y manda una alerta cuando no hubo un handoff reciente", async () => {
     const builders = mockDb({
@@ -96,6 +109,66 @@ describe("escalateToHuman", () => {
     await escalateToHuman({ leadId: null, reason: "urgencia_medica", summary: SUMMARY })
 
     expect(builders.handoff_events.select).not.toHaveBeenCalled() // no hay leadId, no hay nada que throttlear
+    expect(sendHandoffAlert).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe("escalateToHuman — alerta interna de WhatsApp (segundo canal, a pedido de Seba)", () => {
+  const originalEnv = { ...process.env }
+
+  beforeEach(() => jest.clearAllMocks())
+  afterEach(() => { process.env = { ...originalEnv } })
+
+  it("no manda nada por WhatsApp si ALERT_WHATSAPP_TO no está configurado (fail-open)", async () => {
+    delete process.env.ALERT_WHATSAPP_TO
+    mockDb({ handoff_events: { data: null, error: null }, leads: { data: null, error: null } })
+
+    await escalateToHuman({ leadId: "lead-1", reason: "solicitud_explicita", summary: SUMMARY })
+
+    expect(sendTemplate).not.toHaveBeenCalled()
+  })
+
+  it("no manda nada si el número está configurado pero el template todavía no está aprobado por Meta", async () => {
+    process.env.ALERT_WHATSAPP_TO = "5491100000000"
+    ;(getApprovedTemplate as jest.Mock).mockResolvedValue(null)
+    mockDb({ handoff_events: { data: null, error: null }, leads: { data: null, error: null } })
+
+    await escalateToHuman({ leadId: "lead-1", reason: "solicitud_explicita", summary: SUMMARY })
+
+    expect(sendTemplate).not.toHaveBeenCalled()
+  })
+
+  it("con número y template aprobados, manda la alerta por WhatsApp además del email", async () => {
+    process.env.ALERT_WHATSAPP_TO = "5491100000000"
+    ;(getApprovedTemplate as jest.Mock).mockResolvedValue({
+      id: "t1", name: "alerta_interna_derivacion", category: "utility", language: "es_AR",
+      status: "aprobado", body_text: "🚨 {{1}} ... {{2}}", variables: ["nombre_paciente", "motivo"], variable_samples: [],
+    })
+    mockDb({ handoff_events: { data: null, error: null }, leads: { data: null, error: null } })
+
+    await escalateToHuman({ leadId: "lead-1", reason: "solicitud_explicita", summary: SUMMARY })
+
+    expect(sendTemplate).toHaveBeenCalledWith(
+      "5491100000000", "alerta_interna_derivacion", "es_AR",
+      ["Juana Pérez", "Pidió hablar con una persona"],
+      expect.objectContaining({ leadId: null })
+    )
+    expect(sendHandoffAlert).toHaveBeenCalledTimes(1) // el email se manda igual, no se reemplaza
+  })
+
+  it("si sendTemplate falla, no rompe escalateToHuman ni afecta el email ya enviado", async () => {
+    process.env.ALERT_WHATSAPP_TO = "5491100000000"
+    ;(getApprovedTemplate as jest.Mock).mockResolvedValue({
+      id: "t1", name: "alerta_interna_derivacion", category: "utility", language: "es_AR",
+      status: "aprobado", body_text: "🚨 {{1}} ... {{2}}", variables: ["nombre_paciente", "motivo"], variable_samples: [],
+    })
+    ;(sendTemplate as jest.Mock).mockRejectedValue(new Error("WhatsApp API error 401: token vencido"))
+    mockDb({ handoff_events: { data: null, error: null }, leads: { data: null, error: null } })
+
+    await expect(
+      escalateToHuman({ leadId: "lead-1", reason: "solicitud_explicita", summary: SUMMARY })
+    ).resolves.toBeUndefined()
+
     expect(sendHandoffAlert).toHaveBeenCalledTimes(1)
   })
 })
