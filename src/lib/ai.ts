@@ -171,6 +171,18 @@ const IMAGE_PROMPT_RULES = `DIRECCION VISUAL PARA GEMINI:
 - El prompt debe terminar reforzando: "Render only the exact requested Spanish headline and subtitle. No extra text, no logos, no watermark."
 - Inclui "image_alt_text": descripcion accesible en espanol, factual y breve, maximo 180 caracteres.`
 
+// 2026-07-15: Instagram y Google Business NO interpretan Markdown -- un post real salio publicado
+// con "###", "**negrita**" y "*" de vineta literales, sin ningun formato, porque el prompt nunca
+// lo prohibia explicitamente. Se suma esta regla a los tres generadores de texto publicable
+// (generateContentPlan, buildContentPlanPrompt, generateInstagramContent) y ademas una limpieza
+// defensiva del lado del codigo (stripMarkdownArtifacts) por si el modelo igual se escapa.
+const PLAIN_TEXT_RULES = `FORMATO DE TEXTO (Instagram y Google Business NO interpretan Markdown, todo se publica como texto plano):
+- NUNCA uses "#", "##" ni "###" para titulos -- esos simbolos se publican literales, tal cual.
+- NUNCA uses "**texto**" para negrita ni "_texto_" para cursiva -- se publican con los asteriscos o guiones bajos incluidos, no como enfasis.
+- NUNCA uses "*" ni "-" al inicio de una linea para listas -- se ve como un asterisco o guion suelto, no como una vineta.
+- Para dar enfasis puntual usa MAYUSCULAS o un emoji, nunca simbolos de Markdown.
+- Para listas, separa cada item con un salto de linea y un emoji o numero seguido de parentesis (ej: "1) ...", "📌 ..."), nunca con "*" ni "-".`
+
 const PATIENT_ACQUISITION_RULES = `CRITERIO DE CAPTACION DE PACIENTES:
 - Cada pieza debe seguir esta secuencia: detener el scroll, generar identificacion, entregar una idea util y facilitar el proximo paso.
 - El hook y el titular deben ser especificos, faciles de entender en menos de tres segundos y abrir una brecha de curiosidad relevante.
@@ -232,6 +244,8 @@ REGLAS OBLIGATORIAS:
 - Ante síntomas de alarma → siempre derivar a guardia
 - El cierre debe invitar a pedir turno con vos, nunca con un "médico de confianza" genérico
 - NUNCA inventes teléfonos, direcciones web, nombres de apps ni otros canales de contacto que no te hayan sido provistos explícitamente
+
+${PLAIN_TEXT_RULES}
 
 ${IMAGE_PROMPT_RULES}
 
@@ -609,10 +623,29 @@ Nunca hables de vos misma en tercera persona ("la Dra. Chahin", "ella").
 Tono profesional, calido y argentino.
 NUNCA prometes resultados medicos, nunca das diagnosticos, nunca asumis condiciones del lector.
 El objetivo es informar y captar personas que quieran pedir turno.
+${PLAIN_TEXT_RULES}
 Devolve SOLO un JSON con: { "caption": "...", "hook": "...", "hashtags": "..." }`,
     messages: [{ role: "user", content: `Genera un ${type} sobre: ${category}. CTA sugerido: ${cta}` }],
   })
-  return parseJson(text)
+  const parsed = parseJson<{ caption: string; hook: string; hashtags: string }>(text)
+  return {
+    caption: stripMarkdownArtifacts(parsed.caption),
+    hook: stripMarkdownArtifacts(parsed.hook),
+    hashtags: parsed.hashtags,
+  }
+}
+
+// Red de seguridad además de la regla del prompt (PLAIN_TEXT_RULES): si el modelo igual devuelve
+// sintaxis de Markdown, se limpia acá antes de guardar/mostrar el texto. El orden importa (negrita
+// antes que itálica de un solo asterisco, para no comerse la mitad de un "**texto**"). No toca "#"
+// seguido directo de una palabra sin espacio -- eso es un hashtag real de Instagram, no un título.
+export function stripMarkdownArtifacts(text: string): string {
+  return text
+    .replace(/^#{1,6}\s+/gm, "") // títulos "# ", "## ", "### " (con espacio -- no toca "#hashtag")
+    .replace(/\*\*(.+?)\*\*/g, "$1") // **negrita**
+    .replace(/__(.+?)__/g, "$1") // __negrita alternativa__
+    .replace(/^[*-]\s+/gm, "• ") // "* item" / "- item" -> viñeta real
+    .replace(/\*(.+?)\*/g, "$1") // *itálica* remanente
 }
 
 function capHashtags(raw: string, max = 5): string {
@@ -718,6 +751,7 @@ Reglas:
 - Atendes martes en CIMEL Lanus, miercoles en Hospital Britanico y viernes en Swiss Medical Lomas.
 - NUNCA inventes telefonos, direcciones web, nombres de apps ni otros canales de contacto que no te hayan sido provistos explicitamente en el pedido. Si no tenes un link de turnos, usa "link en la bio" nada mas.
 - Gemini resolvera despues la placa final e integrara el titular y subtitulo.
+${PLAIN_TEXT_RULES}
 ${IMAGE_PROMPT_RULES}
 ${PATIENT_ACQUISITION_RULES}
 ${REEL_SCENE_RULES}
@@ -736,7 +770,10 @@ ${REEL_SCENE_RULES}
   const slides = Array.isArray(rawSlides)
     ? (rawSlides as Array<Record<string, unknown>>)
         .filter(s => typeof s.headline === "string" && typeof s.text === "string")
-        .map(s => ({ headline: (s.headline as string).slice(0, 60), text: (s.text as string).slice(0, 300) }))
+        .map(s => ({
+          headline: stripMarkdownArtifacts((s.headline as string).slice(0, 60)),
+          text: stripMarkdownArtifacts((s.text as string).slice(0, 300)),
+        }))
     : undefined
 
   const rawScenes = parsed.scenes
@@ -756,17 +793,17 @@ ${REEL_SCENE_RULES}
     : undefined
 
   return {
-    hook: parsed.hook as string,
-    caption: parsed.caption as string,
-    google_text: (parsed.google_text as string).slice(0, 1500),
+    hook: stripMarkdownArtifacts(parsed.hook as string),
+    caption: stripMarkdownArtifacts(parsed.caption as string),
+    google_text: stripMarkdownArtifacts((parsed.google_text as string).slice(0, 1500)),
     hashtags: capHashtags(parsed.hashtags as string),
-    visual_headline: (parsed.visual_headline as string).slice(0, 90),
-    visual_subtitle: (parsed.visual_subtitle as string).slice(0, 90),
+    visual_headline: stripMarkdownArtifacts((parsed.visual_headline as string).slice(0, 90)),
+    visual_subtitle: stripMarkdownArtifacts((parsed.visual_subtitle as string).slice(0, 90)),
     visual_style: ["rose", "blue", "teal"].includes(parsed.visual_style as string)
       ? parsed.visual_style as "rose" | "blue" | "teal"
       : "blue",
     image_prompt: (parsed.image_prompt as string).slice(0, 2400),
-    image_alt_text: (parsed.image_alt_text as string).slice(0, 180),
+    image_alt_text: stripMarkdownArtifacts((parsed.image_alt_text as string).slice(0, 180)),
     slides: slides && slides.length > 0 ? slides : undefined,
     scenes: scenes && scenes.length > 0 ? scenes : undefined,
     reel_duration_seconds: reelDurationSeconds,
@@ -934,9 +971,10 @@ export async function generateGooglePost(topic: string): Promise<string> {
 Tono profesional y claro. Maximo 1500 caracteres. Sin promesas medicas.
 Siempre inclui donde atendes (CIMEL Lanus los martes, Hospital Britanico los miercoles, Swiss Medical Lomas los viernes).
 NUNCA incluyas numeros de telefono en el texto: Google Business Profile bloquea o rechaza publicaciones que contienen telefonos. Si hay que decir como pedir turno, remiti al perfil, a la app de la institucion o al link de la bio.
+${PLAIN_TEXT_RULES}
 Solo devolve el texto de la publicacion.`,
     messages: [{ role: "user", content: `Publicacion sobre: ${topic}` }],
-  })
+  }).then(stripMarkdownArtifacts)
 }
 
 export async function generateReviewReply(starRating: string, comment: string): Promise<string> {
