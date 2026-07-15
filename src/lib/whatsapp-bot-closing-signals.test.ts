@@ -108,7 +108,7 @@ describe("turno_ya_resuelto: el paciente cierra porque ya consiguió turno en ot
     ;(classifyIntent as jest.Mock).mockResolvedValue("turno_ya_resuelto")
     mockDb(baseSession())
 
-    await handleIncomingMessage({ phone: PHONE, text: "gracias doc, ya conseguí turno en el guemes" })
+    await handleIncomingMessage({ phone: PHONE, text: "gracias doc, ya conseguí turno en otro lado" })
 
     expect(sendText).toHaveBeenCalledWith(
       PHONE,
