@@ -739,11 +739,11 @@ export async function handleIncomingMessage(params: {
       }
 
       if (intent === "otro_no_entendido") {
-        if (settings.cost_saving_mode) {
-          await sendButtons(phone, INTENT_REPLIES.otro_no_entendido!, [{ id: "hablar_humano", title: "Hablar con humano" }], { ...ctx, flowIntent: "otro_no_entendido" })
-        } else {
-          await sendText(phone, INTENT_REPLIES.otro_no_entendido!, { ...ctx, flowIntent: "otro_no_entendido" })
-        }
+        // Ola 4 (incidente real 2026-07-14): este botón antes solo se ofrecía en cost_saving_mode
+        // -- fuera de ese modo (el default), el paciente tenía que escribir la frase exacta para
+        // escalar, y eso fue justo lo que le costó varios intentos en el incidente real. No tiene
+        // costo extra (WhatsApp no cobra distinto por botones vs texto), así que se ofrece siempre.
+        await sendButtons(phone, INTENT_REPLIES.otro_no_entendido!, [{ id: "hablar_humano", title: "Hablar con humano" }], { ...ctx, flowIntent: "otro_no_entendido" })
         return
       }
 
