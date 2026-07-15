@@ -300,6 +300,21 @@
   a punto de pushearse a este repo público (cuerpo de un PR y, más grave, un commit que llegó a
   mergearse a `main` antes de notarlo) — corregidas con un commit de redacción sobre `main` una vez
   detectado. Ver `docs/BACKLOG.md` → Ola 4 para el detalle sin datos identificables.
+- 2026-07-15 (mismo día, cierre): Seba cargó `GEMINI_MODEL=gemini-3.5-flash` y
+  `DAILY_AI_REQUEST_LIMIT=300` en `.env.local` y en las env vars de producción de Vercel (con
+  redeploy), y activó "Proveedor de IA" en Configuración. Al revisar `GEMINI_MODEL` en el dashboard
+  de Vercel se encontró que su valor real era una API key (formato `AIzaSy...`), no un nombre de
+  modelo — probablemente cargada por error en algún momento sin quedar registrado en el código
+  (variable marcada "Sensitive", por eso pasó desapercibida). Corregido a mano por Seba en el
+  dashboard. Pidiendo verificar que la IA del bot funciona de verdad, se probó `classifyWhatsAppIntent()`
+  en vivo contra la API real de Gemini (script temporal, sin tocar Supabase) y se encontró **un
+  segundo bug real, preexistente**: el límite de `maxTokens: 20` hacía que la respuesta siempre
+  llegara cortada a mitad del JSON (`finishReason: MAX_TOKENS`) porque el modo JSON de Gemini
+  pretty-printea la salida — la clasificación nunca funcionaba de verdad, caía siempre en
+  "otro_no_entendido" en silencio. Sin este segundo fix, activar el proveedor de IA no hubiera
+  tenido ningún efecto real. Corregido a `maxTokens: 60` (verificado en vivo: la respuesta real más
+  larga usó 16 tokens), y confirmado que clasifica bien, incluyendo el intent `turno_ya_resuelto`
+  agregado hoy mismo. `npm test` (354/354), lint y build sin errores.
 
 ## Qué es esta app
 Sistema de adquisición de pacientes para la Dra. Lucía Chahin, cardióloga.

@@ -27,17 +27,14 @@ por qué tipo de acción es, para que sepas qué esperar de cada uno. El detalle
 - [ ] **2FA del Business Manager**: Facebook te bloqueó activarlo en tu cuenta personal ("no
   usaste mucho tiempo este dispositivo"). Probá desde la app de Facebook en el celular (más
   historial de uso), o esperá 24-48hs y reintentá.
-- [ ] **Activar el respaldo de IA del bot de WhatsApp (2026-07-15)**: en `Configuración → Bot de
-  WhatsApp → "Proveedor de IA para clasificar intents"`, cambiar de "Sin IA" a "Gemini" — un solo
-  click, no requiere código. Es solo un respaldo (las reglas van primero siempre) para mensajes que
-  no matchean ninguna de las categorías fijas. Costo esperado: prácticamente $0 al volumen de esta
-  cuenta (tier gratuito de Gemini: 1.500 requests/día; ver detalle en CLAUDE.md → "Bot de WhatsApp
-  con IA de respaldo"). **Antes de activarlo**, subir `DAILY_AI_REQUEST_LIMIT` de 20 a **300** en
-  `.env.local` y en las env vars de Vercel (no lo puede hacer un agente — regla del proyecto de no
-  tocar `.env.local`, y sin acceso a la CLI de Vercel en esta sesión) — es un tope compartido entre
-  todo el uso de IA de la app (contenido + clasificación de leads + este respaldo), y hoy alcanza
-  apenas para la generación de contenido. 300 deja un margen amplio (5x) por debajo del techo real
-  del tier gratuito de Google, como red de seguridad ante un uso anómalo.
+- [x] **Activar el respaldo de IA del bot de WhatsApp** ✅ Resuelto (2026-07-15) — `ai_provider:
+  "gemini"` activado (migración `20260715_enable_whatsapp_ai_fallback.sql`), `GEMINI_MODEL`/
+  `DAILY_AI_REQUEST_LIMIT` cargados en `.env.local` y en Vercel producción (con redeploy). En el
+  camino se encontraron y corrigieron dos bugs reales que hubieran dejado esto sin efecto: (1)
+  `GEMINI_MODEL` en Vercel tenía cargada una API key en vez de un nombre de modelo (corregido a
+  mano por Seba en el dashboard); (2) `classifyWhatsAppIntent()` pedía `maxTokens: 20`, insuficiente
+  para el modo JSON de Gemini (siempre cortaba la respuesta a mitad de camino) — corregido a `60`,
+  verificado en vivo contra la API real. Ver CLAUDE.md → entrada 2026-07-15 para el detalle completo.
 - [ ] **Aprobar el template `alerta_interna_derivacion` (2026-07-15)**: para que la derivación a
   humano te avise también por WhatsApp (además del email que ya funciona) — enviálo a aprobación
   en WhatsApp Manager (texto exacto en `Configuración → Templates de WhatsApp`, ver CLAUDE.md →
