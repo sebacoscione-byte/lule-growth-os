@@ -1514,7 +1514,7 @@ export default function ContentStudioPage() {
                     <SelectTrigger className="text-gray-900"><SelectValue /></SelectTrigger>
                     <SelectContent>{OBJECTIVES.map(item => <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>)}</SelectContent>
                   </Select>
-                  <p className="text-xs text-gray-500">Guía el enfoque del hook y del CTA que genera la IA.</p>
+                  <p className="text-xs text-gray-500">{CONTENT_OBJECTIVE_GOALS[objective]} — guía el hook y el CTA que genera la IA.</p>
                 </div>
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                   <div className="space-y-1.5">
