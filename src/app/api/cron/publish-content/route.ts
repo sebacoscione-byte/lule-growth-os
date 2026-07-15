@@ -10,6 +10,7 @@ import type { AutoPublishFormat } from "@/lib/content-pipeline"
 import { generateContentVisual } from "@/lib/ai"
 import { publishApprovedItem } from "@/lib/content-publish"
 import { runWhatsAppFollowup } from "@/lib/whatsapp-followup"
+import { runHandoffReminderCheck } from "@/lib/whatsapp-handoff"
 import { snapshotInstagramFollowers } from "@/lib/instagram-followers"
 import { snapshotGoogleBusinessMetrics } from "@/lib/google-performance"
 import { sendCronFailureAlert } from "@/lib/alert-email"
@@ -144,6 +145,11 @@ export async function GET(request: Request) {
     // sumar un tercer cron job -- el plan Hobby de Vercel limita a 2. Ver src/lib/whatsapp-followup.ts.
     const whatsappFollowup = await runWhatsAppFollowup(supabase, now)
 
+    // Ola 4 (incidente real 2026-07-14): respaldo diario por si la alerta puntual de
+    // escalateToHuman se pierde o se ignora -- ver src/lib/whatsapp-handoff.ts. Mismo motivo de
+    // arriba: corre acá adentro, no en un cron propio.
+    const handoffReminder = await runHandoffReminderCheck(now)
+
     // Mismo motivo: el snapshot diario de seguidores de Instagram corre acá adentro, no en un cron
     // propio. Un fallo acá (token vencido, cuenta desconectada) no debe frenar la publicación de
     // contenido -- ver src/lib/instagram-followers.ts.
@@ -164,6 +170,7 @@ export async function GET(request: Request) {
     if (realWhatsappErrors.length > 0) failures.push(`Seguimiento WhatsApp: ${realWhatsappErrors.join("; ")}`)
     if (instagramFollowers.error) failures.push(`Seguidores de Instagram: ${instagramFollowers.error}`)
     if (googleBusinessMetrics.error) failures.push(`Métricas de Google Business: ${googleBusinessMetrics.error}`)
+    if (handoffReminder.error) failures.push(`Recordatorio de derivación a humano: ${handoffReminder.error}`)
     if (failures.length > 0) {
       await sendCronFailureAlert("publish-content", failures.join("\n"))
     }
@@ -171,7 +178,7 @@ export async function GET(request: Request) {
     return NextResponse.json({
       post: post.last_run_result, historia: historia.last_run_result, carrusel: carrusel.last_run_result,
       whatsappFollowup, instagramFollowers,
-      googleBusinessMetrics,
+      googleBusinessMetrics, handoffReminder,
     })
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)

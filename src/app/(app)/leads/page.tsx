@@ -7,6 +7,7 @@ import {
   type Lead,
 } from "@/types"
 import { timeAgo, sanitizePostgrestValue } from "@/lib/utils"
+import { getOpenHandoffs } from "@/lib/whatsapp-handoff"
 
 const PAGE_SIZE = 50
 
@@ -23,21 +24,53 @@ export default async function LeadsPage({
   const currentPage = Math.max(1, Number.parseInt(sp.page ?? "1", 10) || 1)
   const from = (currentPage - 1) * PAGE_SIZE
   const to = from + PAGE_SIZE - 1
+  const isAttentionView = sp.requires_human === "true"
 
-  let query = supabase.from("leads").select("*", { count: "exact" }).order("created_at", { ascending: false })
+  let query = supabase.from("leads").select("*", { count: "exact" })
+  if (!isAttentionView) query = query.order("created_at", { ascending: false })
 
   if (sp.status) query = query.eq("status", sp.status)
   if (sp.channel) query = query.eq("origin_channel", sp.channel)
   if (sp.service) query = query.eq("requested_service", sp.service)
-  if (sp.requires_human === "true") query = query.eq("requires_human", true)
+  if (isAttentionView) query = query.eq("requires_human", true)
   if (sp.q) {
     const safeQ = sanitizePostgrestValue(sp.q)
     if (safeQ) query = query.or(`name.ilike.%${safeQ}%,phone.ilike.%${safeQ}%,instagram_username.ilike.%${safeQ}%`)
   }
 
-  const { data: leads, count } = await query.range(from, to)
-  const all = (leads ?? []) as Lead[]
-  const total = count ?? 0
+  let all: Lead[]
+  let total: number
+  const waitByLead = new Map<string, string>()
+
+  if (isAttentionView) {
+    // Ola 4 (P2, incidente real 2026-07-14): acá priorizamos por tiempo real de espera (desde que
+    // se abrió el handoff), no por fecha de creación del lead. Es un conjunto chico (leads
+    // esperando a una persona del equipo), así que se trae completo y se pagina en memoria en vez
+    // de sumar una consulta con join a nivel SQL.
+    const { data: leads } = await query
+    const leadsList = (leads ?? []) as Lead[]
+    if (leadsList.length > 0) {
+      const openHandoffs = await getOpenHandoffs(leadsList.map(l => l.id))
+      for (const [leadId, h] of openHandoffs) waitByLead.set(leadId, h.createdAt)
+    }
+
+    leadsList.sort((a, b) => {
+      const aWait = waitByLead.get(a.id)
+      const bWait = waitByLead.get(b.id)
+      if (aWait && bWait) return new Date(aWait).getTime() - new Date(bWait).getTime()
+      if (aWait) return -1
+      if (bWait) return 1
+      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    })
+
+    total = leadsList.length
+    all = leadsList.slice(from, to + 1)
+  } else {
+    const { data: leads, count } = await query.range(from, to)
+    all = (leads ?? []) as Lead[]
+    total = count ?? 0
+  }
+
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
 
   function pageHref(targetPage: number) {
@@ -136,7 +169,11 @@ export default async function LeadsPage({
                         <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium ${STATUS_COLORS[lead.status]}`}>
                           {STATUS_LABELS[lead.status]}
                         </span>
-                        <span className="text-xs text-gray-400">{timeAgo(lead.created_at)}</span>
+                        {waitByLead.has(lead.id) ? (
+                          <span className="text-xs font-medium text-red-600">Esperando {timeAgo(waitByLead.get(lead.id)!)}</span>
+                        ) : (
+                          <span className="text-xs text-gray-400">{timeAgo(lead.created_at)}</span>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -189,8 +226,12 @@ export default async function LeadsPage({
                         {STATUS_LABELS[lead.status]}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-gray-400 text-xs">
-                      {timeAgo(lead.created_at)}
+                    <td className="px-4 py-3 text-xs">
+                      {waitByLead.has(lead.id) ? (
+                        <span className="font-medium text-red-600">Esperando {timeAgo(waitByLead.get(lead.id)!)}</span>
+                      ) : (
+                        <span className="text-gray-400">{timeAgo(lead.created_at)}</span>
+                      )}
                     </td>
                     <td className="px-4 py-3">
                       <Link href={`/leads/${lead.id}`}>

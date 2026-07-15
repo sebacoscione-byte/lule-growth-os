@@ -100,6 +100,11 @@ async function ensureLeadId(session: WhatsAppSession, phone: string): Promise<st
   return data.id as string
 }
 
+function leadPreferredSede(lead: Lead | null): Sede | null {
+  const loc = lead?.preferred_location
+  return loc === "cimel_lanus" || loc === "swiss_lomas" || loc === "hospital_britanico" ? loc : null
+}
+
 function toHandoffLead(lead: Lead | null): HandoffLeadInfo | null {
   if (!lead) return null
   return {
@@ -164,6 +169,17 @@ async function upsertLeadFromIntake(session: WhatsAppSession, waName: string | u
     .single()
 
   if (error || !data?.id) throw new Error(`Error creando lead desde intake: ${error?.message}`)
+
+  // El mensaje que originó este lead (la respuesta combinada de intake) se logueó antes con
+  // lead_id null -- logWhatsAppMessage() solo inserta en `messages` si ya hay lead_id (columna
+  // NOT NULL), así que quedaba invisible para siempre en el Inbox aunque el lead sí se creara.
+  // Incidente real 2026-07-14 (David Portas): el mensaje perdido era el que explicaba el motivo
+  // real de la consulta. Se recupera acá, ahora que ya existe el id real. No duplica
+  // whatsapp_cost_events (ya se registró antes, sin lead_id).
+  if (extraction.notas) {
+    await db.from("messages").insert({ lead_id: data.id, role: "user", content: extraction.notas, direction: "inbound" })
+  }
+
   await updateSession(session.phone, { lead_id: data.id })
   return data.id as string
 }
@@ -233,6 +249,29 @@ async function buildSedeInstructions(sede: Sede, intro: string): Promise<string>
   return lines.join("\n")
 }
 
+// Ola 4 (P1, incidente real 2026-07-14): mientras se espera que una persona del equipo responda,
+// dar de una un contacto directo de la sede que el paciente ya eligió -- antes el mensaje de
+// derivación no tenía ningún dato de contacto propio.
+function buildHumanFallbackLine(sede: Sede, loc: LocationConfig | undefined): string {
+  if (sede === "swiss_lomas") {
+    return loc?.booking_url
+      ? `\n\nMientras tanto, también podés escribirle directo a *${SEDE_NAMES[sede]}* por sus canales oficiales: ${loc.booking_url}`
+      : ""
+  }
+  return loc?.phone
+    ? `\n\nMientras tanto, también podés llamar directo a *${SEDE_NAMES[sede]}*: ${loc.phone}`
+    : ""
+}
+
+async function buildHablarConHumanoReply(lead: Lead | null): Promise<string> {
+  const base = INTENT_REPLIES.hablar_con_humano!
+  const sede = leadPreferredSede(lead)
+  if (!sede) return base
+
+  const locations = await getLocations()
+  return base + buildHumanFallbackLine(sede, locations.find(l => l.id === sede))
+}
+
 function parseSede(text: string, buttonId?: string): Sede | null {
   if (buttonId === "cimel_lanus") return "cimel_lanus"
   if (buttonId === "swiss_lomas") return "swiss_lomas"
@@ -251,7 +290,7 @@ function parseSede(text: string, buttonId?: string): Sede | null {
   return null
 }
 
-async function escalateEmergency(session: WhatsAppSession, phone: string, ctx: SendContext) {
+async function escalateEmergency(session: WhatsAppSession, phone: string, ctx: SendContext, text: string) {
   const db = getDb()
   let leadId = session.lead_id
 
@@ -272,7 +311,14 @@ async function escalateEmergency(session: WhatsAppSession, phone: string, ctx: S
       .select("id")
       .single()
     leadId = data?.id ?? null
-    if (leadId) await updateSession(phone, { lead_id: leadId })
+    if (leadId) {
+      await updateSession(phone, { lead_id: leadId })
+      // El mensaje con los síntomas se logueó antes con lead_id null (logWhatsAppMessage solo
+      // inserta en `messages` si ya hay lead_id -- esa columna es NOT NULL -- así que se perdía
+      // para siempre, ver upsertLeadFromIntake). Crítico no perderlo acá: es el mensaje con los
+      // síntomas de alarma.
+      await db.from("messages").insert({ lead_id: leadId, role: "user", content: text, direction: "inbound" })
+    }
   }
 
   await sendText(phone, EMERGENCY_REPLY, { ...ctx, leadId, flowIntent: "urgencia_medica" })
@@ -355,9 +401,7 @@ async function closeOtherStaleSessions(excludePhone: string) {
 
 async function getSessionPreferredLocation(session: WhatsAppSession): Promise<Sede | null> {
   if (!session.lead_id) return null
-  const lead = await getLead(session.lead_id)
-  const loc = lead?.preferred_location
-  return loc === "cimel_lanus" || loc === "swiss_lomas" || loc === "hospital_britanico" ? loc : null
+  return leadPreferredSede(await getLead(session.lead_id))
 }
 
 // ── Preguntas frecuentes fuera del guion ────────────────────
@@ -447,7 +491,7 @@ export async function handleIncomingMessage(params: {
   })
 
   if (messageType === "text" && isEmergencyMessage(text)) {
-    await escalateEmergency(session, phone, ctx)
+    await escalateEmergency(session, phone, ctx, text)
     return
   }
 
@@ -479,7 +523,7 @@ export async function handleIncomingMessage(params: {
   }
 
   if (messageType === "button_reply" && buttonId === "hablar_humano") {
-    await sendText(phone, INTENT_REPLIES.hablar_con_humano!, { ...ctx, flowIntent: "hablar_con_humano" })
+    await sendText(phone, await buildHablarConHumanoReply(lead), { ...ctx, flowIntent: "hablar_con_humano" })
     await escalateToHuman({
       leadId: session.lead_id,
       reason: "solicitud_explicita",
@@ -664,7 +708,8 @@ export async function handleIncomingMessage(params: {
       const intent = messageType === "text" ? await classifyIntent(text, settings.ai_provider) : "otro_no_entendido"
 
       if (intent === "hablar_con_humano" || intent === "cancelar_reprogramar") {
-        await sendText(phone, INTENT_REPLIES[intent]!, { ...ctx, flowIntent: intent })
+        const replyText = intent === "hablar_con_humano" ? await buildHablarConHumanoReply(lead) : INTENT_REPLIES[intent]!
+        await sendText(phone, replyText, { ...ctx, flowIntent: intent })
         await escalateToHuman({
           leadId: session.lead_id, reason: "solicitud_explicita",
           summary: buildHandoffSummary({ phone, lead: toHandoffLead(lead), messagesSentCount: session.messages_sent_count + 1, costEstimatedTotal: null, nextStepHint: intent === "cancelar_reprogramar" ? "Ayudar a cancelar/reprogramar directamente con la institución" : "Retomar contacto — el paciente pidió hablar con una persona" }),

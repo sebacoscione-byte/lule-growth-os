@@ -11,12 +11,16 @@ jest.mock("@/lib/ai", () => ({
   generateReply: jest.fn(),
   getPublicAiError: jest.fn(() => "error de IA"),
 }))
+jest.mock("@/lib/whatsapp-handoff", () => ({
+  resolveHandoffForLead: jest.fn().mockResolvedValue(undefined),
+}))
 
 import { POST } from "./route"
 import { createClient } from "@/lib/supabase/server"
 import { getServiceDb } from "@/lib/supabase/service"
 import { sendText, WindowClosedError } from "@/lib/whatsapp"
 import { generateReply } from "@/lib/ai"
+import { resolveHandoffForLead } from "@/lib/whatsapp-handoff"
 
 function messagesTable(opts: { latestMessage?: unknown; historyMessages?: unknown[] } = {}) {
   return {
@@ -127,6 +131,9 @@ describe("POST /api/messages — lead con WhatsApp real conectado", () => {
     expect(leads.update).toHaveBeenCalledWith({ last_message: "hola" })
     // Al responder a mano, el bot se pausa para esta conversación (no se pisan entre sí).
     expect(updateSpy).toHaveBeenCalledWith({ bot_paused: true })
+    // Ola 4: la respuesta manual real cierra cualquier handoff abierto de este lead (no hay email
+    // en el usuario mockeado, así que cae al valor por defecto "equipo").
+    expect(resolveHandoffForLead).toHaveBeenCalledWith("lead-1", "equipo")
   })
 
   it("con la ventana de 24h cerrada no manda nada, no pausa el bot, y devuelve un error claro (409)", async () => {
@@ -140,6 +147,7 @@ describe("POST /api/messages — lead con WhatsApp real conectado", () => {
     const body = await res.json()
     expect(body.error).toMatch(/ventana/i)
     expect(updateSpy).not.toHaveBeenCalled()
+    expect(resolveHandoffForLead).not.toHaveBeenCalled()
   })
 
   it("un error real de la API de WhatsApp devuelve 500 sin dejarlo pasar en silencio", async () => {
@@ -152,6 +160,7 @@ describe("POST /api/messages — lead con WhatsApp real conectado", () => {
     expect(res.status).toBe(500)
     const body = await res.json()
     expect(body.error).toMatch(/token vencido/)
+    expect(resolveHandoffForLead).not.toHaveBeenCalled()
   })
 })
 

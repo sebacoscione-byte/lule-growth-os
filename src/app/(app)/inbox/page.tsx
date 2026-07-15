@@ -9,11 +9,16 @@ import { Input } from "@/components/ui/input"
 import { STATUS_LABELS, STATUS_COLORS, type Lead, type Message } from "@/types"
 import { timeAgo, formatDate } from "@/lib/utils"
 
+// Ola 4 (P2, incidente real 2026-07-14): /api/leads agrega este campo (no es parte de la tabla
+// `leads`) para los leads que están esperando a una persona del equipo, ya ordenados por el que
+// espera hace más tiempo.
+type LeadWithWait = Lead & { handoff_waiting_since?: string | null }
+
 export default function InboxPage() {
   const searchParams = useSearchParams()
   const initialLeadId = searchParams.get("lead_id")
 
-  const [leads, setLeads] = useState<Lead[]>([])
+  const [leads, setLeads] = useState<LeadWithWait[]>([])
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(initialLeadId)
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState("")
@@ -170,7 +175,7 @@ export default function InboxPage() {
             <button
               key={lead.id}
               onClick={() => setSelectedLeadId(lead.id)}
-              className={`w-full text-left p-3 border-b border-gray-100 hover:bg-gray-50 transition-colors ${selectedLeadId === lead.id ? "bg-blue-50 border-l-2 border-l-blue-600" : ""}`}
+              className={`w-full text-left p-3 border-b border-gray-100 hover:bg-gray-50 transition-colors ${selectedLeadId === lead.id ? "bg-blue-50 border-l-2 border-l-blue-600" : lead.handoff_waiting_since ? "bg-red-50/60" : ""}`}
             >
               <div className="flex items-center justify-between gap-2">
                 <p className="text-sm font-medium text-gray-900 truncate">
@@ -183,7 +188,13 @@ export default function InboxPage() {
               {lead.last_message && (
                 <p className="text-xs text-gray-400 truncate mt-0.5">{lead.last_message}</p>
               )}
-              <p className="text-xs text-gray-300 mt-0.5">{timeAgo(lead.created_at)}</p>
+              {lead.handoff_waiting_since ? (
+                <p className="text-xs font-medium text-red-600 mt-0.5">
+                  Esperando a una persona {timeAgo(lead.handoff_waiting_since)}
+                </p>
+              ) : (
+                <p className="text-xs text-gray-300 mt-0.5">{timeAgo(lead.created_at)}</p>
+              )}
             </button>
           ))}
         </div>

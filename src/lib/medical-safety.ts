@@ -13,12 +13,21 @@ export const EMERGENCY_KEYWORDS = [
   "debilidad de un lado", "me flojea un lado", "se me durmió un lado", "se me duerme un lado",
   "dolor en el brazo izquierdo", "dolor brazo izquierdo", "opresión en el pecho", "opresion en el pecho",
   "presión muy alta", "presion muy alta", "presión alta con", "presion alta con",
+  "pico de presión", "pico de presion",
   "dificultad para hablar", "se me traba la lengua", "hablo raro",
 ] as const
 
+// Incidente real 2026-07-14 (David Portas): "tuvo pico de presion hoy ... presion de mas de 180"
+// no matcheaba ninguna palabra clave de arriba -- el paciente dio un valor numérico en vez de una
+// de las frases fijas. Un valor de presión reportado en el rango de crisis hipertensiva (>=140,
+// cerca de la palabra "presión") es en sí mismo una señal de alarma, sin depender de que use
+// alguna de esas frases exactas.
+const HIGH_BLOOD_PRESSURE_PATTERN =
+  /presi[oó]n[^\d]{0,20}(1[4-9]\d|2\d\d)|(1[4-9]\d|2\d\d)[^\d]{0,20}presi[oó]n/
+
 export function isEmergencyMessage(text: string): boolean {
   const lower = text.toLowerCase()
-  return EMERGENCY_KEYWORDS.some(keyword => lower.includes(keyword))
+  return EMERGENCY_KEYWORDS.some(keyword => lower.includes(keyword)) || HIGH_BLOOD_PRESSURE_PATTERN.test(lower)
 }
 
 export const EMERGENCY_REPLY =

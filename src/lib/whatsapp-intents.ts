@@ -46,9 +46,18 @@ export function extractIntake(text: string, knownObrasSociales: string[] = []): 
   return { motivo, obraSocial, edad, sede, notas: text.trim() || null }
 }
 
+// Ola 4 (incidente real 2026-07-14, David Portas): el patrón original solo matcheaba la frase
+// exacta "hablar con alguien/una persona/un humano" -- el paciente escribió "Prefiero una persona
+// del equipo porfavor", "Prefiero una persona del equipo" y "Persona" (tres mensajes seguidos) sin
+// que ninguno matcheara, recibiendo el mismo "no entendí" genérico cada vez, hasta que en el quinto
+// intento acertó la frase exacta. Se amplía para cubrir "prefiero/quiero/necesito ... persona/
+// humano/alguien" en cualquier orden, y un mensaje que es solo esa palabra suelta.
+const HABLAR_CON_HUMANO_PATTERN =
+  /hablar con (alguien|una persona|un humano)|atienda una persona|comunicarme con (la )?(secretaria|recepci[oó]n)|\b(prefiero|quiero|necesito)\b.*\b(persona|humano|alguien)\b|^\s*(persona|humano|alguien)s?\s*[.!¡]*\s*$/
+
 const DETERMINISTIC_RULES: Array<{ intent: WhatsAppIntent; test: RegExp }> = [
   { intent: "cancelar_reprogramar", test: /cancelar|reprogramar|cambiar (el|mi) turno|no puedo ir/ },
-  { intent: "hablar_con_humano", test: /hablar con (alguien|una persona|un humano)|atienda una persona|comunicarme con (la )?(secretaria|recepci[oó]n)/ },
+  { intent: "hablar_con_humano", test: HABLAR_CON_HUMANO_PATTERN },
   { intent: "derivar_protocolo", test: /protocolo|estudio de investigaci[oó]n|investigaci[oó]n cl[ií]nica/ },
   { intent: "consultar_cobertura", test: /obra social|obras sociales|cobertura|prepaga|pami|aceptan/ },
   { intent: "ubicacion_horarios", test: /horario|direcci[oó]n|donde queda|d[oó]nde queda|ubicaci[oó]n|que d[ií]a|qu[eé] d[ií]a/ },

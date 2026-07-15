@@ -5,6 +5,7 @@ import { generateReply, getPublicAiError } from "@/lib/ai"
 import { sendText, WindowClosedError } from "@/lib/whatsapp"
 import { getWindowState } from "@/lib/whatsapp-window"
 import { getWhatsAppSettings } from "@/lib/whatsapp-settings"
+import { resolveHandoffForLead } from "@/lib/whatsapp-handoff"
 import { z } from "zod"
 import { parseJsonBody, formatZodError } from "@/lib/api-validation"
 
@@ -86,6 +87,11 @@ export async function POST(request: Request) {
     // El equipo tomó la conversación a mano: el bot deja de responderle a este paciente hasta que
     // alguien lo reactive desde el Inbox (ver /api/whatsapp/bot-pause y el chequeo en whatsapp-bot.ts).
     await db.from("whatsapp_sessions").update({ bot_paused: true }).eq("phone", lead.phone)
+
+    // Ola 4: esta respuesta manual ES la señal de que alguien del equipo tomó la conversación --
+    // cierra cualquier handoff abierto de este lead (quita el aviso de "Atención" y lo saca del
+    // respaldo diario) sin necesitar un botón aparte de "marcar como resuelto".
+    await resolveHandoffForLead(lead_id, user.email ?? "equipo")
 
     // sendText ya deja el mensaje guardado (role "assistant", saliente) vía logWhatsAppMessage.
     const { data: sentMessage } = await supabase

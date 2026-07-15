@@ -229,6 +229,51 @@
   `SUPABASE_DB_PASSWORD` en este entorno) — correr `npm run migrate` antes de que esto tenga efecto
   real; hasta entonces, `bot_paused` no existe como columna y el toggle/pausa automática van a
   fallar. **No se pudo verificar visualmente en este entorno.**
+- 2026-07-15 (Ola 4 del backlog, cierre completo — sesión local con `.env.local` real): se retomó
+  la sesión de emergencia del 2026-07-14 (incidente real con el paciente David Portas). Primero se
+  detectó que el clon local había quedado desactualizado (4 commits — PRs #78-81 — solo existían en
+  GitHub, ver [[reference_claude_code_web_mobile_access]]); se hizo `git fetch`/`pull`. Se aplicó la
+  migración `20260714_whatsapp_bot_pause.sql` pendiente (con aprobación explícita, el harness pide
+  nombrar producción cada vez para `npm run migrate`) — la pausa del bot ya tiene efecto real. Se
+  implementaron los 4 puntos del plan de corrección: **alerta en tiempo real** por email cuando el
+  bot deriva a un humano (`sendHandoffAlert()`, con throttle de 30 min por lead para no saturar en
+  conversaciones largas), **recordatorio diario de respaldo** dentro del cron ya existente
+  (`runHandoffReminderCheck()`, corre una vez al día por el límite de 2 crons de Vercel Hobby — no
+  es un recordatorio fino a los 30-60 min, es una red de seguridad si la alerta puntual se pierde),
+  **teléfono/contacto de la sede** como alternativa inmediata en el mensaje de derivación cuando el
+  bot ya sabe la sede preferida, y **prioridad visual por tiempo de espera** en Inbox/`/leads`
+  (badge rojo "Esperando hace Xh", los leads que requieren humano suben al principio). De paso,
+  `resolveHandoffForLead()` hace que el aviso de "Atención" se limpie solo cuando el equipo responde
+  de verdad desde el Inbox — antes quedaba marcado para siempre, sin ningún mecanismo que lo sacara.
+  **Verificación visual real por segunda vez** (después de la del 2026-07-14): con aprobación
+  explícita, se rotó la contraseña del usuario E2E (la anterior no se había guardado) y se usó
+  Playwright para loguearse y confirmar con datos reales de producción que la priorización funciona
+  (capturas borradas después de revisarlas — contienen PII de un paciente real, nunca se commitean).
+  Esa misma verificación permitió **leer la conversación completa del paciente por primera vez**
+  (24 mensajes, antes solo se tenía un fragmento de captura) y encontrar 3 problemas reales
+  adicionales, no visibles solo con el fragmento (detalle clínico deliberadamente omitido acá —
+  ver `docs/BACKLOG.md` → Ola 4 para el resumen sin datos identificables): (1) el mensaje original
+  daba una lectura numérica de presión arterial elevada sobre un familiar en vez de usar una de las
+  frases fijas del detector de urgencias (`isEmergencyMessage()` en `medical-safety.ts`,
+  "presión muy alta") — no activaba nada. Corregido con un patrón que detecta valores de presión
+  ≥140 mencionados cerca de la palabra "presión", más la frase "pico de presión"; (2) **el primer
+  mensaje con contenido real de toda conversación nueva del bot se perdía para siempre**, no solo
+  en este caso: `logWhatsAppMessage()` en `whatsapp-cost-tracking.ts` solo inserta en `messages`
+  `if (params.leadId)` (la columna es NOT NULL), y el lead recién se crea *después* de procesar esa
+  primera respuesta — corregido insertando ese mensaje retroactivamente en
+  `upsertLeadFromIntake()` y `escalateEmergency()` apenas se crea el lead real (no recupera lo ya
+  perdido, corta la pérdida hacia adelante); (3) el regex de `hablar_con_humano` era demasiado
+  literal — el paciente pidió hablar con una persona cinco veces (variantes como "prefiero una
+  persona del equipo" o solo "persona") sin que matcheara nada, hasta acertar la frase exacta —
+  ampliado para cubrir "prefiero/quiero/necesito ... persona/humano/alguien" y una palabra suelta.
+  Los tres tienen tests con mensajes sintéticos equivalentes (no el texto real del paciente). Con
+  el contexto completo, ese caso puntual seguía marcado "requiere humano" 19 horas después aunque
+  Lucía ya le había respondido varias veces (el mecanismo de resolución automática recién se agregó
+  hoy) — se resolvió a mano con aprobación explícita de Seba, como backfill único, no como acción
+  recurrente. `npm test` (344/344), lint y build sin
+  errores. Riesgo: toca lógica médica (guardrail de emergencia, ampliado — no reducido) y el flujo
+  de creación de leads del bot — verificado con más cuidado antes de mergear por ser la categoría de
+  mayor riesgo directo sobre una persona real.
 
 ## Qué es esta app
 Sistema de adquisición de pacientes para la Dra. Lucía Chahin, cardióloga.

@@ -48,6 +48,18 @@ describe("classifyIntentDeterministic", () => {
     expect(classifyIntentDeterministic("quiero hablar con una persona del consultorio")).toBe("hablar_con_humano")
   })
 
+  it("Ola 4 (incidente real 2026-07-14, David Portas): reconoce variantes que no dicen 'hablar con'", () => {
+    expect(classifyIntentDeterministic("Prefiero una persona del equipo porfavor")).toBe("hablar_con_humano")
+    expect(classifyIntentDeterministic("Prefiero una persona del equipo")).toBe("hablar_con_humano")
+    expect(classifyIntentDeterministic("Persona")).toBe("hablar_con_humano")
+    expect(classifyIntentDeterministic("necesito hablar con alguien del equipo")).toBe("hablar_con_humano")
+  })
+
+  it("no confunde un pedido de turno normal con querer hablar con un humano", () => {
+    expect(classifyIntentDeterministic("quiero un turno con la doctora")).not.toBe("hablar_con_humano")
+    expect(classifyIntentDeterministic("necesito saber los horarios")).not.toBe("hablar_con_humano")
+  })
+
   it("clasifica consulta de cobertura", () => {
     expect(classifyIntentDeterministic("aceptan OSDE o tienen convenio con alguna prepaga?")).toBe("consultar_cobertura")
   })
