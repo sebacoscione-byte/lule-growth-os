@@ -552,7 +552,13 @@ export async function classifyWhatsAppIntent(text: string): Promise<WhatsAppInte
   if (getAiMode() === "manual") return "otro_no_entendido"
 
   const raw = await generateText({
-    maxTokens: 20,
+    // 2026-07-15: probado en vivo contra la API real de Gemini -- con 20 tokens la respuesta
+    // siempre llega cortada a mitad del JSON (finishReason: MAX_TOKENS, ej. `{\n  "intent`) porque
+    // el modo JSON de Gemini pretty-printea la salida. classifyWhatsAppIntent() nunca clasificaba
+    // nada de verdad: parseJson() tiraba (JSON incompleto), el catch de classifyIntent() lo
+    // absorbía en silencio y siempre devolvía "otro_no_entendido". Verificado que 60 alcanza de
+    // sobra (la respuesta real más larga usó 16 tokens).
+    maxTokens: 60,
     json: true,
     purpose: "whatsapp_intent",
     cacheSystem: true,
