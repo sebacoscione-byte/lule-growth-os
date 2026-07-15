@@ -274,6 +274,32 @@
   errores. Riesgo: toca lógica médica (guardrail de emergencia, ampliado — no reducido) y el flujo
   de creación de leads del bot — verificado con más cuidado antes de mergear por ser la categoría de
   mayor riesgo directo sobre una persona real.
+- 2026-07-15 (continuación, mismo día): tres correcciones más en respuesta a preguntas de Seba
+  sobre la misma conversación. (1) **Cuarto bug real**: el paciente cerró la conversación
+  agradeciendo porque ya había conseguido turno en otro lado ("gracias doc... ya conseguí turno...")
+  — como el mensaje contenía la palabra "turno", el clasificador lo tomaba como `pedir_turno` y el
+  bot reenviaba el menú de sedes, ignorando que ya no necesitaba nada. Nuevo intent
+  `turno_ya_resuelto` (`whatsapp-intents.ts`, chequeado antes que `pedir_turno`), responde con un
+  cierre cálido en su lugar. (2) A pedido explícito de Seba, **alerta también por WhatsApp** (además
+  del email) cuando el bot deriva a un humano — nuevo template `alerta_interna_derivacion`
+  (migración `20260715_internal_alert_template.sql`, aplicada), variables `ALERT_WHATSAPP_TO` +
+  aprobación del template en WhatsApp Manager pendientes de Seba (fail-open en ambos: sin eso
+  configurado, sigue llegando solo el email). Tiene costo real por mensaje (a diferencia del email),
+  aclarado en la documentación. (3) Preguntando por el costo de sumar IA de respaldo al bot, se
+  encontró que **Gemini 2.0 Flash** (el modelo default hardcodeado en `ai.ts` cuando `GEMINI_MODEL`
+  no está seteado) **fue dado de baja por Google el 1/6/2026** — corregido a `gemini-3.5-flash`
+  (vigente, verificado contra la documentación pública de Google). El respaldo de IA del bot
+  (`Configuración → Bot de WhatsApp → Proveedor de IA`) sigue en "Sin IA" — es un toggle de un click
+  que le queda a Seba (ver `docs/BACKLOG.md`), junto con subir `DAILY_AI_REQUEST_LIMIT` de 20 a 300
+  antes de activarlo (env var, no lo puede tocar un agente). Con el tier gratuito actual de Gemini
+  (1.500 requests/día), el costo esperado de este respaldo al volumen de esta cuenta es
+  prácticamente $0 — el límite que realmente importa es el propio `DAILY_AI_REQUEST_LIMIT`
+  (compartido entre contenido + clasificación de leads + este respaldo), no el pricing de Google.
+  `npm test` (354/354), lint y build sin errores en las tres correcciones. Además, en el camino se
+  encontraron y corrigieron **dos exposiciones de datos reales de este mismo paciente** en contenido
+  a punto de pushearse a este repo público (cuerpo de un PR y, más grave, un commit que llegó a
+  mergearse a `main` antes de notarlo) — corregidas con un commit de redacción sobre `main` una vez
+  detectado. Ver `docs/BACKLOG.md` → Ola 4 para el detalle sin datos identificables.
 
 ## Qué es esta app
 Sistema de adquisición de pacientes para la Dra. Lucía Chahin, cardióloga.
@@ -420,6 +446,28 @@ ALERT_WHATSAPP_TO=              # Tu número en formato wa.me (ej. 5491100000000
 - Además usa **prompt caching nativo de Anthropic** (`cache_control: { type: "ephemeral" }`) para los system prompts que no dependen del request (instrucciones fijas tipo `SYSTEM_PROMPT`, reglas de imagen, reglas de captación). Esto se activa con la opción `cacheSystem: true` en `generateText`/`generateWithAnthropic`.
 - **Regla al agregar una función nueva en `ai.ts`**: si el `system` que le pasás es 100% estático (no interpola `leadContext`, `topic`, etc. dentro del `system`), agregá `cacheSystem: true`. Si el system tiene contenido dinámico, movelo a `messages` en vez del `system` para poder cachear igual.
 - No agregar SDKs/wrappers externos de terceros para esto: `@anthropic-ai/sdk` ya soporta `cache_control` de forma nativa.
+
+### Bot de WhatsApp con IA de respaldo — costo esperado (2026-07-15)
+
+`Configuración → Bot de WhatsApp → Proveedor de IA` deja elegir "Gemini" como respaldo de
+clasificación de intents cuando ninguna regla determinística matchea (`classifyIntent()` en
+`whatsapp-intents.ts` — las reglas van siempre primero, la IA nunca reemplaza el texto de las
+respuestas, solo elige cuál de las categorías fijas aplica). Análisis de costo al activarlo:
+
+- Tier gratuito de Gemini (modelo `gemini-3.5-flash`, verificado contra ai.google.dev en julio
+  2026): **1.500 requests/día, 10 por minuto**. La clasificación de respaldo solo se llama para el
+  mensaje que no matchea ninguna regla — una minoría del total — así que al volumen real de esta
+  cuenta el costo esperado es prácticamente **$0**, con muchísimo margen por debajo de ese techo.
+- El límite que de verdad importa en la práctica es el propio de la app,
+  `DAILY_AI_REQUEST_LIMIT` (default 20/día, **compartido** entre generación de contenido +
+  clasificación de leads + este respaldo del bot — un solo contador global en `ai_requests`, ver
+  `getDailyRequestCount()`). Antes de activar el respaldo del bot, subir ese número (recomendado:
+  **300** — dejar margen amplio por debajo del techo real de Google, como red de seguridad ante un
+  uso anómalo, sin ser tan alto que dejaría de frenar algo raro). Se cambia en `.env.local` /
+  Vercel, no hace falta código.
+- Si algún día el volumen superara igual el tier gratuito, el costo pagado de `gemini-3.5-flash` es
+  del orden de centésimas de centavo por llamada (mensajes cortos, salida limitada a 20 tokens) —
+  no es una preocupación real a la escala de un consultorio.
 
 ## Instagram Business — cómo configurar OAuth (publicar posts/historias)
 La app usa "Instagram API with Instagram Login" (graph.instagram.com) — NO requiere una Facebook Page vinculada,
