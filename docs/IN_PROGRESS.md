@@ -1,3 +1,56 @@
+# EN CURSO (2026-07-15) — cierre de la Ola 4 (incidente real con David Portas)
+
+## Objetivo
+
+Retomar la sesión de emergencia del 2026-07-14 (que dejó 4 PRs mergeados y un plan de corrección
+sin implementar en `docs/BACKLOG.md` → Ola 4) e implementar los 4 puntos pendientes: alerta en
+tiempo real al derivar a un humano, recordatorio de respaldo, fallback de contacto de sede, y
+prioridad visual por tiempo de espera. Esta sesión corre local con `.env.local` real (a diferencia
+de la del 14/07, que corrió en la nube sin credenciales), así que además se pudo aplicar la
+migración pendiente y verificar todo con datos reales de producción.
+
+## Plan
+
+- [x] `git fetch`/`pull` — el clon local estaba 4 commits atrás de `origin/main`.
+- [x] Aplicar `20260714_whatsapp_bot_pause.sql` (aprobación explícita, nombrando producción).
+- [x] P0: alerta en tiempo real (`sendHandoffAlert`, throttle 30 min).
+- [x] P0: recordatorio diario de respaldo dentro del cron existente (`runHandoffReminderCheck`).
+- [x] P1: teléfono/contacto de sede como fallback en el mensaje de derivación.
+- [x] P2: prioridad visual por tiempo de espera en Inbox/`/leads` + resolución automática del
+      handoff al responder manual (`resolveHandoffForLead`).
+- [x] Verificar visualmente con Playwright + usuario E2E (contraseña rotada con aprobación).
+- [x] Leer la conversación completa de David Portas (24 mensajes) — pendiente explícito de la Ola 4.
+- [x] Corregir 3 hallazgos nuevos encontrados al leer la conversación completa: detector de
+      urgencias sin valor numérico de presión, primer mensaje de toda conversación nueva perdido
+      para siempre, regex de "hablar con humano" demasiado literal.
+- [x] Resolver a mano el caso puntual de David Portas (aprobación explícita, backfill único).
+- [x] `npm test`/lint/build, commitear, PR, verificar preview, mergear.
+
+## Resultado
+
+- PR con los cambios de código (`escalateToHuman`, `resolveHandoffForLead`, `getOpenHandoffs`,
+  `runHandoffReminderCheck` en `whatsapp-handoff.ts`; `sendHandoffAlert`/`sendHandoffReminderAlert`
+  en `alert-email.ts`; fallback de sede y recuperación de mensaje en `whatsapp-bot.ts`; regex
+  ampliado en `whatsapp-intents.ts`; patrón de presión en `medical-safety.ts`; priorización en
+  `/api/leads`, `/leads`, `/inbox`; auto-resolución en `/api/messages`).
+- `npm test`: 344/344. Lint y build sin errores.
+- Verificado visualmente contra producción real (Inbox, `/leads?requires_human=true`, conversación
+  completa) con el usuario E2E dedicado — capturas borradas después de revisarlas (PII real).
+- Caso puntual de David Portas resuelto a mano en producción (aprobación explícita) como backfill
+  único, no como acción recurrente del agente.
+
+## Riesgo y alcance
+
+- Toca lógica médica: el guardrail de emergencia se **amplía** (detecta más casos, no menos) y el
+  regex de "hablar con humano" también se amplía — ambos cambios aumentan la seguridad del guardrail
+  respecto al estado anterior, no la reducen. Verificado con más cuidado antes de mergear.
+- Toca el flujo de creación de leads del bot (`upsertLeadFromIntake`, `escalateEmergency`) para
+  recuperar el mensaje que crea el lead — cambio aditivo (un insert más), no modifica el flujo
+  existente de escalamiento/creación.
+- No suma un tercer cron job de Vercel (todo corre dentro de `publish-content`, ya existente).
+
+---
+
 # EN CURSO (2026-07-14) — claridad de atribución del dashboard
 
 ## Objetivo

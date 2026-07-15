@@ -3,6 +3,8 @@ import { NextResponse } from "next/server"
 import { sanitizePostgrestValue } from "@/lib/utils"
 import { parseJsonBody, formatZodError } from "@/lib/api-validation"
 import { leadFieldsSchema } from "@/lib/lead-schema"
+import { getOpenHandoffs } from "@/lib/whatsapp-handoff"
+import type { Lead } from "@/types"
 
 export async function GET(request: Request) {
   const supabase = await createClient()
@@ -34,7 +36,28 @@ export async function GET(request: Request) {
   const { data, error } = await query
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  return NextResponse.json(data)
+
+  // Ola 4 (P2, incidente real 2026-07-14): el Inbox usa esta ruta sin filtros para armar la lista
+  // de conversaciones -- los leads que están esperando a una persona del equipo se muestran primero,
+  // ordenados por el que espera hace más tiempo, en vez de mezclados por fecha de creación del lead.
+  const leads = (data ?? []) as Lead[]
+  const pendingIds = leads.filter(l => l.requires_human).map(l => l.id)
+  const openHandoffs = pendingIds.length > 0 ? await getOpenHandoffs(pendingIds) : new Map()
+
+  const withWait = leads.map(l => ({
+    ...l,
+    handoff_waiting_since: openHandoffs.get(l.id)?.createdAt ?? null,
+  }))
+  withWait.sort((a, b) => {
+    if (a.handoff_waiting_since && b.handoff_waiting_since) {
+      return new Date(a.handoff_waiting_since).getTime() - new Date(b.handoff_waiting_since).getTime()
+    }
+    if (a.handoff_waiting_since) return -1
+    if (b.handoff_waiting_since) return 1
+    return 0 // Array.prototype.sort es estable: conserva el orden por created_at desc ya traído.
+  })
+
+  return NextResponse.json(withWait)
 }
 
 export async function POST(request: Request) {

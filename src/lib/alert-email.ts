@@ -1,10 +1,10 @@
 const RESEND_API_URL = "https://api.resend.com/emails"
 
-// Alerta directa por email cuando falla un cron (sin sumar infraestructura nueva tipo n8n).
-// Fail-open a proposito: si todavia no esta cargado RESEND_API_KEY/ALERT_EMAIL_TO, no manda nada
-// y no rompe el cron que la origino -- mismo patron que Google Analytics/Places API en este
-// proyecto (ver CLAUDE.md). Setup: "Alertas de cron por email".
-export async function sendCronFailureAlert(cronName: string, details: string): Promise<void> {
+// Alerta directa por email (sin sumar infraestructura nueva tipo n8n). Fail-open a proposito: si
+// todavia no esta cargado RESEND_API_KEY/ALERT_EMAIL_TO, no manda nada y no rompe quien la origino
+// -- mismo patron que Google Analytics/Places API en este proyecto (ver CLAUDE.md). Setup:
+// "Alertas de cron por email".
+async function sendAlertEmail(subject: string, text: string): Promise<void> {
   const apiKey = process.env.RESEND_API_KEY
   const to = process.env.ALERT_EMAIL_TO
   if (!apiKey || !to) return
@@ -18,15 +18,26 @@ export async function sendCronFailureAlert(cronName: string, details: string): P
         Authorization: `Bearer ${apiKey}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({
-        from,
-        to,
-        subject: `[Lule Growth OS] Fallo en cron: ${cronName}`,
-        text: details,
-      }),
+      body: JSON.stringify({ from, to, subject, text }),
     })
   } catch {
     // Sin reintentos: si Resend esta caido se pierde esa alerta puntual, pero no debe tumbar
-    // el cron que la origino.
+    // el proceso que la origino.
   }
+}
+
+export async function sendCronFailureAlert(cronName: string, details: string): Promise<void> {
+  await sendAlertEmail(`[Lule Growth OS] Fallo en cron: ${cronName}`, details)
+}
+
+// Ola 4 (incidente real 2026-07-14): antes de esto, escalar a un humano solo quedaba registrado en
+// la base -- nadie se enteraba hasta abrir /inbox a mano. Ver escalateToHuman() en whatsapp-handoff.ts.
+export async function sendHandoffAlert(details: string): Promise<void> {
+  await sendAlertEmail("[Lule Growth OS] Un paciente pidió hablar con una persona", details)
+}
+
+// Respaldo diario (corre dentro del cron ya existente, ver whatsapp-handoff.ts) por si la alerta
+// puntual de arriba se pierde o se ignora -- ver Ola 4 del backlog.
+export async function sendHandoffReminderAlert(details: string): Promise<void> {
+  await sendAlertEmail("[Lule Growth OS] Pacientes esperando respuesta humana", details)
 }

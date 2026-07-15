@@ -21,6 +21,22 @@ describe("isEmergencyMessage", () => {
     expect(isEmergencyMessage("tengo la presion muy alta y me siento mal")).toBe(true)
   })
 
+  it("Ola 4 (incidente real 2026-07-14): detecta un mensaje con presión numérica alta y sin ninguna frase fija (mensaje sintético equivalente al real, sin datos identificables)", () => {
+    expect(isEmergencyMessage(
+      "Un familiar tuvo un pico de presión hoy, quiero que lo vean lo antes posible, tiene la presión en 185"
+    )).toBe(true)
+  })
+
+  it("detecta un valor numérico de presión alto sin la palabra 'pico'", () => {
+    expect(isEmergencyMessage("tiene 180 de presión y no se siente bien")).toBe(true)
+    expect(isEmergencyMessage("la presión le dio 190")).toBe(true)
+  })
+
+  it("no marca como emergencia un valor de presión normal", () => {
+    expect(isEmergencyMessage("la presión le dio 120, está bien")).toBe(false)
+    expect(isEmergencyMessage("tiene 130 de presión, normal para su edad")).toBe(false)
+  })
+
   it("no marca como emergencia una consulta normal", () => {
     expect(isEmergencyMessage("hola, queria pedir turno para un ecocardiograma")).toBe(false)
   })
