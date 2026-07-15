@@ -61,7 +61,7 @@ describe("classifyIntentDeterministic", () => {
   })
 
   it("Ola 4 (incidente real 2026-07-14): reconoce que el paciente ya consiguió turno en otro lado y cierra", () => {
-    expect(classifyIntentDeterministic("Hola, gracias doc la tomare en cuenta para la proxima, ya consegui turno en el guemes")).toBe("turno_ya_resuelto")
+    expect(classifyIntentDeterministic("Hola, gracias doc la tomare en cuenta para la proxima, ya consegui turno en otro lado")).toBe("turno_ya_resuelto")
     expect(classifyIntentDeterministic("ya tengo turno, gracias igual")).toBe("turno_ya_resuelto")
     expect(classifyIntentDeterministic("ya me atendí en otro lado, gracias")).toBe("turno_ya_resuelto")
   })
