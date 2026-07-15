@@ -284,6 +284,7 @@ export type WhatsAppIntent =
   | "urgencia_medica"
   | "cancelar_reprogramar"
   | "hablar_con_humano"
+  | "turno_ya_resuelto"
   | "otro_no_entendido"
 
 export type TemplateStatus = "borrador" | "pendiente_meta" | "aprobado" | "rechazado"

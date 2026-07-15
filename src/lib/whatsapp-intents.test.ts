@@ -60,6 +60,17 @@ describe("classifyIntentDeterministic", () => {
     expect(classifyIntentDeterministic("necesito saber los horarios")).not.toBe("hablar_con_humano")
   })
 
+  it("Ola 4 (incidente real 2026-07-14): reconoce que el paciente ya consiguió turno en otro lado y cierra", () => {
+    expect(classifyIntentDeterministic("Hola, gracias doc la tomare en cuenta para la proxima, ya consegui turno en el guemes")).toBe("turno_ya_resuelto")
+    expect(classifyIntentDeterministic("ya tengo turno, gracias igual")).toBe("turno_ya_resuelto")
+    expect(classifyIntentDeterministic("ya me atendí en otro lado, gracias")).toBe("turno_ya_resuelto")
+  })
+
+  it("no confunde un pedido de turno nuevo con uno ya resuelto", () => {
+    expect(classifyIntentDeterministic("quiero sacar un turno")).toBe("pedir_turno")
+    expect(classifyIntentDeterministic("necesito un turno para la semana que viene")).toBe("pedir_turno")
+  })
+
   it("clasifica consulta de cobertura", () => {
     expect(classifyIntentDeterministic("aceptan OSDE o tienen convenio con alguna prepaga?")).toBe("consultar_cobertura")
   })
