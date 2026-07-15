@@ -207,6 +207,15 @@ function wantsToChangeObraSocial(text: string): boolean {
   return mentionsCoverage && mentionsChange
 }
 
+// Incidente real 2026-07-15 (prueba de Sebastián): "Quiero atenderme particular" en una
+// conversación ya en curso tampoco matcheaba ninguna regla (consultar_cobertura pide la palabra
+// "cobertura"/"obra social"/"prepaga" literal) y terminaba ofreciendo escalar a humano. "Particular"
+// solo es ambigua en español ("una duda particular" = específica, no self-pay) -- por eso el patrón
+// exige que esté pegada a un verbo de atención ("atenderme particular", "soy particular", "vengo
+// particular"), no la palabra suelta en cualquier parte de la frase.
+const DECLARES_NO_COVERAGE_PATTERN =
+  /\b(soy|vengo|atenderme|atiendo|ir[ée]?)\s+particular\b|\bparticular\s+nom[áa]s\b|sin\s+cobertura|no\s+tengo\s+(obra\s+social|cobertura|prepaga)/i
+
 // Incidente real 2026-07-15 (prueba de Sebastián): un "Hola" simple de alguien que ya tiene una
 // conversación en curso (estado "derivado") no matchea ninguna regla ni categoría concreta, así
 // que terminaba clasificado como "otro_no_entendido" -- respuesta correcta desde el clasificador,
@@ -703,6 +712,14 @@ export async function handleIncomingMessage(params: {
         const options = await getObraSocialOptions()
         await sendList(phone, `Tenés cargada la obra social *${session.obra_social ?? "no informada"}*. Elegí la nueva (o "Particular" si no tenés cobertura):`, "Elegir", options, { ...ctx, flowIntent: "consultar_cobertura" })
         await updateSession(phone, { state: "esperando_obra_social" })
+        return
+      }
+
+      if (messageType === "text" && DECLARES_NO_COVERAGE_PATTERN.test(text)) {
+        const insurance = "Particular / sin cobertura"
+        if (session.lead_id) await updateLeadInsurance(session.lead_id, insurance)
+        await updateSession(phone, { obra_social: insurance })
+        await sendText(phone, `Listo, actualicé tu obra social a *${insurance}*. ✅`, { ...ctx, flowIntent: "consultar_cobertura" })
         return
       }
 
