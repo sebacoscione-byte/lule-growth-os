@@ -52,7 +52,7 @@ jest.mock("@/lib/whatsapp-settings", () => ({
 
 import { handleIncomingMessage } from "@/lib/whatsapp-bot"
 import { getServiceDb } from "@/lib/supabase/service"
-import { sendText } from "@/lib/whatsapp"
+import { sendText, sendButtons } from "@/lib/whatsapp"
 import { escalateToHuman } from "@/lib/whatsapp-handoff"
 import { isEmergencyMessage } from "@/lib/medical-safety"
 import { isMarketingOptOutMessage } from "@/lib/whatsapp-intents"
@@ -128,7 +128,9 @@ describe("handleIncomingMessage — bot_paused", () => {
 
     await handleIncomingMessage({ phone: PHONE, text: "hola, quería preguntar algo" })
 
-    expect(sendText).toHaveBeenCalled()
+    // "otro_no_entendido" (mockeado por defecto en este archivo) ahora siempre ofrece el botón de
+    // "Hablar con humano" -- ver whatsapp-bot-message-recovery.test.ts / whatsapp-bot.ts.
+    expect(sendButtons).toHaveBeenCalled()
   })
 
   it("con el bot pausado, una emergencia médica se escala igual (guardrail siempre activo)", async () => {
