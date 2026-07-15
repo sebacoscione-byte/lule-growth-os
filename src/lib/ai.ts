@@ -357,7 +357,7 @@ async function generateWithAnthropic(options: GenerateOptions): Promise<string> 
 async function generateWithGemini(options: GenerateOptions): Promise<string> {
   const apiKey = process.env.GEMINI_API_KEY
   if (!apiKey) throw new Error("GEMINI_API_KEY no esta configurada.")
-  const model = process.env.GEMINI_MODEL || "gemini-2.0-flash"
+  const model = process.env.GEMINI_MODEL || "gemini-3.5-flash"
   const response = await fetch(
     `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,
     {
@@ -406,7 +406,7 @@ async function generateText(options: GenerateOptions): Promise<string> {
   const errors: unknown[] = []
   for (const provider of getProviderOrder()) {
     const model = provider === "gemini"
-      ? (process.env.GEMINI_MODEL ?? "gemini-2.0-flash")
+      ? (process.env.GEMINI_MODEL ?? "gemini-3.5-flash")
       : (process.env.ANTHROPIC_MODEL ?? "claude-sonnet-4-6")
     try {
       const text = provider === "gemini"
