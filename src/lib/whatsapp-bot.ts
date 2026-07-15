@@ -707,6 +707,19 @@ export async function handleIncomingMessage(params: {
 
       const intent = messageType === "text" ? await classifyIntent(text, settings.ai_provider) : "otro_no_entendido"
 
+      // Ola 4 (incidente real 2026-07-14): el paciente cerró la conversación agradeciendo porque ya
+      // había conseguido turno en otro lado -- antes esto caía en "pedir_turno" (por la palabra
+      // "turno") y el bot reenviaba el menú de sedes, ignorando que ya no necesitaba nada. Se
+      // reconoce el cierre y no se vuelve a insistir con instrucciones de sede.
+      if (intent === "turno_ya_resuelto") {
+        await sendText(
+          phone,
+          "¡Qué bueno que pudiste conseguir turno! Si en algún momento necesitás algo más, escribinos. 😊",
+          { ...ctx, flowIntent: "turno_ya_resuelto" }
+        )
+        return
+      }
+
       if (intent === "hablar_con_humano" || intent === "cancelar_reprogramar") {
         const replyText = intent === "hablar_con_humano" ? await buildHablarConHumanoReply(lead) : INTENT_REPLIES[intent]!
         await sendText(phone, replyText, { ...ctx, flowIntent: intent })

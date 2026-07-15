@@ -540,7 +540,8 @@ Analiza el mensaje del usuario y devolve SOLO un JSON valido con esta estructura
 
 const WHATSAPP_INTENTS = [
   "pedir_turno", "consultar_cobertura", "derivar_protocolo", "ubicacion_horarios",
-  "estudios_cardiologicos", "urgencia_medica", "cancelar_reprogramar", "hablar_con_humano", "otro_no_entendido",
+  "estudios_cardiologicos", "urgencia_medica", "cancelar_reprogramar", "hablar_con_humano",
+  "turno_ya_resuelto", "otro_no_entendido",
 ] as const
 
 /**

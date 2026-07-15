@@ -55,9 +55,18 @@ export function extractIntake(text: string, knownObrasSociales: string[] = []): 
 const HABLAR_CON_HUMANO_PATTERN =
   /hablar con (alguien|una persona|un humano)|atienda una persona|comunicarme con (la )?(secretaria|recepci[oó]n)|\b(prefiero|quiero|necesito)\b.*\b(persona|humano|alguien)\b|^\s*(persona|humano|alguien)s?\s*[.!¡]*\s*$/
 
+// Ola 4 (incidente real 2026-07-14): el paciente escribió "gracias doc, ya conseguí turno en el
+// [otro lugar]" para cerrar la conversación -- como "turno" matcheaba `pedir_turno` (más abajo en
+// este mismo array), el bot le reenvió el menú de sedes como si estuviera arrancando a pedir un
+// turno de nuevo. Chequeado antes que `pedir_turno` para que un cierre no se confunda con un
+// pedido nuevo.
+const TURNO_YA_RESUELTO_PATTERN =
+  /\bya (consegu[ií]|ten[ií]a|tengo|saqu[ié])\b.{0,20}\bturno\b|\bya me atend[ií]/
+
 const DETERMINISTIC_RULES: Array<{ intent: WhatsAppIntent; test: RegExp }> = [
   { intent: "cancelar_reprogramar", test: /cancelar|reprogramar|cambiar (el|mi) turno|no puedo ir/ },
   { intent: "hablar_con_humano", test: HABLAR_CON_HUMANO_PATTERN },
+  { intent: "turno_ya_resuelto", test: TURNO_YA_RESUELTO_PATTERN },
   { intent: "derivar_protocolo", test: /protocolo|estudio de investigaci[oó]n|investigaci[oó]n cl[ií]nica/ },
   { intent: "consultar_cobertura", test: /obra social|obras sociales|cobertura|prepaga|pami|aceptan/ },
   { intent: "ubicacion_horarios", test: /horario|direcci[oó]n|donde queda|d[oó]nde queda|ubicaci[oó]n|que d[ií]a|qu[eé] d[ií]a/ },
