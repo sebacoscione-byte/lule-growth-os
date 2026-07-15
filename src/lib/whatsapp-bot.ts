@@ -207,6 +207,15 @@ function wantsToChangeObraSocial(text: string): boolean {
   return mentionsCoverage && mentionsChange
 }
 
+// Incidente real 2026-07-15 (prueba de Sebastián): un "Hola" simple de alguien que ya tiene una
+// conversación en curso (estado "derivado") no matchea ninguna regla ni categoría concreta, así
+// que terminaba clasificado como "otro_no_entendido" -- respuesta correcta desde el clasificador,
+// pero esa rama manda "no entendí tu consulta" + botón de escalar a humano, como si el bot hubiera
+// fallado. Para un simple saludo de alguien que ya está en la conversación, corresponde la
+// bienvenida de vuelta (ver bloque de "repetir menú" más abajo), no un aviso de fallo -- y es un
+// chequeo determinístico, gratis, sin gastar una clasificación con IA.
+const BARE_GREETING_PATTERN = /^\s*(hola+|holis+|buenas|buen[oa]s?\s+(d[ií]as?|tardes?|noches?)|hey|ey)\W*$/i
+
 const SEDE_NAMES: Record<Sede, string> = {
   cimel_lanus: "CIMEL Lanús",
   swiss_lomas: "Swiss Medical Lomas",
@@ -705,7 +714,8 @@ export async function handleIncomingMessage(params: {
         return
       }
 
-      const intent = messageType === "text" ? await classifyIntent(text, settings.ai_provider) : "otro_no_entendido"
+      const isBareGreeting = messageType === "text" && BARE_GREETING_PATTERN.test(text)
+      const intent = !isBareGreeting && messageType === "text" ? await classifyIntent(text, settings.ai_provider) : "otro_no_entendido"
 
       // Ola 4 (incidente real 2026-07-14): el paciente cerró la conversación agradeciendo porque ya
       // había conseguido turno en otro lado -- antes esto caía en "pedir_turno" (por la palabra
@@ -751,7 +761,7 @@ export async function handleIncomingMessage(params: {
         return
       }
 
-      if (intent === "otro_no_entendido") {
+      if (intent === "otro_no_entendido" && !isBareGreeting) {
         // Ola 4 (incidente real 2026-07-14): este botón antes solo se ofrecía en cost_saving_mode
         // -- fuera de ese modo (el default), el paciente tenía que escribir la frase exacta para
         // escalar, y eso fue justo lo que le costó varios intentos en el incidente real. No tiene
@@ -764,9 +774,9 @@ export async function handleIncomingMessage(params: {
         ? `\n\nTenés cargada la obra social *${session.obra_social}*. Si cambió, escribinos "cambiar obra social".`
         : ""
       const repeatMessage = settings.cost_saving_mode
-        ? "Ya tenés las instrucciones para sacar turno. Elegí una sede o contanos qué necesitás:"
-        : `Hola de nuevo 👋 Ya tenés las instrucciones para sacar turno con la Dra. Lucía Chahin. Si querés volver a ver los datos de una sede, elegí una opción (o escribinos si necesitás otra cosa):${obraSocialLine}`
-      await sendButtons(phone, repeatMessage, SEDE_BUTTONS, { ...ctx, flowIntent: intent })
+        ? "¡Hola! Ya tenés las instrucciones para sacar turno. Elegí una sede o contanos qué necesitás:"
+        : `${isBareGreeting ? "¡Hola!" : "Hola de nuevo"} 👋 Ya tenés las instrucciones para sacar turno con la Dra. Lucía Chahin. Si querés volver a ver los datos de una sede, elegí una opción (o escribinos si necesitás otra cosa):${obraSocialLine}`
+      await sendButtons(phone, repeatMessage, SEDE_BUTTONS, { ...ctx, flowIntent: isBareGreeting ? "otro_no_entendido" : intent })
       return
     }
   }
