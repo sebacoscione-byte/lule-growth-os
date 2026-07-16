@@ -36,7 +36,19 @@ type Location = {
   obras_sociales: string[]
   booking_instruction: string
   notes: string
+  day?: string
+  verified_at?: string
+  verified_by?: string
+  valid_from?: string
   active: boolean
+}
+
+type LocationStatus = {
+  id: string
+  status: "operational" | "inactive" | "unverified" | "not_yet_valid"
+  active: boolean
+  verified: boolean
+  operational: boolean
 }
 
 type AiStatus = {
@@ -55,7 +67,7 @@ const DEFAULT_LOCATION: Omit<Location, "id" | "name"> = {
   obras_sociales: [],
   booking_instruction: "",
   notes: "",
-  active: true,
+  active: false,
 }
 
 const DEFAULT_WA_SETTINGS: WhatsAppSettings = {
@@ -78,6 +90,45 @@ const SUPPORTED_LOCATIONS: Array<Pick<Location, "id" | "name">> = [
   { id: "hospital_britanico", name: "Hospital Británico" },
   { id: "swiss_lomas", name: "Swiss Medical Lomas" },
 ]
+
+function parseAuthoritativeLocations(data: unknown): {
+  locations: Location[]
+  statuses: LocationStatus[]
+  version: string
+} | null {
+  if (!data || typeof data !== "object") return null
+  const payload = data as Record<string, unknown>
+  const status = payload.locations_status as Record<string, unknown> | undefined
+  if (!Array.isArray(payload.locations) || status?.valid !== true || !Array.isArray(status.items)) {
+    return null
+  }
+  if (typeof payload.version !== "string" || !/^[a-f0-9]{64}$/.test(payload.version)) return null
+
+  const supportedIds = new Set(SUPPORTED_LOCATIONS.map(location => location.id))
+  const locations = payload.locations as LegacyLocation[]
+  if (!locations.every(location =>
+    location && typeof location === "object"
+    && typeof location.id === "string" && supportedIds.has(location.id)
+    && typeof location.name === "string"
+  )) return null
+
+  const statuses = status.items as LocationStatus[]
+  const allowedStatuses = new Set(["operational", "inactive", "unverified", "not_yet_valid"])
+  if (!statuses.every(item =>
+    item && typeof item === "object"
+    && typeof item.id === "string" && supportedIds.has(item.id)
+    && allowedStatuses.has(item.status)
+    && typeof item.active === "boolean"
+    && typeof item.verified === "boolean"
+    && typeof item.operational === "boolean"
+  )) return null
+
+  return {
+    locations: locations.map(normalizeLocationForEditor),
+    statuses,
+    version: payload.version,
+  }
+}
 
 function normalizeLocationForEditor(location: LegacyLocation): Location {
   const { practices, ...canonical } = location
@@ -117,7 +168,10 @@ const TEMPLATE_STATUS_VARIANT: Record<TemplateStatus, "secondary" | "warning" | 
 export default function ConfiguracionPage() {
   const [doctor, setDoctor] = useState<Doctor | null>(null)
   const [locations, setLocations] = useState<Location[]>([])
+  const [locationStatuses, setLocationStatuses] = useState<LocationStatus[]>([])
+  const [locationsVersion, setLocationsVersion] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
+  const [configurationLoadError, setConfigurationLoadError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState<string | null>(null)
   const [configError, setConfigError] = useState<string | null>(null)
@@ -134,6 +188,8 @@ export default function ConfiguracionPage() {
 
   const [editingLocationId, setEditingLocationId] = useState<string | null>(null)
   const [locationDraft, setLocationDraft] = useState<Location | null>(null)
+  const [newLocationId, setNewLocationId] = useState<string | null>(null)
+  const [locationConfirmed, setLocationConfirmed] = useState(false)
 
   const [userEmail, setUserEmail] = useState<string | null>(null)
   const [newPassword, setNewPassword] = useState("")
@@ -176,15 +232,21 @@ export default function ConfiguracionPage() {
 
   useEffect(() => {
     fetch("/api/config")
-      .then(r => r.json())
-      .then(data => {
-        setDoctor(data.doctor ?? null)
-        setLocations(Array.isArray(data.locations)
-          ? data.locations.map((location: LegacyLocation) => normalizeLocationForEditor(location))
-          : [])
-        setWaSettings({ ...DEFAULT_WA_SETTINGS, ...(data.whatsapp_settings ?? {}) })
-        setLoading(false)
+      .then(async response => {
+        if (!response.ok) throw new Error("config_unavailable")
+        return response.json()
       })
+      .then(data => {
+        const authoritative = parseAuthoritativeLocations(data)
+        if (!authoritative) throw new Error("invalid_locations_config")
+        setDoctor(data.doctor ?? null)
+        setLocations(authoritative.locations)
+        setLocationStatuses(authoritative.statuses)
+        setLocationsVersion(authoritative.version)
+        setWaSettings({ ...DEFAULT_WA_SETTINGS, ...(data.whatsapp_settings ?? {}) })
+      })
+      .catch(() => setConfigurationLoadError("No se pudo validar la configuración. Recargá la página antes de editar."))
+      .finally(() => setLoading(false))
   }, [])
 
   useEffect(() => {
@@ -294,16 +356,90 @@ export default function ConfiguracionPage() {
       obras_sociales: [...(loc.obras_sociales ?? [])],
     })
     setEditingLocationId(loc.id)
+    setNewLocationId(null)
+    setLocationConfirmed(false)
+  }
+
+  function updateLocationDraft(patch: Partial<Location>) {
+    setLocationDraft(current => current ? { ...current, ...patch } : current)
+    setLocationConfirmed(false)
+  }
+
+  function applyAuthoritativeLocationResponse(data: unknown): boolean {
+    const authoritative = parseAuthoritativeLocations(data)
+    if (!authoritative) {
+      setConfigurationLoadError("El servidor devolvió una configuración inválida. Recargá antes de continuar.")
+      return false
+    }
+    setLocations(authoritative.locations)
+    setLocationStatuses(authoritative.statuses)
+    setLocationsVersion(authoritative.version)
+    return true
   }
 
   async function saveLocation() {
-    if (!locationDraft) return
-    const updated = locations.map(l => l.id === locationDraft.id ? locationDraft : l)
-    const ok = await saveConfig("locations", updated)
-    if (ok) {
-      setLocations(updated)
-      setEditingLocationId(null)
+    if (!locationDraft || !locationsVersion || !locationConfirmed) {
+      setConfigError("locations")
+      return
     }
+
+    const id = locationDraft.id
+    const editable = {
+      name: locationDraft.name,
+      address: locationDraft.address,
+      google_maps_link: locationDraft.google_maps_link,
+      phone: locationDraft.phone,
+      whatsapp: locationDraft.whatsapp,
+      hours: locationDraft.hours,
+      booking_url: locationDraft.booking_url,
+      day: locationDraft.day,
+      booking_instruction: locationDraft.booking_instruction,
+      obras_sociales: locationDraft.obras_sociales.map(value => value.trim()).filter(Boolean),
+      services: locationDraft.services.map(value => value.trim()).filter(Boolean),
+      notes: locationDraft.notes,
+      active: locationDraft.active,
+    }
+
+    setSaving(true)
+    setConfigError(null)
+    try {
+      const response = await fetch(`/api/config/locations/${encodeURIComponent(id)}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ version: locationsVersion, confirmed: true, location: editable }),
+      })
+      if (!response.ok) {
+        if (response.status === 409) {
+          setConfigurationLoadError("Otra persona modificó las sedes. Recargá para trabajar sobre la versión actual.")
+        }
+        throw new Error("location_update_failed")
+      }
+
+      const data = await response.json()
+      if (applyAuthoritativeLocationResponse(data)) {
+        setSaved(`location:${id}`)
+        setTimeout(() => setSaved(null), 2500)
+        setNewLocationId(null)
+        setLocationDraft(null)
+        setEditingLocationId(null)
+        setLocationConfirmed(false)
+      }
+    } catch {
+      setConfigError("locations")
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  function cancelLocationEdit() {
+    if (newLocationId) {
+      setLocations(current => current.filter(location => location.id !== newLocationId))
+    }
+    setNewLocationId(null)
+    setLocationDraft(null)
+    setEditingLocationId(null)
+    setLocationConfirmed(false)
+    setConfigError(null)
   }
 
   function addLocation() {
@@ -313,24 +449,62 @@ export default function ConfiguracionPage() {
       ...supported,
       ...DEFAULT_LOCATION,
     }
-    const updated = [...locations, newLoc]
-    setLocations(updated)
-    startEditLocation(newLoc)
+    setLocations(current => [...current, newLoc])
+    setLocationDraft(newLoc)
+    setEditingLocationId(newLoc.id)
+    setNewLocationId(newLoc.id)
+    setLocationConfirmed(false)
   }
 
   async function deleteLocation(id: string) {
-    const previous = locations
-    const updated = locations.filter(l => l.id !== id)
-    setLocations(updated)
-    if (editingLocationId === id) setEditingLocationId(null)
-    const ok = await saveConfig("locations", updated)
-    if (!ok) setLocations(previous)
+    if (!locationsVersion || !window.confirm("¿Eliminar esta sede? Las demás conservarán su verificación.")) return
+
+    setSaving(true)
+    setConfigError(null)
+    try {
+      const response = await fetch(`/api/config/locations/${encodeURIComponent(id)}`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ version: locationsVersion }),
+      })
+      if (!response.ok) {
+        if (response.status === 409) {
+          setConfigurationLoadError("Otra persona modificó las sedes. Recargá para trabajar sobre la versión actual.")
+        }
+        throw new Error("location_delete_failed")
+      }
+      const data = await response.json()
+      if (applyAuthoritativeLocationResponse(data)) {
+        setSaved("locations")
+        setTimeout(() => setSaved(null), 2500)
+      }
+    } catch {
+      setConfigError("locations")
+    } finally {
+      setSaving(false)
+    }
   }
 
   if (loading) {
     return (
       <div className="flex h-full items-center justify-center">
         <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
+      </div>
+    )
+  }
+
+  if (configurationLoadError) {
+    return (
+      <div className="p-4 md:p-6">
+        <Card className="border-red-200">
+          <CardHeader>
+            <CardTitle className="text-base text-red-700">Configuración bloqueada por seguridad</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4 text-sm text-gray-700">
+            <p>{configurationLoadError}</p>
+            <Button onClick={() => window.location.reload()}>Recargar configuración</Button>
+          </CardContent>
+        </Card>
       </div>
     )
   }
@@ -741,7 +915,7 @@ export default function ConfiguracionPage() {
             <MapPin className="h-4 w-4 text-blue-500" /> Lugares de atención
           </h2>
           <Button variant="outline" size="sm" onClick={addLocation}
-            disabled={SUPPORTED_LOCATIONS.every(candidate => locations.some(location => location.id === candidate.id))}
+            disabled={saving || SUPPORTED_LOCATIONS.every(candidate => locations.some(location => location.id === candidate.id))}
             className="w-full sm:w-auto">
             <Plus className="h-4 w-4 mr-1" /> Agregar lugar
           </Button>
@@ -757,7 +931,10 @@ export default function ConfiguracionPage() {
           <Card key={loc.id}>
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between">
-                <CardTitle className="text-base">{loc.name}</CardTitle>
+                <div className="flex flex-wrap items-center gap-2">
+                  <CardTitle className="text-base">{loc.name}</CardTitle>
+                  <LocationVerificationBadge status={locationStatuses.find(item => item.id === loc.id)} />
+                </div>
                 {editingLocationId !== loc.id && (
                   <div className="flex gap-1">
                     <Button variant="ghost" size="sm" onClick={() => startEditLocation(loc)}>
@@ -777,27 +954,27 @@ export default function ConfiguracionPage() {
                   <div className="space-y-3">
                     <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Datos básicos</p>
                     <Field label="Nombre institución">
-                      <Input value={locationDraft.name} onChange={e => setLocationDraft({ ...locationDraft, name: e.target.value })} />
+                      <Input value={locationDraft.name} onChange={e => updateLocationDraft({ name: e.target.value })} />
                     </Field>
                     <label className="flex items-start gap-2 rounded-md border border-gray-200 p-3 text-sm">
                       <input type="checkbox" className="mt-1" checked={locationDraft.active}
-                        onChange={e => setLocationDraft({ ...locationDraft, active: e.target.checked })} />
+                        onChange={e => updateLocationDraft({ active: e.target.checked })} />
                       <span>
                         <span className="font-medium text-gray-900">Sede activa</span>
-                        <p className="text-xs text-gray-500">Al guardar confirmás que revisaste estos datos. Solo las sedes activas y verificadas se informan por WhatsApp.</p>
+                        <p className="text-xs text-gray-500">Define si esta sede puede informarse por WhatsApp. No modifica ni verifica ninguna otra sede.</p>
                       </span>
                     </label>
                     <Field label="Dirección">
-                      <Input value={locationDraft.address} onChange={e => setLocationDraft({ ...locationDraft, address: e.target.value })} placeholder="Tucumán 1314, Lanús" />
+                      <Input value={locationDraft.address} onChange={e => updateLocationDraft({ address: e.target.value })} placeholder="Tucumán 1314, Lanús" />
                     </Field>
                     <Field label="Link Google Maps">
-                      <Input value={locationDraft.google_maps_link} onChange={e => setLocationDraft({ ...locationDraft, google_maps_link: e.target.value })} placeholder="https://maps.google.com/..." />
+                      <Input value={locationDraft.google_maps_link} onChange={e => updateLocationDraft({ google_maps_link: e.target.value })} placeholder="https://maps.google.com/..." />
                     </Field>
                     <Field label="Teléfono para turnos">
-                      <Input value={locationDraft.phone} onChange={e => setLocationDraft({ ...locationDraft, phone: e.target.value })} placeholder="011 4xxx-xxxx" />
+                      <Input value={locationDraft.phone} onChange={e => updateLocationDraft({ phone: e.target.value })} placeholder="011 4xxx-xxxx" />
                     </Field>
                     <Field label="WhatsApp propio de la institución (opcional)">
-                      <Input value={locationDraft.whatsapp} onChange={e => setLocationDraft({ ...locationDraft, whatsapp: e.target.value })} placeholder="Ej: 11 5051-9982" />
+                      <Input value={locationDraft.whatsapp} onChange={e => updateLocationDraft({ whatsapp: e.target.value })} placeholder="Ej: 11 5051-9982" />
                       <p className="text-xs text-gray-400 mt-1">
                         Solo si la institución tiene su propio WhatsApp para turnos (ej: Swity de Swiss Medical).
                         Si lo dejás vacío, el botón &ldquo;Consultar por WhatsApp&rdquo; de la landing usa el WhatsApp del consultorio.
@@ -806,14 +983,14 @@ export default function ConfiguracionPage() {
                     <Field label="Días y horarios">
                       <textarea
                         value={locationDraft.hours}
-                        onChange={e => setLocationDraft({ ...locationDraft, hours: e.target.value })}
+                        onChange={e => updateLocationDraft({ hours: e.target.value })}
                         rows={2}
                         className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
                         placeholder="Martes 9:00 a 13:00hs&#10;Jueves 14:00 a 18:00hs"
                       />
                     </Field>
                     <Field label="Link para pedir turno (app o web)">
-                      <Input value={locationDraft.booking_url} onChange={e => setLocationDraft({ ...locationDraft, booking_url: e.target.value })} placeholder="https://www.swissmedical.com.ar/... o link de la app" />
+                      <Input value={locationDraft.booking_url} onChange={e => updateLocationDraft({ booking_url: e.target.value })} placeholder="https://www.swissmedical.com.ar/... o link de la app" />
                     </Field>
                   </div>
 
@@ -824,7 +1001,7 @@ export default function ConfiguracionPage() {
                     </p>
                     <StringList
                       items={locationDraft.services}
-                      onChange={services => setLocationDraft({ ...locationDraft, services })}
+                      onChange={services => updateLocationDraft({ services })}
                       placeholder="Ej: Ecocardiograma"
                       addLabel="Agregar práctica"
                     />
@@ -837,7 +1014,7 @@ export default function ConfiguracionPage() {
                     </p>
                     <StringList
                       items={locationDraft.obras_sociales}
-                      onChange={obras_sociales => setLocationDraft({ ...locationDraft, obras_sociales })}
+                      onChange={obras_sociales => updateLocationDraft({ obras_sociales })}
                       placeholder="Ej: OSDE, Swiss Medical, PAMI..."
                       addLabel="Agregar cobertura"
                     />
@@ -849,7 +1026,7 @@ export default function ConfiguracionPage() {
                     <Field label="Instrucción para pedir turno">
                       <textarea
                         value={locationDraft.booking_instruction}
-                        onChange={e => setLocationDraft({ ...locationDraft, booking_instruction: e.target.value })}
+                        onChange={e => updateLocationDraft({ booking_instruction: e.target.value })}
                         rows={3}
                         className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
                         placeholder="Para sacar turno en CIMEL Lanús llamá al..."
@@ -858,7 +1035,7 @@ export default function ConfiguracionPage() {
                     <Field label="Notas adicionales (opcional)">
                       <textarea
                         value={locationDraft.notes}
-                        onChange={e => setLocationDraft({ ...locationDraft, notes: e.target.value })}
+                        onChange={e => updateLocationDraft({ notes: e.target.value })}
                         rows={2}
                         className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
                         placeholder="Info extra: estacionamiento, accesibilidad, etc."
@@ -866,15 +1043,39 @@ export default function ConfiguracionPage() {
                     </Field>
                   </div>
 
+                  <label className="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm">
+                    <input
+                      type="checkbox"
+                      className="mt-1"
+                      checked={locationConfirmed}
+                      onChange={event => setLocationConfirmed(event.target.checked)}
+                    />
+                    <span>
+                      <span className="font-medium text-amber-950">Confirmación exclusiva de esta sede</span>
+                      <p className="text-xs text-amber-800">
+                        Confirmo que revisé los datos de {locationDraft.name || "esta sede"}. El servidor registrará esta verificación sin renovar la de las demás.
+                      </p>
+                    </span>
+                  </label>
+
                   <SaveCancel
                     saving={saving}
                     onSave={saveLocation}
-                    onCancel={() => setEditingLocationId(null)}
-                    error={configError === "locations" ? "No se pudo guardar. Probá de nuevo." : null}
+                    onCancel={cancelLocationEdit}
+                    canSave={locationConfirmed}
+                    error={configError === "locations" ? "Revisá los datos y confirmá exclusivamente esta sede antes de guardar." : null}
                   />
                 </div>
               ) : (
                 <div className="space-y-3 text-sm">
+                  {loc.verified_at ? (
+                    <p className="text-xs text-gray-500">Verificación registrada el {formatVerificationDate(loc.verified_at)}.</p>
+                  ) : (
+                    <p className="text-xs font-medium text-amber-700">Esta sede todavía no tiene verificación registrada.</p>
+                  )}
+                  {!locationStatuses.find(item => item.id === loc.id)?.operational && (
+                    <p className="text-xs font-medium text-amber-700">No se informa por WhatsApp hasta quedar activa y verificada.</p>
+                  )}
                   {loc.address && (
                     <InfoRow icon={<MapPin className="h-3.5 w-3.5 text-gray-400" />} label="Dirección" value={loc.address} />
                   )}
@@ -943,7 +1144,7 @@ export default function ConfiguracionPage() {
                   {loc.notes && (
                     <p className="text-gray-500 text-xs italic">{loc.notes}</p>
                   )}
-                  {saved === "locations" && <p className="text-xs text-green-600 font-medium">Guardado</p>}
+                  {(saved === "locations" || saved === `location:${loc.id}`) && <p className="text-xs text-green-600 font-medium">Guardado</p>}
                   {configError === "locations" && <p className="text-xs text-red-600 font-medium">No se pudo guardar. Probá de nuevo.</p>}
                 </div>
               )}
@@ -956,6 +1157,24 @@ export default function ConfiguracionPage() {
 }
 
 // ── Componentes auxiliares ────────────────────────────────
+
+function formatVerificationDate(value: string): string {
+  const date = new Date(value)
+  if (!Number.isFinite(date.getTime())) return "fecha inválida"
+  return new Intl.DateTimeFormat("es-AR", {
+    dateStyle: "medium",
+    timeStyle: "short",
+    timeZone: "America/Argentina/Buenos_Aires",
+  }).format(date)
+}
+
+function LocationVerificationBadge({ status }: { status?: LocationStatus }) {
+  if (!status) return <Badge variant="warning">Nueva · sin verificar</Badge>
+  if (status.status === "operational") return <Badge variant="success">Activa y verificada</Badge>
+  if (status.status === "inactive") return <Badge variant="secondary">Verificada · inactiva</Badge>
+  if (status.status === "not_yet_valid") return <Badge variant="warning">Vigencia pendiente</Badge>
+  return <Badge variant="warning">Sin verificar</Badge>
+}
 
 function Row({ label, value }: { label: string; value: string }) {
   return (
@@ -1020,12 +1239,24 @@ function StringList({
   )
 }
 
-function SaveCancel({ saving, onSave, onCancel, error }: { saving: boolean; onSave: () => void; onCancel: () => void; error?: string | null }) {
+function SaveCancel({
+  saving,
+  onSave,
+  onCancel,
+  error,
+  canSave = true,
+}: {
+  saving: boolean
+  onSave: () => void
+  onCancel: () => void
+  error?: string | null
+  canSave?: boolean
+}) {
   return (
     <div className="space-y-2 pt-2">
       {error && <p className="text-xs font-medium text-red-600">{error}</p>}
       <div className="grid gap-2 sm:flex">
-        <Button size="sm" onClick={onSave} disabled={saving} className="w-full sm:w-auto">
+        <Button size="sm" onClick={onSave} disabled={saving || !canSave} className="w-full sm:w-auto">
           {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4 mr-1" />}
           Guardar
         </Button>

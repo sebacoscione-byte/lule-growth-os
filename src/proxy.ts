@@ -36,7 +36,8 @@ export async function proxy(request: NextRequest) {
   // que un match exacto sobre PUBLIC_ROOT_PATHS dejaba afuera y mandaba a /login sin sesión.
   const firstSegment = "/" + request.nextUrl.pathname.split("/")[1]
 
-  const isAuthRoute = request.nextUrl.pathname.startsWith("/login")
+  const isLoginRoute = request.nextUrl.pathname === "/login"
+  const isMfaRoute = request.nextUrl.pathname.startsWith("/seguridad/mfa")
   const isPublicRoute =
     request.nextUrl.pathname.startsWith("/landings") ||
     request.nextUrl.pathname.startsWith("/go/") ||
@@ -73,15 +74,20 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(url)
   }
 
-  if (!user && !isAuthRoute && !isPublicRoute) {
+  if (!user && !isLoginRoute && !isPublicRoute) {
     const url = request.nextUrl.clone()
     url.pathname = "/login"
+    url.search = ""
+    if (isMfaRoute || !request.nextUrl.pathname.startsWith("/api")) {
+      url.searchParams.set("next", `${request.nextUrl.pathname}${request.nextUrl.search}`)
+    }
     return NextResponse.redirect(url)
   }
 
-  if (user && isAuthRoute) {
+  if (user && isLoginRoute) {
     const url = request.nextUrl.clone()
     url.pathname = "/dashboard"
+    url.search = ""
     return NextResponse.redirect(url)
   }
 

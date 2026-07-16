@@ -1,3 +1,42 @@
+# CERRADO (2026-07-16) — acceso del staff y evidencia individual de sedes
+
+## Estado
+
+Los PR #96 y #97 ya están mergeados. El hardening, las nueve migraciones, el scheduler durable,
+el audit agregado y el preflight cerrado de Meta están activos en producción. Este cierre incorpora
+estos controles no médicos:
+
+- [x] MFA TOTP central: enrolamiento, step-up de login y administración de varios factores, con
+      segundo autenticador recomendado para cuentas `owner`.
+- [x] Gate central de rol/política para el CRM, callback con origen y `next` seguros, y autorización
+      explícita de las rutas internas que operan sobre datos o configuración.
+- [x] Verificación individual de cada sede, con evidencia propia, control de versión y actualización
+      atómica; editar una sede no verifica ni modifica silenciosamente a las demás.
+- [x] Mantener WhatsApp sin IA médica libre: los modelos sólo producen clasificación estructurada
+      cerrada y las respuestas al paciente salen de política/catálogos determinísticos.
+
+## Gates humanos posteriores al deploy
+
+Los flags `enforce_roles` y `require_mfa_for_sensitive_actions` siguen en `false`. El último audit
+agregado encontró cuatro usuarios sin rol, cero factores MFA verificados y las tres sedes inactivas
+y sin evidencia de verificación. No corresponde inferir esos datos ni activarlos automáticamente.
+
+1. Asignar `app_metadata.role` a las cuatro cuentas.
+2. Enrolar al menos un TOTP por cuenta y un factor de respaldo para cada `owner`; probar login
+   fresco, step-up y el procedimiento de recuperación.
+3. Activar primero `enforce_roles`; validar una cuenta por rol y recién después activar el flag MFA.
+   Ese segundo flag exige AAL2 antes de entrar a todo el CRM, porque RLS protege también las
+   lecturas de PII y no sólo las mutaciones.
+4. Revisar y confirmar una por una CIMEL Lanús, Hospital Británico y Swiss Medical Lomas desde la
+   UI. Hasta entonces permanecen inactivas/no verificadas y el runtime falla cerrado.
+5. Reaprobar en Meta `alerta_interna_derivacion`, que todavía figura como borrador.
+
+Recuperación MFA: no existe endpoint público. Se valida la identidad fuera de banda, un
+administrador elimina el factor desde Supabase Admin/Dashboard y la persona vuelve a enrolarlo.
+Nunca copiar secretos TOTP, emails ni otra PII a tickets, logs o consola.
+
+---
+
 # CERRADO (2026-07-16) — hardening por etapas del bot de WhatsApp
 
 ## Objetivo
@@ -41,6 +80,8 @@ se integró mediante el PR #96 y el cutover atómico quedó aplicado y verificad
       no quedaban migraciones pendientes.
 - [x] Mergear el PR #96, verificar CI/Vercel producción y aprobar el smoke público más el caso
       negativo del webhook.
+- [x] Mergear el PR #97 y dejar productivos el scheduler, el audit agregado y el preflight cerrado
+      de Meta, sin sumar un tercer cron de Vercel ni enviar mensajes en la comprobación.
 
 ## Resultado local
 
@@ -87,6 +128,8 @@ se integró mediante el PR #96 y el cutover atómico quedó aplicado y verificad
   `policy_shadow`, inmediatamente después de crear la tabla, y el contrato de migración lo cubre.
 - PR #96 mergeado en `main` (`dcc0e47`). CI y Vercel producción verdes; smoke público y rechazo
   esperado del webhook inválido aprobados. Las nueve migraciones están persistidas en producción.
+- PR #97 mergeado en `main` (`d9434d7`). El scheduler, el audit productivo y el preflight de Meta
+  quedaron operativos; la salida de diagnóstico no incluye secretos, identificadores ni PII.
 
 ## Plan por etapas y estado
 
@@ -129,12 +172,12 @@ restauración sin tocar producción; ese gate no cuestiona que el esquema produc
   `lule-whatsapp-worker-every-minute`, schedule `* * * * *`, ejecución por `pg_net`, URL y
   `CRON_SECRET` cifrados en Vault. Prueba manual autenticada 200 y cola vacía; la ejecución
   automática posterior terminó correctamente con HTTP 2xx.
-- Implementar enrolamiento y step-up MFA en la app: el backend valida AAL2, pero todavía no existe
-  una UI que invoque `mfa.enroll`, `mfa.challenge` y `mfa.verify`.
+- [x] Enrolamiento, step-up y gestión de múltiples factores TOTP implementados en producto.
 - Asignar `app_metadata.role` a las cuatro cuentas actuales, enrolar MFA, probar al menos una cuenta
-  por rol y recién después activar los flags de autorización.
-- Revisar y guardar individualmente CIMEL Lanús, Hospital Británico y Swiss Medical Lomas con
-  evidencia válida de verificación. El runtime falla cerrado si falta esa evidencia.
+  por rol y activar primero roles y luego MFA. Los dos flags siguen apagados.
+- [x] Verificación individual por sede implementada. Una persona autorizada debe revisar y
+  confirmar CIMEL Lanús, Hospital Británico y Swiss Medical Lomas por separado. El runtime falla
+  cerrado si falta evidencia.
 - [x] Vercel Production fija `META_GRAPH_API_VERSION=v25.0`. El preflight read-only valida
   versión/token/ID sin enviar mensajes y el cron diario alerta sólo con un código cerrado.
 - Reaprobar en Meta `alerta_interna_derivacion`, ahora genérico y con una sola variable opaca.

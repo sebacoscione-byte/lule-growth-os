@@ -1,19 +1,28 @@
 "use client"
 
-import { useState } from "react"
-import { useRouter } from "next/navigation"
+import { Suspense, useState } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
 import { Heart, Loader2 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { getMfaAccessDecision, safeMfaNextPath } from "@/lib/staff-mfa"
 
-export default function LoginPage() {
+function LoginForm() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  const callbackError = searchParams.get("error") === "auth_callback"
+    ? "El enlace de acceso venció o no es válido. Ingresá nuevamente."
+    : searchParams.get("error") === "security_check"
+      ? "No se pudo verificar la seguridad de la sesión. Ingresá nuevamente."
+      : null
+  const visibleError = error ?? callbackError
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault()
@@ -29,7 +38,28 @@ export default function LoginPage() {
       return
     }
 
-    router.push("/dashboard")
+    const assurance = await supabase.auth.mfa.getAuthenticatorAssuranceLevel()
+    const decision = getMfaAccessDecision(
+      assurance.data
+        ? { currentLevel: assurance.data.currentLevel, nextLevel: assurance.data.nextLevel }
+        : null
+    )
+
+    if (assurance.error || decision === "unavailable") {
+      await supabase.auth.signOut({ scope: "local" })
+      setError("No se pudo verificar la seguridad de la cuenta. Intentá de nuevo.")
+      setLoading(false)
+      return
+    }
+
+    const nextPath = safeMfaNextPath(searchParams.get("next"))
+    if (decision === "step_up") {
+      router.replace(`/seguridad/mfa?next=${encodeURIComponent(nextPath)}`)
+      router.refresh()
+      return
+    }
+
+    router.replace(nextPath)
     router.refresh()
   }
 
@@ -72,8 +102,8 @@ export default function LoginPage() {
             />
           </div>
 
-          {error && (
-            <p className="text-sm text-red-600">{error}</p>
+          {visibleError && (
+            <p className="text-sm text-red-600">{visibleError}</p>
           )}
 
           <Button type="submit" className="w-full" disabled={loading}>
@@ -82,5 +112,13 @@ export default function LoginPage() {
         </form>
       </div>
     </div>
+  )
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-gray-50" />}>
+      <LoginForm />
+    </Suspense>
   )
 }

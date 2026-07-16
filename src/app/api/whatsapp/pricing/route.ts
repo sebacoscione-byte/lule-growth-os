@@ -1,10 +1,13 @@
 import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
+import { authorizeStaff } from "@/lib/staff-authz"
+
+const PRICING_READ_ROLES = ["owner", "doctor"] as const
 
 export async function GET() {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  const auth = await authorizeStaff(supabase, { allowedRoles: PRICING_READ_ROLES })
+  if (!auth.ok) return NextResponse.json({ error: auth.error, code: auth.code }, { status: auth.status })
 
   const { data, error } = await supabase
     .from("whatsapp_pricing_rules")

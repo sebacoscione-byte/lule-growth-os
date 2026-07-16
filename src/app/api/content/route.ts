@@ -9,12 +9,15 @@ import {
   getAiMode,
 } from "@/lib/ai"
 import { createClient } from "@/lib/supabase/server"
+import { authorizeStaff } from "@/lib/staff-authz"
+
+const CONTENT_ROLES = ["owner", "doctor"] as const
 
 export async function POST(request: Request) {
   try {
     const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    const auth = await authorizeStaff(supabase, { allowedRoles: CONTENT_ROLES, sensitive: true })
+    if (!auth.ok) return NextResponse.json({ error: auth.error, code: auth.code }, { status: auth.status })
 
     const { type, category, content_type, cta, topic, source, appointment_link, objective } = await request.json()
     const mode = getAiMode()

@@ -1,7 +1,9 @@
-import { POST } from "./route"
-
 jest.mock("@/lib/supabase/server", () => ({ createClient: jest.fn() }))
+jest.mock("@/lib/staff-authz", () => ({ authorizeStaff: jest.fn() }))
+
+import { GET, POST } from "./route"
 import { createClient } from "@/lib/supabase/server"
+import { authorizeStaff } from "@/lib/staff-authz"
 
 function mockClient(user: { id: string } | null, insertResult: { data: unknown; error: { message: string } | null }) {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars -- el parámetro solo tipa el mock para poder leer insertSpy.mock.calls
@@ -15,15 +17,46 @@ function mockClient(user: { id: string } | null, insertResult: { data: unknown; 
     from: jest.fn(() => ({ insert: insertSpy })),
   }
   ;(createClient as jest.Mock).mockResolvedValue(fakeClient)
-  return { insertSpy }
+  return { insertSpy, from: fakeClient.from }
 }
 
-describe("POST /api/leads", () => {
-  it("devuelve 401 sin sesión", async () => {
-    mockClient(null, { data: null, error: null })
+describe("GET/POST /api/leads", () => {
+  beforeEach(() => {
+    jest.clearAllMocks()
+    ;(authorizeStaff as jest.Mock).mockResolvedValue({ ok: true })
+  })
+
+  it("falla cerrado antes de consultar datos para un GET rechazado", async () => {
+    const { from } = mockClient(null, { data: null, error: null })
+    ;(authorizeStaff as jest.Mock).mockResolvedValue({
+      ok: false,
+      status: 403,
+      code: "mfa_required",
+      error: "MFA requerido",
+    })
+
+    const res = await GET(new Request("http://localhost/api/leads"))
+
+    expect(res.status).toBe(403)
+    expect(from).not.toHaveBeenCalled()
+    expect(authorizeStaff).toHaveBeenCalledWith(expect.anything(), {
+      allowedRoles: ["owner", "doctor", "reception"],
+      sensitive: true,
+    })
+  })
+
+  it("devuelve 401 sin sesión antes de insertar", async () => {
+    const { insertSpy } = mockClient(null, { data: null, error: null })
+    ;(authorizeStaff as jest.Mock).mockResolvedValue({
+      ok: false,
+      status: 401,
+      code: "unauthorized",
+      error: "Unauthorized",
+    })
     const req = new Request("http://localhost/api/leads", { method: "POST", body: JSON.stringify({ name: "Test" }) })
     const res = await POST(req)
     expect(res.status).toBe(401)
+    expect(insertSpy).not.toHaveBeenCalled()
   })
 
   it("crea un lead con los defaults esperados cuando el body viene vacío", async () => {

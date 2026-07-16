@@ -15,6 +15,7 @@ import {
   Menu,
   MessageSquare,
   Settings,
+  ShieldCheck,
   Users,
   X,
 } from "lucide-react"
@@ -31,6 +32,7 @@ const NAV_ITEMS = [
   { href: "/landings", label: "Landings", icon: FileText },
   { href: "/experimentos", label: "Experimentos", icon: FlaskConical },
   { href: "/configuracion", label: "Configuración", icon: Settings },
+  { href: "/seguridad/mfa?manage=1&next=/dashboard", label: "Seguridad", icon: ShieldCheck },
 ] as const
 
 const MOBILE_NAV_ITEMS = [
@@ -41,7 +43,8 @@ const MOBILE_NAV_ITEMS = [
 ] as const
 
 function isActive(pathname: string, href: string) {
-  return pathname === href || pathname.startsWith(href + "/")
+  const hrefPath = href.split("?")[0]
+  return pathname === hrefPath || pathname.startsWith(hrefPath + "/")
 }
 
 export function Sidebar() {

@@ -27,7 +27,7 @@ export interface StaffAuthorizationFailure {
 
 export type StaffAuthorization = AuthorizedStaff | StaffAuthorizationFailure
 
-interface SecurityAuthorizationSettings {
+export interface StaffSecurityPolicy {
   enforce_roles: boolean
   require_mfa_for_sensitive_actions: boolean
 }
@@ -45,7 +45,8 @@ export function roleFromAppMetadata(user: Pick<User, "app_metadata">): StaffRole
   return isStaffRole(role) ? role : null
 }
 
-async function getSecurityAuthorizationSettings(): Promise<SecurityAuthorizationSettings> {
+/** Lectura server-only de la política global. Falla cerrado si la fila no está disponible. */
+export async function getStaffSecurityPolicy(): Promise<StaffSecurityPolicy> {
   const db = getServiceDb()
   const { data, error } = await db
     .from("security_authorization_settings")
@@ -79,9 +80,9 @@ export async function authorizeStaff(
   const { data: { user }, error: userError } = await supabase.auth.getUser()
   if (userError || !user) return failure(401, "unauthorized", "Unauthorized")
 
-  let settings: SecurityAuthorizationSettings
+  let settings: StaffSecurityPolicy
   try {
-    settings = await getSecurityAuthorizationSettings()
+    settings = await getStaffSecurityPolicy()
   } catch {
     return failure(503, "authz_unavailable", "No se pudo verificar la autorización")
   }

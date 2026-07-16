@@ -2,6 +2,9 @@ import { createClient } from "@/lib/supabase/server"
 import { NextResponse } from "next/server"
 import { z } from "zod"
 import { parseJsonBody, formatZodError } from "@/lib/api-validation"
+import { authorizeStaff } from "@/lib/staff-authz"
+
+const EXPERIMENT_ROLES = ["owner", "doctor"] as const
 
 // La UI (experimentos/page.tsx) solo actualiza el resultado de un experimento ya creado — se
 // mantiene como allowlist estricta en vez de aceptar el body entero (antes hacía
@@ -15,8 +18,8 @@ const updateResultSchema = z.object({
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  const auth = await authorizeStaff(supabase, { allowedRoles: EXPERIMENT_ROLES, sensitive: true })
+  if (!auth.ok) return NextResponse.json({ error: auth.error, code: auth.code }, { status: auth.status })
 
   const parsedBody = await parseJsonBody(request)
   if (!parsedBody.ok) return NextResponse.json({ error: parsedBody.error }, { status: 400 })
@@ -39,8 +42,8 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 export async function DELETE(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  const auth = await authorizeStaff(supabase, { allowedRoles: EXPERIMENT_ROLES, sensitive: true })
+  if (!auth.ok) return NextResponse.json({ error: auth.error, code: auth.code }, { status: auth.status })
 
   const { error } = await supabase.from("growth_experiments").delete().eq("id", id)
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })

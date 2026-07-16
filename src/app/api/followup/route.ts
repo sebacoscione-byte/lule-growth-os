@@ -4,13 +4,15 @@ import { generateFollowupMessage } from "@/lib/ai"
 import { LOCATION_LABELS } from "@/types"
 import { z } from "zod"
 import { parseJsonBody, formatZodError } from "@/lib/api-validation"
+import { authorizeStaff } from "@/lib/staff-authz"
 
 const followupSchema = z.object({ lead_id: z.string().trim().min(1) })
+const PATIENT_DATA_ROLES = ["owner", "doctor", "reception"] as const
 
 export async function GET() {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  const auth = await authorizeStaff(supabase, { allowedRoles: PATIENT_DATA_ROLES, sensitive: true })
+  if (!auth.ok) return NextResponse.json({ error: auth.error, code: auth.code }, { status: auth.status })
 
   const now = new Date().toISOString()
 
@@ -26,8 +28,8 @@ export async function GET() {
 
 export async function POST(request: Request) {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  const auth = await authorizeStaff(supabase, { allowedRoles: PATIENT_DATA_ROLES, sensitive: true })
+  if (!auth.ok) return NextResponse.json({ error: auth.error, code: auth.code }, { status: auth.status })
 
   const parsedBody = await parseJsonBody(request)
   if (!parsedBody.ok) return NextResponse.json({ error: parsedBody.error }, { status: 400 })

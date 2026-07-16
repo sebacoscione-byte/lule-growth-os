@@ -3,10 +3,15 @@
 ## Estado de despliegue
 
 La implementación del PR #96 está activa en producción. Las nueve migraciones se aplicaron en una
-única transacción y el re-run confirmó cero pendientes. Los controles de rol/MFA permanecen
-deliberadamente apagados: el audit agregado encontró cuatro cuentas sin rol y sin factor MFA
-verificado. La limpieza de retención sigue dentro de `weekly-report`, uno de los dos cron jobs de
-Vercel; el worker durable usa aparte Supabase Cron y no consume un tercer slot de Vercel.
+única transacción y el re-run confirmó cero pendientes. El PR #97 también está productivo: dejó
+activos el scheduler durable, el audit agregado y el preflight cerrado de Meta. La limpieza de
+retención sigue dentro de `weekly-report`, uno de los dos cron jobs de Vercel; el worker usa aparte
+Supabase Cron y no consume un tercer slot.
+
+Los controles de rol/MFA permanecen deliberadamente apagados. El audit agregado encontró cuatro
+cuentas sin rol y cero factores MFA verificados. El cierre actual incorpora el flujo TOTP, el gate
+central del CRM, el callback seguro, la autorización de rutas internas y la verificación individual
+por sede. Los pasos del runbook humano siguen pendientes.
 
 El orden obligatorio del lote es:
 
@@ -24,6 +29,10 @@ El orden obligatorio del lote es:
 respuesta al paciente. 1D unifica la identidad lead/conversación, hace routing y handoff atómicos,
 aplica CAS al despacho y reconcilia IDs de proveedor duplicados antes de exigir unicidad. 1E
 coordina borrado con workers/outbox mediante advisory locks y tombstones HMAC.
+
+El límite clínico no cambia con este cierre: WhatsApp nunca usa un modelo para redactar respuestas
+médicas libres. La IA sólo puede producir enums validados; guardrails, derivaciones y mensajes al
+paciente salen de reglas y catálogos determinísticos.
 
 Los tests de migraciones son contratos estáticos sobre el texto SQL y tests de integración con
 mocks. El lote además pasó un dry-run con rollback y luego se aplicó atómicamente sobre PostgreSQL
@@ -56,42 +65,68 @@ el CRM completo.
 refresh tokens e IDs de integraciones Google/Instagram quedan exclusivamente bajo `service_role`.
 `app_config_history` también es backend-only y el trigger nunca copia claves fuera de esa whitelist.
 
-El acceso a leads/conversaciones y las operaciones sensibles (envío manual, handoff,
-pausa/reactivación, corrección, exportación, borrado y cambio de configuración) requieren `aal2`
-cuando se activa MFA. Los mismos límites se repiten en las políticas RLS para evitar que un cliente
-autenticado eluda las rutas HTTP.
+El acceso server-side pasa por una fuente única de rol y política; las rutas internas que leen o
+mutan datos/configuración también llaman al autorizador explícito. El callback de autenticación
+acepta únicamente orígenes confiables y un destino interno normalizado para evitar redirects
+abiertos. Al activar MFA, el gate central exige `aal2` **antes de entrar a cualquier pantalla del
+CRM**, no sólo al mutar: las políticas RLS protegen también las lecturas de datos identificables.
+Las rutas sensibles vuelven a comprobar rol/AAL para que un cliente no pueda eludir el gate web.
 
 ## Activación segura (dependencia externa)
 
 La migración crea `security_authorization_settings` con ambos flags en `false`, para no bloquear de
-golpe a las cuentas existentes. Antes de activarlos:
+golpe a las cuentas existentes. El flujo TOTP y el gate central están implementados. Orden obligatorio:
 
-1. Inventariar todos los usuarios de Supabase Auth y asignar un rol válido en `app_metadata.role`
-   mediante Admin API/Dashboard con credenciales de servidor.
-2. Implementar el enrolamiento/step-up MFA en la app. Hoy el backend valida `aal2`, pero todavía no
-   existe una UI que invoque `mfa.enroll`, `mfa.challenge` y `mfa.verify`; activar el flag ahora
-   bloquearía operaciones sensibles sin un camino de elevación.
-3. Enrolar MFA para quienes necesiten ejecutar operaciones sensibles y comprobar que su sesión
-   alcanza `aal2`.
-4. Ejecutar el gate de staging descrito arriba y probar al menos una cuenta por rol, incluidos
-   rechazos esperados y RLS desde un cliente autenticado.
-5. **Completado:** Supabase Cron/`pg_net` llama cada minuto a
-   `POST /api/internal/whatsapp-worker`; URL y `CRON_SECRET` están cifrados en Vault. Hay un único
-   job activo y su ejecución automática más reciente terminó correctamente con HTTP 2xx.
-6. Con `service_role`, activar primero roles y luego MFA (o ambos en una ventana controlada):
+1. Inventariar las cuatro cuentas actuales y asignar a cada una un rol válido en
+   `app_metadata.role` mediante Supabase Admin API/Dashboard; no inferir roles por email.
+2. Con los flags todavía apagados, hacer que cada persona enrole y verifique al menos un factor TOTP.
+   Cada `owner` debe agregar además un autenticador de respaldo administrado desde la misma pantalla.
+3. Probar un login fresco y el step-up de cada cuenta. Verificar también el procedimiento de
+   recuperación descrito abajo antes de depender de MFA en producción.
+4. Activar **sólo roles** con `service_role` y validar accesos/rechazos de al menos una cuenta por rol,
+   incluidos RLS y las rutas internas:
 
 ```sql
 update security_authorization_settings
 set enforce_roles = true,
-    require_mfa_for_sensitive_actions = true,
     updated_at = now()
 where id = 'global';
 ```
 
-No se agregó una ruta web para cambiar estos flags: solo `service_role` puede hacerlo. Si falta la
-tabla o su fila global, o si la configuración no puede leerse, las rutas fallan cerradas. El modo
-compatible requiere la fila explícita con ambos flags en `false`, por lo que el código y la
-migración deben desplegarse juntos.
+5. Después de validar roles y confirmar que todas las cuentas necesarias conservan acceso, activar
+   MFA en una segunda operación:
+
+```sql
+update security_authorization_settings
+set require_mfa_for_sensitive_actions = true,
+    updated_at = now()
+where id = 'global';
+```
+
+6. Cerrar las sesiones de prueba, iniciar sesión de nuevo y confirmar que AAL1 no puede entrar al
+   CRM, que AAL2 sí puede y que RLS rechaza lecturas PII desde una sesión que no cumple la política.
+
+No existe una ruta web para cambiar estos flags: sólo `service_role` puede hacerlo. Si falta la
+tabla/fila global o no puede leerse, el sistema falla cerrado. El modo compatible requiere la fila
+explícita con ambos flags en `false`.
+
+### Enrolamiento, factores de respaldo y recuperación
+
+La pantalla central permite enrolar TOTP, resolver el challenge de login y administrar varios
+factores verificados. La clave/QR sólo se muestra durante el enrolamiento en el navegador: nunca se
+debe imprimir, registrar ni copiar a tickets. Para cuentas `owner`, el segundo factor debe quedar en
+otro dispositivo o autenticador controlado por la misma persona responsable.
+
+No hay endpoint público de recuperación ni se implementaron códigos de respaldo. Si una persona
+pierde todos sus factores:
+
+1. verificar su identidad fuera de banda con el procedimiento operativo acordado;
+2. un administrador autorizado elimina el factor desde Supabase Admin/Dashboard, sin compartir
+   emails, IDs, QR o secretos por logs/tickets;
+3. la persona inicia sesión y enrola un factor nuevo; para `owner`, vuelve a agregar el respaldo;
+4. se prueba un login fresco antes de dar el incidente por cerrado.
+
+Cambiar la contraseña no elimina el segundo factor y no reemplaza este procedimiento.
 
 El estado productivo puede revisarse sin mostrar PII ni secretos con:
 
@@ -113,11 +148,14 @@ node scripts/configure-whatsapp-worker.mjs --apply
 
 Vercel Production fija `META_GRAPH_API_VERSION=v25.0`. El preflight read-only comprueba
 versión/token/ID sin enviar mensajes ni devolver credenciales o identificadores; el cron diario
-alerta con un código cerrado si falla. Antes de activar respuestas por sede todavía hay que revisar
-y guardar como verificadas las tres sedes y confirmar que `shadow=false`, `canary=false` y las
-cohortes siguen en 0. El template interno
+alerta con un código cerrado si falla. La confirmación individual de
+sedes: cada ubicación conserva evidencia propia, usa control de versión y se actualiza
+atómicamente; modificar una no verifica ni pisa las demás. El audit productivo sigue mostrando
+CIMEL Lanús, Hospital Británico y Swiss Medical Lomas inactivas y sin verificar. Una persona
+autorizada debe revisar y confirmar cada sede desde la UI; hasta entonces el runtime falla cerrado.
+También debe confirmar que `shadow=false`, `canary=false` y las cohortes siguen en 0. El template interno
 `alerta_interna_derivacion` fue reducido a un texto genérico con una sola variable (ID opaco de
-caso); 0A lo deja en borrador y Meta debe reaprobar esa versión antes de usar el aviso por WhatsApp.
+caso); sigue en borrador y Meta debe reaprobar esa versión antes de usar el aviso por WhatsApp.
 
 ## Auditoría sin PII ni contenido de pacientes
 

@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto"
 import { z } from "zod"
 
 export const WHATSAPP_LOCATION_IDS = [
@@ -10,16 +11,22 @@ export type WhatsAppLocationId = (typeof WHATSAPP_LOCATION_IDS)[number]
 
 const boundedText = (max: number) => z.string().trim().min(1).max(max)
 const optionalText = (max: number) => z.union([boundedText(max), z.literal(""), z.null()]).optional()
+const httpsUrl = z.string().trim().url().max(2_048).refine(value => {
+  try {
+    return new URL(value).protocol === "https:"
+  } catch {
+    return false
+  }
+}, "La URL debe usar HTTPS")
 const optionalUrl = z
-  .union([z.string().trim().url().max(2_048), z.literal(""), z.null()])
+  .union([httpsUrl, z.literal(""), z.null()])
   .optional()
 const optionalTimestamp = z
   .union([z.string().datetime({ offset: true }), z.null()])
   .optional()
 const stringList = z.array(boundedText(120)).max(30)
 
-const locationFields = {
-  id: z.enum(WHATSAPP_LOCATION_IDS),
+const editableLocationFields = {
   name: boundedText(120),
   address: optionalText(300),
   google_maps_link: optionalUrl,
@@ -31,11 +38,42 @@ const locationFields = {
   booking_instruction: optionalText(1_000),
   obras_sociales: stringList.optional(),
   notes: optionalText(1_000),
+  active: z.boolean().optional(),
+}
+
+const verificationFields = {
   verified_at: optionalTimestamp,
   verified_by: optionalText(160),
   valid_from: optionalTimestamp,
-  active: z.boolean().optional(),
 }
+
+const locationFields = {
+  id: z.enum(WHATSAPP_LOCATION_IDS),
+  ...editableLocationFields,
+  ...verificationFields,
+}
+
+/**
+ * Datos que una persona puede confirmar para una sola sede. El ID viaja en la URL y los
+ * metadatos de verificación los escribe exclusivamente el servidor.
+ */
+export const whatsappLocationInputSchema = z.object({
+  ...editableLocationFields,
+  active: z.boolean(),
+  services: stringList.optional(),
+}).strict()
+
+const locationsVersionSchema = z.string().regex(/^[a-f0-9]{64}$/)
+
+export const whatsappLocationPutBodySchema = z.object({
+  version: locationsVersionSchema,
+  confirmed: z.literal(true),
+  location: whatsappLocationInputSchema,
+}).strict()
+
+export const whatsappLocationDeleteBodySchema = z.object({
+  version: locationsVersionSchema,
+}).strict()
 
 /** Forma canónica. `services` es la única clave que se escribe de ahora en adelante. */
 export const whatsappLocationSchema = z.object({
@@ -99,6 +137,28 @@ export interface WhatsAppLocationConfig {
   active: boolean
 }
 
+export type WhatsAppLocationInput = z.infer<typeof whatsappLocationInputSchema>
+
+export type WhatsAppLocationOperationalStatus =
+  | "operational"
+  | "inactive"
+  | "unverified"
+  | "not_yet_valid"
+
+export interface WhatsAppLocationStatus {
+  id: WhatsAppLocationId
+  status: WhatsAppLocationOperationalStatus
+  active: boolean
+  verified: boolean
+  operational: boolean
+}
+
+export interface WhatsAppLocationsStatus {
+  valid: true
+  used_legacy_practices: boolean
+  items: WhatsAppLocationStatus[]
+}
+
 export type WhatsAppLocationsParseResult =
   | { success: true; data: WhatsAppLocationConfig[]; usedLegacyPractices: boolean }
   | { success: false; data: []; usedLegacyPractices: false }
@@ -154,6 +214,121 @@ export function parseWhatsAppLocations(value: unknown): WhatsAppLocationsParseRe
   }
 }
 
+function stableJson(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(stableJson).join(",")}]`
+  if (value && typeof value === "object") {
+    const entries = Object.entries(value as Record<string, unknown>)
+      .filter(([, entryValue]) => entryValue !== undefined)
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([key, entryValue]) => `${JSON.stringify(key)}:${stableJson(entryValue)}`)
+    return `{${entries.join(",")}}`
+  }
+  return JSON.stringify(value)
+}
+
+/** Token opaco para control optimista. El CAS de base de datos sigue comparando el JSON completo. */
+export function createWhatsAppLocationsVersion(value: unknown): string {
+  return createHash("sha256").update(stableJson(value)).digest("hex")
+}
+
+function verificationState(
+  location: WhatsAppLocationConfig,
+  now: Date
+): { verified: boolean; notYetValid: boolean } {
+  if (!location.verified_at || !location.verified_by || !location.valid_from) {
+    return { verified: false, notYetValid: false }
+  }
+
+  const nowMs = now.getTime()
+  const verifiedAt = Date.parse(location.verified_at)
+  const validFrom = Date.parse(location.valid_from)
+  if (!Number.isFinite(verifiedAt) || !Number.isFinite(validFrom)) {
+    return { verified: false, notYetValid: false }
+  }
+  if (verifiedAt > nowMs + 5 * 60_000) return { verified: false, notYetValid: false }
+  if (validFrom > nowMs) return { verified: true, notYetValid: true }
+  return { verified: true, notYetValid: false }
+}
+
+export function getWhatsAppLocationsStatus(
+  locations: WhatsAppLocationConfig[],
+  usedLegacyPractices = false,
+  now: Date = new Date()
+): WhatsAppLocationsStatus {
+  return {
+    valid: true,
+    used_legacy_practices: usedLegacyPractices,
+    items: locations.map(location => {
+      const verification = verificationState(location, now)
+      const operational = location.active && verification.verified && !verification.notYetValid
+      const status: WhatsAppLocationOperationalStatus = operational
+        ? "operational"
+        : verification.notYetValid
+          ? "not_yet_valid"
+          : verification.verified && !location.active
+            ? "inactive"
+            : "unverified"
+      return {
+        id: location.id,
+        status,
+        active: location.active,
+        verified: verification.verified,
+        operational,
+      }
+    }),
+  }
+}
+
+export type WhatsAppLocationDocumentMutation =
+  | { success: true; data: WhatsAppLocationConfig[] }
+  | { success: false; reason: "invalid_document" | "location_not_found" }
+
+/**
+ * Reemplaza/agrega una sola sede y vuelve a sellar exclusivamente esa fila. El resto siempre
+ * parte del documento autoritativo del servidor, no de una copia enviada por el navegador.
+ */
+export function putWhatsAppLocation(
+  currentValue: unknown,
+  id: WhatsAppLocationId,
+  input: WhatsAppLocationInput,
+  actorUserId: string,
+  now: Date = new Date()
+): WhatsAppLocationDocumentMutation {
+  const current = parseWhatsAppLocations(currentValue)
+  if (!current.success) return { success: false, reason: "invalid_document" }
+
+  const verifiedAt = now.toISOString()
+  const nextLocation: WhatsAppLocationConfig = normalizeLocation({
+    id,
+    ...input,
+    verified_at: verifiedAt,
+    verified_by: actorUserId,
+    valid_from: verifiedAt,
+  })
+  const existingIndex = current.data.findIndex(location => location.id === id)
+  if (existingIndex === -1) {
+    return { success: true, data: [...current.data, nextLocation] }
+  }
+
+  return {
+    success: true,
+    data: current.data.map((location, index) => index === existingIndex ? nextLocation : location),
+  }
+}
+
+/** Elimina solo la sede indicada sin alterar ni renovar evidencia de las restantes. */
+export function deleteWhatsAppLocation(
+  currentValue: unknown,
+  id: WhatsAppLocationId
+): WhatsAppLocationDocumentMutation {
+  const current = parseWhatsAppLocations(currentValue)
+  if (!current.success) return { success: false, reason: "invalid_document" }
+  if (!current.data.some(location => location.id === id)) {
+    return { success: false, reason: "location_not_found" }
+  }
+  return { success: true, data: current.data.filter(location => location.id !== id) }
+}
+
 /**
  * Un dato operativo solo se puede afirmar si fue activado y tiene trazabilidad
  * de verificación vigente. Las filas legacy se pueden editar/migrar, pero no se
@@ -163,17 +338,8 @@ export function isOperationallyVerifiedLocation(
   location: WhatsAppLocationConfig,
   now: Date = new Date()
 ): boolean {
-  if (!location.active || !location.verified_at || !location.verified_by || !location.valid_from) {
-    return false
-  }
-
-  const nowMs = now.getTime()
-  const verifiedAt = Date.parse(location.verified_at)
-  const validFrom = Date.parse(location.valid_from)
-  if (!Number.isFinite(verifiedAt) || !Number.isFinite(validFrom)) return false
-
-  // Tolera hasta cinco minutos de diferencia de reloj, pero no fechas futuras arbitrarias.
-  return verifiedAt <= nowMs + 5 * 60_000 && validFrom <= nowMs
+  const verification = verificationState(location, now)
+  return location.active && verification.verified && !verification.notYetValid
 }
 
 export function getOperationalWhatsAppLocations(
