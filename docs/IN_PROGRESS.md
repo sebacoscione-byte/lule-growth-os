@@ -1,3 +1,15 @@
+# HOTFIX APLICADO (2026-07-16) — acceso a Configuración y roles iniciales
+
+- [x] Asignar dos cuentas autorizadas: una `owner` y una `doctor`, sin guardar emails en docs/logs.
+- [x] Confirmar que el `503` de `/api/config` provenía de sedes con `practices: []` y `services`
+      poblado; no se había perdido ningún dato operativo.
+- [x] Canonicalizar producción eliminando sólo la clave histórica vacía, con historial automático.
+- [x] Aceptar transiciones seguras —una lista vacía o conjuntos equivalentes— y mantener rechazo
+      fail-closed si `services` y `practices` contienen valores realmente distintos.
+- [ ] Verificar recarga de Configuración desde la sesión `owner` y completar el MFA de `doctor`.
+
+---
+
 # HOTFIX APLICADO (2026-07-16) — restaurar recepción del webhook de WhatsApp
 
 ## Incidente y corrección

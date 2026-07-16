@@ -59,6 +59,34 @@ describe("parseWhatsAppLocations", () => {
     expect(result.data[0]).not.toHaveProperty("practices")
   })
 
+  it.each([
+    {
+      label: "practices vacío",
+      services: ["Consulta cardiológica", "Ecocardiograma"],
+      practices: [],
+      expected: ["Consulta cardiológica", "Ecocardiograma"],
+    },
+    {
+      label: "services vacío",
+      services: [],
+      practices: ["Ecocardiograma"],
+      expected: ["Ecocardiograma"],
+    },
+    {
+      label: "conjuntos equivalentes",
+      services: ["Consulta cardiológica", "Ecocardiograma"],
+      practices: ["Ecocardiograma", "Consulta cardiológica"],
+      expected: ["Consulta cardiológica", "Ecocardiograma"],
+    },
+  ])("tolera un documento transicional compatible: $label", ({ services, practices, expected }) => {
+    const result = parseWhatsAppLocations([canonicalLocation({ services, practices })])
+
+    expect(result).toEqual(expect.objectContaining({ success: true, usedLegacyPractices: true }))
+    if (!result.success) throw new Error("config transicional inesperadamente inválida")
+    expect(result.data[0].services).toEqual(expected)
+    expect(result.data[0]).not.toHaveProperty("practices")
+  })
+
   it("rechaza documentos ambiguos que mezclan `services` y `practices`", () => {
     expect(parseWhatsAppLocations([
       { ...canonicalLocation(), practices: ["Ecocardiograma"] },

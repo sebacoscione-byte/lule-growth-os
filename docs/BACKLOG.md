@@ -30,7 +30,8 @@ de Meta.
   `POST /api/internal/whatsapp-worker`. URL y `CRON_SECRET` están cifrados en Supabase Vault; la
   llamada manual autenticada respondió 200 con la cola vacía y la ejecución automática posterior
   terminó correctamente con HTTP 2xx.
-- [ ] **Accesos:** asignar `app_metadata.role`, enrolar MFA, probar una cuenta por rol y recién luego
+- [ ] **Accesos:** `owner` y `doctor` ya tienen `app_metadata.role`; las otras dos cuentas quedan
+  deliberadamente sin rol. Falta completar MFA de `doctor`, probar ambas cuentas y recién luego
   activar primero `enforce_roles` y después el flag MFA, siguiendo el runbook de
   `docs/WHATSAPP_SECURITY_ROLES_RETENTION.md`. Estado auditado: cuatro cuentas sin rol; una ya tiene
   MFA verificado y tres siguen pendientes.

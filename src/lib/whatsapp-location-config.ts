@@ -87,6 +87,31 @@ const legacyWhatsAppLocationSchema = z.object({
   practices: stringList.optional(),
 }).strict()
 
+/**
+ * Compatibilidad acotada para el estado transicional que dejó la UI histórica: ambas claves
+ * pueden coexistir sólo si una está vacía o si representan exactamente el mismo conjunto. Una
+ * divergencia real sigue fallando cerrada para no elegir silenciosamente datos operativos.
+ */
+const transitionalWhatsAppLocationSchema = z.object({
+  ...locationFields,
+  services: stringList,
+  practices: stringList,
+}).strict().superRefine((location, ctx) => {
+  const canonical = [...new Set(location.services.map(value => value.trim()))].sort()
+  const legacy = [...new Set(location.practices.map(value => value.trim()))].sort()
+  const compatible = canonical.length === 0
+    || legacy.length === 0
+    || JSON.stringify(canonical) === JSON.stringify(legacy)
+
+  if (!compatible) {
+    ctx.addIssue({
+      code: "custom",
+      message: "services y practices contienen valores incompatibles",
+      path: ["practices"],
+    })
+  }
+})
+
 function requireUniqueLocationIds(
   locations: Array<{ id: WhatsAppLocationId }>,
   ctx: z.RefinementCtx
@@ -111,7 +136,11 @@ export const whatsappLocationsSchema = z
   .superRefine(requireUniqueLocationIds)
 
 const rawLocationsSchema = z
-  .array(z.union([whatsappLocationSchema, legacyWhatsAppLocationSchema]))
+  .array(z.union([
+    whatsappLocationSchema,
+    legacyWhatsAppLocationSchema,
+    transitionalWhatsAppLocationSchema,
+  ]))
   .max(WHATSAPP_LOCATION_IDS.length)
   .superRefine(requireUniqueLocationIds)
 
@@ -187,7 +216,7 @@ function normalizeLocation(location: RawLocation): WhatsAppLocationConfig {
     day: nonEmpty(location.day),
     booking_instruction: nonEmpty(location.booking_instruction),
     obras_sociales: unique(location.obras_sociales),
-    services: unique(canonicalServices ?? legacyServices),
+    services: unique(canonicalServices?.length ? canonicalServices : legacyServices ?? canonicalServices),
     notes: nonEmpty(location.notes),
     verified_at: location.verified_at ?? undefined,
     verified_by: nonEmpty(location.verified_by),
