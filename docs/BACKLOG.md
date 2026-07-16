@@ -52,6 +52,16 @@ por qué tipo de acción es, para que sepas qué esperar de cada uno. El detalle
   se deja pausar la prueba gratuita (Etapa 2).
 
 ### 🤔 Decisiones tuyas (o de Lucía)
+- [ ] **¿Ampliar las categorías del clasificador del bot de WhatsApp? (2026-07-15)** Probando el bot
+  en producción encontraste varios mensajes reales que no encajaban en ninguna de las 9 categorías
+  fijas (saludo simple, declarar "particular", entre otros — todos ya corregidos puntualmente). Es
+  un patrón esperado de cualquier sistema de categorías cerradas, no un error puntual — quedó
+  planteado si sumar de una vez categorías "de conversación" que probablemente se repitan
+  (despedida/agradecimiento tipo "gracias", "listo", "chau"; small talk genérico) en vez de seguir
+  corrigiendo caso por caso a medida que aparecen. Se recomendó explícitamente **no** pasar a que la
+  IA redacte la respuesta libremente (perdería el control sobre lo que el bot le dice a un paciente
+  real) — la propuesta es solo sumar categorías dentro del mismo esquema de reglas-primero. Sesión
+  cerrada antes de que respondieras; retomar cuando quieras.
 - [ ] Agregar a Lucía como administradora del Business Manager de Meta — falta decidir el rol
   (administrador completo vs. acceso acotado).
 - [ ] Definir estrategia de reseñas de Google: cómo y cuándo pedirlas a pacientes actuales.
@@ -84,6 +94,16 @@ por qué tipo de acción es, para que sepas qué esperar de cada uno. El detalle
   que faltaría para que el seguimiento automático funcione de punta a punta con costo real.
 
 ### 🕐 Cuando tengas tiempo (no urgente)
+- [ ] **Conectar la CLI de Vercel para que un agente pueda tocar env vars directamente (2026-07-15).**
+  Hoy ningún agente puede cargar/editar variables de entorno de producción por su cuenta — ni la
+  CLI de Vercel está instalada, ni el login (OAuth interactivo) se puede completar en una sesión no
+  interactiva. Dos formas de resolverlo, ninguna aplicada todavía: (1) generar un token en
+  vercel.com/account/tokens y pasárselo a un agente — da permisos amplios sobre tu cuenta de
+  Vercel, no solo env vars, tenelo en cuenta; (2) correr `vercel login` una sola vez vos mismo en tu
+  propia terminal en esta máquina — si la CLI queda logueada a nivel de tu usuario de Windows,
+  sesiones futuras del agente en esta misma máquina podrían heredar esa sesión sin pedirte nada de
+  nuevo. No es urgente — mientras tanto, cargar env vars a mano en el dashboard (2 minutos) sigue
+  funcionando bien.
 - [ ] **Cargar `E2E_TEST_EMAIL`/`E2E_TEST_PASSWORD` en tu `.env.local` (2026-07-14, contraseña
   rotada de nuevo el 2026-07-15).** El usuario de prueba (`e2e-agent-test@lule-internal.local`,
   aislado de leads/pacientes reales) ya se usó dos veces para verificar visualmente con Playwright
