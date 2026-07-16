@@ -8,10 +8,10 @@ activos el scheduler durable, el audit agregado y el preflight cerrado de Meta. 
 retención sigue dentro de `weekly-report`, uno de los dos cron jobs de Vercel; el worker usa aparte
 Supabase Cron y no consume un tercer slot.
 
-Los controles de rol/MFA permanecen deliberadamente apagados. El audit agregado encontró cuatro
-cuentas sin rol; una ya tiene MFA verificado y tres siguen pendientes. El cierre actual incorpora el flujo TOTP, el gate
-central del CRM, el callback seguro, la autorización de rutas internas y la verificación individual
-por sede. Los pasos del runbook humano siguen pendientes.
+Los controles de rol/MFA están activos en producción. El audit final encontró una cuenta `owner` y
+una `doctor`, ambas con MFA verificado; las otras dos cuentas permanecen deliberadamente sin rol y
+quedan bloqueadas. `enforce_roles` se activó y auditó antes de activar
+`require_mfa_for_sensitive_actions`; ambos flags están en `true`.
 
 El orden obligatorio del lote es:
 
@@ -45,9 +45,8 @@ restauración aislada.
 
 El rol se lee exclusivamente de `auth.users.raw_app_meta_data.role`, expuesto en el JWT como
 `app_metadata.role`. Nunca se usa `user_metadata`, porque el usuario puede modificarlo. La matriz
-siguiente describe el estado objetivo una vez activados los flags; mientras `enforce_roles=false`,
-una cuenta histórica sin rol conserva compatibilidad equivalente a `owner`, y un rol explícito sí
-se respeta.
+siguiente describe el estado productivo con los flags activos. Una cuenta sin rol ya no conserva
+compatibilidad histórica y queda bloqueada.
 
 | Rol | Datos identificables | Inbox / envío manual / handoff | Exportar | Borrar | Leer config | Cambiar config |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -75,13 +74,14 @@ Las rutas sensibles vuelven a comprobar rol/AAL para que un cliente no pueda elu
 
 ## Activación segura (dependencia externa)
 
-La migración crea `security_authorization_settings` con ambos flags en `false`, para no bloquear de
-golpe a las cuentas existentes. El flujo TOTP y el gate central están implementados. Orden obligatorio:
+La migración creó `security_authorization_settings` con ambos flags en `false`, para no bloquear de
+golpe a las cuentas existentes. La activación productiva completó este orden:
 
 1. Inventariar las cuatro cuentas actuales y asignar a cada una un rol válido en
    `app_metadata.role` mediante Supabase Admin API/Dashboard; no inferir roles por email.
 2. Con los flags todavía apagados, hacer que cada persona enrole y verifique al menos un factor TOTP.
-   Cada `owner` debe agregar además un autenticador de respaldo administrado desde la misma pantalla.
+   El respaldo para `owner` fue recomendado; el responsable decidió operar sin segundo factor y
+   aceptó que la pérdida del único autenticador requiere recuperación administrativa.
 3. Probar un login fresco y el step-up de cada cuenta. Verificar también el procedimiento de
    recuperación descrito abajo antes de depender de MFA en producción.
 4. Activar **sólo roles** con `service_role` y validar accesos/rechazos de al menos una cuenta por rol,
@@ -108,15 +108,15 @@ where id = 'global';
    CRM, que AAL2 sí puede y que RLS rechaza lecturas PII desde una sesión que no cumple la política.
 
 No existe una ruta web para cambiar estos flags: sólo `service_role` puede hacerlo. Si falta la
-tabla/fila global o no puede leerse, el sistema falla cerrado. El modo compatible requiere la fila
-explícita con ambos flags en `false`.
+tabla/fila global o no puede leerse, el sistema falla cerrado. El estado productivo actual requiere
+la fila explícita con ambos flags en `true`.
 
 ### Enrolamiento, factores de respaldo y recuperación
 
 La pantalla central permite enrolar TOTP, resolver el challenge de login y administrar varios
 factores verificados. La clave/QR sólo se muestra durante el enrolamiento en el navegador: nunca se
-debe imprimir, registrar ni copiar a tickets. Para cuentas `owner`, el segundo factor debe quedar en
-otro dispositivo o autenticador controlado por la misma persona responsable.
+debe imprimir, registrar ni copiar a tickets. Un segundo factor para `owner` sigue recomendado,
+pero el responsable decidió no configurarlo.
 
 No hay endpoint público de recuperación ni se implementaron códigos de respaldo. Si una persona
 pierde todos sus factores:
@@ -124,7 +124,7 @@ pierde todos sus factores:
 1. verificar su identidad fuera de banda con el procedimiento operativo acordado;
 2. un administrador autorizado elimina el factor desde Supabase Admin/Dashboard, sin compartir
    emails, IDs, QR o secretos por logs/tickets;
-3. la persona inicia sesión y enrola un factor nuevo; para `owner`, vuelve a agregar el respaldo;
+3. la persona inicia sesión y enrola un factor nuevo;
 4. se prueba un login fresco antes de dar el incidente por cerrado.
 
 Cambiar la contraseña no elimina el segundo factor y no reemplaza este procedimiento.
@@ -151,12 +151,12 @@ Vercel Production fija `META_GRAPH_API_VERSION=v25.0`. El preflight read-only co
 versión/token/ID sin enviar mensajes ni devolver credenciales o identificadores; el cron diario
 alerta con un código cerrado si falla. La confirmación individual de
 sedes: cada ubicación conserva evidencia propia, usa control de versión y se actualiza
-atómicamente; modificar una no verifica ni pisa las demás. El audit productivo sigue mostrando
-CIMEL Lanús, Hospital Británico y Swiss Medical Lomas inactivas y sin verificar. Una persona
-autorizada debe revisar y confirmar cada sede desde la UI; hasta entonces el runtime falla cerrado.
+atómicamente; modificar una no verifica ni pisa las demás. El audit productivo muestra CIMEL Lanús,
+Hospital Británico y Swiss Medical Lomas activas y con evidencia individual vigente. El runtime
+falla cerrado si una versión futura pierde esa evidencia.
 También debe confirmar que `shadow=false`, `canary=false` y las cohortes siguen en 0. El template interno
 `alerta_interna_derivacion` fue reducido a un texto genérico con una sola variable (ID opaco de
-caso); sigue en borrador y Meta debe reaprobar esa versión antes de usar el aviso por WhatsApp.
+caso); figura `pendiente_meta` y debe ser aprobado antes de usar el aviso por WhatsApp.
 
 ## Auditoría sin PII ni contenido de pacientes
 

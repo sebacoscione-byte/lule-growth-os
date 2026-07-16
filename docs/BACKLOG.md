@@ -30,19 +30,17 @@ de Meta.
   `POST /api/internal/whatsapp-worker`. URL y `CRON_SECRET` están cifrados en Supabase Vault; la
   llamada manual autenticada respondió 200 con la cola vacía y la ejecución automática posterior
   terminó correctamente con HTTP 2xx.
-- [ ] **Accesos:** `owner` y `doctor` ya tienen `app_metadata.role`; las otras dos cuentas quedan
-  deliberadamente sin rol. Falta completar MFA de `doctor`, probar ambas cuentas y recién luego
-  activar primero `enforce_roles` y después el flag MFA, siguiendo el runbook de
-  `docs/WHATSAPP_SECURITY_ROLES_RETENTION.md`. Estado auditado: una `owner` con MFA, una `doctor`
-  sin MFA y dos cuentas deliberadamente sin rol.
+- [x] **Accesos:** `owner` y `doctor` tienen `app_metadata.role` y MFA verificado. Las otras dos
+  cuentas quedan deliberadamente sin rol y bloqueadas. Se activó primero `enforce_roles`, se auditó,
+  y después `require_mfa_for_sensitive_actions`; ambos quedaron en `true`.
 - [x] **Flujo MFA en producto:** enrolamiento y step-up TOTP,
   administración de múltiples factores, gate central del CRM, callback seguro y autorización de
   rutas internas completados técnicamente. Al activar el flag, todo el CRM exige AAL2 porque RLS
   protege también las lecturas de PII.
-- [ ] **Enrolamiento y recuperación MFA:** después del deploy, enrolar cada cuenta y un factor de
-  respaldo por cada `owner`; probar login fresco y recuperación. Sin endpoint público: validar
-  identidad fuera de banda, eliminar el factor por Supabase Admin/Dashboard y reenrolar, sin copiar
-  secretos ni PII a logs o tickets.
+- [x] **Enrolamiento y recuperación MFA:** ambas cuentas operativas tienen TOTP verificado. El
+  `owner` decidió no agregar un segundo autenticador; se acepta el riesgo de recuperación
+  administrativa. Sin endpoint público: validar identidad fuera de banda, eliminar el factor por
+  Supabase Admin/Dashboard y reenrolar, sin copiar secretos ni PII a logs o tickets.
 - [x] **Verificación individual de sedes:** UI/API con evidencia,
   control de versión y escritura atómica por sede completadas; una edición ya no verifica a las
   otras ubicaciones.
