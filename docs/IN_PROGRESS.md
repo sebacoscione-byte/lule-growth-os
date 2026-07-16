@@ -8,9 +8,11 @@
       fail-closed si `services` y `practices` contienen valores realmente distintos.
 - [x] Asignar los únicos dos roles operativos definidos: una cuenta `owner` y una `doctor`; las
       otras dos cuentas permanecen deliberadamente sin rol.
-- [x] Confirmar por audit que `owner` tiene MFA verificado y que `doctor` todavía debe enrolarlo.
+- [x] Confirmar por audit que `owner` y `doctor` tienen MFA verificado.
 - [x] Confirmar que Configuración vuelve a cargar y que las tres sedes tienen evidencia individual.
-- [ ] Completar el MFA de `doctor` y probar una sesión fresca de cada rol.
+- [x] Activar primero roles obligatorios y después MFA obligatorio, con audit entre operaciones.
+- [x] Registrar la decisión de `owner` de no agregar un segundo autenticador y conservar el
+      procedimiento administrativo de recuperación si se pierde el único factor.
 
 ---
 
@@ -47,23 +49,23 @@ estos controles no médicos:
 - [x] Mantener WhatsApp sin IA médica libre: los modelos sólo producen clasificación estructurada
       cerrada y las respuestas al paciente salen de política/catálogos determinísticos.
 
-## Gates humanos posteriores al deploy
+## Cierre de gates humanos posteriores al deploy
 
-Los flags `enforce_roles` y `require_mfa_for_sensitive_actions` siguen en `false`. El audit del
-2026-07-16 encontró una cuenta `owner` con MFA verificado, una `doctor` sin MFA y dos cuentas
-deliberadamente sin rol. Las tres sedes están activas y tienen evidencia de verificación individual.
-No corresponde activar roles/MFA sin completar las pruebas humanas correspondientes.
+Los flags `enforce_roles` y `require_mfa_for_sensitive_actions` están en `true`. El audit final del
+2026-07-16 encontró una cuenta `owner` y una `doctor`, ambas con MFA verificado, y dos cuentas
+deliberadamente sin rol que ahora quedan bloqueadas. Las tres sedes están activas y verificadas.
 
-1. Cerrar sesión y volver a entrar con `owner` y `doctor` para refrescar `app_metadata.role`.
-2. Enrolar al menos un TOTP para `doctor` y un factor de respaldo para `owner`; probar login fresco,
-   step-up y el procedimiento de recuperación.
-3. Activar primero `enforce_roles`; validar una cuenta por rol y recién después activar el flag MFA.
-   Ese segundo flag exige AAL2 antes de entrar a todo el CRM, porque RLS protege también las
-   lecturas de PII y no sólo las mutaciones.
+1. [x] Refrescar las sesiones y enrolar TOTP para ambas cuentas.
+2. [x] Activar primero `enforce_roles`, auditar, y luego `require_mfa_for_sensitive_actions`.
+3. [x] Exigir AAL2 antes de entrar al CRM; RLS protege también lecturas de PII.
 4. [x] Revisar y confirmar individualmente CIMEL Lanús, Hospital Británico y Swiss Medical Lomas.
    El runtime continúa fallando cerrado si una futura versión pierde evidencia vigente.
 5. Reaprobar en Meta `alerta_interna_derivacion`, que figura `pendiente_meta`. El destino ya está
    configurado como variable sensible en Vercel Production.
+
+El segundo autenticador de `owner` quedó rechazado por decisión expresa del responsable. Riesgo
+aceptado: si se pierde el único factor, un administrador debe validar la identidad fuera de banda,
+eliminar el factor desde Supabase Admin/Dashboard y exigir un nuevo enrolamiento.
 
 Recuperación MFA: no existe endpoint público. Se valida la identidad fuera de banda, un
 administrador elimina el factor desde Supabase Admin/Dashboard y la persona vuelve a enrolarlo.
@@ -211,8 +213,8 @@ restauración sin tocar producción; ese gate no cuestiona que el esquema produc
   automática posterior terminó correctamente con HTTP 2xx.
 - [x] Enrolamiento, step-up y gestión de múltiples factores TOTP implementados en producto.
 - [x] Asignar `app_metadata.role` a las dos cuentas operativas (`owner` y `doctor`); las otras dos
-  quedan deliberadamente sin rol. Falta enrolar MFA para `doctor`, probar ambas sesiones y activar
-  primero roles y luego MFA. Los dos flags siguen apagados.
+  quedan deliberadamente sin rol. Ambas tienen MFA verificado; roles y MFA obligatorios están
+  activos después de dos operaciones secuenciales auditadas.
 - [x] Verificación individual por sede implementada. Una persona autorizada debe revisar y
   confirmar cada sede por separado. Las tres sedes están activas y tienen evidencia vigente; el
   runtime falla cerrado si una futura versión pierde esa evidencia.
