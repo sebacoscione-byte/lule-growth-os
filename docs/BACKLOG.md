@@ -46,9 +46,9 @@ de Meta.
 - [x] **Verificación individual de sedes:** UI/API con evidencia,
   control de versión y escritura atómica por sede completadas; una edición ya no verifica a las
   otras ubicaciones.
-- [ ] **Confirmar sedes reales:** las tres están activas y se revisan individualmente. CIMEL Lanús
-  y Swiss Medical Lomas ya tienen evidencia; falta confirmar Hospital Británico desde la UI. El
-  runtime falla cerrado para datos sin evidencia vigente.
+- [x] **Confirmar sedes reales:** CIMEL Lanús, Hospital Británico y Swiss Medical Lomas están
+  activas y tienen evidencia individual vigente. El runtime falla cerrado si una futura versión
+  pierde esa evidencia.
 - [x] **Preflight de Meta:** Vercel Production fija `META_GRAPH_API_VERSION=v25.0`; un GET read-only
   valida versión, token e ID sin enviar mensajes ni devolver credenciales/identificadores. El cron
   diario alerta por email con códigos cerrados si deja de funcionar.

@@ -9,7 +9,8 @@
 - [x] Asignar los únicos dos roles operativos definidos: una cuenta `owner` y una `doctor`; las
       otras dos cuentas permanecen deliberadamente sin rol.
 - [x] Confirmar por audit que `owner` tiene MFA verificado y que `doctor` todavía debe enrolarlo.
-- [ ] Verificar recarga de Configuración desde la sesión `owner` y completar el MFA de `doctor`.
+- [x] Confirmar que Configuración vuelve a cargar y que las tres sedes tienen evidencia individual.
+- [ ] Completar el MFA de `doctor` y probar una sesión fresca de cada rol.
 
 ---
 
@@ -50,9 +51,8 @@ estos controles no médicos:
 
 Los flags `enforce_roles` y `require_mfa_for_sensitive_actions` siguen en `false`. El audit del
 2026-07-16 encontró una cuenta `owner` con MFA verificado, una `doctor` sin MFA y dos cuentas
-deliberadamente sin rol. Las tres sedes están activas; CIMEL Lanús y Swiss Medical Lomas tienen
-evidencia de verificación, mientras Hospital Británico todavía no. No corresponde activar roles/MFA
-ni dar por verificada esa sede sin completar las pruebas humanas correspondientes.
+deliberadamente sin rol. Las tres sedes están activas y tienen evidencia de verificación individual.
+No corresponde activar roles/MFA sin completar las pruebas humanas correspondientes.
 
 1. Cerrar sesión y volver a entrar con `owner` y `doctor` para refrescar `app_metadata.role`.
 2. Enrolar al menos un TOTP para `doctor` y un factor de respaldo para `owner`; probar login fresco,
@@ -60,8 +60,8 @@ ni dar por verificada esa sede sin completar las pruebas humanas correspondiente
 3. Activar primero `enforce_roles`; validar una cuenta por rol y recién después activar el flag MFA.
    Ese segundo flag exige AAL2 antes de entrar a todo el CRM, porque RLS protege también las
    lecturas de PII y no sólo las mutaciones.
-4. Revisar y confirmar Hospital Británico desde la UI; CIMEL Lanús y Swiss Medical Lomas ya tienen
-   evidencia individual. El runtime falla cerrado para datos de una sede sin evidencia vigente.
+4. [x] Revisar y confirmar individualmente CIMEL Lanús, Hospital Británico y Swiss Medical Lomas.
+   El runtime continúa fallando cerrado si una futura versión pierde evidencia vigente.
 5. Reaprobar en Meta `alerta_interna_derivacion`, que figura `pendiente_meta`. El destino ya está
    configurado como variable sensible en Vercel Production.
 
@@ -214,8 +214,8 @@ restauración sin tocar producción; ese gate no cuestiona que el esquema produc
   quedan deliberadamente sin rol. Falta enrolar MFA para `doctor`, probar ambas sesiones y activar
   primero roles y luego MFA. Los dos flags siguen apagados.
 - [x] Verificación individual por sede implementada. Una persona autorizada debe revisar y
-  confirmar cada sede por separado. CIMEL Lanús y Swiss Medical Lomas ya tienen evidencia;
-  Hospital Británico sigue pendiente. El runtime falla cerrado si falta evidencia.
+  confirmar cada sede por separado. Las tres sedes están activas y tienen evidencia vigente; el
+  runtime falla cerrado si una futura versión pierde esa evidencia.
 - [x] Vercel Production fija `META_GRAPH_API_VERSION=v25.0`. El preflight read-only valida
   versión/token/ID sin enviar mensajes y el cron diario alerta sólo con un código cerrado.
 - [x] Configurar `ALERT_WHATSAPP_TO` como variable sensible de Vercel Production y redeplegar la
