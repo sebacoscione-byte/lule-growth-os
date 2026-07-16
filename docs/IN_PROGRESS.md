@@ -1,8 +1,24 @@
+# HOTFIX APLICADO (2026-07-16) — restaurar recepción del webhook de WhatsApp
+
+## Incidente y corrección
+
+- [x] Confirmar que Meta entrega los POST al webhook productivo y que éste responde HTTP 503.
+- [x] Reproducir el fallo sin datos de pacientes: el trigger de supresión falla con SQLSTATE 42883
+      porque Supabase instala `hmac`/`digest` en `extensions` y las funciones fijaban sólo `public`.
+- [x] Preparar una migración que prioriza `pg_catalog, extensions, public` en las once funciones
+      afectadas y una regresión que exige ese contrato.
+- [x] Validar la migración con rollback, aplicarla atómicamente en producción y comprobar el mismo
+      `upsert` por REST con un evento técnico sintético eliminado inmediatamente.
+- [x] Confirmar 10/10 migraciones, preflight Meta 200, scheduler sano y suite completa verde.
+- [ ] Reenviar un mensaje real para confirmar el POST 200 y la respuesta desde el teléfono.
+
+---
+
 # CERRADO (2026-07-16) — acceso del staff y evidencia individual de sedes
 
 ## Estado
 
-Los PR #96 y #97 ya están mergeados. El hardening, las nueve migraciones, el scheduler durable,
+Los PR #96, #97 y #98 ya están mergeados. El hardening, las diez migraciones, el scheduler durable,
 el audit agregado y el preflight cerrado de Meta están activos en producción. Este cierre incorpora
 estos controles no médicos:
 
@@ -18,7 +34,7 @@ estos controles no médicos:
 ## Gates humanos posteriores al deploy
 
 Los flags `enforce_roles` y `require_mfa_for_sensitive_actions` siguen en `false`. El último audit
-agregado encontró cuatro usuarios sin rol, cero factores MFA verificados y las tres sedes inactivas
+agregado encontró cuatro usuarios sin rol, una cuenta con MFA verificado, tres todavía sin MFA y las tres sedes inactivas
 y sin evidencia de verificación. No corresponde inferir esos datos ni activarlos automáticamente.
 
 1. Asignar `app_metadata.role` a las cuatro cuentas.
@@ -160,9 +176,12 @@ El cutover de producción aplicó atómicamente este orden exacto:
 7. `20260716_whatsapp_phase1e_erasure_suppression.sql` — locks y tombstones HMAC de borrado.
 8. `20260716_whatsapp_policy_shadow.sql` — evaluación shadow auditable, todavía apagada.
 9. `20260716_whatsapp_privacy_roles_retention.sql` — roles, MFA, RLS, auditoría y limpieza.
+10. `20260716_whatsapp_security_pgcrypto_search_path.sql` — resolución segura de `hmac`/`digest`
+    desde el esquema `extensions` de Supabase.
 
 El lote completo primero pasó con `--dry-run` y rollback; después se persistió con `--atomic`, por
-lo que las nueve migraciones confirmaron juntas. Un re-run no encontró pendientes. Sigue faltando
+lo que las nueve migraciones originales confirmaron juntas. El hotfix de `search_path` se validó
+con rollback y se aplicó después en su propia transacción; el audit confirmó 10/10. Sigue faltando
 una base clonada/staging para probar interleavings reales de cola/outbox/borrado y ensayar
 restauración sin tocar producción; ese gate no cuestiona que el esquema productivo ya esté aplicado.
 

@@ -18,6 +18,7 @@ const EXPECTED_MIGRATIONS = [
   "20260716_whatsapp_phase1e_erasure_suppression.sql",
   "20260716_whatsapp_policy_shadow.sql",
   "20260716_whatsapp_privacy_roles_retention.sql",
+  "20260716_whatsapp_security_pgcrypto_search_path.sql",
 ]
 const EXPECTED_RELATIONS = [
   "public.whatsapp_webhook_events",

@@ -4,7 +4,7 @@ import { resolve } from "node:path"
 const migration = readFileSync(
   resolve(process.cwd(), "supabase/migrations/20260716_whatsapp_phase1d_atomic_routing.sql"),
   "utf8"
-).toLowerCase()
+).replace(/\r\n/g, "\n").toLowerCase()
 
 describe("WhatsApp phase 1D migration contract", () => {
   it("serializa la identidad por telefono y crea intake/links en una sola RPC", () => {

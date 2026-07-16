@@ -7,7 +7,8 @@
 
 El hardening derivado de `Investigacion_y_plan_bot_WhatsApp_Dra_Lucia_Chahin_para_Claude.md` y de
 los 180 casos del CSV está activo en producción. El PR #96 fue mergeado (`dcc0e47`), las nueve
-migraciones se aplicaron atómicamente y el re-run no encontró pendientes. CI, Vercel producción,
+migraciones iniciales se aplicaron atómicamente y el re-run no encontró pendientes. El hotfix
+`whatsapp_security_pgcrypto_search_path` elevó el estado productivo a 10/10 migraciones. CI, Vercel producción,
 el smoke público y el rechazo esperado del webhook inválido quedaron verdes. El PR #97 también
 fue mergeado (`d9434d7`) y dejó productivos el scheduler, el audit agregado y el preflight cerrado
 de Meta.
@@ -17,8 +18,8 @@ de Meta.
 - [ ] **Revisión legal:** validar consentimiento por finalidad, texto de privacidad, proveedores y
   transferencia internacional, oposición/borrado, primer mensaje pre-consentimiento y plazos de
   retención, incluido `data_erasure_log`.
-- [x] **Migraciones productivas:** 0A → 0B → 1 → 1B → 1C → 1D → 1E → policy → privacy aplicadas
-  con `--atomic`; el re-run informó cero migraciones pendientes.
+- [x] **Migraciones productivas:** 0A → 0B → 1 → 1B → 1C → 1D → 1E → policy → privacy →
+  pgcrypto-search-path aplicadas con `--atomic`; el audit informó 10/10.
 - [x] **Compatibilidad SQL real:** el dry-run con rollback y la aplicación persistente terminaron
   correctamente sobre el esquema de producción.
 - [ ] **Staging de concurrencia:** disponer de una base clonada, inspeccionar duplicados históricos
@@ -31,7 +32,8 @@ de Meta.
   terminó correctamente con HTTP 2xx.
 - [ ] **Accesos:** asignar `app_metadata.role`, enrolar MFA, probar una cuenta por rol y recién luego
   activar primero `enforce_roles` y después el flag MFA, siguiendo el runbook de
-  `docs/WHATSAPP_SECURITY_ROLES_RETENTION.md`. Estado auditado: cuatro cuentas sin rol y cero MFA.
+  `docs/WHATSAPP_SECURITY_ROLES_RETENTION.md`. Estado auditado: cuatro cuentas sin rol; una ya tiene
+  MFA verificado y tres siguen pendientes.
 - [x] **Flujo MFA en producto:** enrolamiento y step-up TOTP,
   administración de múltiples factores, gate central del CRM, callback seguro y autorización de
   rutas internas completados técnicamente. Al activar el flag, todo el CRM exige AAL2 porque RLS
