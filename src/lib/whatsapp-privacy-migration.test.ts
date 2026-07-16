@@ -4,19 +4,19 @@ import { resolve } from "node:path"
 const migration = readFileSync(
   resolve(process.cwd(), "supabase/migrations/20260716_whatsapp_privacy_roles_retention.sql"),
   "utf8"
-)
+).replace(/\r\n/g, "\n")
 const phase0bMigration = readFileSync(
   resolve(process.cwd(), "supabase/migrations/20260716_whatsapp_phase0b_operations.sql"),
   "utf8"
-)
+).replace(/\r\n/g, "\n")
 const phase1Migration = readFileSync(
   resolve(process.cwd(), "supabase/migrations/20260716_whatsapp_phase1_durable_transport.sql"),
   "utf8"
-)
+).replace(/\r\n/g, "\n")
 const phase1dMigration = readFileSync(
   resolve(process.cwd(), "supabase/migrations/20260716_whatsapp_phase1d_atomic_routing.sql"),
   "utf8"
-)
+).replace(/\r\n/g, "\n")
 
 describe("privacy/roles/retention migration contract", () => {
   it("nace en modo compatible y toma el rol desde el claim firmado", () => {

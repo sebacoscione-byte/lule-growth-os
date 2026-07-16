@@ -2,14 +2,14 @@
 
 ## Estado de despliegue
 
-La implementación del PR #96 está activa en producción. Las nueve migraciones se aplicaron en una
-única transacción y el re-run confirmó cero pendientes. El PR #97 también está productivo: dejó
+La implementación del PR #96 está activa en producción. Las nueve migraciones iniciales se aplicaron
+en una única transacción; el hotfix posterior de `search_path` dejó 10/10 aplicadas. El PR #97 también está productivo: dejó
 activos el scheduler durable, el audit agregado y el preflight cerrado de Meta. La limpieza de
 retención sigue dentro de `weekly-report`, uno de los dos cron jobs de Vercel; el worker usa aparte
 Supabase Cron y no consume un tercer slot.
 
 Los controles de rol/MFA permanecen deliberadamente apagados. El audit agregado encontró cuatro
-cuentas sin rol y cero factores MFA verificados. El cierre actual incorpora el flujo TOTP, el gate
+cuentas sin rol; una ya tiene MFA verificado y tres siguen pendientes. El cierre actual incorpora el flujo TOTP, el gate
 central del CRM, el callback seguro, la autorización de rutas internas y la verificación individual
 por sede. Los pasos del runbook humano siguen pendientes.
 
@@ -24,6 +24,7 @@ El orden obligatorio del lote es:
 7. `20260716_whatsapp_phase1e_erasure_suppression.sql` (1E).
 8. `20260716_whatsapp_policy_shadow.sql` (policy).
 9. `20260716_whatsapp_privacy_roles_retention.sql` (privacy).
+10. `20260716_whatsapp_security_pgcrypto_search_path.sql` (pgcrypto en `extensions`).
 
 1C persiste un checkpoint cuando termina el handler para que un fallo del ACK no reprocese la
 respuesta al paciente. 1D unifica la identidad lead/conversación, hace routing y handoff atómicos,

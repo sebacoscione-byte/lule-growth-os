@@ -165,6 +165,7 @@ policy → privacy, correspondiente a:
 7. `20260716_whatsapp_phase1e_erasure_suppression.sql`.
 8. `20260716_whatsapp_policy_shadow.sql`.
 9. `20260716_whatsapp_privacy_roles_retention.sql`.
+10. `20260716_whatsapp_security_pgcrypto_search_path.sql`.
 
 El smoke público y el rechazo esperado del webhook ante una solicitud inválida también fueron
 aprobados. El worker frecuente ya está activo con un único job `lule-whatsapp-worker-every-minute`
