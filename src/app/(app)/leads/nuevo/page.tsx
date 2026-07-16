@@ -27,7 +27,7 @@ export default function NuevoLeadPage() {
     searched_keyword: "",
     insurance: "",
     general_reason: "",
-    consent_to_contact: true,
+    consent_to_contact: false,
   })
 
   function update(field: string, value: string | boolean) {
@@ -60,7 +60,8 @@ export default function NuevoLeadPage() {
       requires_human: classified?.requires_human ?? false,
       possible_emergency: classified?.possible_emergency ?? false,
       ai_summary: classified ? `Intent: ${classified.intent}. Next: ${classified.next_action}` : null,
-      last_message: form.general_reason || null,
+      // En altas manuales marcadas como WhatsApp, no duplicar el texto pegado en dos columnas.
+      last_message: form.origin_channel === "whatsapp" ? null : (form.general_reason || null),
     }
 
     const res = await fetch("/api/leads", {
@@ -70,7 +71,10 @@ export default function NuevoLeadPage() {
     })
     const lead = await res.json()
 
-    if (classified?.reply_suggestion && form.general_reason) {
+    // Un alta manual marcada como WhatsApp no puede usar /api/messages para registrar texto: esa
+    // ruta envía de verdad al paciente si encuentra una sesión abierta. Nunca reenviar el mensaje
+    // pegado ni una sugerencia automática por este camino.
+    if (form.origin_channel !== "whatsapp" && classified?.reply_suggestion && form.general_reason) {
       await fetch("/api/messages", {
         method: "POST",
         headers: { "Content-Type": "application/json" },

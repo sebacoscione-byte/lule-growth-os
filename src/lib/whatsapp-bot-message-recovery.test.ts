@@ -1,8 +1,8 @@
 // Ola 4 (incidente real 2026-07-14, David Portas): logWhatsAppMessage() solo inserta en `messages`
 // si ya hay lead_id (esa columna es NOT NULL) -- el primer mensaje con contenido real de cada
 // conversación nueva se logueaba ANTES de que el lead existiera, así que se perdía para siempre
-// aunque el lead sí se creara (invisible en el Inbox). Cubre los dos puntos donde
-// handleIncomingMessage crea un lead nuevo: el intake normal y una emergencia médica.
+// aunque el lead sí se creara (invisible en el Inbox). El intake administrativo aceptado conserva
+// una copia canónica; una urgencia solo conserva flags operativos, nunca síntomas libres.
 
 jest.mock("@/lib/supabase/service", () => ({ getServiceDb: jest.fn() }))
 jest.mock("@/lib/whatsapp", () => ({
@@ -23,10 +23,16 @@ jest.mock("@/lib/landing-referral-codes", () => ({
 }))
 jest.mock("@/lib/medical-safety", () => ({
   isEmergencyMessage: jest.fn().mockReturnValue(false),
+  isMedicalBoundaryMessage: jest.fn().mockReturnValue(false),
+  containsSensitiveMedicalContent: jest.fn().mockReturnValue(false),
   EMERGENCY_REPLY: "Esto suena a una urgencia — llamá al 107 (SAME) o andá a la guardia más cercana.",
+  MEDICAL_BOUNDARY_REPLY: "Este canal es solo administrativo.",
+  SENSITIVE_MEDICAL_CONTENT_REPLY: "Repetí sólo los datos administrativos.",
 }))
 jest.mock("@/lib/whatsapp-consent", () => ({
   CONSENT_TEXT: "texto de consentimiento",
+  CONSENT_ACCEPT_BUTTON_ID: "consent_accept",
+  CONSENT_DECLINE_BUTTON_ID: "consent_decline",
   interpretConsentReply: jest.fn(),
   recordConsent: jest.fn(),
   hasConsented: jest.fn().mockResolvedValue(true),
@@ -80,7 +86,7 @@ function baseSession(overrides: Record<string, unknown> = {}) {
 
 function makeThenableBuilder(result: { data: unknown; error: unknown }) {
   const builder: Record<string, unknown> = {}
-  const chain = ["select", "eq", "neq", "in", "lt", "update", "insert"]
+  const chain = ["select", "eq", "neq", "in", "lt", "update", "insert", "upsert", "is"]
   for (const method of chain) builder[method] = jest.fn(() => builder)
   builder.single = jest.fn(() => Promise.resolve(result))
   builder.maybeSingle = jest.fn(() => Promise.resolve(result))
@@ -99,16 +105,26 @@ function mockDb(session: ReturnType<typeof baseSession>) {
   })
   const appConfigBuilder = makeThenableBuilder({ data: { value: [] }, error: null })
   const messagesBuilder = makeThenableBuilder({ data: null, error: null })
+  const consentBuilder = makeThenableBuilder({ data: null, error: null })
+  const costBuilder = makeThenableBuilder({ data: null, error: null })
 
   const fromSpy = jest.fn((table: string) => {
     if (table === "whatsapp_sessions") return sessionsBuilder
     if (table === "leads") return leadsBuilder
     if (table === "app_config") return appConfigBuilder
     if (table === "messages") return messagesBuilder
+    if (table === "consent_records") return consentBuilder
+    if (table === "whatsapp_cost_events") return costBuilder
     throw new Error(`tabla inesperada en el mock: ${table}`)
   })
-  ;(getServiceDb as jest.Mock).mockReturnValue({ from: fromSpy })
-  return { leadsBuilder, messagesBuilder }
+  const rpc = jest.fn().mockImplementation((name: string) => {
+    if (name === "upsert_whatsapp_intake_lead" || name === "ensure_whatsapp_lead") {
+      return Promise.resolve({ data: session.lead_id ?? NEW_LEAD_ID, error: null })
+    }
+    throw new Error(`rpc inesperada en el mock: ${name}`)
+  })
+  ;(getServiceDb as jest.Mock).mockReturnValue({ from: fromSpy, rpc })
+  return { leadsBuilder, messagesBuilder, rpc }
 }
 
 beforeEach(() => {
@@ -117,48 +133,72 @@ beforeEach(() => {
 })
 
 describe("recuperación del mensaje que crea el lead", () => {
-  it("intake normal: al crear el lead, inserta en `messages` el texto que lo originó", async () => {
+  it("intake normal: recupera el mensaje dentro de la RPC atómica", async () => {
     const texto = "Busco turno cardiologico para un familiar, necesita que lo vean pronto"
-    const { messagesBuilder } = mockDb(baseSession({ state: "intake_pendiente", lead_id: null }))
-    ;(extractIntake as jest.Mock).mockReturnValue({ motivo: null, obraSocial: null, edad: null, sede: null, notas: texto })
+    const { messagesBuilder, rpc } = mockDb(baseSession({ state: "intake_pendiente", lead_id: null }))
+    ;(extractIntake as jest.Mock).mockReturnValue({ motivo: null, obraSocial: null, sede: null })
 
-    await handleIncomingMessage({ phone: PHONE, text: texto })
+    await handleIncomingMessage({ phone: PHONE, text: texto, waMessageId: "wamid.intake-normal" })
 
-    expect(messagesBuilder.insert).toHaveBeenCalledWith(
-      expect.objectContaining({ lead_id: NEW_LEAD_ID, role: "user", content: texto, direction: "inbound" })
-    )
+    expect(rpc).toHaveBeenCalledWith("upsert_whatsapp_intake_lead", expect.objectContaining({
+      p_phone: PHONE,
+      p_raw_message: texto,
+      p_wa_message_id: "wamid.intake-normal",
+    }))
+    expect(messagesBuilder.insert).not.toHaveBeenCalled()
   })
 
   it("intake para un lead que ya existía: no vuelve a insertar el mensaje en `messages` (ya lo logueó logWhatsAppMessage)", async () => {
-    const { messagesBuilder } = mockDb(baseSession({ state: "intake_pendiente", lead_id: "lead-existente" }))
-    ;(extractIntake as jest.Mock).mockReturnValue({ motivo: null, obraSocial: "OSDE", edad: null, sede: null, notas: "tengo OSDE" })
+    const { messagesBuilder, rpc } = mockDb(baseSession({ state: "intake_pendiente", lead_id: "lead-existente" }))
+    ;(extractIntake as jest.Mock).mockReturnValue({ motivo: null, obraSocial: "OSDE", sede: null })
 
     await handleIncomingMessage({ phone: PHONE, text: "tengo OSDE" })
 
     expect(messagesBuilder.insert).not.toHaveBeenCalled()
+    expect(rpc).toHaveBeenCalledWith("upsert_whatsapp_intake_lead", expect.any(Object))
   })
 
-  it("emergencia médica con lead nuevo: inserta en `messages` el texto con los síntomas", async () => {
+  it("un retry del mismo wa_message_id recupera el mensaje con upsert idempotente", async () => {
+    const texto = "Quiero un turno con OSDE"
+    const { messagesBuilder, rpc } = mockDb(baseSession({ state: "intake_pendiente", lead_id: null }))
+    ;(extractIntake as jest.Mock).mockReturnValue({ motivo: "turno", obraSocial: "OSDE", sede: null })
+
+    await handleIncomingMessage({ phone: PHONE, text: texto, waMessageId: "wamid.intake-1" })
+
+    expect(rpc).toHaveBeenCalledWith("upsert_whatsapp_intake_lead", expect.objectContaining({
+      p_raw_message: texto,
+      p_wa_message_id: "wamid.intake-1",
+    }))
+    expect(messagesBuilder.upsert).not.toHaveBeenCalled()
+  })
+
+  it("emergencia médica con lead nuevo: guarda flags pero no persiste el texto con síntomas", async () => {
     const texto = "tengo mucho dolor de pecho y no puedo respirar"
-    const { messagesBuilder } = mockDb(baseSession({ state: "nuevo", lead_id: null }))
+    const { leadsBuilder, messagesBuilder, rpc } = mockDb(baseSession({ state: "nuevo", lead_id: null }))
     ;(isEmergencyMessage as jest.Mock).mockReturnValue(true)
 
     await handleIncomingMessage({ phone: PHONE, text: texto })
 
-    expect(messagesBuilder.insert).toHaveBeenCalledWith(
-      expect.objectContaining({ lead_id: NEW_LEAD_ID, role: "user", content: texto, direction: "inbound" })
-    )
+    expect(messagesBuilder.insert).not.toHaveBeenCalled()
+    expect(rpc).toHaveBeenCalledWith("ensure_whatsapp_lead", expect.objectContaining({
+      p_possible_emergency: true,
+      p_requires_human: true,
+      p_status: "urgencia_derivada",
+    }))
+    expect(leadsBuilder.insert).not.toHaveBeenCalled()
   })
 
   it("emergencia médica con lead ya existente: no inserta de nuevo (solo actualiza el lead)", async () => {
-    const { messagesBuilder, leadsBuilder } = mockDb(baseSession({ state: "derivado", lead_id: "lead-existente" }))
+    const { messagesBuilder, leadsBuilder, rpc } = mockDb(baseSession({ state: "derivado", lead_id: "lead-existente" }))
     ;(isEmergencyMessage as jest.Mock).mockReturnValue(true)
 
     await handleIncomingMessage({ phone: PHONE, text: "tengo dolor de pecho" })
 
     expect(messagesBuilder.insert).not.toHaveBeenCalled()
-    expect(leadsBuilder.update).toHaveBeenCalledWith(
-      expect.objectContaining({ status: "urgencia_derivada", possible_emergency: true })
-    )
+    expect(leadsBuilder.update).not.toHaveBeenCalled()
+    expect(rpc).toHaveBeenCalledWith("ensure_whatsapp_lead", expect.objectContaining({
+      p_status: "urgencia_derivada",
+      p_possible_emergency: true,
+    }))
   })
 })

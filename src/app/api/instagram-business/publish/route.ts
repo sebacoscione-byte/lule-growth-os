@@ -2,6 +2,9 @@ import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { getServiceDb } from "@/lib/supabase/service"
 import { publishImageToInstagram, publishCarouselToInstagram } from "@/lib/instagram-business"
+import { authorizeStaff } from "@/lib/staff-authz"
+
+const INSTAGRAM_BUSINESS_ROLES = ["owner", "doctor"] as const
 
 // Un carrusel espera hasta 10 contenedores de imagen (aunque en paralelo, ver publishCarouselToInstagram)
 // mas el contenedor padre -- el default de la plataforma podria no alcanzar en un caso lento.
@@ -10,8 +13,8 @@ export const maxDuration = 120
 export async function POST(request: Request) {
   try {
     const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    const auth = await authorizeStaff(supabase, { allowedRoles: INSTAGRAM_BUSINESS_ROLES, sensitive: true })
+    if (!auth.ok) return NextResponse.json({ error: auth.error, code: auth.code }, { status: auth.status })
 
     const body = await request.json() as {
       itemId?: string; imageDataUrl?: string; imageUrl?: string; imageUrls?: string[]; caption?: string; format?: string
@@ -48,6 +51,6 @@ export async function POST(request: Request) {
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
     console.error(`[instagram-business/publish] ${message}`)
-    return NextResponse.json({ error: message }, { status: 500 })
+    return NextResponse.json({ error: "No se pudo publicar el contenido en Instagram" }, { status: 500 })
   }
 }

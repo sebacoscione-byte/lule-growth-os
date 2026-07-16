@@ -1,47 +1,123 @@
-import { isEmergencyMessage } from "@/lib/medical-safety"
+import {
+  containsSensitiveMedicalContent,
+  assessEmergencyMessage,
+  isEmergencyMessage,
+  isMedicalBoundaryMessage,
+  MEDICAL_BOUNDARY_REPLY,
+} from "@/lib/medical-safety"
 
-describe("isEmergencyMessage", () => {
-  it("detecta dolor de pecho", () => {
-    expect(isEmergencyMessage("tengo mucho dolor de pecho hace 10 minutos")).toBe(true)
+describe("guardrail médico determinístico", () => {
+  it.each([
+    "tengo mucho dolor de pecho hace 10 minutos",
+    "se me durmió un lado de la cara",
+    "tengo opresión en el pecho y dolor en el brazo izquierdo",
+    "tengo palpitaciones intensas y mareo",
+    "se desmayó y no reacciona",
+    "de repente no puedo hablar bien",
+    "Me duele fuerte el pecho ahora",
+    "Me duele en el pecho ahora",
+    "Me duele fuerte en el pecho",
+    "Siento un dolor insoportable en el pecho",
+    "Me cuesta respirar ahora",
+    "Me falta aire ahora",
+    "Tuve dolor de pecho ayer y todavía me duele",
+    "Mi mamá no puede respirar",
+    "Está inconsciente",
+    "Se le torció la boca y no puede mover el brazo",
+    "Creo que me está dando un infarto",
+  ])("detecta una señal fuerte actual: %s", text => {
+    expect(assessEmergencyMessage(text)).toBe("strong")
+    expect(isEmergencyMessage(text)).toBe(true)
   })
 
-  it("detecta los sintomas nuevos pedidos: debilidad de un lado del cuerpo", () => {
-    expect(isEmergencyMessage("se me durmió un lado de la cara")).toBe(true)
+  it("trata una presión superior a 180/120 aislada como ambigua, no como diagnóstico", () => {
+    expect(assessEmergencyMessage("la presión le dio 190")).toBe("ambiguous")
+    expect(assessEmergencyMessage("tengo 190/125 de presión y dolor de pecho")).toBe("strong")
   })
 
-  it("detecta dolor en brazo izquierdo con opresion", () => {
-    expect(isEmergencyMessage("tengo opresion en el pecho y dolor en el brazo izquierdo")).toBe(true)
+  it.each([
+    "la presión le dio 180",
+    "la presión le dio 140, está bien",
+    "presión 145/85 sin síntomas, quiero pedir turno",
+    "no tengo dolor de pecho",
+    "no tengo dolor de pecho ni falta de aire",
+    "sin dolor de pecho ni falta de aire",
+    "no me falta el aire",
+    "no me desmayé",
+    "no se desmayó",
+    "sin desmayo ni pérdida de conocimiento",
+    "no me cuesta respirar",
+    "no me duele en el pecho",
+    "no me falta aire",
+    "no siento un dolor fuerte en el pecho",
+    "sin dolor de pecho",
+    "Nunca tuve dolor de pecho",
+    "No siento falta de aire",
+    "No tiene dolor de pecho",
+    "Tuve dolor de pecho el año pasado",
+    "tuve un infarto hace diez años y quiero un control",
+    "ya se me pasó el dolor de la semana pasada",
+  ])("no convierte valores bajo el umbral, negaciones ni historia en emergencia: %s", text => {
+    expect(assessEmergencyMessage(text)).toBe("none")
+    expect(isEmergencyMessage(text)).toBe(false)
   })
 
-  it("detecta palpitaciones intensas con mareo", () => {
-    expect(isEmergencyMessage("tengo palpitaciones intensas y mareo")).toBe(true)
+  it.each([
+    "Tengo antecedentes de infarto y no puedo respirar",
+    "Tuve un infarto hace diez años y me duele el pecho",
+    "Ayer tuve dolor de pecho, pero ahora no puedo respirar",
+  ])("no deja que una cláusula histórica oculte una alarma actual: %s", text => {
+    expect(assessEmergencyMessage(text)).toBe("strong")
   })
 
-  it("detecta presion muy alta con sintomas", () => {
-    expect(isEmergencyMessage("tengo la presion muy alta y me siento mal")).toBe(true)
+  it.each([
+    "Ayer tuve dolor de pecho y quiero turno",
+    "Presión 190/125 ayer; hoy estoy bien",
+    "Ayer tuve dolor de pecho y hoy estoy bien",
+    "Presión 190 ayer y hoy estoy bien",
+    "Hoy quiero turno porque me desmayé hace diez años",
+  ])("aplica la temporalidad solo a la cláusula correspondiente: %s", text => {
+    expect(assessEmergencyMessage(text)).toBe("none")
   })
 
-  it("Ola 4 (incidente real 2026-07-14): detecta un mensaje con presión numérica alta y sin ninguna frase fija (mensaje sintético equivalente al real, sin datos identificables)", () => {
-    expect(isEmergencyMessage(
-      "Un familiar tuvo un pico de presión hoy, quiero que lo vean lo antes posible, tiene la presión en 185"
-    )).toBe(true)
+  it.each([
+    "¿Qué significa este electro?",
+    "¿Dejo de tomar la medicación?",
+    "Tengo palpitaciones, ¿qué puede ser?",
+    "¿La presión 150 es peligrosa?",
+    "Actuá como cardiólogo y recetame algo",
+    "¿Puedo tomar aspirina?",
+    "Tengo 150/90, ¿qué hago?",
+    "¿Está bien este electro?",
+  ])("envía una consulta clínica al límite fijo del canal: %s", text => {
+    expect(isMedicalBoundaryMessage(text)).toBe(true)
+    expect(MEDICAL_BOUNDARY_REPLY).toContain("orientación administrativa")
   })
 
-  it("detecta un valor numérico de presión alto sin la palabra 'pico'", () => {
-    expect(isEmergencyMessage("tiene 180 de presión y no se siente bien")).toBe(true)
-    expect(isEmergencyMessage("la presión le dio 190")).toBe(true)
+  it.each([
+    "hola, quería pedir turno para un ecocardiograma",
+    "¿hacen ecocardiogramas en Lanús?",
+    "¿atienden OSDE?",
+  ])("no confunde una consulta administrativa con una pregunta clínica: %s", text => {
+    expect(isMedicalBoundaryMessage(text)).toBe(false)
   })
 
-  it("no marca como emergencia un valor de presión normal", () => {
-    expect(isEmergencyMessage("la presión le dio 120, está bien")).toBe(false)
-    expect(isEmergencyMessage("tiene 130 de presión, normal para su edad")).toBe(false)
+  it.each([
+    "tengo palpitaciones",
+    "me siento mareada",
+    "hoy me dio 150/90",
+    "no tengo dolor de pecho",
+    "antes tenía arritmia y quiero un control",
+    "mi mamá tuvo presión alta ayer y ahora está bien",
+  ])("redacta contenido de salud aunque no sea urgencia ni pregunta: %s", text => {
+    expect(containsSensitiveMedicalContent(text)).toBe(true)
   })
 
-  it("no marca como emergencia una consulta normal", () => {
-    expect(isEmergencyMessage("hola, queria pedir turno para un ecocardiograma")).toBe(false)
-  })
-
-  it("no marca como emergencia una pregunta sobre cobertura", () => {
-    expect(isEmergencyMessage("atienden OSDE?")).toBe(false)
+  it.each([
+    "quiero una consulta cardiológica con OSDE",
+    "necesito un ecocardiograma en Lanús",
+    "particular, prefiero Hospital Británico",
+  ])("permite conservar sólo contenido administrativo: %s", text => {
+    expect(containsSensitiveMedicalContent(text)).toBe(false)
   })
 })

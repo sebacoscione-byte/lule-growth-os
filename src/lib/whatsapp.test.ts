@@ -1,6 +1,7 @@
 jest.mock("./whatsapp-cost-tracking", () => ({
   logWhatsAppMessage: jest.fn().mockResolvedValue({ costEstimated: 0 }),
   incrementMessagesSentCount: jest.fn().mockResolvedValue(1),
+  accountWhatsAppOutboundDelivery: jest.fn().mockResolvedValue(undefined),
 }))
 
 jest.mock("./whatsapp-templates", () => ({
@@ -8,25 +9,162 @@ jest.mock("./whatsapp-templates", () => ({
   fillTemplateBody: jest.fn().mockReturnValue("cuerpo del template"),
 }))
 
-import { sendText, sendTemplate, WindowClosedError, TemplateNotApprovedError, type SendContext } from "@/lib/whatsapp"
+jest.mock("./whatsapp-outbox", () => ({
+  executeWhatsAppOutboundWithLedger: jest.fn(async (options: { dispatch: () => Promise<unknown> }) => ({
+    result: await options.dispatch(), ledgerKey: null, replayedAccepted: false,
+  })),
+}))
+
+jest.mock("@/lib/supabase/service", () => ({ getServiceDb: jest.fn() }))
+jest.mock("@/lib/whatsapp-erasure-suppression", () => ({
+  assertWhatsAppErasureNotSuppressed: jest.fn().mockResolvedValue(undefined),
+  WhatsAppErasureSuppressedError: class WhatsAppErasureSuppressedError extends Error {},
+}))
+
+import {
+  getWhatsAppGraphApiVersion,
+  sendText,
+  sendTemplate,
+  WhatsAppApiError,
+  WhatsAppConfigurationError,
+  WhatsAppAutomaticDispatchSuppressedError,
+  WindowClosedError,
+  TemplateNotApprovedError,
+  type SendContext,
+} from "@/lib/whatsapp"
 import { getApprovedTemplate } from "./whatsapp-templates"
+import { accountWhatsAppOutboundDelivery, incrementMessagesSentCount, logWhatsAppMessage } from "./whatsapp-cost-tracking"
+import { executeWhatsAppOutboundWithLedger } from "./whatsapp-outbox"
+import { getServiceDb } from "@/lib/supabase/service"
 
 const baseCtx: SendContext = {
   windowState: "open",
   entryPoint: "organic",
+  deliveryKey: "test-outbound-event",
+  flowIntent: "test_outbound",
   serviceMessageChargingEnabled: false,
 }
 
 describe("sendText — gate de ventana de 24h", () => {
   beforeEach(() => {
+    jest.clearAllMocks()
     process.env.WHATSAPP_PHONE_NUMBER_ID = "123"
     process.env.WHATSAPP_ACCESS_TOKEN = "token"
+    process.env.META_GRAPH_API_VERSION = "v23.0"
+    delete process.env.WHATSAPP_GRAPH_API_VERSION
     global.fetch = jest.fn().mockResolvedValue({ ok: true, json: async () => ({}) }) as unknown as typeof fetch
   })
 
   it("con la ventana abierta envia el mensaje de texto libre normalmente", async () => {
     await sendText("5491100000000", "hola", baseCtx)
     expect(global.fetch).toHaveBeenCalledTimes(1)
+  })
+
+  it("integra el ledger con el id entrante y el paso de flujo", async () => {
+    await sendText("5491100000000", "hola", {
+      ...baseCtx,
+      sourceWaMessageId: "wamid.inbound-1",
+      flowIntent: "consent_request",
+    })
+    expect(executeWhatsAppOutboundWithLedger).toHaveBeenCalledWith(expect.objectContaining({
+      sourceKey: "wamid.inbound-1",
+      destination: "5491100000000",
+      flowStep: "consent_request",
+      messageType: "text",
+    }))
+  })
+
+  it("revalida version y ownership del bot inmediatamente antes del request", async () => {
+    const rpc = jest.fn().mockResolvedValue({ data: true, error: null })
+    ;(getServiceDb as jest.Mock).mockReturnValue({ rpc })
+
+    await sendText("5491100000000", "hola", {
+      ...baseCtx,
+      sourceWaMessageId: "wamid.inbound-cas",
+      flowIntent: "consent_request",
+      requireActiveBot: true,
+      expectedStateVersion: 7,
+    })
+
+    expect(rpc).toHaveBeenCalledWith("authorize_whatsapp_bot_dispatch", {
+      p_phone: "5491100000000",
+      p_expected_state_version: 7,
+    })
+    expect(global.fetch).toHaveBeenCalledTimes(1)
+  })
+
+  it("suprime el envio si una persona tomo la conversacion durante el handler", async () => {
+    const rpc = jest.fn().mockResolvedValue({ data: false, error: null })
+    ;(getServiceDb as jest.Mock).mockReturnValue({ rpc })
+
+    await expect(sendText("5491100000000", "hola", {
+      ...baseCtx,
+      sourceWaMessageId: "wamid.inbound-takeover",
+      flowIntent: "consent_request",
+      requireActiveBot: true,
+      expectedStateVersion: 7,
+    })).rejects.toBeInstanceOf(WhatsAppAutomaticDispatchSuppressedError)
+
+    expect(global.fetch).not.toHaveBeenCalled()
+    expect(logWhatsAppMessage).not.toHaveBeenCalled()
+  })
+
+  it("un replay accepted usa logging/accounting idempotente en vez de incrementar a ciegas", async () => {
+    ;(executeWhatsAppOutboundWithLedger as jest.Mock).mockResolvedValueOnce({
+      result: { messages: [{ id: "wamid.outbound-ledger" }] },
+      ledgerKey: "a".repeat(64),
+      replayedAccepted: true,
+    })
+    await sendText("5491100000000", "hola", {
+      ...baseCtx,
+      sourceWaMessageId: "wamid.inbound-1",
+      flowIntent: "consent_request",
+    })
+    expect(logWhatsAppMessage).toHaveBeenCalledWith(expect.objectContaining({
+      outboundLedgerKey: "a".repeat(64),
+      waMessageId: "wamid.outbound-ledger",
+    }))
+    expect(accountWhatsAppOutboundDelivery).toHaveBeenCalledWith("a".repeat(64), "5491100000000")
+    expect(incrementMessagesSentCount).not.toHaveBeenCalled()
+    expect(global.fetch).not.toHaveBeenCalled()
+  })
+
+  it("usa una versión configurable válida y falla cerrado para valores inválidos", async () => {
+    process.env.META_GRAPH_API_VERSION = "v24.0"
+    await sendText("5491100000000", "hola", baseCtx)
+    expect(global.fetch).toHaveBeenCalledWith(
+      "https://graph.facebook.com/v24.0/123/messages",
+      expect.any(Object)
+    )
+
+    expect(() => getWhatsAppGraphApiVersion("../../otro-host")).toThrow(WhatsAppConfigurationError)
+    expect(() => getWhatsAppGraphApiVersion("")).toThrow("invalid_graph_api_version")
+  })
+
+  it("guarda el wa_message_id de la respuesta para conciliar estados de entrega", async () => {
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ messages: [{ id: "wamid.outbound-1" }] }),
+    }) as unknown as typeof fetch
+    await sendText("5491100000000", "hola", baseCtx)
+    expect(logWhatsAppMessage).toHaveBeenCalledWith(expect.objectContaining({
+      waMessageId: "wamid.outbound-1",
+    }))
+  })
+
+  it("descarta el body libre de errores de Meta", async () => {
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: false,
+      status: 400,
+      json: async () => ({
+        error: { code: 131026, is_transient: false, message: "token secreto y teléfono" },
+      }),
+    }) as unknown as typeof fetch
+
+    const promise = sendText("5491100000000", "hola", baseCtx)
+    await expect(promise).rejects.toBeInstanceOf(WhatsAppApiError)
+    await expect(promise).rejects.not.toThrow("token secreto")
+    expect(logWhatsAppMessage).not.toHaveBeenCalled()
   })
 
   it("con la ventana cerrada bloquea el envio de texto libre y no llama a la API de Meta", async () => {
@@ -40,6 +178,7 @@ describe("sendTemplate — funciona sin importar la ventana, pero exige template
   beforeEach(() => {
     process.env.WHATSAPP_PHONE_NUMBER_ID = "123"
     process.env.WHATSAPP_ACCESS_TOKEN = "token"
+    process.env.META_GRAPH_API_VERSION = "v23.0"
     global.fetch = jest.fn().mockResolvedValue({ ok: true, json: async () => ({}) }) as unknown as typeof fetch
   })
 

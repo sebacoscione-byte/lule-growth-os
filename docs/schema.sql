@@ -1,6 +1,21 @@
 -- ============================================================
--- Lule Growth OS — Schema SQL para Supabase
--- Ejecutar en Supabase SQL Editor en este orden
+-- Lule Growth OS — snapshot base del schema para Supabase
+--
+-- NO desplegar este archivo de forma aislada: las migraciones versionadas son la fuente canónica
+-- del estado actual. Después de este snapshot deben aplicarse, por nombre/fecha, entre otras:
+--   20260715_whatsapp_phase0a_safety.sql
+--   20260716_whatsapp_phase0b_operations.sql
+--   20260716_whatsapp_phase1_durable_transport.sql
+--   20260716_whatsapp_phase1b_outbound_ledger.sql
+--   20260716_whatsapp_phase1c_queue_checkpoint.sql
+--   20260716_whatsapp_phase1d_atomic_routing.sql
+--   20260716_whatsapp_phase1e_erasure_suppression.sql
+--   20260716_whatsapp_policy_shadow.sql
+--   20260716_whatsapp_privacy_roles_retention.sql
+-- La última reemplaza las políticas amplias de compatibilidad de este snapshot por roles/MFA.
+-- Este snapshot es un bootstrap base y omite deliberadamente parte del delta operativo de esas
+-- migraciones (queue checkpoint, identity map, tombstones y RPCs); no representa por sí solo el
+-- esquema efectivo ni debe usarse para saltar migraciones.
 -- ============================================================
 
 -- Enable UUID extension
@@ -42,6 +57,10 @@ create table if not exists leads (
   updated_at timestamptz not null default now(),
   referred_at timestamptz,
   followup_due_at timestamptz,
+  whatsapp_followup_sent_at timestamptz,
+  whatsapp_followup_claimed_at timestamptz,
+  whatsapp_followup_status text not null default 'not_requested'
+    check (whatsapp_followup_status in ('not_requested','pending','dispatching','sent','declined','cancelled','ambiguous')),
   confirmed_booked boolean not null default false,
   utm_source text,
   utm_medium text,
@@ -70,12 +89,18 @@ create table if not exists messages (
   content text not null,
   created_at timestamptz not null default now(),
   direction text check (direction in ('inbound', 'outbound')),
-  wa_message_id text,
+  wa_message_id text unique,
   category text check (category in ('marketing', 'utility', 'authentication', 'service')),
   template_name text,
   window_state text check (window_state in ('open', 'closed')),
   flow_intent text,
-  cost_estimated numeric(12, 4)
+  cost_estimated numeric(12, 4),
+  delivery_status text,
+  delivered_at timestamptz,
+  read_at timestamptz,
+  failed_at timestamptz,
+  delivery_error_code text,
+  outbound_ledger_key text unique
 );
 
 -- ============================================================
@@ -117,9 +142,8 @@ create table if not exists app_config (
   updated_at timestamptz not null default now()
 );
 
--- Historial de app_config: guarda el valor anterior de cada fila antes de
--- cualquier UPDATE (trigger), para poder recuperar datos si una migracion
--- u otro bug pisa una config sin querer sin dejar rastro.
+-- Historial de app_config: guarda sólo las cinco claves operativas no secretas de la whitelist
+-- antes de un UPDATE. Tokens e IDs internos de integraciones nunca se copian a este historial.
 create table if not exists app_config_history (
   id uuid default uuid_generate_v4() primary key,
   key text not null,
@@ -129,7 +153,9 @@ create table if not exists app_config_history (
 
 create or replace function log_app_config_change() returns trigger as $$
 begin
-  insert into app_config_history (key, value) values (old.key, old.value);
+  if old.key = any(array['doctor','locations','whatsapp_settings','auto_publish_settings','content_pipeline']) then
+    insert into app_config_history (key, value) values (old.key, old.value);
+  end if;
   return new;
 end;
 $$ language plpgsql security definer;
@@ -265,6 +291,13 @@ create table if not exists whatsapp_cost_events (
   currency text,
   flow_intent text,
   window_state text check (window_state in ('open', 'closed')),
+  wa_message_id text unique,
+  delivery_status text,
+  delivered_at timestamptz,
+  read_at timestamptz,
+  failed_at timestamptz,
+  delivery_error_code text,
+  outbound_ledger_key text unique,
   created_at timestamptz not null default now()
 );
 
@@ -288,23 +321,37 @@ create table if not exists consent_records (
   lead_id uuid references leads(id) on delete set null,
   consented boolean not null,
   consent_text text not null,
-  version text not null default 'v1',
+  version text not null default 'v2-administrative-service',
+  purpose text not null default 'administrative_service'
+    check (purpose in ('legacy_unspecified', 'administrative_service', 'appointment_followup', 'marketing', 'research_protocol')),
+  evidence_message_id text,
   source text not null default 'whatsapp_bot',
-  created_at timestamptz not null default now()
+  created_at timestamptz not null default now(),
+  unique (purpose, evidence_message_id)
 );
+
+create index if not exists consent_records_wa_id_purpose_created_idx
+  on consent_records(wa_id, purpose, created_at desc);
 
 create table if not exists handoff_events (
   id uuid default uuid_generate_v4() primary key,
   lead_id uuid references leads(id) on delete cascade,
   reason text not null
-    check (reason in ('urgencia_medica', 'solicitud_explicita', 'conversacion_larga', 'intent_no_entendido', 'sin_template_valido')),
+    check (reason in ('urgencia_medica', 'solicitud_explicita', 'conversacion_larga', 'intent_no_entendido', 'sin_template_valido', 'entrega_ambigua')),
   summary jsonb not null default '{}'::jsonb,
   messages_sent_count integer not null default 0,
   cost_estimated_total numeric(12, 4),
   created_at timestamptz not null default now(),
+  taken_at timestamptz,
+  taken_by text,
+  source_wa_message_id text,
   resolved_at timestamptz,
   resolved_by text
 );
+
+create unique index if not exists handoff_events_source_reason_unique
+  on handoff_events(source_wa_message_id, reason)
+  where source_wa_message_id is not null;
 
 alter table whatsapp_pricing_rules enable row level security;
 alter table whatsapp_cost_events enable row level security;
@@ -342,16 +389,11 @@ insert into whatsapp_pricing_rules (country_code, currency, category, is_templat
 on conflict do nothing;
 
 insert into templates (name, category, body_text, variables, variable_samples) values
-  ('confirmacion_turno', 'utility', 'Hola {{1}}, te confirmamos que gestionaste tu turno con la Dra. Lucía Chahin en {{2}} el día {{3}}. Ante cualquier cambio, contactate directamente con la institución.', '["nombre", "sede", "fecha"]', '["Juana", "CIMEL Lanús", "martes 10:00hs"]'),
-  ('recordatorio_turno', 'utility', 'Hola {{1}}, te recordamos tu turno con la Dra. Lucía Chahin en {{2}} el día {{3}}. Si ya no podés asistir, gestioná el cambio directamente con la institución.', '["nombre", "sede", "fecha"]', '["Juana", "CIMEL Lanús", "martes 10:00hs"]'),
-  ('preparacion_consulta_estudios', 'utility', 'Hola {{1}}, para tu turno de {{2}} con la Dra. Lucía Chahin te recomendamos: {{3}}. Cualquier duda, escribinos.', '["nombre", "practica", "indicaciones"]', '["Juana", "un ecocardiograma", "venir en ayunas"]'),
-  ('solicitud_documentacion', 'utility', 'Hola {{1}}, para avanzar con tu consulta necesitamos que tengas a mano: {{2}}. Llevalo el día de tu turno.', '["nombre", "documentacion"]', '["Juana", "tu DNI y el pedido médico"]'),
-  ('seguimiento_post_consulta', 'utility', 'Hola {{1}}, te escribimos sobre tu atención con la Dra. Lucía Chahin para saber cómo seguís después de tu consulta. Si tenés dudas sobre las indicaciones que te dieron, consultá directamente con la institución donde te atendiste.', '["nombre"]', '["Juana"]'),
-  ('invitacion_protocolo', 'marketing', 'Hola {{1}}, en el marco de tu atención con la Dra. Lucía Chahin, tu perfil médico podría ser compatible con el protocolo de investigación {{2}}. Es voluntario y requiere tu consentimiento explícito antes de avanzar. Respondé este mensaje si querés que te contactemos con más información, o "BAJA" si no querés recibir este tipo de mensajes.', '["nombre", "protocolo"]', '["Juana", "Estudio de arritmias 2026"]'),
+  ('invitacion_protocolo', 'marketing', 'Hola {{1}}. Como aceptaste recibir información sobre protocolos, una persona del equipo puede contarte aspectos administrativos de {{2}}. Esto no determina elegibilidad ni reemplaza el consentimiento del estudio. Respondé "BAJA" si no querés recibir más mensajes de esta finalidad.', '["nombre", "protocolo"]', '["Juana", "protocolo informado"]'),
   ('recontacto_incompleto', 'utility', 'Hola {{1}}, notamos que no pudiste terminar de coordinar tu turno con la Dra. Lucía Chahin. ¿Te ayudamos a retomarlo?', '["nombre"]', '["Juana"]'),
   ('aviso_administrativo', 'utility', 'Hola {{1}}, te escribimos desde el consultorio de la Dra. Lucía Chahin con una novedad sobre tu atención: {{2}}. Ante cualquier duda, respondé este mensaje.', '["nombre", "aviso"]', '["Juana", "el consultorio va a cerrar más temprano este viernes"]'),
-  ('derivacion_humano', 'utility', 'Hola {{1}}, tu consulta fue derivada a una persona del equipo de la Dra. Lucía Chahin, te va a contactar a la brevedad.', '["nombre"]', '["Juana"]'),
-  ('alerta_interna_derivacion', 'utility', '🚨 {{1}} pidió hablar con una persona en Lule Growth OS. Motivo: {{2}}. Revisá el email o el Inbox para más detalle.', '["nombre_paciente", "motivo"]', '["Juana Pérez", "Pidió hablar con una persona del equipo"]')
+  ('derivacion_humano', 'utility', 'Hola {{1}}, tu consulta quedó derivada al equipo de la Dra. Lucía Chahin. Podés continuar por este canal cuando una persona tome el caso.', '["nombre"]', '["Juana"]'),
+  ('alerta_interna_derivacion', 'utility', 'Hay una derivación pendiente en Lule Growth OS. Caso {{1}}. Revisá el Inbox autenticado para más detalle.', '["referencia_caso"]', '["CASO-1234ABCD"]')
 on conflict (name) do nothing;
 
 -- ============================================================
@@ -426,11 +468,10 @@ create policy "Authenticated users can do everything on experiments"
 create policy "Authenticated users can do everything on checklist"
   on google_local_checklist for all using (auth.role() = 'authenticated');
 
-create policy "Authenticated users can do everything on config"
-  on app_config for all using (auth.role() = 'authenticated');
-
-create policy "authenticated_read_app_config_history"
-  on app_config_history for select to authenticated using (true);
+-- Políticas finales y restricciones por rol: ver migración canónica
+-- `20260716_whatsapp_privacy_roles_retention.sql`. En particular, los clientes autenticados sólo
+-- acceden a una whitelist de configuración no secreta; tokens OAuth y el historial quedan
+-- exclusivamente bajo service_role.
 
 create policy "service_role_write_ai_requests"
   on ai_requests for all to service_role using (true) with check (true);
@@ -478,6 +519,8 @@ create policy "authenticated_read_google_business_snapshots"
 
 -- ============================================================
 -- SEED: Configuración inicial
+-- Las sedes nacen deliberadamente inactivas y NO VERIFICADAS. Una persona `owner` debe completar
+-- y guardar cada fila por `/api/config` para que el servidor selle verified_at/by/valid_from.
 -- ============================================================
 insert into app_config (key, value) values
   ('doctor', '{
@@ -493,13 +536,13 @@ insert into app_config (key, value) values
     ]
   }'),
   ('locations', '[
-    {"id": "cimel_lanus", "name": "CIMEL Lanús", "address": "Tucumán 1314, Lanús", "day": "martes", "services": ["Consulta cardiológica", "Ecocardiograma"], "booking_instruction": "Comunicate con CIMEL Lanús y solicitá turno con la Dra. Lucía Chahin."},
-    {"id": "swiss_lomas", "name": "Swiss Medical Lomas", "address": null, "day": "viernes", "services": ["Consulta cardiológica", "Ecocardiograma"], "booking_instruction": "Pedí turno por los canales oficiales de Swiss Medical Lomas solicitando a la Dra. Lucía Chahin."},
-    {"id": "hospital_britanico", "name": "Hospital Británico", "address": "Perdriel 74, CABA", "day": "miercoles", "services": ["Consulta cardiológica", "Ecocardiograma"], "booking_instruction": "Llamá al 4309-6400 (atención telefónica 24hs) o a la Central de Turnos 0810-222-2748 / 11-3015-9749, o pedí turno desde la app del Hospital Británico, y solicitá turno con la Dra. Lucía Chahin en cardiología."}
+    {"id": "cimel_lanus", "name": "CIMEL Lanús", "services": [], "active": false},
+    {"id": "swiss_lomas", "name": "Swiss Medical Lomas", "services": [], "active": false},
+    {"id": "hospital_britanico", "name": "Hospital Británico", "services": [], "active": false}
   ]'),
   ('messages', '{
-    "initial": "Hola, soy el asistente de la Dra. Lucía Chahin. Ella atiende consultas de cardiología y realiza ecocardiogramas.\n\nActualmente atiende:\n- Martes en CIMEL Lanús.\n- Miércoles en Hospital Británico.\n- Viernes en Swiss Medical Lomas.\n\n¿Buscás una consulta cardiológica o un ecocardiograma?",
-    "followup": "Hola, te escribo para saber si pudiste pedir turno con la Dra. Lucía Chahin. Si tuviste algún problema, avisame y te paso nuevamente las indicaciones."
+    "initial": "Hola, soy el asistente administrativo de la Dra. Lucía Chahin. Puedo orientarte sobre los canales oficiales para pedir turno. ¿Buscás una consulta cardiológica o un ecocardiograma?",
+    "followup": "Hola, te escribimos una sola vez, como aceptaste, para saber si pudiste pedir turno. Si necesitás los canales oficiales nuevamente, respondé este mensaje."
   }')
 on conflict (key) do nothing;
 

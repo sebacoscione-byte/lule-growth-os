@@ -3,8 +3,20 @@ import type { SupabaseClient } from "@supabase/supabase-js"
 import { createClient } from "@/lib/supabase/server"
 import { readContentItems, writeContentItems } from "@/lib/content-pipeline"
 import type { ContentItem } from "@/types"
+import { authorizeStaff } from "@/lib/staff-authz"
 
 const INTERACTION_EVENT_TYPES = new Set(["click_booking", "click_call", "click_whatsapp", "click_maps"])
+const CONTENT_ROLES = ["owner", "doctor"] as const
+
+class ContentAuthorizationError extends Error {
+  constructor(
+    readonly status: 401 | 403 | 503,
+    readonly code: string,
+    message: string
+  ) {
+    super(message)
+  }
+}
 
 async function readAttribution(supabase: SupabaseClient, itemIds: string[]) {
   const attribution: Record<string, { visits: number; interactions: number }> = {}
@@ -24,23 +36,18 @@ async function readAttribution(supabase: SupabaseClient, itemIds: string[]) {
 }
 
 function errorResponse(error: unknown) {
-  const message = error instanceof Error ? error.message : String(error)
-  return NextResponse.json({ error: message }, { status: message === "Unauthorized" ? 401 : 500 })
+  if (error instanceof ContentAuthorizationError) {
+    return NextResponse.json({ error: error.message, code: error.code }, { status: error.status })
+  }
+  console.error(`[content/items] ${error instanceof Error ? error.message : String(error)}`)
+  return NextResponse.json({ error: "No se pudo completar la operación de contenido" }, { status: 500 })
 }
 
 async function authenticatedClient() {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) throw new Error("Unauthorized")
+  const auth = await authorizeStaff(supabase, { allowedRoles: CONTENT_ROLES })
+  if (!auth.ok) throw new ContentAuthorizationError(auth.status, auth.code, auth.error)
   return supabase
-}
-
-async function readItems() {
-  return readContentItems(await authenticatedClient())
-}
-
-async function writeItems(items: ContentItem[]) {
-  await writeContentItems(await authenticatedClient(), items)
 }
 
 export async function GET() {
@@ -61,6 +68,7 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
+    const supabase = await authenticatedClient()
     const incoming = await request.json() as ContentItem
     const topic = [incoming.topic, incoming.visual_headline, incoming.hook, incoming.category]
       .find(value => typeof value === "string" && value.trim())?.trim() || "Contenido generado"
@@ -71,8 +79,8 @@ export async function POST(request: NextRequest) {
     if (!item.id || typeof item.caption !== "string") {
       return NextResponse.json({ error: "Falta el id de la pieza." }, { status: 400 })
     }
-    const items = await readItems()
-    await writeItems([item, ...items.filter(existing => existing.id !== item.id)].slice(0, 100))
+    const items = await readContentItems(supabase)
+    await writeContentItems(supabase, [item, ...items.filter(existing => existing.id !== item.id)].slice(0, 100))
     return NextResponse.json({ item })
   } catch (error) {
     return errorResponse(error)
@@ -81,8 +89,9 @@ export async function POST(request: NextRequest) {
 
 export async function PATCH(request: NextRequest) {
   try {
+    const supabase = await authenticatedClient()
     const body = await request.json() as Partial<ContentItem> & { id: string }
-    const items = await readItems()
+    const items = await readContentItems(supabase)
     const current = items.find(item => item.id === body.id)
     if (!current) return NextResponse.json({ error: "Borrador no encontrado" }, { status: 404 })
 
@@ -202,7 +211,7 @@ export async function PATCH(request: NextRequest) {
     }
 
     const updated = items.map(item => item.id === body.id ? nextItem : item)
-    await writeItems(updated)
+    await writeContentItems(supabase, updated)
     return NextResponse.json({ item: nextItem })
   } catch (error) {
     return errorResponse(error)
@@ -211,9 +220,10 @@ export async function PATCH(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
+    const supabase = await authenticatedClient()
     const id = request.nextUrl.searchParams.get("id")
     if (!id) return NextResponse.json({ error: "id required" }, { status: 400 })
-    await writeItems((await readItems()).filter(item => item.id !== id))
+    await writeContentItems(supabase, (await readContentItems(supabase)).filter(item => item.id !== id))
     return NextResponse.json({ ok: true })
   } catch (error) {
     return errorResponse(error)

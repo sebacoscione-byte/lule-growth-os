@@ -3,14 +3,17 @@ import { createClient } from "@/lib/supabase/server"
 import { getServiceDb } from "@/lib/supabase/service"
 import { getValidToken, getConnectionInfo, replyToReview } from "@/lib/google-business"
 import { parseJsonBody } from "@/lib/api-validation"
+import { authorizeStaff } from "@/lib/staff-authz"
+
+const GOOGLE_BUSINESS_ROLES = ["owner", "doctor"] as const
 
 export async function PUT(
   req: NextRequest,
   { params }: { params: Promise<{ reviewId: string }> }
 ) {
   const userClient = await createClient()
-  const { data: { user } } = await userClient.auth.getUser()
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  const auth = await authorizeStaff(userClient, { allowedRoles: GOOGLE_BUSINESS_ROLES, sensitive: true })
+  if (!auth.ok) return NextResponse.json({ error: auth.error, code: auth.code }, { status: auth.status })
 
   const { reviewId } = await params
   const parsedBody = await parseJsonBody(req)
@@ -35,6 +38,6 @@ export async function PUT(
     return NextResponse.json(data)
   } catch (e) {
     console.error(`[google-business/reviews/reply] review=${reviewId}: ${String(e)}`)
-    return NextResponse.json({ error: String(e) }, { status: 500 })
+    return NextResponse.json({ error: "No se pudo publicar la respuesta en Google Business" }, { status: 500 })
   }
 }

@@ -22,10 +22,16 @@ jest.mock("@/lib/landing-referral-codes", () => ({
 }))
 jest.mock("@/lib/medical-safety", () => ({
   isEmergencyMessage: jest.fn().mockReturnValue(false),
+  isMedicalBoundaryMessage: jest.fn().mockReturnValue(false),
+  containsSensitiveMedicalContent: jest.fn().mockReturnValue(false),
   EMERGENCY_REPLY: "Esto suena a una urgencia — llamá al 107 (SAME) o andá a la guardia más cercana.",
+  MEDICAL_BOUNDARY_REPLY: "Este canal es solo administrativo.",
+  SENSITIVE_MEDICAL_CONTENT_REPLY: "Repetí sólo los datos administrativos.",
 }))
 jest.mock("@/lib/whatsapp-consent", () => ({
   CONSENT_TEXT: "texto de consentimiento",
+  CONSENT_ACCEPT_BUTTON_ID: "consent_accept",
+  CONSENT_DECLINE_BUTTON_ID: "consent_decline",
   interpretConsentReply: jest.fn(),
   recordConsent: jest.fn(),
   hasConsented: jest.fn().mockResolvedValue(true),

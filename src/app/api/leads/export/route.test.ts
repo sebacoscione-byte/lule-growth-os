@@ -1,7 +1,17 @@
 import { GET } from "./route"
 
 jest.mock("@/lib/supabase/server", () => ({ createClient: jest.fn() }))
+jest.mock("@/lib/staff-authz", () => ({
+  authorizeStaff: jest.fn(async (supabase: { auth: { getUser: () => Promise<{ data: { user: unknown } }> } }) => {
+    const { data: { user } } = await supabase.auth.getUser()
+    return user
+      ? { ok: true, user, role: "owner", legacyCompatibility: true, assuranceLevel: null }
+      : { ok: false, status: 401, code: "unauthorized", error: "Unauthorized" }
+  }),
+}))
+jest.mock("@/lib/security-audit", () => ({ recordSecurityAudit: jest.fn().mockResolvedValue(undefined) }))
 import { createClient } from "@/lib/supabase/server"
+import { recordSecurityAudit } from "@/lib/security-audit"
 
 function mockClient(user: { id: string } | null, leadsResult: { data: unknown; error: { message: string } | null }) {
   const fakeClient = {
@@ -66,6 +76,9 @@ describe("GET /api/leads/export", () => {
     expect(res.status).toBe(200)
     const text = await res.text()
     expect(text).toContain("'=HYPERLINK")
+    expect(recordSecurityAudit).toHaveBeenCalledWith(expect.objectContaining({
+      action: "lead_export", actorUserId: "u1",
+    }))
   })
 
   it("no antepone comilla a un nombre normal", async () => {

@@ -38,7 +38,7 @@ export default function PrivacidadPage() {
           </p>
           <h1 className="font-display text-3xl font-semibold text-ink">Política de privacidad</h1>
           <p className="mt-2 text-sm text-ink-soft">
-            Última actualización: 12 de julio de 2026.
+            Última actualización: 16 de julio de 2026.
           </p>
 
           <div className="mt-5 flex items-start gap-3 rounded-2xl border border-orange-200 bg-orange-50 p-4">
@@ -71,9 +71,12 @@ export default function PrivacidadPage() {
       <Section title="Qué datos recolectamos">
         <p>Según cómo nos contactes, podemos recolectar:</p>
         <ul className="list-disc pl-5 space-y-1">
-          <li>Nombre, teléfono y obra social/prepaga, si los compartís.</li>
-          <li>Motivo de consulta, edad y estudios o síntomas previos, si los mencionás.</li>
-          <li>El contenido de la conversación de WhatsApp, si nos escribís por ese canal.</li>
+          <li>Nombre, teléfono, obra social/prepaga, servicio administrativo y sede elegida, si los compartís.</li>
+          <li>
+            El contenido administrativo de la conversación de WhatsApp después de que aceptás el
+            aviso de privacidad. El bot no pide edad, síntomas ni estudios y no conserva el texto
+            detectado como urgencia o consulta clínica.
+          </li>
           <li>
             Sede/institución elegida, canal de origen (Google Maps, Instagram, búsqueda,
             WhatsApp) y parámetros de campaña (UTM), si llegaste desde un link de una
@@ -91,26 +94,31 @@ export default function PrivacidadPage() {
         </ul>
         <p>
           <strong>No recolectamos ni pedimos</strong> resultados de estudios médicos, historia
-          clínica completa, ni ningún dato de salud más allá de lo que decidas contarnos vos
-          mismo para que podamos derivarte a la sede correcta.
+          clínica completa, edad ni síntomas para operar el bot. Si enviás espontáneamente una
+          consulta clínica, el asistente aplica una respuesta fija de seguridad y no la usa para
+          elaborar una respuesta médica.
         </p>
       </Section>
 
       <Section title="Para qué usamos estos datos">
         <ul className="list-disc pl-5 space-y-1">
           <li>Contactarte y ayudarte a elegir la sede/institución más conveniente.</li>
-          <li>Hacer seguimiento hasta que nos confirmes que ya pediste el turno.</li>
           <li>
-            Clasificar automáticamente el motivo de tu consulta (por ejemplo, distinguir un
-            pedido de turno de una urgencia) para poder responderte más rápido.
+            Hacer un único seguimiento para saber si pudiste pedir el turno, solo si lo aceptás
+            por separado y de forma opcional; ese permiso no incluye promociones.
+          </li>
+          <li>
+            Clasificar automáticamente el motivo administrativo de tu consulta y marcar señales
+            de seguridad para que una política fija responda o derive a una persona.
           </li>
           <li>Medir qué canales (Google Maps, Instagram, búsqueda) generan más consultas.</li>
         </ul>
         <p>
           <strong>Este sitio y el bot de WhatsApp no dan diagnósticos, no interpretan estudios, no
           reservan turnos ni confirman disponibilidad</strong> — solo te orientan sobre cómo
-          pedirlo vos mismo en la institución elegida. Ante una emergencia médica, siempre te
-          vamos a indicar que llames al 107 o vayas a una guardia.
+          pedirlo vos mismo en la institución elegida. Ante una posible emergencia, te indicamos
+          que busques atención inmediata en una guardia o llames al servicio de emergencias de tu
+          zona, sin esperar una respuesta por WhatsApp.
         </p>
       </Section>
 
@@ -126,9 +134,11 @@ export default function PrivacidadPage() {
           </li>
           <li>
             <strong>Anthropic (Claude) y/o Google (Gemini)</strong>, proveedores de inteligencia
-            artificial que usamos para clasificar automáticamente tu consulta y sugerir
-            respuestas — no toman ninguna decisión médica, solo ayudan a dirigir tu mensaje al
-            flujo correcto.
+            artificial que podemos usar para clasificar una consulta dentro de categorías
+            cerradas. El texto que recibe el paciente sale de un catálogo aprobado: estos
+            proveedores no redactan respuestas para pacientes ni deciden diagnósticos,
+            tratamientos o elegibilidad clínica. Una señal de seguridad del clasificador solo
+            puede activar una respuesta fija y una derivación conservadora.
           </li>
           <li>
             <strong>Supabase</strong>, donde se almacena la base de datos de la aplicación.
@@ -151,10 +161,9 @@ export default function PrivacidadPage() {
         </p>
         <p>
           Si tu consulta fue por interés en un protocolo de investigación clínica, esos datos no
-          se eliminan automáticamente: se conservan por el plazo legal aplicable (como mínimo 10
-          años desde la última actuación registrada). Pasados 24 meses sin actividad, dejamos de
-          usarlos para contactarte — el dato se conserva, pero no se vuelve a utilizar
-          comercialmente.
+          se eliminan automáticamente mientras se define y aplica el plazo legal correspondiente.
+          Pasados 24 meses sin actividad, dejamos de usarlos para contactarte — el dato queda bajo
+          una retención especial y no se vuelve a utilizar comercialmente.
         </p>
         <p>
           En cualquier momento podés pedirnos el borrado manual de tus datos, sin esperar a que se
@@ -201,10 +210,11 @@ export default function PrivacidadPage() {
 
       <Section title="Datos de salud">
         <p>
-          Entendemos que el motivo de consulta o los síntomas que compartís son datos sensibles.
-          Se usan exclusivamente para ayudarte a elegir la sede correcta y agilizar tu atención —
-          nunca se publican, ni se comparten con fines comerciales, ni se usan para ningún
-          propósito distinto al que motivó tu consulta.
+          Entendemos que cualquier síntoma, estudio o consulta clínica que envíes espontáneamente
+          puede ser un dato sensible. El bot no lo solicita, no lo usa para elegir una sede ni para
+          elaborar una respuesta médica y evita conservar ese texto en el CRM cuando lo detecta.
+          Aplica una respuesta fija de seguridad o deriva a una persona; nunca lo publica ni lo usa
+          con fines comerciales.
         </p>
       </Section>
 

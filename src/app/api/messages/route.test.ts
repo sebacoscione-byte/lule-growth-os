@@ -12,15 +12,25 @@ jest.mock("@/lib/ai", () => ({
   getPublicAiError: jest.fn(() => "error de IA"),
 }))
 jest.mock("@/lib/whatsapp-handoff", () => ({
-  resolveHandoffForLead: jest.fn().mockResolvedValue(undefined),
+  takeHandoffForLead: jest.fn().mockResolvedValue(undefined),
 }))
+jest.mock("@/lib/staff-authz", () => ({
+  authorizeStaff: jest.fn(async (supabase: { auth: { getUser: () => Promise<{ data: { user: unknown } }> } }) => {
+    const { data: { user } } = await supabase.auth.getUser()
+    return user
+      ? { ok: true, user, role: "owner", legacyCompatibility: true, assuranceLevel: null }
+      : { ok: false, status: 401, code: "unauthorized", error: "Unauthorized" }
+  }),
+}))
+jest.mock("@/lib/security-audit", () => ({ recordSecurityAudit: jest.fn().mockResolvedValue(undefined) }))
 
 import { POST } from "./route"
 import { createClient } from "@/lib/supabase/server"
 import { getServiceDb } from "@/lib/supabase/service"
 import { sendText, WindowClosedError } from "@/lib/whatsapp"
 import { generateReply } from "@/lib/ai"
-import { resolveHandoffForLead } from "@/lib/whatsapp-handoff"
+import { takeHandoffForLead } from "@/lib/whatsapp-handoff"
+import { recordSecurityAudit } from "@/lib/security-audit"
 
 function messagesTable(opts: { latestMessage?: unknown; historyMessages?: unknown[] } = {}) {
   return {
@@ -81,20 +91,17 @@ function mockSupabase(opts: { lead: Record<string, unknown> | null; latestMessag
 }
 
 function mockServiceSession(session: Record<string, unknown> | null) {
-  const updateSpy = jest.fn(() => ({ eq: jest.fn().mockResolvedValue({ data: null, error: null }) }))
   const fromSpy = jest.fn((table: string) => {
     if (table === "whatsapp_sessions") {
       return {
         select: jest.fn(() => ({
           eq: jest.fn(() => ({ maybeSingle: jest.fn().mockResolvedValue({ data: session, error: null }) })),
         })),
-        update: updateSpy,
       }
     }
     throw new Error(`tabla de servicio inesperada: ${table}`)
   })
   ;(getServiceDb as jest.Mock).mockReturnValue({ from: fromSpy })
-  return { updateSpy }
 }
 
 function postRequest(body: unknown) {
@@ -110,13 +117,14 @@ beforeEach(() => {
 
 describe("POST /api/messages — lead con WhatsApp real conectado", () => {
   const lead = { id: "lead-1", phone: "5491100000000", origin_channel: "whatsapp", name: "Paciente" }
+  const deliveryKey = "11111111-1111-4111-8111-111111111111"
 
-  it("manda el mensaje de verdad por la API de WhatsApp, no solo lo guarda en la tabla, y pausa el bot", async () => {
+  it("manda el mensaje por WhatsApp y toma la conversacion sin reactivar el bot", async () => {
     const { leads, messages } = mockSupabase({ lead, latestMessage: { id: "msg-1", role: "assistant", content: "hola" } })
-    const { updateSpy } = mockServiceSession({ last_inbound_at: new Date().toISOString(), entry_point: "organic" })
+    mockServiceSession({ last_inbound_at: new Date().toISOString(), entry_point: "organic" })
     ;(sendText as jest.Mock).mockResolvedValue({})
 
-    const res = await POST(postRequest({ lead_id: "lead-1", content: "hola" }))
+    const res = await POST(postRequest({ lead_id: "lead-1", content: "hola", generate_reply: true, delivery_key: deliveryKey }))
 
     expect(res.status).toBe(200)
     const body = await res.json()
@@ -124,30 +132,39 @@ describe("POST /api/messages — lead con WhatsApp real conectado", () => {
     expect(sendText).toHaveBeenCalledWith(
       "5491100000000",
       "hola",
-      expect.objectContaining({ windowState: "open", leadId: "lead-1" })
+      expect.objectContaining({
+        windowState: "open",
+        leadId: "lead-1",
+        deliveryKey: `manual:${deliveryKey}`,
+        outboundStep: "manual_response",
+      })
     )
+    expect(generateReply).not.toHaveBeenCalled()
     // El mensaje ya queda guardado por sendText -> logWhatsAppMessage; la ruta no debe insertarlo de nuevo.
     expect(messages.insert).not.toHaveBeenCalled()
     expect(leads.update).toHaveBeenCalledWith({ last_message: "hola" })
     // Al responder a mano, el bot se pausa para esta conversación (no se pisan entre sí).
-    expect(updateSpy).toHaveBeenCalledWith({ bot_paused: true })
     // Ola 4: la respuesta manual real cierra cualquier handoff abierto de este lead (no hay email
     // en el usuario mockeado, así que cae al valor por defecto "equipo").
-    expect(resolveHandoffForLead).toHaveBeenCalledWith("lead-1", "equipo")
+    expect(takeHandoffForLead).toHaveBeenCalledWith("lead-1", "staff-1")
+    expect(recordSecurityAudit).toHaveBeenCalledWith(expect.objectContaining({
+      action: "manual_message_send",
+      actorUserId: "staff-1",
+      resourceId: "lead-1",
+    }))
   })
 
   it("con la ventana de 24h cerrada no manda nada, no pausa el bot, y devuelve un error claro (409)", async () => {
     mockSupabase({ lead })
-    const { updateSpy } = mockServiceSession({ last_inbound_at: null, entry_point: "organic" })
+    mockServiceSession({ last_inbound_at: null, entry_point: "organic" })
     ;(sendText as jest.Mock).mockRejectedValue(new WindowClosedError("5491100000000"))
 
-    const res = await POST(postRequest({ lead_id: "lead-1", content: "hola" }))
+    const res = await POST(postRequest({ lead_id: "lead-1", content: "hola", delivery_key: deliveryKey }))
 
     expect(res.status).toBe(409)
     const body = await res.json()
     expect(body.error).toMatch(/ventana/i)
-    expect(updateSpy).not.toHaveBeenCalled()
-    expect(resolveHandoffForLead).not.toHaveBeenCalled()
+    expect(takeHandoffForLead).not.toHaveBeenCalled()
   })
 
   it("un error real de la API de WhatsApp devuelve 500 sin dejarlo pasar en silencio", async () => {
@@ -155,12 +172,22 @@ describe("POST /api/messages — lead con WhatsApp real conectado", () => {
     mockServiceSession({ last_inbound_at: new Date().toISOString(), entry_point: "organic" })
     ;(sendText as jest.Mock).mockRejectedValue(new Error("WhatsApp API error 401: token vencido"))
 
-    const res = await POST(postRequest({ lead_id: "lead-1", content: "hola" }))
+    const res = await POST(postRequest({ lead_id: "lead-1", content: "hola", delivery_key: deliveryKey }))
 
     expect(res.status).toBe(500)
     const body = await res.json()
-    expect(body.error).toMatch(/token vencido/)
-    expect(resolveHandoffForLead).not.toHaveBeenCalled()
+    expect(body.error).toMatch(/no se pudo confirmar/i)
+    expect(body.error).not.toMatch(/token vencido/i)
+    // El takeover se persiste antes de llamar a Meta para evitar una carrera con el bot.
+    // Si el proveedor falla, la conversación debe seguir pausada para intervención humana.
+    expect(takeHandoffForLead).toHaveBeenCalledWith("lead-1", "staff-1")
+  })
+
+  it("exige una clave idempotente para cualquier envío manual por WhatsApp", async () => {
+    mockSupabase({ lead })
+    const res = await POST(postRequest({ lead_id: "lead-1", content: "hola" }))
+    expect(res.status).toBe(400)
+    expect(sendText).not.toHaveBeenCalled()
   })
 })
 

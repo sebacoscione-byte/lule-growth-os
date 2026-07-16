@@ -2,6 +2,8 @@ import Anthropic from "@anthropic-ai/sdk"
 import { createHash } from "crypto"
 import { createClient as createSupabaseClient } from "@supabase/supabase-js"
 import { parseAiJson } from "@/lib/parse-ai-json"
+import { EMERGENCY_REPLY, MEDICAL_BOUNDARY_REPLY, isEmergencyMessage, isMedicalBoundaryMessage } from "@/lib/medical-safety"
+import { z } from "zod"
 import type { ClassifyResult, ContentObjective, ContentScene, ContentSource, WhatsAppIntent } from "@/types"
 
 export type AiMode = "manual" | "gemini_api"
@@ -25,6 +27,10 @@ type GenerateOptions = {
   purpose?: string
   /** Marcar true cuando `system` no depende de datos del request: habilita prompt caching de Anthropic. */
   cacheSystem?: boolean
+  /** `none` evita leer o persistir prompts/outputs con mensajes de pacientes. */
+  cacheMode?: "none" | "safe_non_personal"
+  /** Permite que una configuración operativa explícita elija proveedor para esta llamada. */
+  provider?: AiProvider
 }
 
 const SPANISH_INSTRUCTION = `Responde siempre en espanol rioplatense claro, natural y profesional.
@@ -328,23 +334,6 @@ Usá exactamente estas claves:
 }`}`
 }
 
-export function buildReplyPrompt(message: string, leadContext: string): string {
-  return `Sos el asistente de la Dra. Lucía Chahin, cardióloga.
-Respondé este mensaje de forma cálida y profesional en español rioplatense.
-
-REGLAS:
-- No des diagnósticos ni tratamientos
-- No confirmes disponibilidad ni reservés turnos
-- Si hay síntomas de alarma → derivar a guardia inmediatamente
-- Lucía atiende martes en CIMEL Lanús, miércoles en Hospital Británico y viernes en Swiss Medical Lomas
-
-Contexto del lead: ${leadContext}
-
-Mensaje a responder: "${message}"
-
-Devolvé solo el texto de la respuesta, sin JSON ni formato extra.`
-}
-
 // ---------------------------------------------------------------------------
 // API callers
 // ---------------------------------------------------------------------------
@@ -413,12 +402,16 @@ async function generateText(options: GenerateOptions): Promise<string> {
   const promptText = `${options.system}\n${options.messages.map(m => m.content).join("\n")}`
   const promptHash = hashPrompt(promptText)
   const purpose = options.purpose ?? "general"
+  const cacheMode = options.cacheMode ?? "safe_non_personal"
 
-  const cached = await getCachedOutput(promptHash)
-  if (cached) return cached
+  if (cacheMode === "safe_non_personal") {
+    const cached = await getCachedOutput(promptHash)
+    if (cached) return cached
+  }
 
   const errors: unknown[] = []
-  for (const provider of getProviderOrder()) {
+  const providerOrder = options.provider ? [options.provider] : getProviderOrder()
+  for (const provider of providerOrder) {
     const model = provider === "gemini"
       ? (process.env.GEMINI_MODEL ?? "gemini-3.5-flash")
       : (process.env.ANTHROPIC_MODEL ?? "claude-sonnet-4-6")
@@ -426,14 +419,22 @@ async function generateText(options: GenerateOptions): Promise<string> {
       const text = provider === "gemini"
         ? await generateWithGemini(options)
         : await generateWithAnthropic(options)
-      await saveCachedOutput(promptHash, purpose, promptText, text)
+      if (cacheMode === "safe_non_personal") {
+        await saveCachedOutput(promptHash, purpose, promptText, text)
+      }
       await logRequest(provider, model, promptHash, purpose, true)
       return text
     } catch (error) {
       errors.push(error)
-      await logRequest(provider, model, promptHash, purpose, false,
-        error instanceof Error ? error.message : String(error))
-      if (getRequestedProvider() !== "auto") break
+      await logRequest(
+        provider,
+        model,
+        promptHash,
+        purpose,
+        false,
+        cacheMode === "none" ? "patient_context_request_failed" : (error instanceof Error ? error.message : String(error))
+      )
+      if (options.provider || getRequestedProvider() !== "auto") break
     }
   }
   throw errors[0] || new Error("No hay un proveedor de IA disponible.")
@@ -495,13 +496,9 @@ REGLAS OBLIGATORIAS:
 - Usas tono claro, calido, profesional y argentino (voseo)
 - Haces una pregunta por vez
 
-INFORMACION DE ATENCION:
-- Dra. Lucia Chahin atiende:
-  - Martes en CIMEL Lanus (Tucuman 1314, Lanus): consulta cardiologica y ecocardiograma
-  - Miercoles en Hospital Britanico (Perdriel 74, CABA): consulta cardiologica y ecocardiograma. Para pedir turno ahi: llamar al 4309-6400 (atencion telefonica 24hs) o a la Central de Turnos 0810-222-2748 / 11-3015-9749, o pedir turno desde la app del Hospital Britanico
-  - Viernes en Swiss Medical Lomas: consulta cardiologica y ecocardiograma
-- Para pedir turno: comunicarse con la institucion y solicitar turno con la Dra. Lucia Chahin
-- La app NO reserva turnos ni confirma horarios
+DATOS OPERATIVOS:
+- No inventes ni afirmes sedes, dias, horarios, coberturas, telefonos o disponibilidad.
+- La clasificacion no necesita datos operativos; esos valores provienen de configuracion validada.
 
 DETECCION DE URGENCIAS:
 Si el usuario menciona dolor de pecho actual, falta de aire, desmayo, perdida de fuerza,
@@ -525,7 +522,42 @@ const MANUAL_CLASSIFY_DEFAULT: ClassifyResult = {
   next_action: "escalar",
 }
 
+const CLASSIFY_OUTPUT_SCHEMA = z.object({
+  intent: z.enum(["turno", "consulta_cardiologia", "ecocardiograma", "cobertura", "lugar_atencion", "consulta_medica", "urgencia", "spam", "otro"]),
+  requested_service: z.enum(["consulta_cardiologia", "ecocardiograma", "no_definido"]),
+  suggested_location: z.enum(["cimel_lanus", "swiss_lomas", "hospital_britanico", "preguntar"]),
+  suggested_day: z.enum(["martes", "miercoles", "viernes", "preguntar"]),
+  priority_score: z.number().int().min(1).max(10),
+  requires_human: z.boolean(),
+  possible_emergency: z.boolean(),
+  next_action: z.enum(["responder", "pedir_preferencia", "derivar_cimel", "derivar_swiss", "derivar_britanico", "escalar", "descartar"]),
+})
+
+const EMERGENCY_CLASSIFY_RESULT: ClassifyResult = {
+  ...MANUAL_CLASSIFY_DEFAULT,
+  intent: "urgencia",
+  priority_score: 10,
+  requires_human: true,
+  possible_emergency: true,
+  reply_suggestion: EMERGENCY_REPLY,
+  next_action: "escalar",
+}
+
+const MEDICAL_BOUNDARY_CLASSIFY_RESULT: ClassifyResult = {
+  ...MANUAL_CLASSIFY_DEFAULT,
+  intent: "consulta_medica",
+  priority_score: 7,
+  requires_human: true,
+  possible_emergency: false,
+  reply_suggestion: MEDICAL_BOUNDARY_REPLY,
+  next_action: "escalar",
+}
+
 export async function classifyMessage(message: string): Promise<ClassifyResult> {
+  // Las rutas clínicas conocidas se resuelven antes de cualquier proveedor: no se comparte el
+  // texto con IA ni se permite que un modelo decida la respuesta visible.
+  if (isEmergencyMessage(message)) return EMERGENCY_CLASSIFY_RESULT
+  if (isMedicalBoundaryMessage(message)) return MEDICAL_BOUNDARY_CLASSIFY_RESULT
   if (getAiMode() === "manual") return MANUAL_CLASSIFY_DEFAULT
 
   const text = await generateText({
@@ -533,6 +565,7 @@ export async function classifyMessage(message: string): Promise<ClassifyResult> 
     json: true,
     purpose: "classify",
     cacheSystem: true,
+    cacheMode: "none",
     system: `${SYSTEM_PROMPT}
 
 Analiza el mensaje del usuario y devolve SOLO un JSON valido con esta estructura exacta:
@@ -544,12 +577,37 @@ Analiza el mensaje del usuario y devolve SOLO un JSON valido con esta estructura
   "priority_score": 1,
   "requires_human": false,
   "possible_emergency": false,
-  "reply_suggestion": "texto de respuesta en espanol",
   "next_action": "responder | pedir_preferencia | derivar_cimel | derivar_swiss | derivar_britanico | escalar | descartar"
 }`,
     messages: [{ role: "user", content: message }],
   })
-  return parseJson<ClassifyResult>(text)
+  const parsed = CLASSIFY_OUTPUT_SCHEMA.parse(parseJson<unknown>(text))
+  if (parsed.possible_emergency || parsed.intent === "urgencia") {
+    return {
+      ...parsed,
+      intent: "urgencia",
+      priority_score: Math.max(parsed.priority_score, 9),
+      requires_human: true,
+      possible_emergency: true,
+      reply_suggestion: EMERGENCY_REPLY,
+      next_action: "escalar",
+    }
+  }
+  if (parsed.intent === "consulta_medica") {
+    return {
+      ...parsed,
+      requires_human: true,
+      possible_emergency: false,
+      reply_suggestion: MEDICAL_BOUNDARY_REPLY,
+      next_action: "escalar",
+    }
+  }
+  return {
+    ...parsed,
+    reply_suggestion: parsed.requires_human
+      ? "Gracias por escribirnos. Una persona del equipo va a revisar tu consulta desde el Inbox."
+      : "Gracias por escribirnos. Podemos orientarte sobre sedes y canales oficiales para pedir turno.",
+  }
 }
 
 const WHATSAPP_INTENTS = [
@@ -558,11 +616,15 @@ const WHATSAPP_INTENTS = [
   "turno_ya_resuelto", "otro_no_entendido",
 ] as const
 
+const WHATSAPP_INTENT_OUTPUT_SCHEMA = z.object({
+  intent: z.enum(WHATSAPP_INTENTS),
+}).strict()
+
 /**
  * Respaldo del clasificador determinístico del bot de WhatsApp (src/lib/whatsapp-intents.ts) cuando
  * ningún patrón de reglas matchea. Devuelve siempre uno de los 9 intents cerrados, nunca texto libre.
  */
-export async function classifyWhatsAppIntent(text: string): Promise<WhatsAppIntent> {
+export async function classifyWhatsAppIntent(text: string, provider?: AiProvider): Promise<WhatsAppIntent> {
   if (getAiMode() === "manual") return "otro_no_entendido"
 
   const raw = await generateText({
@@ -576,14 +638,14 @@ export async function classifyWhatsAppIntent(text: string): Promise<WhatsAppInte
     json: true,
     purpose: "whatsapp_intent",
     cacheSystem: true,
+    cacheMode: "none",
+    provider,
     system: `Clasificá el mensaje de un paciente de WhatsApp de una cardióloga en UNA sola de estas categorías exactas: ${WHATSAPP_INTENTS.join(", ")}.
 Devolvé SOLO un JSON: {"intent": "..."}. Si no estás seguro de a cuál corresponde, devolvé "otro_no_entendido". Nunca inventes una categoría fuera de la lista.`,
     messages: [{ role: "user", content: text }],
   })
-  const parsed = parseJson<{ intent: string }>(raw)
-  return (WHATSAPP_INTENTS as readonly string[]).includes(parsed.intent)
-    ? (parsed.intent as WhatsAppIntent)
-    : "otro_no_entendido"
+  const parsed = WHATSAPP_INTENT_OUTPUT_SCHEMA.parse(parseJson<unknown>(raw))
+  return parsed.intent
 }
 
 export async function generateReply(
@@ -591,18 +653,14 @@ export async function generateReply(
   leadContext: string,
   conversationHistory: AiMessage[]
 ): Promise<string> {
-  if (getAiMode() === "manual") {
-    throw new Error("Modo manual activo: la generación automática de respuestas está deshabilitada.")
-  }
-  return generateText({
-    maxTokens: 512,
-    purpose: "reply",
-    system: `${SYSTEM_PROMPT}
+  const userContext = [message, ...conversationHistory.filter(item => item.role === "user").map(item => item.content)].join("\n")
+  if (isEmergencyMessage(message)) return EMERGENCY_REPLY
+  if (isMedicalBoundaryMessage(userContext)) return MEDICAL_BOUNDARY_REPLY
 
-Contexto del lead: ${leadContext}
-Genera una respuesta apropiada. Solo el texto de la respuesta, sin JSON ni formato extra.`,
-    messages: [...conversationHistory, { role: "user", content: message }],
-  })
+  // Fase 0A: una respuesta dirigida a una persona nunca se redacta con IA. El clasificador puede
+  // interpretar mensajes, pero la salida visible siempre proviene de este catálogo fijo.
+  void leadContext
+  return "Gracias por escribirnos. Este canal puede ayudarte con sedes y formas de pedir turno. Si necesitás otra cosa, una persona del equipo puede revisar tu consulta."
 }
 
 export async function generateInstagramContent(
@@ -1003,31 +1061,11 @@ export async function generateFollowupSuggestion(
   leadContext: string,
   conversationHistory: AiMessage[]
 ): Promise<string> {
-  if (getAiMode() === "manual") {
-    throw new Error("Modo manual activo: la generación automática está deshabilitada.")
-  }
-  const historyContext = conversationHistory.length > 0
-    ? `Historial de conversación:\n${conversationHistory.map(m => `${m.role === "user" ? "Lead" : "Nosotros"}: ${m.content}`).join("\n")}`
-    : "Sin mensajes previos."
+  const userContext = conversationHistory.filter(item => item.role === "user").map(item => item.content).join("\n")
+  if (isEmergencyMessage(userContext)) return EMERGENCY_REPLY
+  if (isMedicalBoundaryMessage(userContext)) return MEDICAL_BOUNDARY_REPLY
 
-  return generateText({
-    maxTokens: 400,
-    purpose: "followup_suggestion",
-    cacheSystem: true,
-    system: `${SYSTEM_PROMPT}
-
-Tu tarea es redactar el próximo mensaje que el equipo enviará al lead para hacer seguimiento.
-Generá un mensaje cálido, breve y en español rioplatense que:
-- Pregunte si pudo pedir turno con la Dra. Lucía Chahin
-- Ofrezca ayuda concreta si no pudo
-- No sea repetitivo si ya hubo conversación previa
-- Cierre con opciones simples (Ya pedí turno / No pude / Necesito los datos de nuevo)
-Solo devolvé el texto del mensaje, sin comillas ni formato extra.`,
-    messages: [
-      {
-        role: "user",
-        content: `${leadContext}\n\n${historyContext}\n\nRedactá el próximo mensaje de seguimiento.`,
-      },
-    ],
-  })
+  // Igual que generateReply(): el texto visible es administrativo y aprobado, no salida libre de IA.
+  void leadContext
+  return "Hola, te escribimos para saber si pudiste pedir turno con la Dra. Lucía Chahin. Si tuviste algún problema, podemos volver a pasarte los canales oficiales. Respondé: 1) Ya pedí turno 2) No pude 3) Necesito los datos de nuevo."
 }

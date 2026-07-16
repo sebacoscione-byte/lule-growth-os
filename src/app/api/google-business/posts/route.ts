@@ -3,16 +3,14 @@ import { createClient } from "@/lib/supabase/server"
 import { getServiceDb } from "@/lib/supabase/service"
 import { getValidToken, getConnectionInfo, listPosts, createGoogleBusinessPost } from "@/lib/google-business"
 import { parseJsonBody } from "@/lib/api-validation"
+import { authorizeStaff } from "@/lib/staff-authz"
 
-async function requireAuth() {
-  const userClient = await createClient()
-  const { data: { user } } = await userClient.auth.getUser()
-  if (!user) return null
-  return user
-}
+const GOOGLE_BUSINESS_ROLES = ["owner", "doctor"] as const
 
 export async function GET() {
-  if (!await requireAuth()) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  const userClient = await createClient()
+  const auth = await authorizeStaff(userClient, { allowedRoles: GOOGLE_BUSINESS_ROLES })
+  if (!auth.ok) return NextResponse.json({ error: auth.error, code: auth.code }, { status: auth.status })
 
   const supabase = getServiceDb()
   const info = await getConnectionInfo(supabase)
@@ -28,12 +26,14 @@ export async function GET() {
     return NextResponse.json(data)
   } catch (e) {
     console.error(`[google-business/posts] GET: ${String(e)}`)
-    return NextResponse.json({ error: String(e) }, { status: 500 })
+    return NextResponse.json({ error: "No se pudieron consultar las publicaciones de Google Business" }, { status: 500 })
   }
 }
 
 export async function POST(req: NextRequest) {
-  if (!await requireAuth()) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  const userClient = await createClient()
+  const auth = await authorizeStaff(userClient, { allowedRoles: GOOGLE_BUSINESS_ROLES, sensitive: true })
+  if (!auth.ok) return NextResponse.json({ error: auth.error, code: auth.code }, { status: auth.status })
 
   const parsedBody = await parseJsonBody(req)
   if (!parsedBody.ok) return NextResponse.json({ error: parsedBody.error }, { status: 400 })
@@ -51,6 +51,12 @@ export async function POST(req: NextRequest) {
     const message = e instanceof Error ? e.message : String(e)
     const isKnownCondition = message.includes("Account ID") || message === "Token expired"
     if (!isKnownCondition) console.error(`[google-business/posts] POST: ${message}`)
-    return NextResponse.json({ error: message }, { status: isKnownCondition ? (message === "Token expired" ? 401 : 400) : 500 })
+    if (message === "Token expired") {
+      return NextResponse.json({ error: "La conexión con Google Business expiró" }, { status: 401 })
+    }
+    if (message.includes("Account ID")) {
+      return NextResponse.json({ error: "La cuenta de Google Business no tiene una ubicación seleccionada" }, { status: 400 })
+    }
+    return NextResponse.json({ error: "No se pudo crear la publicación en Google Business" }, { status: 500 })
   }
 }

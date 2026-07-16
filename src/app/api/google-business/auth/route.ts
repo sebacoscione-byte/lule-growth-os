@@ -11,6 +11,9 @@ import {
   getGoogleRedirectUri,
   isSecureRequest,
 } from "@/lib/google-oauth"
+import { authorizeStaff } from "@/lib/staff-authz"
+
+const GOOGLE_OAUTH_ROLES = ["owner"] as const
 
 const SCOPES = ["https://www.googleapis.com/auth/business.manage"].join(" ")
 
@@ -18,16 +21,17 @@ export async function GET(request: NextRequest) {
   // Requiere sesión: sin esto, cualquiera con la URL podía iniciar el OAuth con su propia
   // cuenta de Google y reemplazar la conexión de Lucía (ver auditoría de seguridad 2026-07-07).
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) {
-    return NextResponse.redirect(new URL("/login", request.url))
+  const auth = await authorizeStaff(supabase, { allowedRoles: GOOGLE_OAUTH_ROLES, sensitive: true })
+  if (!auth.ok) {
+    const destination = auth.status === 401 ? "/login" : `/google-local?error=${auth.code}`
+    return NextResponse.redirect(new URL(destination, request.url))
   }
 
   const clientId = process.env.GOOGLE_CLIENT_ID
   const redirectUri = getGoogleRedirectUri(request)
 
   if (!clientId) {
-    return NextResponse.json({ error: "Google OAuth not configured" }, { status: 500 })
+    return NextResponse.json({ error: "Google OAuth no está configurado" }, { status: 503 })
   }
 
   const state = createOauthState()

@@ -3,6 +3,7 @@ import { GET } from "./route"
 
 jest.mock("@/lib/supabase/server", () => ({ createClient: jest.fn() }))
 jest.mock("@/lib/supabase/service", () => ({ getServiceDb: jest.fn() }))
+jest.mock("@/lib/staff-authz", () => ({ authorizeStaff: jest.fn() }))
 jest.mock("@/lib/google-business", () => ({
   saveTokens: jest.fn(),
   listAccounts: jest.fn(),
@@ -11,6 +12,7 @@ jest.mock("@/lib/google-business", () => ({
 
 import { createClient } from "@/lib/supabase/server"
 import { getServiceDb } from "@/lib/supabase/service"
+import { authorizeStaff } from "@/lib/staff-authz"
 import { saveTokens, listAccounts } from "@/lib/google-business"
 import { GOOGLE_OAUTH_STATE_COOKIE, GOOGLE_OAUTH_VERIFIER_COOKIE } from "@/lib/google-oauth"
 
@@ -42,6 +44,13 @@ const ORIGINAL_FETCH = global.fetch
 
 beforeEach(() => {
   jest.clearAllMocks()
+  ;(authorizeStaff as jest.Mock).mockResolvedValue({
+    ok: true,
+    user: { id: "u1" },
+    role: "owner",
+    legacyCompatibility: false,
+    assuranceLevel: "aal2",
+  })
   ;(getServiceDb as jest.Mock).mockReturnValue(upsertableDb())
 })
 
@@ -52,6 +61,12 @@ afterEach(() => {
 describe("GET /api/google-business/callback", () => {
   it("redirige a /login sin sesión", async () => {
     mockAuthedUser(null)
+    ;(authorizeStaff as jest.Mock).mockResolvedValue({
+      ok: false,
+      status: 401,
+      code: "unauthorized",
+      error: "Unauthorized",
+    })
     const res = await GET(callbackRequest({ code: "abc" }))
     expect(res.status).toBe(307)
     expect(res.headers.get("location")).toContain("/login")
@@ -102,6 +117,26 @@ describe("GET /api/google-business/callback", () => {
 
     expect(res.headers.get("location")).toContain("connected=1")
     expect(saveTokens).toHaveBeenCalled()
+    expect(authorizeStaff).toHaveBeenCalledWith(expect.anything(), {
+      allowedRoles: ["owner"],
+      sensitive: true,
+    })
+  })
+
+  it("rechaza de forma sanitizada a un rol sin permiso antes de intercambiar tokens", async () => {
+    mockAuthedUser({ id: "u-doctor" })
+    ;(authorizeStaff as jest.Mock).mockResolvedValue({
+      ok: false,
+      status: 403,
+      code: "forbidden",
+      error: "No tenés permisos para esta acción",
+    })
+    global.fetch = jest.fn()
+
+    const res = await GET(callbackRequest({ code: "abc" }))
+
+    expect(res.headers.get("location")).toContain("error=forbidden")
+    expect(global.fetch).not.toHaveBeenCalled()
   })
 
   it("OPS-01: si falla el descubrimiento de cuenta/ubicación, loguea pero igual redirige con connected=1 (no fatal)", async () => {

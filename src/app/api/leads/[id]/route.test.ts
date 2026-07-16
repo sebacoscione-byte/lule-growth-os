@@ -1,7 +1,18 @@
 import { GET, PATCH } from "./route"
 
 jest.mock("@/lib/supabase/server", () => ({ createClient: jest.fn() }))
+jest.mock("@/lib/staff-authz", () => ({
+  authorizeStaff: jest.fn(async (supabase: { auth: { getUser: () => Promise<{ data: { user: unknown } }> } }) => {
+    const { data: { user } } = await supabase.auth.getUser()
+    return user
+      ? { ok: true, user, role: "owner", legacyCompatibility: true, assuranceLevel: null }
+      : { ok: false, status: 401, code: "unauthorized", error: "Unauthorized" }
+  }),
+}))
+jest.mock("@/lib/security-audit", () => ({ recordSecurityAudit: jest.fn().mockResolvedValue(undefined) }))
 import { createClient } from "@/lib/supabase/server"
+import { authorizeStaff } from "@/lib/staff-authz"
+import { recordSecurityAudit } from "@/lib/security-audit"
 
 type QueryResult = { data: unknown; error: { message: string } | null }
 
@@ -41,6 +52,9 @@ describe("GET /api/leads/[id]", () => {
     expect(res.status).toBe(200)
     const body = await res.json()
     expect(body.name).toBe("Test")
+    expect(authorizeStaff).toHaveBeenCalledWith(expect.anything(), {
+      allowedRoles: ["owner", "doctor", "reception"], sensitive: true,
+    })
   })
 
   it("devuelve 404 si Supabase no encuentra el lead", async () => {
@@ -71,6 +85,9 @@ describe("PATCH /api/leads/[id]", () => {
     })
     await PATCH(req, { params: Promise.resolve({ id: "abc" }) })
     expect(updateSpy).toHaveBeenCalledWith({ status: "nuevo" })
+    expect(recordSecurityAudit).toHaveBeenCalledWith(expect.objectContaining({
+      action: "lead_correction", actorUserId: "user-1", resourceId: "abc",
+    }))
   })
 
   it("auto-completa followup_due_at al pasar a seguimiento_pendiente sin fecha explícita", async () => {

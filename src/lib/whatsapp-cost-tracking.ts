@@ -2,6 +2,7 @@ import { getServiceDb } from "@/lib/supabase/service"
 import { resolvePriceFromDb } from "@/lib/whatsapp-pricing"
 import type { WhatsAppCategory, WhatsAppDirection, WhatsAppEntryPoint, WhatsAppWindowState } from "@/types"
 import type { SupabaseClient } from "@supabase/supabase-js"
+import { createHash } from "node:crypto"
 
 export interface LogMessageParams {
   phoneNumberId?: string | null
@@ -17,7 +18,13 @@ export interface LogMessageParams {
   content: string
   flowIntent?: string | null
   waMessageId?: string | null
+  outboundLedgerKey?: string | null
   serviceMessageChargingEnabled: boolean
+}
+
+/** Costos solo necesitan una clave estable para agregados, nunca el teléfono en claro. */
+export function hashWhatsAppCostIdentity(waId: string): string {
+  return createHash("sha256").update(waId).digest("hex")
 }
 
 export async function logWhatsAppMessage(params: LogMessageParams): Promise<{ costEstimated: number | null }> {
@@ -39,9 +46,9 @@ export async function logWhatsAppMessage(params: LogMessageParams): Promise<{ co
       )
   const costEstimated = price.billable ? price.cost : 0
 
-  await db.from("whatsapp_cost_events").insert({
+  const costRow = {
     phone_number_id: params.phoneNumberId ?? null,
-    wa_id: params.waId,
+    wa_id: hashWhatsAppCostIdentity(params.waId),
     lead_id: params.leadId ?? null,
     direction: params.direction,
     message_type: params.messageType,
@@ -55,10 +62,18 @@ export async function logWhatsAppMessage(params: LogMessageParams): Promise<{ co
     currency: price.currency,
     flow_intent: params.flowIntent ?? null,
     window_state: params.windowState,
-  })
+    wa_message_id: params.waMessageId ?? null,
+    outbound_ledger_key: params.outboundLedgerKey ?? null,
+  }
+  const costWrite = params.outboundLedgerKey
+    ? await db.from("whatsapp_cost_events").upsert(costRow, { onConflict: "outbound_ledger_key", ignoreDuplicates: true })
+    : params.waMessageId
+      ? await db.from("whatsapp_cost_events").upsert(costRow, { onConflict: "wa_message_id", ignoreDuplicates: true })
+      : await db.from("whatsapp_cost_events").insert(costRow)
+  if (costWrite.error) throw new Error("whatsapp_cost_log_failed")
 
   if (params.leadId) {
-    await db.from("messages").insert({
+    const messageRow = {
       lead_id: params.leadId,
       role: params.direction === "inbound" ? "user" : "assistant",
       content: params.content,
@@ -69,29 +84,57 @@ export async function logWhatsAppMessage(params: LogMessageParams): Promise<{ co
       window_state: params.windowState,
       flow_intent: params.flowIntent ?? null,
       cost_estimated: costEstimated,
+      outbound_ledger_key: params.outboundLedgerKey ?? null,
+    }
+    const messageWrite = params.outboundLedgerKey
+      ? await db.from("messages").upsert(messageRow, { onConflict: "outbound_ledger_key", ignoreDuplicates: true })
+      : params.waMessageId
+        ? await db.from("messages").upsert(messageRow, { onConflict: "wa_message_id", ignoreDuplicates: true })
+        : await db.from("messages").insert(messageRow)
+    if (messageWrite.error) throw new Error("whatsapp_message_log_failed")
+  }
+
+  if (params.direction === "outbound" && params.waMessageId) {
+    const { error } = await db.rpc("reconcile_whatsapp_delivery_status", {
+      p_wa_message_id: params.waMessageId,
     })
+    if (error) throw new Error("whatsapp_delivery_status_reconcile_failed")
   }
 
   return { costEstimated }
 }
 
+export async function accountWhatsAppOutboundDelivery(ledgerKey: string, phone: string): Promise<void> {
+  const { data, error } = await getServiceDb().rpc("account_whatsapp_outbound_delivery", {
+    p_dedupe_key: ledgerKey,
+    p_phone: phone,
+  })
+  if (error || (data !== true && data !== false)) throw new Error("whatsapp_outbound_accounting_failed")
+}
+
 /** Volumen bajo y procesamiento secuencial por webhook: read-then-write es aceptable, no hace falta un RPC atómico. */
 export async function incrementMessagesSentCount(phone: string): Promise<number> {
   const db = getServiceDb()
-  const { data } = await db
+  const { data, error: readError } = await db
     .from("whatsapp_sessions")
     .select("messages_sent_count")
     .eq("phone", phone)
     .single()
 
+  if (readError) throw new Error("whatsapp_message_count_read_failed")
   const next = (data?.messages_sent_count ?? 0) + 1
-  await db.from("whatsapp_sessions").update({ messages_sent_count: next }).eq("phone", phone)
+  const { error: writeError } = await db
+    .from("whatsapp_sessions")
+    .update({ messages_sent_count: next })
+    .eq("phone", phone)
+  if (writeError) throw new Error("whatsapp_message_count_update_failed")
   return next
 }
 
 export async function resetMessagesSentCount(phone: string): Promise<void> {
   const db = getServiceDb()
-  await db.from("whatsapp_sessions").update({ messages_sent_count: 0 }).eq("phone", phone)
+  const { error } = await db.from("whatsapp_sessions").update({ messages_sent_count: 0 }).eq("phone", phone)
+  if (error) throw new Error("whatsapp_message_count_reset_failed")
 }
 
 export interface WhatsAppCostSummary {

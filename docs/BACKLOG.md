@@ -1,5 +1,64 @@
 # Backlog — Lule Growth OS
-**Actualizado:** 2026-07-14 | **Basado en:** PRD Estrategia de Captación v2.1
+**Actualizado:** 2026-07-16 | **Basado en:** PRD Estrategia de Captación v2.1
+
+---
+
+## Bot de WhatsApp — gates para activar el hardening local (2026-07-16)
+
+El hardening derivado de `Investigacion_y_plan_bot_WhatsApp_Dra_Lucia_Chahin_para_Claude.md` y de
+los 180 casos del CSV está implementado y probado solamente en la rama local
+`codex/whatsapp-fase0-safety`. No hay commit, push, migración ni deploy.
+
+- [ ] **Revisión médica de Lucía:** aprobar detector y textos fijos de guardia, límites clínicos y
+  derivación. La IA no redacta respuestas para pacientes; solo puede devolver categorías cerradas.
+- [ ] **Revisión legal:** validar consentimiento por finalidad, texto de privacidad, proveedores y
+  transferencia internacional, oposición/borrado y plazos de retención.
+- [ ] **Decidir el primer mensaje pre-consentimiento:** hoy se descarta y se pide repetir. Reusarlo
+  requiere base legal y almacenamiento temporal cifrado con plazo explícito, o consentimiento web
+  previo al salto a WhatsApp.
+- [ ] **Preparar producción:** definir `META_GRAPH_API_VERSION` y aplicar, primero en staging y en
+  este orden exacto: `20260715_whatsapp_phase0a_safety.sql` (0A) →
+  `20260716_whatsapp_phase0b_operations.sql` (0B) →
+  `20260716_whatsapp_phase1_durable_transport.sql` (1) →
+  `20260716_whatsapp_phase1b_outbound_ledger.sql` (1B) →
+  `20260716_whatsapp_phase1c_queue_checkpoint.sql` (1C) →
+  `20260716_whatsapp_phase1d_atomic_routing.sql` (1D) →
+  `20260716_whatsapp_phase1e_erasure_suppression.sql` (1E) →
+  `20260716_whatsapp_policy_shadow.sql` (policy) →
+  `20260716_whatsapp_privacy_roles_retention.sql` (privacy). Después comprobar el worker interno
+  con `CRON_SECRET` sin exponerlo.
+- [ ] **Gate SQL real:** ejecutar el lote en una base clonada/staging con backup, inspeccionar los
+  duplicados históricos de identidad/IDs de Meta que 1D reconcilia y probar concurrencia real entre
+  cola, outbox, handoff y borrado. Los tests actuales de migraciones son contratos estáticos del
+  texto SQL y mocks de integración; no ejecutan PostgreSQL ni demuestran esas carreras.
+- [ ] **Programar recuperación frecuente:** después del deploy, guardar URL de producción y
+  `CRON_SECRET` en Supabase Vault y crear un Supabase Cron/`pg_net` que llame cada minuto a
+  `POST /api/internal/whatsapp-worker`. `after()` acelera el caso normal y el cron diario es sólo
+  respaldo; sin este paso externo un retry aislado podría esperar hasta la corrida diaria.
+- [ ] **Accesos:** asignar `app_metadata.role`, enrolar MFA, probar una cuenta por rol y recién luego
+  activar los flags de autorización documentados en `docs/WHATSAPP_SECURITY_ROLES_RETENTION.md`.
+- [ ] **Fuente operativa:** revisar y guardar CIMEL Lanús, Hospital Británico y Swiss Medical Lomas
+  en Configuración. Sin evidencia de verificación el bot se niega deliberadamente a afirmar sede,
+  día, dirección, servicio o canal de contacto.
+- [ ] **Retención del registro de borrado:** pedir al asesor legal un plazo para
+  `data_erasure_log`. El registro queda seudonimizado y sirve como evidencia, pero hoy no tiene una
+  política automática de expiración definida.
+- [ ] **Rollout:** mantener shadow/canary apagados hasta completar los gates anteriores; después
+  medir primero en shadow, luego en una cohorte mínima con rollback inmediato.
+
+Estado técnico local: contención Fase 0 y transporte durable Fase 1 completos; scaffolding offline
+de Fases 2/3 listo; Fases 4/5 no activadas. El outbox evita reintentos automáticos ciegos, pero no
+promete entrega externa exactamente una vez porque Meta no expone una clave de idempotencia.
+
+Dentro de Fase 1, **1C** separa “handler completado” del ACK final para que un retry no vuelva a
+responder; **1D** hace atómicos identidad/routing/handoff y aplica CAS antes del envío; **1E**
+coordina borrado con workers/outbox y mantiene tombstones HMAC. El teléfono se tombstonea 90 días,
+pero el bloqueo genérico dura 15 minutos; un redelivery viejo sigue bloqueado según `occurred_at`.
+
+Esta implementación supersede las descripciones históricas WA-02/WA-03 y Ola 4 que aparecen más
+abajo: ya no existe `whatsapp-idempotency.ts`, el webhook no usa `500` como cola de reintento, el
+umbral de presión no es `>=140` y el mensaje pre-consentimiento no se persiste ni reutiliza. Se usa
+persist-before-ACK + worker/leases/DLQ/outbox y el guardrail actual evalúa `>180`/`>120` con contexto.
 
 ---
 
@@ -35,11 +94,11 @@ por qué tipo de acción es, para que sepas qué esperar de cada uno. El detalle
   mano por Seba en el dashboard); (2) `classifyWhatsAppIntent()` pedía `maxTokens: 20`, insuficiente
   para el modo JSON de Gemini (siempre cortaba la respuesta a mitad de camino) — corregido a `60`,
   verificado en vivo contra la API real. Ver CLAUDE.md → entrada 2026-07-15 para el detalle completo.
-- [ ] **Aprobar el template `alerta_interna_derivacion` (2026-07-15)**: para que la derivación a
-  humano te avise también por WhatsApp (además del email que ya funciona) — enviálo a aprobación
-  en WhatsApp Manager (texto exacto en `Configuración → Templates de WhatsApp`, ver CLAUDE.md →
-  "Alerta también por WhatsApp") y después cargá `ALERT_WHATSAPP_TO` con tu número. Sin esto, solo
-  llega el email (que ya funciona sin depender de este trámite).
+- [ ] **Reaprobar el template `alerta_interna_derivacion` (actualizado 2026-07-16)**: el hardening
+  lo redujo a un texto genérico con **una sola variable**, un ID opaco `CASO-…`; ya no envía nombre
+  ni motivo por el aviso interno. La migración 0A lo deja en `borrador`, por lo que hay que enviar
+  esta versión a aprobación en WhatsApp Manager y después configurar `ALERT_WHATSAPP_TO`. Hasta
+  entonces, solo llega el email, que funciona de manera independiente.
 - [x] **Acceso a las APIs de Google Business Profile** (proyecto `app-lule`) — **solicitud enviada
   el 2026-07-12**, caso de asistencia de Google **`2-7574000041506`**, tiempo de revisión
   informado por Google: 7-10 días hábiles (no es instantáneo, y con volumen chico existe la
@@ -52,16 +111,11 @@ por qué tipo de acción es, para que sepas qué esperar de cada uno. El detalle
   se deja pausar la prueba gratuita (Etapa 2).
 
 ### 🤔 Decisiones tuyas (o de Lucía)
-- [ ] **¿Ampliar las categorías del clasificador del bot de WhatsApp? (2026-07-15)** Probando el bot
-  en producción encontraste varios mensajes reales que no encajaban en ninguna de las 9 categorías
-  fijas (saludo simple, declarar "particular", entre otros — todos ya corregidos puntualmente). Es
-  un patrón esperado de cualquier sistema de categorías cerradas, no un error puntual — quedó
-  planteado si sumar de una vez categorías "de conversación" que probablemente se repitan
-  (despedida/agradecimiento tipo "gracias", "listo", "chau"; small talk genérico) en vez de seguir
-  corrigiendo caso por caso a medida que aparecen. Se recomendó explícitamente **no** pasar a que la
-  IA redacte la respuesta libremente (perdería el control sobre lo que el bot le dice a un paciente
-  real) — la propuesta es solo sumar categorías dentro del mismo esquema de reglas-primero. Sesión
-  cerrada antes de que respondieras; retomar cuando quieras.
+- [ ] **Decidir cuándo activar el clasificador estructurado nuevo.** El schema jerárquico, la
+  política determinista y las categorías sociales/administrativas ya están implementados offline.
+  Primero deben medirse contra el dataset en shadow y revisarse las discrepancias; recién después
+  corresponde un canary mínimo. La IA seguirá devolviendo enums validados, nunca texto para el
+  paciente.
 - [ ] Agregar a Lucía como administradora del Business Manager de Meta — falta decidir el rol
   (administrador completo vs. acceso acotado).
 - [ ] Definir estrategia de reseñas de Google: cómo y cuándo pedirlas a pacientes actuales.
@@ -90,8 +144,9 @@ por qué tipo de acción es, para que sepas qué esperar de cada uno. El detalle
 - [ ] Cargar las obras sociales reales por sede en Configuración (hoy están vacías).
 - [ ] Cargar el link de Google Maps del Hospital Británico en Configuración.
 - [ ] Confirmar que el `$0` (tarifa pública de Meta para Argentina) haya quedado guardado en
-  `Configuración → Precios de WhatsApp` — los 9 templates ya están aprobados, esto es lo único
-  que faltaría para que el seguimiento automático funcione de punta a punta con costo real.
+  `Configuración → Precios de WhatsApp`. Los templates de seguimiento existentes conservan su
+  estado; `alerta_interna_derivacion` es la excepción y debe reaprobarse por separado en su nueva
+  versión genérica de una variable.
 
 ### 🕐 Cuando tengas tiempo (no urgente)
 - [ ] **Conectar la CLI de Vercel para que un agente pueda tocar env vars directamente (2026-07-15).**
@@ -210,7 +265,10 @@ deliberado: primero integridad de WhatsApp y datos de pacientes; luego medición
     Privacy Policy URL en el Meta Developer Console (necesario recién si se saca la app de
     Instagram del modo desarrollo — no es urgente mientras solo haya testers/admins agregados).
 
-- [x] **DATA-02 — Eliminación de pacientes.** ✅ Resuelto (2026-07-12) — plazos de retención definidos
+- [x] **DATA-02 — Eliminación de pacientes.** ✅ Implementación técnica inicial (2026-07-12),
+  ampliada localmente el 2026-07-16. La política final sigue sujeta a los gates legales del inicio
+  de este documento: en particular, no está definido el plazo de `data_erasure_log` ni el de datos
+  de protocolo.
   - Botón **"Eliminar datos de este paciente"** en `/leads/[id]` (con confirmación explícita,
     irreversible) → `POST /api/leads/[id]/erase` → `eraseLead()` (`src/lib/data-erasure.ts`) →
     RPC `erase_lead` (migración `20260711_data_erasure.sql`), todo en una sola transacción SQL:
@@ -223,8 +281,9 @@ deliberado: primero integridad de WhatsApp y datos de pacientes; luego medición
       vinculada a otro lead distinto — `leads.phone` no es unique, a diferencia de
       `whatsapp_sessions.phone`, así que en teoría dos leads podrían compartir número).
     - Borra la fila de `leads`.
-    - Deja registro en `data_erasure_log` (quién lo pidió, cuándo) sin conservar ningún dato del
-      paciente eliminado — satisface "queda evidencia sin conservar el contenido".
+    - Deja registro en `data_erasure_log` con referencias seudonimizadas del caso y del operador,
+      más la fecha, sin conservar el contenido del paciente. Su plazo de expiración todavía debe
+      definirlo un asesor legal.
   - Se eliminó de paso el `DELETE /api/leads/[id]` genérico que ya existía: no tenía ningún
     llamador en la UI, y borraba solo la fila de `leads` sin limpiar mensajes/costos/consentimiento/
     sesión — quedaba código muerto con riesgo real de un borrado incompleto si alguna vez se
@@ -236,9 +295,10 @@ deliberado: primero integridad de WhatsApp y datos de pacientes; luego medición
       mecanismo auditable que el botón manual, ver arriba), corriendo automáticamente en vez de
       esperar un pedido.
     - **Datos de participación en protocolo de investigación clínica** (`protocol_interest`,
-      `protocol_name`, `status = elegible_protocolo`): **nunca se borran automáticamente** —
-      se conservan por el plazo legal aplicable (mínimo 10 años desde la última actuación). En
-      cambio, tras 24 meses de inactividad se bloquea el uso comercial (`consent_to_contact =
+      `protocol_name`, `status = elegible_protocolo`): **no se borran automáticamente** mientras
+      se define el plazo legal aplicable. La referencia histórica a un piso de 10 años queda
+      supersedida: no se incorporó como política final sin dictamen legal. Tras 24 meses de
+      inactividad se bloquea el uso comercial (`consent_to_contact =
       false` + `retention_hold = true`, columna nueva en `leads`, migración
       `20260712_data_retention.sql`) sin tocar el dato — visible como aviso
       "🔒 En resguardo legal" en `/leads/[id]`.

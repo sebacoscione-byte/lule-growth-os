@@ -1,21 +1,25 @@
 import { classifyWhatsAppIntent } from "@/lib/ai"
 import { isEmergencyMessage } from "@/lib/medical-safety"
+import type { WhatsAppLocationConfig } from "@/lib/whatsapp-location-config"
 import type { WhatsAppAiProvider, WhatsAppIntent } from "@/types"
 
 export interface IntakeExtraction {
   motivo: "turno" | "estudio" | "protocolo" | null
   obraSocial: string | null
-  edad: number | null
   sede: "cimel_lanus" | "swiss_lomas" | "hospital_britanico" | null
-  notas: string | null
 }
 
 /**
- * Extrae del primer mensaje combinado (motivo + cobertura + edad + sede + sintomas/estudios) todo lo
+ * Extrae del primer mensaje administrativo (motivo + cobertura + sede) todo lo
  * que el paciente haya contestado de una — nunca vuelve a preguntar lo que ya vino en este bloque.
  * Deterministico a proposito (sin IA): tiene que ser gratis y rapido, se corre en cada mensaje entrante.
+ * No devuelve una copia libre del texto: el mensaje ya se conserva una sola vez en `messages`.
  */
-export function extractIntake(text: string, knownObrasSociales: string[] = []): IntakeExtraction {
+export function extractIntake(
+  text: string,
+  knownObrasSociales: string[] = [],
+  knownLocations: WhatsAppLocationConfig[] = []
+): IntakeExtraction {
   const lower = text.toLowerCase()
 
   let motivo: IntakeExtraction["motivo"] = null
@@ -31,19 +35,27 @@ export function extractIntake(text: string, knownObrasSociales: string[] = []): 
     if (match) obraSocial = match
   }
 
-  let edad: number | null = null
-  const edadMatch = lower.match(/(\d{1,3})\s*(años|anos|añitos)/) ?? lower.match(/tengo\s+(\d{1,3})\b/)
-  if (edadMatch) {
-    const parsed = parseInt(edadMatch[1], 10)
-    if (parsed > 0 && parsed < 120) edad = parsed
-  }
+  const normalize = (value: string) => value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+  const normalizedText = normalize(text)
+  const genericTokens = new Set(["centro", "clinica", "hospital", "medical", "medico", "salud"])
+  const matchedLocation = knownLocations.find(location => {
+    const normalizedName = normalize(location.name)
+    const normalizedId = normalize(location.id.replaceAll("_", " "))
+    const tokens = normalizedName
+      .split(/\s+/)
+      .filter(token => token.length >= 5 && !genericTokens.has(token))
+    const day = location.day ? normalize(location.day) : null
+    return normalizedText.includes(normalizedName)
+      || normalizedText.includes(normalizedId)
+      || tokens.some(token => normalizedText.includes(token))
+      || Boolean(day && normalizedText.includes(day))
+  })
+  const sede: IntakeExtraction["sede"] = matchedLocation?.id ?? null
 
-  let sede: IntakeExtraction["sede"] = null
-  if (/cimel|lan[uú]s|martes/.test(lower)) sede = "cimel_lanus"
-  else if (/brit[aá]nico|miercoles|mi[eé]rcoles/.test(lower)) sede = "hospital_britanico"
-  else if (/swiss|lomas|viernes/.test(lower)) sede = "swiss_lomas"
-
-  return { motivo, obraSocial, edad, sede, notas: text.trim() || null }
+  return { motivo, obraSocial, sede }
 }
 
 // Ola 4 (incidente real 2026-07-14, David Portas): el patrón original solo matcheaba la frase
@@ -97,15 +109,16 @@ export async function classifyIntent(text: string, provider: WhatsAppAiProvider)
     console.error(`Proveedor de IA "${provider}" seleccionado en Configuración pero todavía no está implementado.`)
     return "otro_no_entendido"
   }
+  if (provider !== "gemini" && provider !== "anthropic") return "otro_no_entendido"
   try {
-    return await classifyWhatsAppIntent(text)
+    return await classifyWhatsAppIntent(text, provider)
   } catch {
     return "otro_no_entendido"
   }
 }
 
 export const INTENT_REPLIES: Partial<Record<WhatsAppIntent, string>> = {
-  hablar_con_humano: "Te derivamos con una persona del equipo de la Dra. Lucía Chahin, te va a contactar a la brevedad.",
+  hablar_con_humano: "La conversación quedó derivada a una persona del equipo de la Dra. Lucía Chahin.",
   cancelar_reprogramar: "Para cancelar o reprogramar tu turno, comunicate directamente con la institución donde lo sacaste — nosotros no gestionamos la agenda.",
   otro_no_entendido: "No estoy seguro de haber entendido tu consulta. ¿Podés reformularla o preferís hablar con una persona del equipo?",
 }
@@ -130,7 +143,7 @@ export function classifyProtocolButtonReply(text: string): ProtocolButtonReply |
 // Argentina (mismo patrón que un SMS masivo). No confundir con protocol_opt_out (ese es solo para
 // la invitación puntual a un protocolo de investigación, ver classifyProtocolButtonReply).
 const MARKETING_OPT_OUT_PATTERN =
-  /\bbaja\b|\bstop\b|no (me )?(escriban|contacten|molesten) m[aá]s|dejen de (escribirme|contactarme)|no quiero (m[aá]s )?mensajes|\bunsubscribe\b/
+  /^(?:baja|stop|unsubscribe)[.! ]*$|\b(?:quiero|solicito|pedir|pido|darme|dame|dar)\s+(?:la\s+)?baja\b|\bdarme\s+de\s+baja\b|no (?:me )?(?:escriban|contacten|molesten) m[aá]s|dejen de (?:escribirme|contactarme)|no quiero (?:m[aá]s )?mensajes/
 
 export function isMarketingOptOutMessage(text: string): boolean {
   return MARKETING_OPT_OUT_PATTERN.test(text.toLowerCase())

@@ -32,10 +32,11 @@ type Location = {
   whatsapp: string
   hours: string
   booking_url: string
-  practices: string[]
+  services: string[]
   obras_sociales: string[]
   booking_instruction: string
   notes: string
+  active: boolean
 }
 
 type AiStatus = {
@@ -50,19 +51,44 @@ const DEFAULT_LOCATION: Omit<Location, "id" | "name"> = {
   whatsapp: "",
   hours: "",
   booking_url: "",
-  practices: [],
+  services: [],
   obras_sociales: [],
   booking_instruction: "",
   notes: "",
+  active: true,
 }
 
 const DEFAULT_WA_SETTINGS: WhatsAppSettings = {
+  bot_enabled: true,
+  session_ttl_hours: 24,
+  shadow_mode_enabled: false,
+  policy_rollout_percent: 0,
   cost_saving_mode: false,
   enable_service_message_charging: false,
   warning_message_threshold: 8,
   handoff_message_threshold: 12,
   monthly_cost_alert_ars: null,
   ai_provider: "sin_ia",
+}
+
+type LegacyLocation = Partial<Location> & Pick<Location, "id" | "name"> & { practices?: string[] }
+
+const SUPPORTED_LOCATIONS: Array<Pick<Location, "id" | "name">> = [
+  { id: "cimel_lanus", name: "CIMEL Lanús" },
+  { id: "hospital_britanico", name: "Hospital Británico" },
+  { id: "swiss_lomas", name: "Swiss Medical Lomas" },
+]
+
+function normalizeLocationForEditor(location: LegacyLocation): Location {
+  const { practices, ...canonical } = location
+  return {
+    ...DEFAULT_LOCATION,
+    ...canonical,
+    id: location.id,
+    name: location.name,
+    services: [...(location.services ?? practices ?? [])],
+    obras_sociales: [...(location.obras_sociales ?? [])],
+  }
 }
 
 const AI_PROVIDER_LABELS: Record<WhatsAppAiProvider, string> = {
@@ -153,7 +179,9 @@ export default function ConfiguracionPage() {
       .then(r => r.json())
       .then(data => {
         setDoctor(data.doctor ?? null)
-        setLocations(data.locations ?? [])
+        setLocations(Array.isArray(data.locations)
+          ? data.locations.map((location: LegacyLocation) => normalizeLocationForEditor(location))
+          : [])
         setWaSettings({ ...DEFAULT_WA_SETTINGS, ...(data.whatsapp_settings ?? {}) })
         setLoading(false)
       })
@@ -262,7 +290,7 @@ export default function ConfiguracionPage() {
     setLocationDraft({
       ...DEFAULT_LOCATION,
       ...loc,
-      practices: [...(loc.practices ?? [])],
+      services: [...(loc.services ?? [])],
       obras_sociales: [...(loc.obras_sociales ?? [])],
     })
     setEditingLocationId(loc.id)
@@ -279,9 +307,10 @@ export default function ConfiguracionPage() {
   }
 
   function addLocation() {
+    const supported = SUPPORTED_LOCATIONS.find(candidate => !locations.some(location => location.id === candidate.id))
+    if (!supported) return
     const newLoc: Location = {
-      id: crypto.randomUUID(),
-      name: "Nueva institución",
+      ...supported,
       ...DEFAULT_LOCATION,
     }
     const updated = [...locations, newLoc]
@@ -386,6 +415,15 @@ export default function ConfiguracionPage() {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4 text-sm">
+          <label className="flex items-start gap-2 cursor-pointer rounded-md border border-gray-200 p-3">
+            <input type="checkbox" className="mt-1" checked={waSettings.bot_enabled}
+              onChange={e => saveWaSettings({ bot_enabled: e.target.checked })} />
+            <span>
+              <span className="font-medium text-gray-900">Bot habilitado</span>
+              <p className="text-xs text-gray-500">Kill switch global. Aunque se apague, siguen funcionando las respuestas fijas de urgencia, baja y formato no soportado.</p>
+            </span>
+          </label>
+
           <Field label="Proveedor de IA para clasificar intents (respaldo, no obligatorio)">
             <Select value={waSettings.ai_provider} onValueChange={v => saveWaSettings({ ai_provider: v as WhatsAppAiProvider })}>
               <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
@@ -427,6 +465,12 @@ export default function ConfiguracionPage() {
             <Field label="Derivar a humano a los X mensajes">
               <Input type="number" min={1} value={waSettings.handoff_message_threshold}
                 onChange={e => saveWaSettings({ handoff_message_threshold: Number(e.target.value) || 1 })} />
+            </Field>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Reiniciar sesion tras X horas inactiva">
+              <Input type="number" min={1} max={168} value={waSettings.session_ttl_hours}
+                onChange={e => saveWaSettings({ session_ttl_hours: Number(e.target.value) || 24 })} />
             </Field>
           </div>
           <Field label="Alertar si el gasto mensual proyectado supera (ARS, opcional)">
@@ -696,7 +740,9 @@ export default function ConfiguracionPage() {
           <h2 className="text-base font-semibold text-gray-700 flex items-center gap-2">
             <MapPin className="h-4 w-4 text-blue-500" /> Lugares de atención
           </h2>
-          <Button variant="outline" size="sm" onClick={addLocation} className="w-full sm:w-auto">
+          <Button variant="outline" size="sm" onClick={addLocation}
+            disabled={SUPPORTED_LOCATIONS.every(candidate => locations.some(location => location.id === candidate.id))}
+            className="w-full sm:w-auto">
             <Plus className="h-4 w-4 mr-1" /> Agregar lugar
           </Button>
         </div>
@@ -733,6 +779,14 @@ export default function ConfiguracionPage() {
                     <Field label="Nombre institución">
                       <Input value={locationDraft.name} onChange={e => setLocationDraft({ ...locationDraft, name: e.target.value })} />
                     </Field>
+                    <label className="flex items-start gap-2 rounded-md border border-gray-200 p-3 text-sm">
+                      <input type="checkbox" className="mt-1" checked={locationDraft.active}
+                        onChange={e => setLocationDraft({ ...locationDraft, active: e.target.checked })} />
+                      <span>
+                        <span className="font-medium text-gray-900">Sede activa</span>
+                        <p className="text-xs text-gray-500">Al guardar confirmás que revisaste estos datos. Solo las sedes activas y verificadas se informan por WhatsApp.</p>
+                      </span>
+                    </label>
                     <Field label="Dirección">
                       <Input value={locationDraft.address} onChange={e => setLocationDraft({ ...locationDraft, address: e.target.value })} placeholder="Tucumán 1314, Lanús" />
                     </Field>
@@ -769,8 +823,8 @@ export default function ConfiguracionPage() {
                       <Stethoscope className="h-3 w-3" /> Prácticas que se realizan
                     </p>
                     <StringList
-                      items={locationDraft.practices}
-                      onChange={practices => setLocationDraft({ ...locationDraft, practices })}
+                      items={locationDraft.services}
+                      onChange={services => setLocationDraft({ ...locationDraft, services })}
                       placeholder="Ej: Ecocardiograma"
                       addLabel="Agregar práctica"
                     />
@@ -855,13 +909,13 @@ export default function ConfiguracionPage() {
                       </div>
                     </div>
                   )}
-                  {loc.practices?.length > 0 && (
+                  {loc.services?.length > 0 && (
                     <div className="flex items-start gap-2">
                       <Stethoscope className="h-3.5 w-3.5 text-gray-400 mt-0.5 shrink-0" />
                       <div>
                         <p className="text-gray-500 mb-1">Prácticas</p>
                         <div className="flex flex-wrap gap-1">
-                          {loc.practices.map(p => (
+                          {loc.services.map(p => (
                             <span key={p} className="bg-blue-50 text-blue-700 text-xs px-2 py-0.5 rounded-full">{p}</span>
                           ))}
                         </div>

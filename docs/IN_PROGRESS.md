@@ -1,3 +1,142 @@
+# EN CURSO (2026-07-16) — hardening por etapas del bot de WhatsApp
+
+## Objetivo
+
+Comparar la investigación externa y los 180 casos del CSV con el bot real, documentar las brechas
+y aplicar por etapas los controles críticos sin habilitar un rollout clínico. Esta tarea es
+exclusivamente local por pedido del usuario: no se hace commit, push, PR, migración, deploy ni
+cambio de variables de entorno.
+
+## Alcance implementado localmente
+
+- [x] Leer la investigación, el CSV, el webhook, el bot, las librerías relacionadas, migraciones y tests.
+- [x] Medir las reglas actuales contra los casos críticos del CSV.
+- [x] Fase 0A: exigir consentimiento administrativo explícito antes del intake.
+- [x] Fase 0A: corregir falsos positivos/negativos del guardrail médico y usar respuestas fijas.
+- [x] Fase 0A: impedir texto libre de IA en cualquier camino que pueda llegar a WhatsApp.
+- [x] Fase 0A: desactivar caché persistente para prompts con mensajes de pacientes.
+- [x] Fase 0A: dejar de duplicar el mensaje completo en campos de síntomas/motivo.
+- [x] Incorporar el CSV como fixture parametrizado y agregar regresiones específicas.
+- [x] Fase 0B: handoff atómico que pausa el bot, kill switch, medios no soportados y seguimiento
+      con opt-in/claim explícitos.
+- [x] Fase 1: webhook autenticado y acotado, inbox durable, orden por conversación, retries/DLQ,
+      estados de entrega y ledger de salida sin reintentos ciegos ante resultado ambiguo.
+- [x] Fase 1C: checkpoint durable entre el handler y el ACK de cola; un fallo del ACK ya no vuelve
+      a interpretar ni a responder un mensaje que el bot terminó de manejar.
+- [x] Fase 1D: identidad canónica de conversación/lead, routing y handoff atómicos, CAS en el límite
+      de despacho, IDs de proveedor globalmente únicos y DLQ administrativa sin contenido clínico.
+- [x] Fase 1E: borrado coordinado con workers/outbox mediante locks y tombstones HMAC, incluida la
+      supresión de redeliverys viejos de Meta sin guardar teléfono ni ID de proveedor en claro.
+- [x] Fases 2/3, sin activar: contrato NLU cerrado, política determinista, catálogo versionado,
+      simulador de los 180 casos, shadow/canary apagado y sedes desde configuración verificada.
+- [x] Privacidad operativa: roles desde `app_metadata`, MFA opcional fail-closed, auditoría sin PII,
+      borrado ampliado y retención dentro de los dos cron existentes.
+- [x] Auditoría final: cerrar idempotencia de logs/consent/handoff, retry seguro de estados,
+      ledger para envíos manuales, reconciliación de delivery status, DLQ alertable y secretos de
+      integraciones fuera de RLS/historial del cliente.
+- [x] Ejecutar el build de producción final, lint, TypeScript, suite completa y revisar el diff
+      sin commitear.
+
+## Resultado local
+
+- Consentimiento v2 por finalidad y evidencia; registros legacy no habilitan el intake y los
+  errores de persistencia cierran el flujo de forma segura.
+- Intake reducido a servicio, cobertura y sede; no solicita ni extrae edad, síntomas o estudios.
+- Urgencias y límites clínicos se resuelven antes de la IA con catálogo fijo; el contenido clínico
+  detectado no se persiste en `messages`.
+- Clasificadores de mensajes usan `cacheMode: none`, contrato runtime cerrado y errores sin PII;
+  la migración propuesta limpia cachés y errores históricos de esas finalidades.
+- El CSV completo valida contrato/180 IDs y alimenta tanto gates parametrizados de urgencia,
+  negación/temporalidad y límite médico como la simulación offline de políticas (180/180).
+- El webhook confirma solamente después de persistir una representación mínima; el worker procesa
+  por conversación y el outbox hace como máximo un intento automático por intención estable. Un
+  resultado incierto de Meta se deriva a revisión humana, porque la API no ofrece una clave de
+  idempotencia que permita prometer entrega externa exactamente una vez.
+- Los eventos inválidos se convierten en una DLQ técnica sin contenido, se valida el
+  `phone_number_id` configurado y los estados recibidos antes del log se reconcilian después.
+- El worker frecuente tiene endpoint autenticado, presupuesto temporal, alerta de DLQ sin PII y
+  health-check por conteos. Falta únicamente programar su invocación externa en Supabase/Vault.
+- Los envíos manuales llevan una clave estable reutilizada por el navegador; consentimientos,
+  mensajes, costos y handoffs deduplican por evidencia/ID de Meta.
+- Tokens Google/Instagram y sus versiones históricas quedan sólo bajo `service_role`; los helpers
+  nunca devuelven tokens como metadata de conexión.
+- La IA queda limitada a clasificación estructurada cerrada. Ningún texto generado por un modelo
+  se usa como respuesta para pacientes; catálogo, guardrails y acciones pertenecen a la política
+  determinista. El adaptador NLU nuevo permanece offline y el rollout está forzado a apagado.
+- Sedes, días, direcciones, servicios e instrucciones operativas se leen de una configuración
+  canónica verificada. Si falta verificación, el bot no afirma el dato y deriva a una persona.
+- El tombstone HMAC del teléfono se conserva 90 días. Bloquea escrituras genéricas por teléfono
+  durante 15 minutos; después de esa ventana, un evento de Meta sigue bloqueado si su `occurred_at`
+  es anterior o igual al borrado. Los IDs estables de evento/salida también se bloquean 90 días.
+- Los tests de migraciones validan contratos estáticos del SQL y los mocks validan la integración
+  TypeScript. No ejecutan las migraciones ni carreras concurrentes contra PostgreSQL real; eso
+  permanece como gate obligatorio de staging.
+- Verificación final posterior al hardening: `npm run lint` sin errores ni warnings,
+  `npx tsc --noEmit` limpio, 78 suites/715 tests aprobados, `npm run build` exitoso y
+  `git diff --check` sin errores. El build necesitó ejecutarse fuera del sandbox porque Windows
+  bloqueó el proceso hijo de Next con `EPERM`; no implicó red, deploy ni cambios externos.
+- La revisión estática final encontró una dependencia de orden: 1E instalaba un trigger sobre
+  `whatsapp_policy_evaluations` antes de que existiera. El trigger quedó movido a la migración
+  `policy_shadow`, inmediatamente después de crear la tabla, y el contrato de migración lo cubre.
+- Rama local `codex/whatsapp-fase0-safety`; sin commit, push, PR, migración ni deploy.
+
+## Plan por etapas y estado
+
+1. **Fase 0 — contención:** implementada y probada localmente; requiere revisión médica/legal antes
+   de cualquier despliegue.
+2. **Fase 1 — transporte durable:** implementada y probada localmente; las migraciones y el código
+   todavía no fueron desplegados, por lo que el worker integrado al cron aún no corre en producción.
+3. **Fase 2 — NLU shadow:** contrato, adaptador mockeable, dataset y persistencia mínima listos,
+   pero no conectados a mensajes reales ni habilitados.
+4. **Fase 3 — políticas y fuentes:** motor/catalogo y configuración de sedes implementados; falta
+   que una persona autorizada revise y guarde las tres sedes para crear evidencia de verificación.
+5. **Fases 4/5 — canary y optimización:** no iniciadas. El código reserva los controles pero fuerza
+   `shadow=false`, `canary=false` y cohortes en 0 hasta completar los gates previos.
+
+## Orden obligatorio de migraciones y gate de staging
+
+Aplicar exactamente en este orden, con backup y primero en staging:
+
+1. `20260715_whatsapp_phase0a_safety.sql` — consentimiento/minimización, limpieza histórica y
+   template interno genérico.
+2. `20260716_whatsapp_phase0b_operations.sql` — handoff, pausa y seguimiento durable.
+3. `20260716_whatsapp_phase1_durable_transport.sql` — inbox, leases, retries, DLQ y status.
+4. `20260716_whatsapp_phase1b_outbound_ledger.sql` — identidad estable de salida y cuarentena
+   de resultados ambiguos.
+5. `20260716_whatsapp_phase1c_queue_checkpoint.sql` — checkpoint handler/ACK y recuperación de
+   follow-ups trabados.
+6. `20260716_whatsapp_phase1d_atomic_routing.sql` — identidad/routing atómicos, CAS y unicidad de
+   IDs de Meta.
+7. `20260716_whatsapp_phase1e_erasure_suppression.sql` — locks y tombstones HMAC de borrado.
+8. `20260716_whatsapp_policy_shadow.sql` — evaluación shadow auditable, todavía apagada.
+9. `20260716_whatsapp_privacy_roles_retention.sql` — roles, MFA, RLS, auditoría y limpieza.
+
+Antes de producción hay que ejecutar este lote en una base clonada/staging, revisar las filas
+históricas duplicadas o incompatibles que 1D reconcilia, probar carreras reales de cola/outbox/
+borrado y verificar rollback/restauración. Las suites Jest actuales no sustituyen ese ensayo SQL.
+
+## Riesgo y pausa
+
+- Toca lógica médica y el texto de guardia/límite clínico. Se puede desarrollar y probar localmente,
+  pero no debe desplegarse sin la revisión médica prevista por las reglas vigentes del proyecto.
+- Toca tratamiento de datos personales y consentimiento. La implementación técnica no reemplaza la
+  revisión legal pendiente del texto, finalidades y política de retención.
+- La retención automática de `data_erasure_log` no se fijó: conserva evidencia seudonimizada del
+  ejercicio de borrado y su plazo debe definirlo el asesor legal antes de activar la política final.
+- Por minimización, el primer mensaje orgánico anterior al consentimiento no se conserva ni se
+  reutiliza: la persona debe repetirlo. Cambiar eso exige definir base legal y un sobre temporal
+  cifrado con retención explícita, o capturar consentimiento antes de abrir WhatsApp.
+- Antes de activar hacen falta: completar el gate SQL de staging, definir
+  `META_GRAPH_API_VERSION`, asignar roles/enrolar MFA, validar las tres sedes y demás configuración
+  operativa, probar una cuenta por rol y programar el worker de un minuto en Supabase Cron usando
+  URL/`CRON_SECRET` desde Vault.
+- La alerta interna por WhatsApp ahora usa un template genérico de una sola variable (ID opaco de
+  caso), y la migración lo deja en borrador: `alerta_interna_derivacion` debe reaprobarse en Meta
+  antes de esperar ese canal de aviso. El email sigue siendo el respaldo independiente.
+- No se toca `.env.local`, ningún secret, la cantidad de cron jobs ni producción.
+
+---
+
 # EN CURSO (2026-07-15) — cierre de la Ola 4 (incidente real con David Portas)
 
 ## Objetivo

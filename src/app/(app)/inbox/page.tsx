@@ -26,9 +26,10 @@ export default function InboxPage() {
   const [closingAction, setClosingAction] = useState(false)
   const [autoReply, setAutoReply] = useState(true)
   const [suggesting, setSuggesting] = useState(false)
-  const [botPauseState, setBotPauseState] = useState<{ leadId: string; value: boolean } | null>(null)
+  const [botPauseState, setBotPauseState] = useState<{ leadId: string; value: boolean; state: string } | null>(null)
   const [togglingBot, setTogglingBot] = useState(false)
   const bottomRef = useRef<HTMLDivElement>(null)
+  const deliveryAttemptRef = useRef<{ fingerprint: string; key: string } | null>(null)
 
   useEffect(() => {
     function loadLeads() {
@@ -70,22 +71,29 @@ export default function InboxPage() {
       .then(r => r.json())
       .then(data => {
         if (cancelled) return
-        setBotPauseState({ leadId: selectedLeadId, value: typeof data.paused === "boolean" ? data.paused : false })
+        setBotPauseState({
+          leadId: selectedLeadId,
+          value: typeof data.paused === "boolean" ? data.paused : false,
+          state: typeof data.state === "string" ? data.state : "nuevo",
+        })
       })
       .catch(() => {})
     return () => { cancelled = true }
   }, [selectedLeadId, canSendWhatsApp])
 
-  async function toggleBotPause() {
-    if (!selectedLeadId || botPaused === null) return
+  async function changeHandoff(action: "take" | "reactivate" | "close") {
+    if (!selectedLeadId) return
     setTogglingBot(true)
-    const next = !botPaused
-    const res = await fetch("/api/whatsapp/bot-pause", {
-      method: "PATCH",
+    const res = await fetch("/api/whatsapp/handoff", {
+      method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ lead_id: selectedLeadId, paused: next }),
+      body: JSON.stringify({ lead_id: selectedLeadId, action }),
     })
-    if (res.ok) setBotPauseState({ leadId: selectedLeadId, value: next })
+    if (res.ok) {
+      const nextPaused = action !== "reactivate"
+      const nextState = action === "take" ? "human_active" : action === "close" ? "closed" : "nuevo"
+      setBotPauseState({ leadId: selectedLeadId, value: nextPaused, state: nextState })
+    }
     setTogglingBot(false)
   }
 
@@ -123,13 +131,20 @@ export default function InboxPage() {
     if (!input.trim() || !selectedLeadId) return
     setSending(true)
 
+    const trimmedInput = input.trim()
+    const fingerprint = `${selectedLeadId}\u0000${trimmedInput}`
+    if (!deliveryAttemptRef.current || deliveryAttemptRef.current.fingerprint !== fingerprint) {
+      deliveryAttemptRef.current = { fingerprint, key: crypto.randomUUID() }
+    }
+
     const res = await fetch("/api/messages", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         lead_id: selectedLeadId,
-        content: input,
-        generate_reply: autoReply,
+        content: trimmedInput,
+        generate_reply: canSendWhatsApp ? false : autoReply,
+        delivery_key: canSendWhatsApp ? deliveryAttemptRef.current.key : undefined,
       }),
     })
     const data = await res.json()
@@ -147,7 +162,8 @@ export default function InboxPage() {
     ])
     // El envío real por WhatsApp pausa el bot para esta conversación del lado del servidor —
     // reflejarlo acá al toque, sin esperar al próximo fetch de estado.
-    if (canSendWhatsApp) setBotPauseState({ leadId: selectedLeadId, value: true })
+    if (canSendWhatsApp) setBotPauseState({ leadId: selectedLeadId, value: true, state: "human_active" })
+    deliveryAttemptRef.current = null
     setInput("")
     setSending(false)
   }
@@ -258,17 +274,28 @@ export default function InboxPage() {
                 </>
               )}
               {canSendWhatsApp && botPaused !== null && (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className={`text-xs h-7 px-2 ${botPaused ? "border-amber-300 text-amber-700 hover:bg-amber-50" : "border-gray-300 text-gray-600 hover:bg-gray-50"}`}
-                  disabled={togglingBot}
-                  onClick={toggleBotPause}
-                  title={botPaused ? "El bot no le está respondiendo a este paciente — click para reactivarlo" : "El bot puede seguir respondiendo automáticamente — click para pausarlo"}
-                >
-                  <Bot className="h-3 w-3 mr-1" />
-                  {botPaused ? "Bot pausado" : "Bot activo"}
-                </Button>
+                botPaused ? (
+                  <>
+                    <Button size="sm" variant="outline"
+                      className="text-xs h-7 px-2 border-green-300 text-green-700 hover:bg-green-50"
+                      disabled={togglingBot} onClick={() => changeHandoff("reactivate")}>
+                      <Bot className="h-3 w-3 mr-1" /> Resolver y reactivar
+                    </Button>
+                    {botPauseState?.state !== "closed" && (
+                      <Button size="sm" variant="outline"
+                        className="text-xs h-7 px-2 border-gray-300 text-gray-600 hover:bg-gray-50"
+                        disabled={togglingBot} onClick={() => changeHandoff("close")}>
+                        Cerrar conversación
+                      </Button>
+                    )}
+                  </>
+                ) : (
+                  <Button size="sm" variant="outline"
+                    className="text-xs h-7 px-2 border-amber-300 text-amber-700 hover:bg-amber-50"
+                    disabled={togglingBot} onClick={() => changeHandoff("take")}>
+                    <Users className="h-3 w-3 mr-1" /> Tomar conversación
+                  </Button>
+                )
               )}
               {!canSendWhatsApp && (
                 <label className="flex items-center gap-1 text-xs text-gray-500 cursor-pointer">
@@ -327,17 +354,19 @@ export default function InboxPage() {
                   : "Se manda directo por WhatsApp al paciente. Al enviar, el bot se pausa automáticamente para esta conversación."
                 : "Este lead no tiene una conversación de WhatsApp real conectada acá — el mensaje queda solo como registro interno, no se manda a ningún lado automáticamente."}
             </p>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="text-xs text-blue-600 hover:text-blue-700 hover:bg-blue-50 w-full"
-              onClick={suggestMessage}
-              disabled={suggesting || sending}
-            >
-              {suggesting
-                ? <><Loader2 className="h-3 w-3 animate-spin mr-1" /> Generando sugerencia...</>
-                : <><Sparkles className="h-3 w-3 mr-1" /> Sugerir mensaje de seguimiento</>}
-            </Button>
+            {!canSendWhatsApp && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-xs text-blue-600 hover:text-blue-700 hover:bg-blue-50 w-full"
+                onClick={suggestMessage}
+                disabled={suggesting || sending}
+              >
+                {suggesting
+                  ? <><Loader2 className="h-3 w-3 animate-spin mr-1" /> Preparando sugerencia...</>
+                  : <><Sparkles className="h-3 w-3 mr-1" /> Sugerir seguimiento administrativo</>}
+              </Button>
+            )}
           </div>
         </div>
       )}

@@ -2,11 +2,14 @@ import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { getServiceDb } from "@/lib/supabase/service"
 import { getValidToken, getConnectionInfo, listAccounts, listLocations } from "@/lib/google-business"
+import { authorizeStaff } from "@/lib/staff-authz"
+
+const GOOGLE_BUSINESS_ROLES = ["owner", "doctor"] as const
 
 export async function GET() {
   const userClient = await createClient()
-  const { data: { user } } = await userClient.auth.getUser()
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  const auth = await authorizeStaff(userClient, { allowedRoles: GOOGLE_BUSINESS_ROLES })
+  if (!auth.ok) return NextResponse.json({ error: auth.error, code: auth.code }, { status: auth.status })
 
   const supabase = getServiceDb()
   const info = await getConnectionInfo(supabase)
@@ -36,6 +39,6 @@ export async function GET() {
     return NextResponse.json({ locations: result })
   } catch (e) {
     console.error(`[google-business/locations] ${String(e)}`)
-    return NextResponse.json({ error: String(e) }, { status: 500 })
+    return NextResponse.json({ error: "No se pudieron consultar las ubicaciones de Google Business" }, { status: 500 })
   }
 }
