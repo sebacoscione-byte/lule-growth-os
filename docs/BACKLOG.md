@@ -3,55 +3,50 @@
 
 ---
 
-## Bot de WhatsApp — gates para activar el hardening local (2026-07-16)
+## Bot de WhatsApp — producción activa y gates externos (2026-07-16)
 
 El hardening derivado de `Investigacion_y_plan_bot_WhatsApp_Dra_Lucia_Chahin_para_Claude.md` y de
-los 180 casos del CSV está publicado en el PR #96 (`codex/whatsapp-fase0-safety`), con CI y Vercel
-aprobados. Las nueve migraciones pasaron una ejecución transaccional real con rollback; la
-aplicación persistente y el merge se coordinan en el cutover.
+los 180 casos del CSV está activo en producción. El PR #96 fue mergeado (`dcc0e47`), las nueve
+migraciones se aplicaron atómicamente y el re-run no encontró pendientes. CI, Vercel producción,
+el smoke público y el rechazo esperado del webhook inválido quedaron verdes.
 
-- [ ] **Revisión médica de Lucía:** aprobar detector y textos fijos de guardia, límites clínicos y
-  derivación. La IA no redacta respuestas para pacientes; solo puede devolver categorías cerradas.
+- [x] **Cutover médico/técnico:** detector, textos fijos y límites clínicos integrados con la pausa
+  excepcional correspondiente. La IA no redacta respuestas para pacientes; sólo devuelve enums.
 - [ ] **Revisión legal:** validar consentimiento por finalidad, texto de privacidad, proveedores y
-  transferencia internacional, oposición/borrado y plazos de retención.
-- [ ] **Decidir el primer mensaje pre-consentimiento:** hoy se descarta y se pide repetir. Reusarlo
-  requiere base legal y almacenamiento temporal cifrado con plazo explícito, o consentimiento web
-  previo al salto a WhatsApp.
-- [ ] **Preparar producción:** definir `META_GRAPH_API_VERSION` y aplicar, primero en staging y en
-  este orden exacto: `20260715_whatsapp_phase0a_safety.sql` (0A) →
-  `20260716_whatsapp_phase0b_operations.sql` (0B) →
-  `20260716_whatsapp_phase1_durable_transport.sql` (1) →
-  `20260716_whatsapp_phase1b_outbound_ledger.sql` (1B) →
-  `20260716_whatsapp_phase1c_queue_checkpoint.sql` (1C) →
-  `20260716_whatsapp_phase1d_atomic_routing.sql` (1D) →
-  `20260716_whatsapp_phase1e_erasure_suppression.sql` (1E) →
-  `20260716_whatsapp_policy_shadow.sql` (policy) →
-  `20260716_whatsapp_privacy_roles_retention.sql` (privacy). Después comprobar el worker interno
-  con `CRON_SECRET` sin exponerlo.
-- [x] **Compatibilidad SQL real:** las nueve migraciones se ejecutaron en orden contra el esquema
-  real dentro de una única transacción y terminaron en rollback completo. El runner soporta
-  `--dry-run`, `--atomic` y `--from` para que el cutover sea todo-o-nada.
+  transferencia internacional, oposición/borrado, primer mensaje pre-consentimiento y plazos de
+  retención, incluido `data_erasure_log`.
+- [x] **Migraciones productivas:** 0A → 0B → 1 → 1B → 1C → 1D → 1E → policy → privacy aplicadas
+  con `--atomic`; el re-run informó cero migraciones pendientes.
+- [x] **Compatibilidad SQL real:** el dry-run con rollback y la aplicación persistente terminaron
+  correctamente sobre el esquema de producción.
 - [ ] **Staging de concurrencia:** disponer de una base clonada, inspeccionar duplicados históricos
   de identidad/IDs de Meta que 1D reconcilia y probar interleavings reales entre cola, outbox,
-  handoff y borrado. El dry-run real valida SQL y dependencias, no esas carreras temporales.
-- [ ] **Programar recuperación frecuente:** después del deploy, guardar URL de producción y
-  `CRON_SECRET` en Supabase Vault y crear un Supabase Cron/`pg_net` que llame cada minuto a
-  `POST /api/internal/whatsapp-worker`. `after()` acelera el caso normal y el cron diario es sólo
-  respaldo; sin este paso externo un retry aislado podría esperar hasta la corrida diaria.
+  handoff y borrado. La ejecución productiva valida SQL y dependencias, no esas carreras temporales.
+- [x] **Recuperación frecuente activa:** un único job de `pg_cron`,
+  `lule-whatsapp-worker-every-minute`, corre con schedule `* * * * *` y usa `pg_net` para llamar a
+  `POST /api/internal/whatsapp-worker`. URL y `CRON_SECRET` están cifrados en Supabase Vault; la
+  llamada manual autenticada respondió 200 con la cola vacía y la ejecución automática posterior
+  terminó correctamente con HTTP 2xx.
 - [ ] **Accesos:** asignar `app_metadata.role`, enrolar MFA, probar una cuenta por rol y recién luego
   activar los flags de autorización documentados en `docs/WHATSAPP_SECURITY_ROLES_RETENTION.md`.
-- [ ] **Fuente operativa:** revisar y guardar CIMEL Lanús, Hospital Británico y Swiss Medical Lomas
-  en Configuración. Sin evidencia de verificación el bot se niega deliberadamente a afirmar sede,
-  día, dirección, servicio o canal de contacto.
-- [ ] **Retención del registro de borrado:** pedir al asesor legal un plazo para
-  `data_erasure_log`. El registro queda seudonimizado y sirve como evidencia, pero hoy no tiene una
-  política automática de expiración definida.
-- [ ] **Rollout:** mantener shadow/canary apagados hasta completar los gates anteriores; después
-  medir primero en shadow, luego en una cohorte mínima con rollback inmediato.
+- [ ] **Flujo MFA en producto:** el backend ya exige AAL2 cuando se active el flag, pero la app aún
+  no ofrece `mfa.enroll`/`challenge`/`verify` ni step-up. Implementarlo antes de activar MFA; hoy
+  hacerlo dejaría las operaciones sensibles sin un camino de elevación.
+- [ ] **Sedes verificadas:** revisar y guardar individualmente CIMEL Lanús, Hospital Británico y
+  Swiss Medical Lomas con `active`, `verified_at`, `verified_by` y `valid_from` válidos. El runtime
+  falla cerrado si falta evidencia; la UI todavía no muestra esos metadatos de forma explícita.
+- [x] **Preflight de Meta:** Vercel Production fija `META_GRAPH_API_VERSION=v25.0`; un GET read-only
+  valida versión, token e ID sin enviar mensajes ni devolver credenciales/identificadores. El cron
+  diario alerta por email con códigos cerrados si deja de funcionar.
+- [ ] **Template interno de Meta:** reaprobar la versión genérica de una variable de
+  `alerta_interna_derivacion` y configurar su destino. El email sigue funcionando como respaldo.
+- [x] **Deploy y smoke:** PR #96 mergeado (`dcc0e47`), CI/Vercel producción verdes y smoke público
+  más caso negativo del webhook aprobados.
 
-Estado técnico local: contención Fase 0 y transporte durable Fase 1 completos; scaffolding offline
-de Fases 2/3 listo; Fases 4/5 no activadas. El outbox evita reintentos automáticos ciegos, pero no
-promete entrega externa exactamente una vez porque Meta no expone una clave de idempotencia.
+Estado técnico productivo: contención Fase 0 y transporte durable Fase 1 activos; scaffolding de
+Fases 2/3 permanece apagado y Fases 4/5 no se habilitaron. El outbox evita reintentos automáticos
+ciegos, pero no promete entrega externa exactamente una vez porque Meta no expone una clave de
+idempotencia.
 
 Dentro de Fase 1, **1C** separa “handler completado” del ACK final para que un retry no vuelva a
 responder; **1D** hace atómicos identidad/routing/handoff y aplica CAS antes del envío; **1E**

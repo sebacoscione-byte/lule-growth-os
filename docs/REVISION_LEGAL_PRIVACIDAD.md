@@ -29,8 +29,8 @@ en lenguaje llano:
   edad, síntomas ni estudios.
 - Para qué se usan (contactar, derivar a la sede correcta, clasificar automáticamente el motivo).
 - Con qué terceros se comparten (ver punto 3).
-- Cuánto tiempo se conservan (ver punto 4 — propuesta técnica ampliada localmente, todavía sin
-  despliegue ni aprobación legal).
+- Cuánto tiempo se conservan (ver punto 4 — controles técnicos ya desplegados, todavía pendientes
+  de aprobación legal).
 - Cómo pedir acceso, corrección o eliminación (hoy manual, por WhatsApp).
 
 ## 3. Terceros que reciben datos
@@ -58,9 +58,9 @@ guarde un Data Processing Agreement (DPA) firmado o aceptado de cada proveedor (
 Google, Supabase, Vercel) — la mayoría los ofrece como parte de sus términos estándar — o alcanza
 con la descripción de `/privacidad` sin un documento adicional por proveedor?
 
-## 4. Política de retención (ampliada en el PR #96, pendiente del cutover)
+## 4. Política de retención (ampliada por el PR #96 y activa técnicamente)
 
-Propuesta técnica incluida en el PR #96, sujeta a revisión legal y al cutover coordinado:
+Implementación técnica desplegada por el PR #96, todavía sujeta a revisión legal:
 
 - **Leads que nunca se convirtieron en pacientes, o con solo datos administrativos**: se
   anonimizan/eliminan automáticamente tras **24 meses de inactividad**.
@@ -149,11 +149,12 @@ producto que hay que diseñar aparte — no algo para resolver solo en el texto 
    variable con un ID opaco de caso y no incluye nombre, teléfono, síntoma ni motivo. La migración
    la deja en borrador hasta completar esa aprobación.
 
-## 10. Estado técnico previo a producción (para no confundir código con despliegue)
+## 10. Estado técnico productivo (para no confundir despliegue con aprobación legal)
 
-El PR #96 pasó CI/Vercel y el lote se ejecutó contra el esquema real dentro de una transacción con
-rollback completo. La aplicación persistente mantiene este orden obligatorio: 0A → 0B → 1 → 1B →
-1C → 1D → 1E → policy → privacy, correspondiente a:
+El PR #96 fue mergeado (`dcc0e47`) y CI/Vercel producción quedaron verdes. Después del dry-run con
+rollback, el lote se aplicó atómicamente al esquema productivo; un segundo run confirmó que no
+quedaban migraciones pendientes. El orden persistido fue 0A → 0B → 1 → 1B → 1C → 1D → 1E →
+policy → privacy, correspondiente a:
 
 1. `20260715_whatsapp_phase0a_safety.sql`.
 2. `20260716_whatsapp_phase0b_operations.sql`.
@@ -165,8 +166,12 @@ rollback completo. La aplicación persistente mantiene este orden obligatorio: 0
 8. `20260716_whatsapp_policy_shadow.sql`.
 9. `20260716_whatsapp_privacy_roles_retention.sql`.
 
-El dry-run transaccional valida el SQL y sus dependencias sobre PostgreSQL real, pero no reemplaza
-staging para carreras concurrentes ni un ensayo de restauración. Después del cutover todavía hacen
-falta roles en `app_metadata`, enrolamiento MFA, una cuenta probada por rol, versión de Meta
-configurada y sedes/configuración operativa verificadas. Estos son gates técnicos separados de la
-aprobación médica y de esta revisión legal.
+El smoke público y el rechazo esperado del webhook ante una solicitud inválida también fueron
+aprobados. El worker frecuente ya está activo con un único job `lule-whatsapp-worker-every-minute`
+de `pg_cron` (`* * * * *`), `pg_net` y secretos cifrados en Supabase Vault; la llamada manual
+autenticada respondió 200 con la cola vacía. Siguen pendientes únicamente los gates externos:
+staging para carreras concurrentes/restauración, roles en `app_metadata` y enrolamiento MFA,
+evidencia de verificación para las tres sedes, reaprobación del template interno de Meta y esta
+revisión legal. La versión Graph v25.0 y su preflight read-only ya están configurados.
+Ninguno cambia que el esquema y el código ya están activos; tampoco reemplazan la validación
+jurídica de consentimiento y retenciones.

@@ -98,6 +98,65 @@ function getAccessToken() {
   return token
 }
 
+export type WhatsAppCloudApiPreflightCode =
+  | WhatsAppConfigurationError["code"]
+  | "provider_rejected"
+  | "provider_unavailable"
+  | "invalid_provider_response"
+  | "phone_number_id_mismatch"
+
+export type WhatsAppCloudApiPreflight =
+  | { ok: true; code: null }
+  | { ok: false; code: WhatsAppCloudApiPreflightCode }
+
+/**
+ * Read-only preflight for the production Meta configuration. It never sends a message and never
+ * returns the token, phone-number ID, provider body, verified name or display phone number.
+ */
+export async function checkWhatsAppCloudApiConfiguration(): Promise<WhatsAppCloudApiPreflight> {
+  try {
+    const apiBase = getApiBase()
+    const phoneNumberId = getPhoneNumberId()
+    const token = getAccessToken()
+    const response = await fetch(
+      `${apiBase}/${encodeURIComponent(phoneNumberId)}?fields=id`,
+      {
+        method: "GET",
+        headers: { Authorization: `Bearer ${token}` },
+        signal: AbortSignal.timeout(META_REQUEST_TIMEOUT_MS),
+      },
+    )
+
+    if (!response.ok) {
+      return {
+        ok: false,
+        code: response.status >= 400 && response.status < 500
+          ? "provider_rejected"
+          : "provider_unavailable",
+      }
+    }
+
+    let payload: unknown
+    try {
+      payload = await response.json()
+    } catch {
+      return { ok: false, code: "invalid_provider_response" }
+    }
+    if (!payload || typeof payload !== "object" || typeof (payload as { id?: unknown }).id !== "string") {
+      return { ok: false, code: "invalid_provider_response" }
+    }
+    if ((payload as { id: string }).id !== phoneNumberId) {
+      return { ok: false, code: "phone_number_id_mismatch" }
+    }
+    return { ok: true, code: null }
+  } catch (error) {
+    if (error instanceof WhatsAppConfigurationError) {
+      return { ok: false, code: error.code }
+    }
+    return { ok: false, code: "provider_unavailable" }
+  }
+}
+
 async function postToApi(body: object) {
   const res = await fetch(`${getApiBase()}/${getPhoneNumberId()}/messages`, {
     method: "POST",
