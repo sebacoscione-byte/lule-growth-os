@@ -5,7 +5,8 @@ Sistema de adquisición de pacientes para la **Dra. Lucía Chahin**, cardióloga
 ## Qué hace
 
 - Captura leads desde Google Maps, Instagram, WhatsApp, landings y entrada manual
-- Clasifica la intención del paciente con Gemini o Claude (consulta cardiológica o ecocardiograma)
+- Clasifica intención administrativa con enums cerrados; WhatsApp nunca usa IA para redactar una
+  respuesta médica libre visible al paciente
 - Deriva al canal correcto: CIMEL Lanús (martes), Hospital Británico (miércoles) o Swiss Medical Lomas (viernes)
 - Hace seguimiento hasta que el paciente confirme que pidió turno
 - Investiga fuentes recientes y genera contenido coordinado para Instagram y Google Business Profile
@@ -19,7 +20,7 @@ Sistema de adquisición de pacientes para la **Dra. Lucía Chahin**, cardióloga
 - Next.js (App Router) + TypeScript
 - Tailwind CSS + shadcn/ui (componentes manuales)
 - Supabase (Auth + PostgreSQL + RLS)
-- Google Gemini o Claude — clasificación, respuestas y generación en español
+- Google Gemini o Claude — clasificación cerrada y generación de contenido editorial en español
 - Vercel (deploy automático desde `main`)
 
 ## Setup
@@ -33,7 +34,17 @@ cp .env.example .env.local
 
 ### 2. Base de datos Supabase
 
-Ejecutar `docs/schema.sql` en el SQL Editor de Supabase. El script crea:
+`docs/schema.sql` es sólo el snapshot base. En una base nueva, ejecutarlo primero en el SQL Editor y
+después aplicar **todas** las migraciones versionadas en orden:
+
+```bash
+npm run migrate
+```
+
+Para validar un lote sin persistirlo, el runner soporta `--dry-run`; para confirmar todo-o-nada,
+`--atomic`. Requiere `SUPABASE_DB_PASSWORD` local y nunca imprime el valor.
+
+El snapshot base crea:
 - Tablas: `leads`, `messages`, `growth_experiments`, `google_local_checklist`, `app_config`
 - RLS policies (solo usuarios autenticados)
 - Triggers para `updated_at`

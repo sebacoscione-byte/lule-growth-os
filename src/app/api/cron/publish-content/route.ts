@@ -12,6 +12,7 @@ import { publishApprovedItem } from "@/lib/content-publish"
 import { runWhatsAppFollowup } from "@/lib/whatsapp-followup"
 import { runHandoffReminderCheck } from "@/lib/whatsapp-handoff"
 import { drainWhatsAppInboundQueue, getWhatsAppQueueHealth } from "@/lib/whatsapp-inbound-queue"
+import { checkWhatsAppCloudApiConfiguration } from "@/lib/whatsapp"
 import { snapshotInstagramFollowers } from "@/lib/instagram-followers"
 import { snapshotGoogleBusinessMetrics } from "@/lib/google-performance"
 import { sendCronFailureAlert } from "@/lib/alert-email"
@@ -149,6 +150,9 @@ export async function GET(request: Request) {
     } catch {
       whatsappQueueHealthError = true
     }
+    // GET read-only contra Meta: valida diariamente versión, token e ID sin enviar mensajes ni
+    // devolver identificadores. Evita que una rotación/configuración rota quede silenciosa.
+    const whatsappMetaPreflight = await checkWhatsAppCloudApiConfiguration()
 
     const settings = await readAutoPublishSettings(supabase)
 
@@ -198,6 +202,9 @@ export async function GET(request: Request) {
     if (whatsappQueueHealth.dueCount > 0) {
       failures.push(`Cola WhatsApp: ${whatsappQueueHealth.dueCount} evento(s) vencido(s) pendiente(s)`)
     }
+    if (!whatsappMetaPreflight.ok) {
+      failures.push(`WhatsApp Meta: preflight_${whatsappMetaPreflight.code}`)
+    }
     if (failures.length > 0) {
       await sendCronFailureAlert("publish-content", failures.join("\n"))
     }
@@ -206,6 +213,7 @@ export async function GET(request: Request) {
       post: post.last_run_result, historia: historia.last_run_result, carrusel: carrusel.last_run_result,
       whatsappFollowup, instagramFollowers,
       googleBusinessMetrics, handoffReminder, whatsappQueue, whatsappQueueHealth,
+      whatsappMetaPreflight,
     })
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)

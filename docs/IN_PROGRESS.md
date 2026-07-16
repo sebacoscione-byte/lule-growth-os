@@ -1,11 +1,10 @@
-# EN CURSO (2026-07-16) — hardening por etapas del bot de WhatsApp
+# CERRADO (2026-07-16) — hardening por etapas del bot de WhatsApp
 
 ## Objetivo
 
 Comparar la investigación externa y los 180 casos del CSV con el bot real, documentar las brechas
 y aplicar por etapas los controles críticos sin habilitar un rollout clínico prematuro. El trabajo
-está publicado en el PR #96; la base y el merge se coordinan como un único cutover y no se modifican
-variables de entorno.
+se integró mediante el PR #96 y el cutover atómico quedó aplicado y verificado en producción.
 
 ## Alcance implementado localmente
 
@@ -38,6 +37,10 @@ variables de entorno.
       antes de publicar el PR.
 - [x] Ejecutar las nueve migraciones contra el esquema real dentro de una única transacción y
       confirmar el rollback completo antes del cutover.
+- [x] Aplicar las nueve migraciones atómicamente en producción y confirmar en un segundo run que
+      no quedaban migraciones pendientes.
+- [x] Mergear el PR #96, verificar CI/Vercel producción y aprobar el smoke público más el caso
+      negativo del webhook.
 
 ## Resultado local
 
@@ -47,7 +50,7 @@ variables de entorno.
 - Urgencias y límites clínicos se resuelven antes de la IA con catálogo fijo; el contenido clínico
   detectado no se persiste en `messages`.
 - Clasificadores de mensajes usan `cacheMode: none`, contrato runtime cerrado y errores sin PII;
-  la migración propuesta limpia cachés y errores históricos de esas finalidades.
+  la migración aplicada limpió cachés y errores históricos de esas finalidades.
 - El CSV completo valida contrato/180 IDs y alimenta tanto gates parametrizados de urgencia,
   negación/temporalidad y límite médico como la simulación offline de políticas (180/180).
 - El webhook confirma solamente después de persistir una representación mínima; el worker procesa
@@ -56,8 +59,9 @@ variables de entorno.
   idempotencia que permita prometer entrega externa exactamente una vez.
 - Los eventos inválidos se convierten en una DLQ técnica sin contenido, se valida el
   `phone_number_id` configurado y los estados recibidos antes del log se reconcilian después.
-- El worker frecuente tiene endpoint autenticado, presupuesto temporal, alerta de DLQ sin PII y
-  health-check por conteos. Falta únicamente programar su invocación externa en Supabase/Vault.
+- El worker frecuente está activo en producción mediante un único job de `pg_cron` llamado
+  `lule-whatsapp-worker-every-minute` (`* * * * *`). Usa `pg_net`; URL y `CRON_SECRET` están
+  cifrados en Supabase Vault. La llamada manual autenticada respondió 200 con la cola vacía.
 - Los envíos manuales llevan una clave estable reutilizada por el navegador; consentimientos,
   mensajes, costos y handoffs deduplican por evidencia/ID de Meta.
 - Tokens Google/Instagram y sus versiones históricas quedan sólo bajo `service_role`; los helpers
@@ -71,9 +75,9 @@ variables de entorno.
   durante 15 minutos; después de esa ventana, un evento de Meta sigue bloqueado si su `occurred_at`
   es anterior o igual al borrado. Los IDs estables de evento/salida también se bloquean 90 días.
 - Los tests de migraciones validan contratos estáticos del SQL y los mocks validan la integración
-  TypeScript. Además, las nueve migraciones pasaron una ejecución real y ordenada contra el esquema
-  de producción dentro de una única transacción con rollback. Esto valida SQL/dependencias reales,
-  pero no reemplaza pruebas de interleavings concurrentes en una base aislada.
+  TypeScript. Además del dry-run con rollback, las nueve migraciones se aplicaron atómicamente en
+  producción y el re-run informó cero pendientes. Esto valida SQL/dependencias reales, pero no
+  reemplaza pruebas de interleavings concurrentes en una base aislada.
 - Verificación final posterior al hardening: `npm run lint` sin errores ni warnings,
   `npx tsc --noEmit` limpio, 78 suites/715 tests aprobados, `npm run build` exitoso y
   `git diff --check` sin errores. El build necesitó ejecutarse fuera del sandbox porque Windows
@@ -81,15 +85,14 @@ variables de entorno.
 - La revisión estática final encontró una dependencia de orden: 1E instalaba un trigger sobre
   `whatsapp_policy_evaluations` antes de que existiera. El trigger quedó movido a la migración
   `policy_shadow`, inmediatamente después de crear la tabla, y el contrato de migración lo cubre.
-- PR #96 (`codex/whatsapp-fase0-safety`), commit base `2b7db23`; CI y Vercel aprobados. La
-  aplicación persistente de migraciones y el merge quedan acoplados al cutover final.
+- PR #96 mergeado en `main` (`dcc0e47`). CI y Vercel producción verdes; smoke público y rechazo
+  esperado del webhook inválido aprobados. Las nueve migraciones están persistidas en producción.
 
 ## Plan por etapas y estado
 
-1. **Fase 0 — contención:** implementada y probada localmente; requiere revisión médica/legal antes
-   de cualquier despliegue.
-2. **Fase 1 — transporte durable:** implementada, probada y validada transaccionalmente contra el
-   esquema real; queda completar el cutover coordinado y programar el worker frecuente externo.
+1. **Fase 0 — contención:** implementada, probada y desplegada mediante el PR #96.
+2. **Fase 1 — transporte durable:** implementada, probada y desplegada, incluido el worker frecuente
+   vía Supabase `pg_cron`/`pg_net`/Vault.
 3. **Fase 2 — NLU shadow:** contrato, adaptador mockeable, dataset y persistencia mínima listos,
    pero no conectados a mensajes reales ni habilitados.
 4. **Fase 3 — políticas y fuentes:** motor/catalogo y configuración de sedes implementados; falta
@@ -97,9 +100,9 @@ variables de entorno.
 5. **Fases 4/5 — canary y optimización:** no iniciadas. El código reserva los controles pero fuerza
    `shadow=false`, `canary=false` y cohortes en 0 hasta completar los gates previos.
 
-## Orden obligatorio de migraciones y gate de staging
+## Orden aplicado de migraciones y gate de staging
 
-Aplicar exactamente en este orden, con backup y primero en staging:
+El cutover de producción aplicó atómicamente este orden exacto:
 
 1. `20260715_whatsapp_phase0a_safety.sql` — consentimiento/minimización, limpieza histórica y
    template interno genérico.
@@ -115,30 +118,31 @@ Aplicar exactamente en este orden, con backup y primero en staging:
 8. `20260716_whatsapp_policy_shadow.sql` — evaluación shadow auditable, todavía apagada.
 9. `20260716_whatsapp_privacy_roles_retention.sql` — roles, MFA, RLS, auditoría y limpieza.
 
-El lote completo ya pasó sobre el esquema real con `--dry-run`: las nueve migraciones se ejecutaron
-en orden y se revirtieron juntas. La aplicación persistente usa `--atomic`, por lo que confirma las
-nueve o revierte todo. Sigue pendiente como mejora operativa disponer de una base clonada/staging
-para probar interleavings reales de cola/outbox/borrado y ensayar restauración sin tocar producción.
+El lote completo primero pasó con `--dry-run` y rollback; después se persistió con `--atomic`, por
+lo que las nueve migraciones confirmaron juntas. Un re-run no encontró pendientes. Sigue faltando
+una base clonada/staging para probar interleavings reales de cola/outbox/borrado y ensayar
+restauración sin tocar producción; ese gate no cuestiona que el esquema productivo ya esté aplicado.
 
-## Riesgo y pausa
+## Configuración externa y pendientes posteriores al cutover
 
-- Toca lógica médica y el texto de guardia/límite clínico. Se puede desarrollar y probar localmente,
-  pero no debe desplegarse sin la revisión médica prevista por las reglas vigentes del proyecto.
-- Toca tratamiento de datos personales y consentimiento. La implementación técnica no reemplaza la
-  revisión legal pendiente del texto, finalidades y política de retención.
-- La retención automática de `data_erasure_log` no se fijó: conserva evidencia seudonimizada del
-  ejercicio de borrado y su plazo debe definirlo el asesor legal antes de activar la política final.
-- Por minimización, el primer mensaje orgánico anterior al consentimiento no se conserva ni se
-  reutiliza: la persona debe repetirlo. Cambiar eso exige definir base legal y un sobre temporal
-  cifrado con retención explícita, o capturar consentimiento antes de abrir WhatsApp.
-- Antes de activar hacen falta: completar el gate SQL de staging, definir
-  `META_GRAPH_API_VERSION`, asignar roles/enrolar MFA, validar las tres sedes y demás configuración
-  operativa, probar una cuenta por rol y programar el worker de un minuto en Supabase Cron usando
-  URL/`CRON_SECRET` desde Vault.
-- La alerta interna por WhatsApp ahora usa un template genérico de una sola variable (ID opaco de
-  caso), y la migración lo deja en borrador: `alerta_interna_derivacion` debe reaprobarse en Meta
-  antes de esperar ese canal de aviso. El email sigue siendo el respaldo independiente.
-- No se toca `.env.local`, ningún secret, la cantidad de cron jobs ni producción.
+- [x] Worker frecuente configurado en producción: un único job
+  `lule-whatsapp-worker-every-minute`, schedule `* * * * *`, ejecución por `pg_net`, URL y
+  `CRON_SECRET` cifrados en Vault. Prueba manual autenticada 200 y cola vacía; la ejecución
+  automática posterior terminó correctamente con HTTP 2xx.
+- Implementar enrolamiento y step-up MFA en la app: el backend valida AAL2, pero todavía no existe
+  una UI que invoque `mfa.enroll`, `mfa.challenge` y `mfa.verify`.
+- Asignar `app_metadata.role` a las cuatro cuentas actuales, enrolar MFA, probar al menos una cuenta
+  por rol y recién después activar los flags de autorización.
+- Revisar y guardar individualmente CIMEL Lanús, Hospital Británico y Swiss Medical Lomas con
+  evidencia válida de verificación. El runtime falla cerrado si falta esa evidencia.
+- [x] Vercel Production fija `META_GRAPH_API_VERSION=v25.0`. El preflight read-only valida
+  versión/token/ID sin enviar mensajes y el cron diario alerta sólo con un código cerrado.
+- Reaprobar en Meta `alerta_interna_derivacion`, ahora genérico y con una sola variable opaca.
+  Hasta entonces, el email mantiene el aviso independiente.
+- Completar la revisión legal del consentimiento, privacidad y retenciones, incluido el plazo de
+  `data_erasure_log`. La implementación técnica ya está activa, pero no sustituye ese dictamen.
+- Disponer de una base clonada/staging para carreras concurrentes y restauración. Los contratos,
+  tests y ejecución productiva no simulan todos los interleavings distribuidos posibles.
 
 ---
 

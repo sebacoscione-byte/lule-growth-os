@@ -2,10 +2,11 @@
 
 ## Estado de despliegue
 
-La implementación está en código y en la migración
-`20260716_whatsapp_privacy_roles_retention.sql`, pero la migración no fue aplicada y los controles
-de rol/MFA no fueron activados. No se agregó un cron: la limpieza se ejecuta dentro de
-`weekly-report`, uno de los dos cron jobs existentes.
+La implementación del PR #96 está activa en producción. Las nueve migraciones se aplicaron en una
+única transacción y el re-run confirmó cero pendientes. Los controles de rol/MFA permanecen
+deliberadamente apagados: el audit agregado encontró cuatro cuentas sin rol y sin factor MFA
+verificado. La limpieza de retención sigue dentro de `weekly-report`, uno de los dos cron jobs de
+Vercel; el worker durable usa aparte Supabase Cron y no consume un tercer slot de Vercel.
 
 El orden obligatorio del lote es:
 
@@ -24,10 +25,11 @@ respuesta al paciente. 1D unifica la identidad lead/conversación, hace routing 
 aplica CAS al despacho y reconcilia IDs de proveedor duplicados antes de exigir unicidad. 1E
 coordina borrado con workers/outbox mediante advisory locks y tombstones HMAC.
 
-Los tests de migraciones actuales son contratos estáticos sobre el texto SQL y tests de integración
-con mocks. No aplican estas funciones a PostgreSQL real ni prueban interleavings concurrentes. Antes
-de producción hay que ejecutar todo el lote, en orden, sobre una copia/staging con backup; revisar
-las reconciliaciones de duplicados de 1D y probar carreras entre cola, outbox, handoff y borrado.
+Los tests de migraciones son contratos estáticos sobre el texto SQL y tests de integración con
+mocks. El lote además pasó un dry-run con rollback y luego se aplicó atómicamente sobre PostgreSQL
+de producción. Eso valida SQL y dependencias, pero no prueba interleavings concurrentes: sigue
+faltando una copia/staging para revisar carreras entre cola, outbox, handoff y borrado y ensayar una
+restauración aislada.
 
 ## Roles y permisos
 
@@ -66,14 +68,17 @@ golpe a las cuentas existentes. Antes de activarlos:
 
 1. Inventariar todos los usuarios de Supabase Auth y asignar un rol válido en `app_metadata.role`
    mediante Admin API/Dashboard con credenciales de servidor.
-2. Enrolar MFA para quienes necesiten ejecutar operaciones sensibles y comprobar que su sesión
+2. Implementar el enrolamiento/step-up MFA en la app. Hoy el backend valida `aal2`, pero todavía no
+   existe una UI que invoque `mfa.enroll`, `mfa.challenge` y `mfa.verify`; activar el flag ahora
+   bloquearía operaciones sensibles sin un camino de elevación.
+3. Enrolar MFA para quienes necesiten ejecutar operaciones sensibles y comprobar que su sesión
    alcanza `aal2`.
-3. Ejecutar el gate de staging descrito arriba, aplicar las migraciones y probar al menos una cuenta
-   por rol, incluidos rechazos esperados y RLS desde un cliente autenticado.
-4. Configurar en Supabase Cron/`pg_net` una llamada por minuto a
-   `POST /api/internal/whatsapp-worker`, con URL y `CRON_SECRET` guardados en Vault. Esto es
-   configuración externa posterior al deploy; no se agrega un tercer cron de Vercel.
-5. Con `service_role`, activar primero roles y luego MFA (o ambos en una ventana controlada):
+4. Ejecutar el gate de staging descrito arriba y probar al menos una cuenta por rol, incluidos
+   rechazos esperados y RLS desde un cliente autenticado.
+5. **Completado:** Supabase Cron/`pg_net` llama cada minuto a
+   `POST /api/internal/whatsapp-worker`; URL y `CRON_SECRET` están cifrados en Vault. Hay un único
+   job activo y su ejecución automática más reciente terminó correctamente con HTTP 2xx.
+6. Con `service_role`, activar primero roles y luego MFA (o ambos en una ventana controlada):
 
 ```sql
 update security_authorization_settings
@@ -88,9 +93,29 @@ tabla o su fila global, o si la configuración no puede leerse, las rutas fallan
 compatible requiere la fila explícita con ambos flags en `false`, por lo que el código y la
 migración deben desplegarse juntos.
 
-Antes de activar respuestas reales también hay que definir `META_GRAPH_API_VERSION`, revisar y
-guardar como verificadas las tres sedes y su configuración operativa, y confirmar que
-`shadow=false`, `canary=false` y las cohortes siguen en 0. El template interno
+El estado productivo puede revisarse sin mostrar PII ni secretos con:
+
+```bash
+node scripts/audit-whatsapp-production.mjs
+node scripts/audit-whatsapp-production.mjs --with-meta
+```
+
+`--with-meta` agrega el preflight autenticado de producción; su salida sigue limitada a HTTP,
+`ok` y un enum cerrado, sin token ni identificadores.
+
+La configuración del worker es idempotente. Sin argumentos valida en una transacción y hace
+rollback; `--apply` persiste extensiones, secretos Vault y el único job, y luego prueba el endpoint:
+
+```bash
+node scripts/configure-whatsapp-worker.mjs
+node scripts/configure-whatsapp-worker.mjs --apply
+```
+
+Vercel Production fija `META_GRAPH_API_VERSION=v25.0`. El preflight read-only comprueba
+versión/token/ID sin enviar mensajes ni devolver credenciales o identificadores; el cron diario
+alerta con un código cerrado si falla. Antes de activar respuestas por sede todavía hay que revisar
+y guardar como verificadas las tres sedes y confirmar que `shadow=false`, `canary=false` y las
+cohortes siguen en 0. El template interno
 `alerta_interna_derivacion` fue reducido a un texto genérico con una sola variable (ID opaco de
 caso); 0A lo deja en borrador y Meta debe reaprobar esa versión antes de usar el aviso por WhatsApp.
 

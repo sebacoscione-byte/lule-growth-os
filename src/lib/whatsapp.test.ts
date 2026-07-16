@@ -22,6 +22,7 @@ jest.mock("@/lib/whatsapp-erasure-suppression", () => ({
 }))
 
 import {
+  checkWhatsAppCloudApiConfiguration,
   getWhatsAppGraphApiVersion,
   sendText,
   sendTemplate,
@@ -44,6 +45,69 @@ const baseCtx: SendContext = {
   flowIntent: "test_outbound",
   serviceMessageChargingEnabled: false,
 }
+
+describe("checkWhatsAppCloudApiConfiguration", () => {
+  beforeEach(() => {
+    jest.clearAllMocks()
+    process.env.WHATSAPP_PHONE_NUMBER_ID = "123"
+    process.env.WHATSAPP_ACCESS_TOKEN = "token"
+    process.env.META_GRAPH_API_VERSION = "v25.0"
+    delete process.env.WHATSAPP_GRAPH_API_VERSION
+  })
+
+  it("valida version, token e ID con un GET que no envia mensajes", async () => {
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ id: "123", display_phone_number: "dato-que-no-se-devuelve" }),
+    }) as unknown as typeof fetch
+
+    await expect(checkWhatsAppCloudApiConfiguration()).resolves.toEqual({ ok: true, code: null })
+    expect(global.fetch).toHaveBeenCalledWith(
+      "https://graph.facebook.com/v25.0/123?fields=id",
+      expect.objectContaining({
+        method: "GET",
+        headers: { Authorization: "Bearer token" },
+      }),
+    )
+  })
+
+  it("falla cerrado antes del request si falta la version", async () => {
+    delete process.env.META_GRAPH_API_VERSION
+    global.fetch = jest.fn() as unknown as typeof fetch
+
+    await expect(checkWhatsAppCloudApiConfiguration()).resolves.toEqual({
+      ok: false,
+      code: "invalid_graph_api_version",
+    })
+    expect(global.fetch).not.toHaveBeenCalled()
+  })
+
+  it("reduce errores de Meta a un codigo cerrado sin copiar el body", async () => {
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: false,
+      status: 401,
+      json: async () => ({ error: { message: "token y datos sensibles" } }),
+    }) as unknown as typeof fetch
+
+    const result = await checkWhatsAppCloudApiConfiguration()
+    expect(result).toEqual({ ok: false, code: "provider_rejected" })
+    expect(JSON.stringify(result)).not.toContain("token y datos sensibles")
+  })
+
+  it("rechaza una respuesta que no confirma el ID configurado", async () => {
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ id: "otro-id" }),
+    }) as unknown as typeof fetch
+
+    await expect(checkWhatsAppCloudApiConfiguration()).resolves.toEqual({
+      ok: false,
+      code: "phone_number_id_mismatch",
+    })
+  })
+})
 
 describe("sendText — gate de ventana de 24h", () => {
   beforeEach(() => {
