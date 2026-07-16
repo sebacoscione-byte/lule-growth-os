@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
+import { getServiceDb } from "@/lib/supabase/service"
 
 const ACCOUNTS_API = "https://mybusinessaccountmanagement.googleapis.com/v1"
 const INFO_API = "https://mybusinessbusinessinformation.googleapis.com/v1"
@@ -18,13 +19,16 @@ async function refreshAccessToken(refreshToken: string) {
       grant_type: "refresh_token",
     }),
   })
-  if (!res.ok) throw new Error(`Token refresh failed: ${await res.text()}`)
+  if (!res.ok) throw new Error("google_token_refresh_failed")
   return res.json() as Promise<{ access_token: string; expires_in: number }>
 }
 
-export async function getValidToken(supabase: SupabaseClient): Promise<string | null> {
+export async function getValidToken(_supabase: SupabaseClient): Promise<string | null> {
+  void _supabase // Compatibility-only: secrets must always be read with the server-only client.
+  const supabase = getServiceDb()
   const keys = ["google_access_token", "google_refresh_token", "google_token_expires_at"]
-  const { data } = await supabase.from("app_config").select("key, value").in("key", keys)
+  const { data, error } = await supabase.from("app_config").select("key, value").in("key", keys)
+  if (error) throw new Error("google_token_read_failed")
   if (!data?.length) return null
 
   const map: Record<string, string> = {}
@@ -40,42 +44,57 @@ export async function getValidToken(supabase: SupabaseClient): Promise<string | 
   const fresh = await refreshAccessToken(map.google_refresh_token)
   const newExpiry = new Date(Date.now() + fresh.expires_in * 1000).toISOString()
 
-  await Promise.all([
+  const refreshWrites = await Promise.all([
     supabase.from("app_config").upsert({ key: "google_access_token", value: fresh.access_token }, { onConflict: "key" }),
     supabase.from("app_config").upsert({ key: "google_token_expires_at", value: newExpiry }, { onConflict: "key" }),
   ])
+  if (refreshWrites.some(write => write.error)) throw new Error("google_token_storage_failed")
 
   return fresh.access_token
 }
 
-export async function getConnectionInfo(supabase: SupabaseClient) {
+export async function getConnectionInfo(_supabase: SupabaseClient) {
+  void _supabase // Never trust a cookie-backed client for integration metadata.
+  const supabase = getServiceDb()
   const keys = ["google_refresh_token", "google_account_id", "google_location_id", "google_location_name", "google_account_name"]
-  const { data } = await supabase.from("app_config").select("key, value").in("key", keys)
+  const { data, error } = await supabase.from("app_config").select("key, value").in("key", keys)
+  if (error) throw new Error("google_connection_read_failed")
   if (!data?.length) return null
 
   const map: Record<string, string> = {}
   data.forEach((r: { key: string; value: unknown }) => { map[r.key] = r.value as string })
 
   if (!map.google_refresh_token) return null
-  return map
+  return {
+    google_account_id: map.google_account_id,
+    google_location_id: map.google_location_id,
+    google_location_name: map.google_location_name,
+    google_account_name: map.google_account_name,
+  }
 }
 
-export async function saveTokens(supabase: SupabaseClient, tokens: {
+export async function saveTokens(_supabase: SupabaseClient, tokens: {
   access_token: string
   refresh_token: string
   expires_in: number
 }) {
+  void _supabase // Compatibility-only: token writes are service-role-only.
+  const supabase = getServiceDb()
   const expiry = new Date(Date.now() + tokens.expires_in * 1000).toISOString()
-  await Promise.all([
+  const writes = await Promise.all([
     supabase.from("app_config").upsert({ key: "google_access_token", value: tokens.access_token }, { onConflict: "key" }),
     supabase.from("app_config").upsert({ key: "google_refresh_token", value: tokens.refresh_token }, { onConflict: "key" }),
     supabase.from("app_config").upsert({ key: "google_token_expires_at", value: expiry }, { onConflict: "key" }),
   ])
+  if (writes.some(write => write.error)) throw new Error("google_token_storage_failed")
 }
 
-export async function clearTokens(supabase: SupabaseClient) {
+export async function clearTokens(_supabase: SupabaseClient) {
+  void _supabase // Compatibility-only: token deletes are service-role-only.
+  const supabase = getServiceDb()
   const keys = ["google_access_token", "google_refresh_token", "google_token_expires_at", "google_account_id", "google_location_id", "google_account_name", "google_location_name"]
-  await supabase.from("app_config").delete().in("key", keys)
+  const { error } = await supabase.from("app_config").delete().in("key", keys)
+  if (error) throw new Error("google_token_delete_failed")
 }
 
 // ─── Account & Location discovery ────────────────────────────────────────────

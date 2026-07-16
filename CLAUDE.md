@@ -1,6 +1,7 @@
 # Lule Growth OS — Contexto para Claude
 
 ## Estado actual
+- 2026-07-16 (**estado vigente del bot de WhatsApp; supersede las notas históricas de Ola 0/WA-02/WA-03 y DATA-02 que describen la implementación anterior**): el webhook valida firma sobre el body crudo, limita tamaño, normaliza con esquema cerrado y persiste un envelope mínimo en una cola durable. El worker usa leases, reintentos, DLQ, checkpoint `handler_completed_at` y ACK idempotente; no se vuelve a ejecutar el handler después de completar el efecto de negocio. Las salidas usan un outbox/ledger con identidad estable, CAS antes de Meta y cuarentena ante resultado ambiguo. El borrado crea tombstones HMAC y coordina writers/workers con advisory locks. La IA de WhatsApp solo puede devolver enums de clasificación validados: **nunca genera texto médico libre visible al paciente**, y todo contenido médico/sensible se responde con catálogo fijo determinístico sin persistir el texto. Presión arterial de alarma: sistólica `>180` o diastólica `>120`, con manejo de negación, antecedentes y terceros. El seguimiento requiere consentimiento específico `appointment_followup` vigente, además del estado/claim correspondiente. PR #96 pasó CI/Vercel y las nueve migraciones se ejecutaron sobre el esquema real dentro de una única transacción con `ROLLBACK`; la activación persistente debe coordinar `--atomic` con el merge.
 - 2026-06-11: Setup inicial del proyecto. MVP Fase 1 en construcción.
 - 2026-07-05: Se sumó el Hospital Británico como tercera sede de derivación (miércoles), junto a CIMEL Lanús (martes) y Swiss Medical Lomas (viernes).
 - 2026-07-06: Se eliminó `createServiceClient()` (bug de sesión pisando service_role, ver más abajo) migrando todas las rutas a `getServiceDb()`. Se ampliaron los eventos de landing (visitas + clicks por acción/sede), se agregó ranking de landings, link de seguimiento por pieza de contenido (utm_content) y reportes semanales automáticos en `/dashboard`.
@@ -327,17 +328,12 @@ y hacer seguimiento hasta que el paciente confirme que pidió turno.
 - **Nunca** exponer tokens, API keys, Supabase `service_role`, ni credenciales de Meta,
   Google, Anthropic o Gemini — ni en código, ni en logs, ni en commits, ni en output.
 - **Nunca** pushear directo a `main`. Trabajar siempre en rama + Pull Request (Vercel genera
-  una URL de preview por PR). El usuario (Seba) hace vibe coding, no revisa código y **no
-  quiere que se le pida confirmación para mergear** — es responsabilidad del agente verificar
-  que el build/tests pasen y el preview cargue bien, y mergear directamente.
-- **Mergear el PR sin pedir aprobación, siempre que build/tests pasen** — incluye webhooks de
-  WhatsApp, cron jobs, RLS/auth, lógica médica (guardrails, síntomas de alarma, mensajes al
-  paciente) y cualquier otro riesgo legal/privacidad/producción. No esperar un "dale": mergear
-  y listo. Mergear a `main` dispara el deploy automático de Vercel.
-  - **Historial**: hasta el 2026-07-12 los cambios a lógica médica eran la única excepción con
-    pausa obligatoria antes de mergear (decisión del 2026-07-07). Ese mismo día el usuario pidió
-    sacar la excepción — ahora se auto-mergean igual que todo lo demás, pero con el punto de
-    abajo (avisar con claridad qué cambió) aplicado con más cuidado todavía en esta categoría.
+  una URL de preview por PR).
+- **Para la tarea de hardening del bot iniciada el 2026-07-16, no hacer commit ni push sin
+  autorización explícita de Seba.** Además, los cambios de lógica médica (guardrails, síntomas de
+  alarma o texto sobre salud visible al paciente) requieren mostrar el resultado y esperar su
+  “dale” antes de mergear/deployar, aunque build/tests pasen. Esta regla vigente reemplaza cualquier
+  instrucción histórica de auto-merge sin excepción que aparezca más abajo.
 - **"Avisar" en cualquier caso significa informar en el resumen de la tarea, no preguntar ni
   esperar respuesta.** Si el cambio tocó webhooks, cron, RLS/auth o lógica médica, contarlo
   igual de claro en el resumen técnico — pero después de haber mergeado, no antes.
@@ -357,7 +353,8 @@ Ver también `AGENTS.md` para las instrucciones equivalentes orientadas a Codex.
 - Next.js 16.2 (App Router) — usar `next.config.mjs`, NO `.ts`
 - TypeScript + Tailwind CSS + shadcn/ui (instalado manualmente, sin CLI)
 - Supabase (Auth + PostgreSQL) — NO usar generic `createBrowserClient<Database>`
-- Google Gemini o Claude mediante `src/lib/ai.ts` para clasificación, respuestas y generación de contenido
+- Google Gemini o Claude mediante `src/lib/ai.ts` para clasificación y generación de contenido. En
+  WhatsApp la IA solo clasifica a enums cerrados; las respuestas al paciente salen de un catálogo fijo.
 - Vercel (deploy automático desde `main`)
 
 ## Node.js en Windows
@@ -442,9 +439,10 @@ WHATSAPP_VERIFY_TOKEN=        # String secreto elegido por vos, para verificar e
 WHATSAPP_APP_SECRET=          # App Secret de la app de Meta (Configuración básica → App Secret).
                                # Verifica la firma X-Hub-Signature-256 de cada POST entrante al
                                # webhook, para descartar mensajes forjados por alguien que
-                               # descubra la URL. Sin esto seteado, el webhook sigue funcionando
-                               # pero SIN esa verificación (fail-open a propósito, agregado
-                               # 2026-07-07 en auditoría de seguridad) — agregarlo cuanto antes.
+                               # descubra la URL. Sin esto seteado, el webhook rechaza los POST
+                               # entrantes (fail-closed).
+META_GRAPH_API_VERSION=       # Versión explícita de Graph API. Se acepta temporalmente el alias
+                               # legacy WHATSAPP_GRAPH_API_VERSION; no depender del default.
 # Cron jobs de Vercel (publicacion automatica de contenido + reporte semanal). Mismo secreto para ambos.
 CRON_SECRET=                  # String secreto elegido por vos. Sin esto seteado, los crons fallan-cerrado (401) y no corren nada
 # Alerta por email si falla un cron (publish-content o weekly-report) — ver "Alertas de cron por email"
@@ -461,6 +459,8 @@ ALERT_WHATSAPP_TO=              # Tu número en formato wa.me (ej. 5491100000000
 - Además usa **prompt caching nativo de Anthropic** (`cache_control: { type: "ephemeral" }`) para los system prompts que no dependen del request (instrucciones fijas tipo `SYSTEM_PROMPT`, reglas de imagen, reglas de captación). Esto se activa con la opción `cacheSystem: true` en `generateText`/`generateWithAnthropic`.
 - **Regla al agregar una función nueva en `ai.ts`**: si el `system` que le pasás es 100% estático (no interpola `leadContext`, `topic`, etc. dentro del `system`), agregá `cacheSystem: true`. Si el system tiene contenido dinámico, movelo a `messages` en vez del `system` para poder cachear igual.
 - No agregar SDKs/wrappers externos de terceros para esto: `@anthropic-ai/sdk` ya soporta `cache_control` de forma nativa.
+- **Privacidad**: cualquier propósito que pueda incluir contexto de pacientes o WhatsApp usa
+  `cacheMode: "none"`; no guardar prompts ni outputs identificables en `ai_outputs`.
 
 ### Bot de WhatsApp con IA de respaldo — costo esperado (2026-07-15)
 
@@ -634,11 +634,10 @@ A pedido explícito de Seba (más probable de notarse al toque que un email), la
 real de `escalateToHuman()` (ver Ola 4 en `docs/BACKLOG.md`) manda **además** un WhatsApp propio,
 sin reemplazar el email — si Meta rechaza el template o vos todavía no lo aprobaste, el email sigue
 funcionando exactamente igual que antes.
-1. Enviá el template **`alerta_interna_derivacion`** a aprobación real en WhatsApp Manager →
-   Administrador de cuenta → Plantillas de mensajes (mismo lugar que los otros 9 templates). Texto
-   exacto (ya cargado en la base, migración `20260715_internal_alert_template.sql`): "🚨 {{1}} pidió
-   hablar con una persona en Lule Growth OS. Motivo: {{2}}. Revisá el email o el Inbox para más
-   detalle." — categoría `utility`, 2 variables (nombre del paciente, motivo).
+1. El template **`alerta_interna_derivacion`** debe volver a aprobarse en WhatsApp Manager después de
+   aplicar `20260715_whatsapp_phase0a_safety.sql`. El texto vigente es genérico y usa una sola
+   variable (`CASO-XXXXXXXX`); no envía nombre, motivo ni contenido del paciente. La migración lo
+   deja en `borrador` deliberadamente hasta esa reaprobación.
 2. Una vez que Meta lo apruebe, marcalo "Aprobado" en `Configuración → Templates de WhatsApp` (igual
    que el resto).
 3. Cargá `ALERT_WHATSAPP_TO` con tu número en formato wa.me (ej. `5491100000000`).
@@ -664,9 +663,9 @@ a la corrida diaria.
 - **Requiere que el template `recontacto_incompleto` esté aprobado por Meta** (`Configuración →
   Templates de WhatsApp`, marcarlo "Aprobado" ahí una vez que Meta lo apruebe). Sin eso, la función
   no manda nada y lo reporta en el resultado del cron (`whatsappFollowup.errors`).
-- Solo contacta leads con `consent_to_contact = true` (los que vinieron por el bot de WhatsApp; leads
-  cargados a mano u originados en la landing no tienen consentimiento registrado, así que no se les
-  manda nada automático).
+- Solo contacta leads con consentimiento específico `appointment_followup`, versión vigente y
+  evidencia válida. `consent_to_contact = true` por sí solo no alcanza; además se exige estado
+  pendiente y claim atómico. Un resultado ambiguo se cuarentena y escala, no se reenvía a ciegas.
 - Usa siempre `sendTemplate`, nunca texto libre — es un mensaje iniciado por el negocio, no una
   respuesta dentro de una conversación activa, así que corresponde template sin importar si la
   ventana de 24h está abierta o cerrada.
@@ -797,17 +796,13 @@ powershell.exe -NoProfile -Command "[System.Environment]::SetEnvironmentVariable
 ```
 
 ## Preferencias de interacción
-- **No pedir confirmación antes de actuar** — ni para pasos de bajo riesgo ni para mergear un
-  PR, incluidos los que tocan lógica médica (guardrails, síntomas de alarma, mensajes al
-  paciente). El usuario lo pidió explícitamente (2026-07-07, y reafirmado sin excepciones el
-  2026-07-12): "no quiero tener que confirmarte". Explicar el plan/riesgos como información,
-  no como pregunta que espera respuesta.
+- **No pedir confirmación para trabajo local reversible**, pero respetar cualquier restricción
+  explícita de la tarea. En el hardening de WhatsApp del 2026-07-16: no hacer commit/push sin
+  preguntar, y esperar un “dale” antes de desplegar cambios de lógica médica.
 - **Nunca pushear directo a `main`.** Trabajar siempre en rama + Pull Request (la rama+PR es
   para tener preview de Vercel como red de seguridad, no para pedir aprobación humana).
-- **Mergear (y por lo tanto deployar) sin pedir aprobación siempre que build/tests pasen**,
-  sin excepciones. Es responsabilidad del agente verificar el preview antes de mergear, no
-  del usuario — y ser especialmente cuidadoso verificando cambios a lógica médica antes de
-  ese merge, ya que ahí no hay una segunda revisión humana antes del deploy.
+- Para cambios no médicos, seguir `AGENTS.md`. Para cambios médicos, el build/tests/preview son
+  necesarios pero no reemplazan la aprobación humana previa al merge/deploy.
 - **Solo preguntar cuando hay una decisión real entre múltiples opciones** con consecuencias
   distintas que no se pueden inferir del contexto — no para pedir permiso de ejecutar algo que
   ya se decidió hacer.
@@ -818,7 +813,8 @@ powershell.exe -NoProfile -Command "[System.Environment]::SetEnvironmentVariable
 1. **Correr el build Y los tests antes de commitear.**
 2. **Nunca commitear archivos que importan módulos sin commitear.**
 3. **Verificar `git status` antes del push.**
-4. **Commitear y pushear `docs/` automáticamente.**
+4. **No separar documentación y código si uno depende del otro; respetar siempre una instrucción
+   explícita del usuario de no hacer commit/push.**
 5. **Verificar en código que el bug fue realmente corregido** antes de marcarlo como resuelto.
 6. **Trabajar en rama propia y abrir Pull Request hacia `main`** — nunca commit/push directo
    a `main`. El PR debe incluir resumen técnico + lista de archivos modificados.
@@ -840,7 +836,7 @@ parte del array reescrito.
   primero (`select value from app_config where key = '...'`) y armar el `UPDATE` a partir de eso,
   no desde un array escrito de memoria en la migración.
 - Desde el 2026-07-07 existe `app_config_history` (trigger `before update`) que guarda el valor
-  anterior de cualquier fila de `app_config` antes de pisarla — sirve de red de seguridad, pero
+  anterior solo para la allowlist de claves operativas no secretas definida en SQL — sirve de red de seguridad, pero
   no reemplaza escribir la migración con cuidado.
 
 ## Cliente de Supabase con service_role — usar siempre `getServiceDb()`, nunca un cliente con cookies
@@ -866,9 +862,11 @@ plano, sin cookies, que siempre autentica como `service_role` real.
 - **Especialidad**: Cardiología
 - **Servicios**: Consulta cardiológica, Ecocardiograma
 - **Ubicaciones**:
-  - CIMEL Lanús — Tucumán 1314, Lanús — martes
-  - Hospital Británico — Perdriel 74, CABA — miércoles (turnos: 4309-6400 atención 24hs, Central de Turnos 0810-222-2748 / 11-3015-9749, o app del Hospital Británico)
-  - Swiss Medical Lomas — viernes
+  - CIMEL Lanús
+  - Hospital Británico
+  - Swiss Medical Lomas
+  El bot solo puede comunicar direcciones, horarios, coberturas y canales marcados como verificados
+  en la configuración vigente; no tomar los valores históricos de este documento como fuente operativa.
 - **Regla crítica**: La app NUNCA da diagnósticos, no reserva turnos, no confirma disponibilidad.
 
 ## Guardrails médicos (siempre activos)
@@ -880,19 +878,14 @@ plano, sin cookies, que siempre autentica como `service_role` real.
 - Si la consulta es sensible → escalar a humano
 
 ## Instrucciones específicas para Claude Code
-- El usuario (Seba) hace vibe coding, no revisa diffs de código y pidió explícitamente no
-  tener que confirmar nada para mergear — **sin excepciones, incluidos cambios a lógica
-  médica** (guardrails, síntomas de alarma, mensajes al paciente; esta excepción existió entre
-  el 2026-07-07 y el 2026-07-12, el usuario pidió sacarla). Para todo (webhooks, cron,
-  RLS/auth, lógica médica, producción en general), verificar vos mismo que el build/tests
-  pasen y el preview cargue bien, y **mergear directamente, sin esperar un "dale"** (mergear a
-  `main` = deploy automático a producción). Sí prestar atención extra al verificar cambios de
-  lógica médica antes de ese merge — es la única categoría con riesgo directo sobre una
-  persona real y ya no hay pausa humana después del merge.
+- El usuario autorizó avanzar de forma autónoma con trabajo local, pero en la tarea de WhatsApp del
+  2026-07-16 pidió expresamente no hacer commit ni push sin preguntarle. Los cambios de lógica
+  médica requieren además su “dale” antes de mergear/deployar. Verificar build, tests y preview
+  sigue siendo obligatorio y no elimina ese gate.
 - Nunca tocar `.env`/`.env.local`/secrets, ni exponerlos en output, commits o logs.
 - Nunca pushear directo a `main` — usar rama + PR, incluso si el usuario no lo pide
   explícitamente en el mensaje. El PR genera un preview en Vercel; es la red de seguridad
   (poder ver que compiló y cargó bien antes de mergear), no un gate de aprobación humana.
-- El resumen técnico final es donde va la transparencia: si el cambio tocó algo sensible,
-  contarlo ahí con claridad — pero eso pasa después de mergear, no antes.
+- El resumen técnico final debe detallar cualquier cambio sensible y distinguir validación local,
+  preview y ejecución real de migraciones.
 - Para comandos de build/test/lint y detalles de stack, ver también `AGENTS.md`.

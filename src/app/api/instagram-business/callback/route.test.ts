@@ -3,6 +3,7 @@ import { GET } from "./route"
 
 jest.mock("@/lib/supabase/server", () => ({ createClient: jest.fn() }))
 jest.mock("@/lib/supabase/service", () => ({ getServiceDb: jest.fn() }))
+jest.mock("@/lib/staff-authz", () => ({ authorizeStaff: jest.fn() }))
 jest.mock("@/lib/instagram-business", () => ({
   exchangeCodeForToken: jest.fn(),
   exchangeForLongLivedToken: jest.fn(),
@@ -12,6 +13,7 @@ jest.mock("@/lib/instagram-business", () => ({
 
 import { createClient } from "@/lib/supabase/server"
 import { getServiceDb } from "@/lib/supabase/service"
+import { authorizeStaff } from "@/lib/staff-authz"
 import { exchangeCodeForToken, exchangeForLongLivedToken, getProfile, saveTokens } from "@/lib/instagram-business"
 import { INSTAGRAM_OAUTH_STATE_COOKIE } from "@/lib/instagram-oauth"
 
@@ -38,12 +40,25 @@ function callbackRequest(params: Record<string, string>, cookies: Record<string,
 
 beforeEach(() => {
   jest.clearAllMocks()
+  ;(authorizeStaff as jest.Mock).mockResolvedValue({
+    ok: true,
+    user: { id: "u1" },
+    role: "owner",
+    legacyCompatibility: false,
+    assuranceLevel: "aal2",
+  })
   ;(getServiceDb as jest.Mock).mockReturnValue(upsertableDb())
 })
 
 describe("GET /api/instagram-business/callback", () => {
   it("redirige a /login sin sesión", async () => {
     mockAuthedUser(null)
+    ;(authorizeStaff as jest.Mock).mockResolvedValue({
+      ok: false,
+      status: 401,
+      code: "unauthorized",
+      error: "Unauthorized",
+    })
     const res = await GET(callbackRequest({ code: "abc" }))
     expect(res.headers.get("location")).toContain("/login")
   })
@@ -91,5 +106,24 @@ describe("GET /api/instagram-business/callback", () => {
 
     expect(res.headers.get("location")).toContain("ig_connected=1")
     expect(saveTokens).toHaveBeenCalled()
+    expect(authorizeStaff).toHaveBeenCalledWith(expect.anything(), {
+      allowedRoles: ["owner"],
+      sensitive: true,
+    })
+  })
+
+  it("rechaza de forma sanitizada a un rol sin permiso antes de intercambiar tokens", async () => {
+    mockAuthedUser({ id: "u-doctor" })
+    ;(authorizeStaff as jest.Mock).mockResolvedValue({
+      ok: false,
+      status: 403,
+      code: "forbidden",
+      error: "No tenés permisos para esta acción",
+    })
+
+    const res = await GET(callbackRequest({ code: "abc" }))
+
+    expect(res.headers.get("location")).toContain("ig_error=forbidden")
+    expect(exchangeCodeForToken).not.toHaveBeenCalled()
   })
 })

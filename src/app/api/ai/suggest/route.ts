@@ -15,12 +15,27 @@ export async function POST(request: Request) {
   const { lead_id } = parsedBody.data as { lead_id?: string }
   if (!lead_id) return NextResponse.json({ error: "lead_id required" }, { status: 400 })
 
-  const [{ data: lead }, { data: recentHistory }] = await Promise.all([
-    supabase.from("leads").select("*").eq("id", lead_id).single(),
-    // Últimos 20 mensajes (más nuevo primero) — no los primeros 20 de la conversación (CRM-01).
-    supabase.from("messages").select("role,content").eq("lead_id", lead_id)
-      .order("created_at", { ascending: false }).limit(20),
-  ])
+  const { data: lead } = await supabase
+    .from("leads")
+    .select("name, origin_channel, requested_service, preferred_location, status")
+    .eq("id", lead_id)
+    .single()
+
+  if (!lead) return NextResponse.json({ error: "Lead no encontrado" }, { status: 404 })
+  if (lead.origin_channel === "whatsapp") {
+    return NextResponse.json(
+      { error: "Las sugerencias generativas están deshabilitadas para conversaciones de WhatsApp." },
+      { status: 409 }
+    )
+  }
+
+  // Últimos 20 mensajes (más nuevo primero) — no los primeros 20 de la conversación (CRM-01).
+  const { data: recentHistory } = await supabase
+    .from("messages")
+    .select("role,content")
+    .eq("lead_id", lead_id)
+    .order("created_at", { ascending: false })
+    .limit(20)
 
   const location =
     lead?.preferred_location === "cimel_lanus" ? "CIMEL Lanús (martes)" :
@@ -28,7 +43,7 @@ export async function POST(request: Request) {
     lead?.preferred_location === "hospital_britanico" ? "Hospital Británico (miércoles)" :
     "CIMEL Lanús, Hospital Británico o Swiss Medical Lomas"
 
-  const leadContext = `Lead: ${lead?.name ?? "anónimo"}. Teléfono: ${lead?.phone ?? "no registrado"}. Canal: ${lead?.origin_channel}. Servicio buscado: ${lead?.requested_service}. Sede preferida: ${location}. Estado actual: ${lead?.status}.`
+  const leadContext = `Lead: ${lead.name ?? "anónimo"}. Canal: ${lead.origin_channel}. Servicio buscado: ${lead.requested_service}. Sede preferida: ${location}. Estado actual: ${lead.status}.`
   const conversationHistory = toChronologicalContext((recentHistory ?? []) as { role: "user" | "assistant"; content: string }[])
 
   try {

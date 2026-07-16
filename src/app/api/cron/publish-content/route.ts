@@ -11,6 +11,7 @@ import { generateContentVisual } from "@/lib/ai"
 import { publishApprovedItem } from "@/lib/content-publish"
 import { runWhatsAppFollowup } from "@/lib/whatsapp-followup"
 import { runHandoffReminderCheck } from "@/lib/whatsapp-handoff"
+import { drainWhatsAppInboundQueue, getWhatsAppQueueHealth } from "@/lib/whatsapp-inbound-queue"
 import { snapshotInstagramFollowers } from "@/lib/instagram-followers"
 import { snapshotGoogleBusinessMetrics } from "@/lib/google-performance"
 import { sendCronFailureAlert } from "@/lib/alert-email"
@@ -131,6 +132,24 @@ export async function GET(request: Request) {
   try {
     const supabase = getServiceDb()
     const now = new Date()
+
+    // Primero se atiende el canal de pacientes. El worker frecuente de Supabase es el recuperador
+    // principal; esta corrida diaria queda como último respaldo sin consumir un tercer cron Vercel.
+    let whatsappQueue = { claimed: 0, processed: 0, retried: 0, deadLettered: 0 }
+    let whatsappQueueError = false
+    try {
+      whatsappQueue = await drainWhatsAppInboundQueue({ maxEvents: 200, timeBudgetMs: 120_000 })
+    } catch {
+      whatsappQueueError = true
+    }
+    let whatsappQueueHealth = { deadLetterCount: 0, dueCount: 0 }
+    let whatsappQueueHealthError = false
+    try {
+      whatsappQueueHealth = await getWhatsAppQueueHealth(now)
+    } catch {
+      whatsappQueueHealthError = true
+    }
+
     const settings = await readAutoPublishSettings(supabase)
 
     const post = await runTrack(supabase, "post", settings.post, settings.channels, now)
@@ -171,6 +190,14 @@ export async function GET(request: Request) {
     if (instagramFollowers.error) failures.push(`Seguidores de Instagram: ${instagramFollowers.error}`)
     if (googleBusinessMetrics.error) failures.push(`Métricas de Google Business: ${googleBusinessMetrics.error}`)
     if (handoffReminder.error) failures.push(`Recordatorio de derivación a humano: ${handoffReminder.error}`)
+    if (whatsappQueueError) failures.push("Cola WhatsApp: worker_unavailable")
+    if (whatsappQueueHealthError) failures.push("Cola WhatsApp: health_check_failed")
+    if (whatsappQueueHealth.deadLetterCount > 0) {
+      failures.push(`Cola WhatsApp: ${whatsappQueueHealth.deadLetterCount} evento(s) en dead-letter`)
+    }
+    if (whatsappQueueHealth.dueCount > 0) {
+      failures.push(`Cola WhatsApp: ${whatsappQueueHealth.dueCount} evento(s) vencido(s) pendiente(s)`)
+    }
     if (failures.length > 0) {
       await sendCronFailureAlert("publish-content", failures.join("\n"))
     }
@@ -178,7 +205,7 @@ export async function GET(request: Request) {
     return NextResponse.json({
       post: post.last_run_result, historia: historia.last_run_result, carrusel: carrusel.last_run_result,
       whatsappFollowup, instagramFollowers,
-      googleBusinessMetrics, handoffReminder,
+      googleBusinessMetrics, handoffReminder, whatsappQueue, whatsappQueueHealth,
     })
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)

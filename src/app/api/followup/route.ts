@@ -40,6 +40,11 @@ export async function POST(request: Request) {
 
   const { data: lead } = await supabase.from("leads").select("*").eq("id", lead_id).single()
   if (!lead) return NextResponse.json({ error: "lead not found" }, { status: 404 })
+  if (lead.origin_channel === "whatsapp") {
+    return NextResponse.json({
+      error: "Los seguimientos de WhatsApp sólo se envían por el worker durable con consentimiento específico.",
+    }, { status: 409 })
+  }
 
   const locationLabel = LOCATION_LABELS[lead.preferred_location] ?? "la institución correspondiente"
   const message = await generateFollowupMessage(lead.name, locationLabel)

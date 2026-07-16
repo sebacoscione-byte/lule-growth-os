@@ -1,21 +1,49 @@
 import { extractIntake, classifyIntentDeterministic, classifyIntent, classifyProtocolButtonReply, isMarketingOptOutMessage } from "@/lib/whatsapp-intents"
 
 describe("extractIntake", () => {
-  it("extrae motivo, obra social, edad, sede y notas del mensaje combinado", () => {
+  const verifiedLocations = [
+    {
+      id: "cimel_lanus" as const,
+      name: "CIMEL Lanús",
+      day: "martes",
+      obras_sociales: [],
+      services: [],
+      active: true,
+    },
+    {
+      id: "hospital_britanico" as const,
+      name: "Hospital Británico",
+      day: "miércoles",
+      obras_sociales: [],
+      services: [],
+      active: true,
+    },
+  ]
+
+  it("extrae solamente entidades administrativas del mensaje combinado", () => {
     const result = extractIntake(
       "Quiero un turno, tengo OSDE, tengo 45 años, prefiero CIMEL Lanús, tengo dolor en el pecho a veces",
-      ["OSDE", "Swiss Medical", "Galeno"]
+      ["OSDE", "Swiss Medical", "Galeno"],
+      verifiedLocations
     )
     expect(result.motivo).toBe("turno")
     expect(result.obraSocial).toBe("OSDE")
-    expect(result.edad).toBe(45)
     expect(result.sede).toBe("cimel_lanus")
-    expect(result.notas).toContain("dolor en el pecho")
+    expect(result).not.toHaveProperty("edad")
+    expect(result).not.toHaveProperty("notas")
   })
 
   it("detecta la sede Hospital Británico por nombre o día", () => {
-    expect(extractIntake("prefiero el británico", []).sede).toBe("hospital_britanico")
-    expect(extractIntake("¿atiende los miércoles?", []).sede).toBe("hospital_britanico")
+    expect(extractIntake("prefiero el británico", [], verifiedLocations).sede).toBe("hospital_britanico")
+    expect(extractIntake("¿atiende los miércoles?", [], verifiedLocations).sede).toBe("hospital_britanico")
+  })
+
+  it("no infiere una sede por días hardcodeados fuera de la configuración vigente", () => {
+    const locationsWithoutTuesday = verifiedLocations.map(location => ({
+      ...location,
+      day: location.id === "cimel_lanus" ? "jueves" : location.day,
+    }))
+    expect(extractIntake("¿atiende los martes?", [], locationsWithoutTuesday).sede).toBeNull()
   })
 
   it("detecta paciente sin cobertura", () => {
@@ -28,9 +56,9 @@ describe("extractIntake", () => {
     expect(result.motivo).toBe("protocolo")
   })
 
-  it("no inventa una edad si no hay ningun numero de edad en el texto", () => {
-    const result = extractIntake("Quiero un turno con Galeno", ["Galeno"])
-    expect(result.edad).toBeNull()
+  it("no extrae edad aunque el mensaje la incluya", () => {
+    const result = extractIntake("Quiero un turno con Galeno, tengo 52 años", ["Galeno"])
+    expect(result).not.toHaveProperty("edad")
     expect(result.obraSocial).toBe("Galeno")
   })
 })
@@ -115,6 +143,12 @@ describe("isMarketingOptOutMessage (DATA-02)", () => {
   it("reconoce la palabra clave BAJA", () => {
     expect(isMarketingOptOutMessage("BAJA")).toBe(true)
     expect(isMarketingOptOutMessage("quiero la baja")).toBe(true)
+    expect(isMarketingOptOutMessage("quiero darme de baja")).toBe(true)
+  })
+
+  it("no confunde la palabra baja dentro de una consulta clínica", () => {
+    expect(isMarketingOptOutMessage("Me baja la presión cuando me levanto")).toBe(false)
+    expect(isMarketingOptOutMessage("Tengo la presión baja")).toBe(false)
   })
 
   it("reconoce STOP", () => {

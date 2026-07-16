@@ -2,17 +2,15 @@ import { createClient } from "@/lib/supabase/server"
 import { NextResponse } from "next/server"
 import { parseJsonBody, formatZodError } from "@/lib/api-validation"
 import { leadFieldsSchema } from "@/lib/lead-schema"
+import { authorizeStaff } from "@/lib/staff-authz"
+import { recordSecurityAudit } from "@/lib/security-audit"
 
-async function getAuthedClient() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return null
-  return supabase
-}
+const PATIENT_DATA_ROLES = ["owner", "doctor", "reception"] as const
 
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
-  const supabase = await getAuthedClient()
-  if (!supabase) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  const supabase = await createClient()
+  const auth = await authorizeStaff(supabase, { allowedRoles: PATIENT_DATA_ROLES, sensitive: true })
+  if (!auth.ok) return NextResponse.json({ error: auth.error, code: auth.code }, { status: auth.status })
 
   const { id } = await params
   const { data, error } = await supabase.from("leads").select("*").eq("id", id).single()
@@ -32,8 +30,9 @@ const PATCHABLE_FIELDS = new Set([
 ])
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const supabase = await getAuthedClient()
-  if (!supabase) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  const supabase = await createClient()
+  const auth = await authorizeStaff(supabase, { allowedRoles: PATIENT_DATA_ROLES, sensitive: true })
+  if (!auth.ok) return NextResponse.json({ error: auth.error, code: auth.code }, { status: auth.status })
 
   const { id } = await params
   const parsedBody = await parseJsonBody(request)
@@ -57,6 +56,19 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   // Auto-set followup_due_at when transitioning to seguimiento_pendiente without explicit date
   if (update.status === "seguimiento_pendiente" && !update.followup_due_at) {
     update.followup_due_at = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
+  }
+
+  try {
+    await recordSecurityAudit({
+      actorUserId: auth.user.id,
+      actorRole: auth.role,
+      action: "lead_correction",
+      resourceType: "lead",
+      resourceId: id,
+      metadata: { field_count: Object.keys(update).length },
+    })
+  } catch {
+    return NextResponse.json({ error: "No se pudo registrar la corrección" }, { status: 503 })
   }
 
   const { data, error } = await supabase

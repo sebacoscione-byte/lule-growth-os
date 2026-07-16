@@ -5,14 +5,19 @@ import { generateReply, getPublicAiError } from "@/lib/ai"
 import { sendText, WindowClosedError } from "@/lib/whatsapp"
 import { getWindowState } from "@/lib/whatsapp-window"
 import { getWhatsAppSettings } from "@/lib/whatsapp-settings"
-import { resolveHandoffForLead } from "@/lib/whatsapp-handoff"
+import { takeHandoffForLead } from "@/lib/whatsapp-handoff"
 import { z } from "zod"
 import { parseJsonBody, formatZodError } from "@/lib/api-validation"
+import { authorizeStaff } from "@/lib/staff-authz"
+import { recordSecurityAudit } from "@/lib/security-audit"
+
+const INBOX_ROLES = ["owner", "doctor", "reception"] as const
 
 const sendMessageSchema = z.object({
   lead_id: z.string().trim().min(1),
   content: z.string().trim().min(1).max(5000),
   generate_reply: z.boolean().optional(),
+  delivery_key: z.string().uuid().optional(),
 })
 
 export async function GET(request: Request) {
@@ -21,8 +26,8 @@ export async function GET(request: Request) {
   if (!lead_id) return NextResponse.json({ error: "lead_id required" }, { status: 400 })
 
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  const auth = await authorizeStaff(supabase, { allowedRoles: INBOX_ROLES, sensitive: true })
+  if (!auth.ok) return NextResponse.json({ error: auth.error, code: auth.code }, { status: auth.status })
 
   const { data, error } = await supabase
     .from("messages")
@@ -36,8 +41,8 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  const auth = await authorizeStaff(supabase, { allowedRoles: INBOX_ROLES, sensitive: true })
+  if (!auth.ok) return NextResponse.json({ error: auth.error, code: auth.code }, { status: auth.status })
 
   const parsedBody = await parseJsonBody(request)
   if (!parsedBody.ok) return NextResponse.json({ error: parsedBody.error }, { status: 400 })
@@ -46,14 +51,18 @@ export async function POST(request: Request) {
   if (!result.success) {
     return NextResponse.json({ error: formatZodError(result.error) }, { status: 400 })
   }
-  const { lead_id, content, generate_reply } = result.data
+  const { lead_id, content, generate_reply, delivery_key } = result.data
 
-  const { data: lead } = await supabase.from("leads").select("*").eq("id", lead_id).single()
+  const { data: lead, error: leadError } = await supabase.from("leads").select("*").eq("id", lead_id).single()
+  if (leadError || !lead) return NextResponse.json({ error: "Lead no encontrado" }, { status: 404 })
 
   // El lead vino del bot de WhatsApp: acá "responder" tiene que llegarle de verdad al paciente por
   // WhatsApp, no solo quedar guardado en esta tabla. Antes de esto, un mensaje escrito acá nunca
   // salía de la app (se guardaba con role "user", como si lo hubiera escrito el paciente).
   if (lead?.phone && lead.origin_channel === "whatsapp") {
+    if (!delivery_key) {
+      return NextResponse.json({ error: "delivery_key requerido para WhatsApp" }, { status: 400 })
+    }
     const db = getServiceDb()
     const { data: session } = await db
       .from("whatsapp_sessions")
@@ -65,12 +74,38 @@ export async function POST(request: Request) {
     const windowState = getWindowState(session?.last_inbound_at ?? null, entryPoint)
     const settings = await getWhatsAppSettings()
 
+    if (windowState === "closed") {
+      return NextResponse.json({
+        error: "La ventana de 24hs de WhatsApp está cerrada para este paciente. No se puede mandar texto libre — hace falta un template aprobado (Configuración → Templates de WhatsApp), que todavía no se puede elegir desde acá.",
+      }, { status: 409 })
+    }
+
+    try {
+      await recordSecurityAudit({
+        actorUserId: auth.user.id,
+        actorRole: auth.role,
+        action: "manual_message_send",
+        resourceType: "whatsapp_conversation",
+        resourceId: lead_id,
+        metadata: { channel: "whatsapp" },
+      })
+    } catch {
+      return NextResponse.json({ error: "No se pudo registrar la acción de seguridad" }, { status: 503 })
+    }
+
+    // Reservar la conversación para el equipo antes del envío evita una respuesta automática
+    // concurrente mientras la llamada a Meta está en curso. Si el envío falla, queda pausada de
+    // forma conservadora y el operador puede reactivarla explícitamente.
+    await takeHandoffForLead(lead_id, auth.user.id)
+
     try {
       await sendText(lead.phone, content, {
         windowState,
         entryPoint,
         leadId: lead_id,
         flowIntent: "respuesta_manual",
+        deliveryKey: `manual:${delivery_key}`,
+        outboundStep: "manual_response",
         serviceMessageChargingEnabled: settings.enable_service_message_charging,
       })
     } catch (error) {
@@ -80,18 +115,9 @@ export async function POST(request: Request) {
         }, { status: 409 })
       }
       return NextResponse.json({
-        error: error instanceof Error ? error.message : "Error enviando el mensaje por WhatsApp",
+        error: "No se pudo confirmar el envío por WhatsApp. La conversación quedó pausada para revisión.",
       }, { status: 500 })
     }
-
-    // El equipo tomó la conversación a mano: el bot deja de responderle a este paciente hasta que
-    // alguien lo reactive desde el Inbox (ver /api/whatsapp/bot-pause y el chequeo en whatsapp-bot.ts).
-    await db.from("whatsapp_sessions").update({ bot_paused: true }).eq("phone", lead.phone)
-
-    // Ola 4: esta respuesta manual ES la señal de que alguien del equipo tomó la conversación --
-    // cierra cualquier handoff abierto de este lead (quita el aviso de "Atención" y lo saca del
-    // respaldo diario) sin necesitar un botón aparte de "marcar como resuelto".
-    await resolveHandoffForLead(lead_id, user.email ?? "equipo")
 
     // sendText ya deja el mensaje guardado (role "assistant", saliente) vía logWhatsAppMessage.
     const { data: sentMessage } = await supabase
@@ -102,8 +128,24 @@ export async function POST(request: Request) {
       .limit(1)
       .single()
 
-    await supabase.from("leads").update({ last_message: content }).eq("id", lead_id)
+    const { error: leadUpdateError } = await supabase.from("leads").update({ last_message: content }).eq("id", lead_id)
+    if (leadUpdateError) {
+      return NextResponse.json({ error: "El mensaje se envió, pero no se pudo actualizar la ficha" }, { status: 503 })
+    }
     return NextResponse.json({ assistant_message: sentMessage })
+  }
+
+  try {
+    await recordSecurityAudit({
+      actorUserId: auth.user.id,
+      actorRole: auth.role,
+      action: "manual_message_send",
+      resourceType: "lead",
+      resourceId: lead_id,
+      metadata: { channel: "internal", ai_requested: generate_reply === true },
+    })
+  } catch {
+    return NextResponse.json({ error: "No se pudo registrar la acción de seguridad" }, { status: 503 })
   }
 
   const { data: userMessage } = await supabase

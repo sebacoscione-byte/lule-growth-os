@@ -10,80 +10,105 @@ jest.mock("@/lib/whatsapp-settings", () => ({
 }))
 
 import {
-  buildHandoffSummary, escalateToHuman, resolveHandoffForLead, getOpenHandoffs, runHandoffReminderCheck,
+  buildHandoffSummary,
+  closeHandoffForLead,
+  escalateToHuman,
+  formatHandoffAlertText,
+  getOpenHandoffs,
+  resolveHandoffForLead,
+  runHandoffReminderCheck,
+  takeHandoffForLead,
 } from "@/lib/whatsapp-handoff"
 import { getServiceDb } from "@/lib/supabase/service"
 import { sendHandoffAlert, sendHandoffReminderAlert } from "@/lib/alert-email"
 import { sendTemplate } from "@/lib/whatsapp"
 import { getApprovedTemplate } from "@/lib/whatsapp-templates"
 
-/** Chainable mínimo: cualquier método de la cadena devuelve el mismo builder, y tanto
- * `.single()/.maybeSingle()` como awaitear el builder directo resuelven al mismo resultado
- * -- mismo patrón que whatsapp-bot-pause.test.ts. */
 function makeThenableBuilder(result: { data: unknown; error: unknown }) {
   const builder: Record<string, unknown> = {}
-  const chain = ["select", "eq", "order", "limit", "insert", "update", "is", "not", "in"]
-  for (const method of chain) builder[method] = jest.fn(() => builder)
-  builder.single = jest.fn(() => Promise.resolve(result))
+  for (const method of ["select", "eq", "order", "limit", "is", "not", "in"]) {
+    builder[method] = jest.fn(() => builder)
+  }
   builder.maybeSingle = jest.fn(() => Promise.resolve(result))
-  builder.then = (resolve: (v: unknown) => unknown) => resolve(result)
+  builder.then = (resolve: (value: unknown) => unknown) => resolve(result)
   return builder
 }
 
-function mockDb(tables: Record<string, { data: unknown; error: unknown }>) {
-  const builders = Object.fromEntries(
-    Object.entries(tables).map(([table, result]) => [table, makeThenableBuilder(result)])
+function mockDb(options: {
+  handoffEvents?: { data: unknown; error: unknown }
+  rpcError?: unknown
+} = {}) {
+  const handoffEvents = makeThenableBuilder(
+    options.handoffEvents ?? { data: null, error: null }
   )
-  const fromSpy = jest.fn((table: string) => {
-    if (!builders[table]) throw new Error(`tabla inesperada en el mock: ${table}`)
-    return builders[table]
+  const rpc = jest.fn().mockResolvedValue({ data: null, error: options.rpcError ?? null })
+  const from = jest.fn((table: string) => {
+    if (table !== "handoff_events") throw new Error(`tabla inesperada: ${table}`)
+    return handoffEvents
   })
-  ;(getServiceDb as jest.Mock).mockReturnValue({ from: fromSpy })
-  return builders
+  ;(getServiceDb as jest.Mock).mockReturnValue({ from, rpc })
+  return { handoffEvents, rpc, from }
 }
 
 const SUMMARY = buildHandoffSummary({
   phone: "5491100000000",
-  lead: { id: "lead-1", name: "Juana Pérez", insurance: "OSDE", patient_age: 60, general_reason: "Turno", possible_emergency: false, protocol_interest: false, protocol_name: null, last_message: "quiero hablar con alguien" },
+  lead: {
+    id: "lead-1",
+    name: "Juana Perez",
+    insurance: "OSDE",
+    patient_age: 60,
+    general_reason: "Turno por dolor",
+    possible_emergency: false,
+    protocol_interest: false,
+    protocol_name: null,
+    last_message: "quiero hablar con alguien por mis estudios",
+  },
   messagesSentCount: 4,
   costEstimatedTotal: 0,
   nextStepHint: "Retomar contacto",
 })
 
+beforeEach(() => {
+  jest.clearAllMocks()
+  delete process.env.ALERT_WHATSAPP_TO
+})
+
 describe("escalateToHuman", () => {
-  const originalEnv = { ...process.env }
-
-  beforeEach(() => {
-    jest.clearAllMocks()
-    delete process.env.ALERT_WHATSAPP_TO // ver describe "alerta interna de WhatsApp" más abajo
-  })
-  afterEach(() => { process.env = { ...originalEnv } })
-
-  it("inserta el handoff, marca requires_human y manda una alerta cuando no hubo un handoff reciente", async () => {
-    const builders = mockDb({
-      handoff_events: { data: null, error: null }, // sin handoff previo reciente
-      leads: { data: null, error: null },
-    })
+  it("crea y pausa el handoff con una unica RPC atomica antes de alertar", async () => {
+    const { rpc } = mockDb()
 
     await escalateToHuman({ leadId: "lead-1", reason: "solicitud_explicita", summary: SUMMARY })
 
-    expect(builders.handoff_events.insert).toHaveBeenCalledWith(
-      expect.objectContaining({ lead_id: "lead-1", reason: "solicitud_explicita" })
-    )
-    expect(builders.leads.update).toHaveBeenCalledWith(
-      expect.objectContaining({ requires_human: true })
-    )
+    expect(rpc).toHaveBeenCalledTimes(1)
+    expect(rpc).toHaveBeenCalledWith("create_whatsapp_handoff", {
+      p_phone: "5491100000000",
+      p_lead_id: "lead-1",
+      p_reason: "solicitud_explicita",
+      p_summary: SUMMARY,
+      p_messages_sent_count: 4,
+      p_cost_estimated_total: 0,
+      p_source_wa_message_id: null,
+    })
     expect(sendHandoffAlert).toHaveBeenCalledTimes(1)
-    const [text] = (sendHandoffAlert as jest.Mock).mock.calls[0]
-    expect(text).toContain("Juana Pérez")
-    expect(text).toContain("/inbox?lead_id=lead-1")
   })
 
-  it("no manda una segunda alerta si el último handoff del mismo lead fue hace menos de 30 minutos", async () => {
-    const fiveMinAgo = new Date(Date.now() - 5 * 60_000).toISOString()
+  it("falla cerrado y no emite alertas si la transaccion durable falla", async () => {
+    mockDb({ rpcError: { message: "db unavailable" } })
+
+    await expect(
+      escalateToHuman({ leadId: "lead-1", reason: "solicitud_explicita", summary: SUMMARY })
+    ).rejects.toThrow("No se pudo registrar y pausar la derivación")
+
+    expect(sendHandoffAlert).not.toHaveBeenCalled()
+    expect(sendTemplate).not.toHaveBeenCalled()
+  })
+
+  it("omite una segunda alerta si ya hubo una para el lead hace menos de 30 minutos", async () => {
     mockDb({
-      handoff_events: { data: { created_at: fiveMinAgo }, error: null },
-      leads: { data: null, error: null },
+      handoffEvents: {
+        data: { created_at: new Date(Date.now() - 5 * 60_000).toISOString() },
+        error: null,
+      },
     })
 
     await escalateToHuman({ leadId: "lead-1", reason: "solicitud_explicita", summary: SUMMARY })
@@ -91,114 +116,88 @@ describe("escalateToHuman", () => {
     expect(sendHandoffAlert).not.toHaveBeenCalled()
   })
 
-  it("sí manda alerta si el último handoff del mismo lead fue hace más de 30 minutos", async () => {
-    const fortyFiveMinAgo = new Date(Date.now() - 45 * 60_000).toISOString()
-    mockDb({
-      handoff_events: { data: { created_at: fortyFiveMinAgo }, error: null },
-      leads: { data: null, error: null },
-    })
+  it("alerta sin PII ni texto clinico y enlaza al inbox autenticado", async () => {
+    mockDb()
 
     await escalateToHuman({ leadId: "lead-1", reason: "urgencia_medica", summary: SUMMARY })
 
-    expect(sendHandoffAlert).toHaveBeenCalledTimes(1)
+    const [text] = (sendHandoffAlert as jest.Mock).mock.calls[0] as [string]
+    expect(text).toContain("Prioridad: Alta")
+    expect(text).toContain("caso lead-1")
+    expect(text).toContain("/inbox")
+    expect(text).not.toContain("?lead_id=")
+    for (const sensitive of [
+      SUMMARY.nombre,
+      SUMMARY.telefono,
+      SUMMARY.motivo,
+      SUMMARY.cobertura,
+      SUMMARY.ultimo_mensaje!,
+    ]) {
+      expect(text).not.toContain(sensitive)
+    }
   })
 
-  it("sin leadId (todavía no hay lead creado) igual manda la alerta, sin chequear throttle", async () => {
-    const builders = mockDb({ handoff_events: { data: null, error: null } })
-
-    await escalateToHuman({ leadId: null, reason: "urgencia_medica", summary: SUMMARY })
-
-    expect(builders.handoff_events.select).not.toHaveBeenCalled() // no hay leadId, no hay nada que throttlear
-    expect(sendHandoffAlert).toHaveBeenCalledTimes(1)
-  })
-})
-
-describe("escalateToHuman — alerta interna de WhatsApp (segundo canal, a pedido de Seba)", () => {
-  const originalEnv = { ...process.env }
-
-  beforeEach(() => jest.clearAllMocks())
-  afterEach(() => { process.env = { ...originalEnv } })
-
-  it("no manda nada por WhatsApp si ALERT_WHATSAPP_TO no está configurado (fail-open)", async () => {
-    delete process.env.ALERT_WHATSAPP_TO
-    mockDb({ handoff_events: { data: null, error: null }, leads: { data: null, error: null } })
-
-    await escalateToHuman({ leadId: "lead-1", reason: "solicitud_explicita", summary: SUMMARY })
-
-    expect(sendTemplate).not.toHaveBeenCalled()
-  })
-
-  it("no manda nada si el número está configurado pero el template todavía no está aprobado por Meta", async () => {
-    process.env.ALERT_WHATSAPP_TO = "5491100000000"
-    ;(getApprovedTemplate as jest.Mock).mockResolvedValue(null)
-    mockDb({ handoff_events: { data: null, error: null }, leads: { data: null, error: null } })
-
-    await escalateToHuman({ leadId: "lead-1", reason: "solicitud_explicita", summary: SUMMARY })
-
-    expect(sendTemplate).not.toHaveBeenCalled()
-  })
-
-  it("con número y template aprobados, manda la alerta por WhatsApp además del email", async () => {
-    process.env.ALERT_WHATSAPP_TO = "5491100000000"
+  it("la alerta interna de WhatsApp usa sólo una referencia seudónima", async () => {
+    process.env.ALERT_WHATSAPP_TO = "5491199999999"
     ;(getApprovedTemplate as jest.Mock).mockResolvedValue({
-      id: "t1", name: "alerta_interna_derivacion", category: "utility", language: "es_AR",
-      status: "aprobado", body_text: "🚨 {{1}} ... {{2}}", variables: ["nombre_paciente", "motivo"], variable_samples: [],
+      name: "alerta_interna_derivacion",
+      language: "es_AR",
     })
-    mockDb({ handoff_events: { data: null, error: null }, leads: { data: null, error: null } })
+    mockDb()
 
     await escalateToHuman({ leadId: "lead-1", reason: "solicitud_explicita", summary: SUMMARY })
 
     expect(sendTemplate).toHaveBeenCalledWith(
-      "5491100000000", "alerta_interna_derivacion", "es_AR",
-      ["Juana Pérez", "Pidió hablar con una persona"],
+      "5491199999999",
+      "alerta_interna_derivacion",
+      "es_AR",
+      [expect.stringMatching(/^CASO-[0-9A-F]{8}$/)],
       expect.objectContaining({ leadId: null })
     )
-    expect(sendHandoffAlert).toHaveBeenCalledTimes(1) // el email se manda igual, no se reemplaza
-  })
-
-  it("si sendTemplate falla, no rompe escalateToHuman ni afecta el email ya enviado", async () => {
-    process.env.ALERT_WHATSAPP_TO = "5491100000000"
-    ;(getApprovedTemplate as jest.Mock).mockResolvedValue({
-      id: "t1", name: "alerta_interna_derivacion", category: "utility", language: "es_AR",
-      status: "aprobado", body_text: "🚨 {{1}} ... {{2}}", variables: ["nombre_paciente", "motivo"], variable_samples: [],
-    })
-    ;(sendTemplate as jest.Mock).mockRejectedValue(new Error("WhatsApp API error 401: token vencido"))
-    mockDb({ handoff_events: { data: null, error: null }, leads: { data: null, error: null } })
-
-    await expect(
-      escalateToHuman({ leadId: "lead-1", reason: "solicitud_explicita", summary: SUMMARY })
-    ).resolves.toBeUndefined()
-
-    expect(sendHandoffAlert).toHaveBeenCalledTimes(1)
+    const serializedCall = JSON.stringify((sendTemplate as jest.Mock).mock.calls[0])
+    expect(serializedCall).not.toContain(SUMMARY.nombre)
+    expect(serializedCall).not.toContain(SUMMARY.telefono)
+    expect(serializedCall).not.toContain(SUMMARY.ultimo_mensaje)
   })
 })
 
-describe("resolveHandoffForLead", () => {
-  beforeEach(() => jest.clearAllMocks())
+describe("formatHandoffAlertText", () => {
+  it("no incorpora ningun dato del resumen por construccion", () => {
+    const text = formatHandoffAlertText("solicitud_explicita", "12345678-abcd")
+    expect(text).toContain("Referencia: caso 12345678")
+    expect(text).toContain("/inbox")
+    expect(text).not.toContain("12345678-abcd")
+    expect(text).not.toMatch(/54911|OSDE|Juana|estudios/i)
+  })
+})
 
-  it("marca resuelto el handoff abierto del lead y limpia requires_human", async () => {
-    const builders = mockDb({
-      handoff_events: { data: null, error: null },
-      leads: { data: null, error: null },
+describe("transiciones operativas del handoff", () => {
+  it.each([
+    [takeHandoffForLead, "take"],
+    [resolveHandoffForLead, "reactivate"],
+    [closeHandoffForLead, "close"],
+  ] as const)("usa la RPC atomica para %s", async (operation, action) => {
+    const { rpc } = mockDb()
+    await operation("lead-1", "staff@example.com")
+    expect(rpc).toHaveBeenCalledWith("transition_whatsapp_handoff", {
+      p_lead_id: "lead-1",
+      p_action: action,
+      p_actor: "staff@example.com",
     })
+  })
 
-    await resolveHandoffForLead("lead-1", "seba@example.com")
-
-    expect(builders.handoff_events.update).toHaveBeenCalledWith(
-      expect.objectContaining({ resolved_by: "seba@example.com" })
+  it("propaga un error de transicion sin simular exito", async () => {
+    mockDb({ rpcError: { message: "failed" } })
+    await expect(takeHandoffForLead("lead-1", "staff")).rejects.toThrow(
+      "No se pudo actualizar la derivación"
     )
-    expect(builders.handoff_events.eq).toHaveBeenCalledWith("lead_id", "lead-1")
-    expect(builders.handoff_events.is).toHaveBeenCalledWith("resolved_at", null)
-    expect(builders.leads.update).toHaveBeenCalledWith({ requires_human: false })
   })
 })
 
 describe("getOpenHandoffs", () => {
-  beforeEach(() => jest.clearAllMocks())
-
-  it("devuelve el handoff más antiguo por lead, sin duplicar leads con más de un evento abierto", async () => {
+  it("devuelve solo el handoff mas antiguo por lead", async () => {
     mockDb({
-      handoff_events: {
+      handoffEvents: {
         data: [
           { lead_id: "a", reason: "solicitud_explicita", created_at: "2026-07-14T10:00:00.000Z" },
           { lead_id: "a", reason: "conversacion_larga", created_at: "2026-07-14T11:00:00.000Z" },
@@ -209,111 +208,63 @@ describe("getOpenHandoffs", () => {
     })
 
     const result = await getOpenHandoffs()
-
     expect(result.size).toBe(2)
-    expect(result.get("a")).toEqual({ createdAt: "2026-07-14T10:00:00.000Z", reason: "solicitud_explicita" })
-    expect(result.get("b")?.reason).toBe("urgencia_medica")
+    expect(result.get("a")).toEqual({
+      createdAt: "2026-07-14T10:00:00.000Z",
+      reason: "solicitud_explicita",
+    })
   })
 
-  it("con un array de leadIds vacío, devuelve un Map vacío sin consultar la base", async () => {
-    mockDb({})
-
+  it("no consulta la tabla con un filtro vacio", async () => {
     const result = await getOpenHandoffs([])
-
     expect(result.size).toBe(0)
     expect(getServiceDb).not.toHaveBeenCalled()
   })
 })
 
 describe("runHandoffReminderCheck", () => {
-  beforeEach(() => jest.clearAllMocks())
-
-  it("no manda nada si ningún handoff abierto lleva más de 60 minutos esperando", async () => {
-    const now = new Date("2026-07-14T12:00:00.000Z")
+  it("no alerta si no hay handoffs vencidos", async () => {
     mockDb({
-      handoff_events: {
+      handoffEvents: {
         data: [{ lead_id: "a", reason: "solicitud_explicita", created_at: "2026-07-14T11:45:00.000Z" }],
         error: null,
       },
     })
 
-    const result = await runHandoffReminderCheck(now)
-
-    expect(result).toEqual({ pending: 0 })
+    await expect(runHandoffReminderCheck(new Date("2026-07-14T12:00:00.000Z"))).resolves.toEqual({ pending: 0 })
     expect(sendHandoffReminderAlert).not.toHaveBeenCalled()
   })
 
-  it("manda un único mail con los handoffs abiertos hace más de 60 minutos", async () => {
-    const now = new Date("2026-07-14T12:00:00.000Z")
-    const builders = mockDb({
-      handoff_events: {
-        data: [{ lead_id: "lead-1", reason: "solicitud_explicita", created_at: "2026-07-14T05:30:00.000Z" }],
+  it("manda referencias e inbox, nunca telefono, nombre ni ultimo mensaje", async () => {
+    mockDb({
+      handoffEvents: {
+        data: [{ lead_id: "lead-123456", reason: "solicitud_explicita", created_at: "2026-07-14T05:30:00.000Z" }],
         error: null,
       },
-      leads: { data: [{ id: "lead-1", name: "Juana Pérez", phone: "5491100000000" }], error: null },
     })
 
-    const result = await runHandoffReminderCheck(now)
-
-    expect(result).toEqual({ pending: 1 })
-    expect(builders.leads.in).toHaveBeenCalledWith("id", ["lead-1"])
-    expect(sendHandoffReminderAlert).toHaveBeenCalledTimes(1)
-    const [text] = (sendHandoffReminderAlert as jest.Mock).mock.calls[0]
-    expect(text).toContain("Juana Pérez")
-    expect(text).toContain("5491100000000")
+    await expect(runHandoffReminderCheck(new Date("2026-07-14T12:00:00.000Z"))).resolves.toEqual({ pending: 1 })
+    const [text] = (sendHandoffReminderAlert as jest.Mock).mock.calls[0] as [string]
+    expect(text).toContain("Caso lead-123")
+    expect(text).toContain("/inbox?lead_id=lead-123456")
+    expect(text).not.toMatch(/5491100000000|Juana|OSDE|estudios/i)
   })
 
-  it("si falla la consulta, devuelve el error en vez de lanzar (no debe tumbar el cron)", async () => {
-    ;(getServiceDb as jest.Mock).mockImplementation(() => { throw new Error("conexión caída") })
-
+  it("devuelve el error sin tumbar el cron", async () => {
+    ;(getServiceDb as jest.Mock).mockImplementation(() => { throw new Error("conexion caida") })
     const result = await runHandoffReminderCheck(new Date())
-
-    expect(result.pending).toBe(0)
-    expect(result.error).toBe("conexión caída")
-    expect(sendHandoffReminderAlert).not.toHaveBeenCalled()
+    expect(result).toEqual({ pending: 0, error: "handoff_reminder_failed" })
   })
 })
 
 describe("buildHandoffSummary", () => {
-  it("arma un resumen compacto a partir del lead y la conversacion", () => {
-    const summary = buildHandoffSummary({
-      phone: "5491100000000",
-      lead: {
-        id: "lead-1",
-        name: "Juana Pérez",
-        insurance: "OSDE",
-        patient_age: 52,
-        general_reason: "Dolor precordial ocasional",
-        possible_emergency: false,
-        protocol_interest: true,
-        protocol_name: "Estudio arritmias 2026",
-        last_message: "Quiero saber si aplico al protocolo",
-      },
-      messagesSentCount: 6,
-      costEstimatedTotal: 0,
-      nextStepHint: "Contactar para evaluar elegibilidad de protocolo",
-    })
-
-    expect(summary.nombre).toBe("Juana Pérez")
-    expect(summary.cobertura).toBe("OSDE")
-    expect(summary.edad).toBe(52)
-    expect(summary.urgencia).toBe("No urgente")
-    expect(summary.protocolo_posible).toBe("Estudio arritmias 2026")
-    expect(summary.mensajes_enviados).toBe(6)
-  })
-
-  it("usa valores por defecto cuando todavia no hay lead creado", () => {
-    const summary = buildHandoffSummary({
-      phone: "5491100000000",
-      lead: null,
-      messagesSentCount: 1,
-      costEstimatedTotal: null,
-      nextStepHint: "Contactar apenas se pueda",
-    })
-
-    expect(summary.nombre).toBe("Sin nombre")
-    expect(summary.cobertura).toBe("No informada")
-    expect(summary.urgencia).toBe("No urgente")
-    expect(summary.protocolo_posible).toBe("No")
+  it("conserva el resumen completo solo para el registro interno durable", () => {
+    expect(SUMMARY).toEqual(expect.objectContaining({
+      nombre: "Juana Perez",
+      telefono: "5491100000000",
+      cobertura: "OSDE",
+      edad: 60,
+      ultimo_mensaje: "quiero hablar con alguien por mis estudios",
+    }))
   })
 })

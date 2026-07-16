@@ -9,6 +9,9 @@ import {
   getInstagramRedirectUri,
   isSecureRequest,
 } from "@/lib/instagram-oauth"
+import { authorizeStaff } from "@/lib/staff-authz"
+
+const INSTAGRAM_OAUTH_ROLES = ["owner"] as const
 
 const SCOPES = [
   "instagram_business_basic",
@@ -20,16 +23,17 @@ export async function GET(request: NextRequest) {
   // Requiere sesión: sin esto, cualquiera con la URL podía iniciar el OAuth con su propia
   // cuenta de Instagram y reemplazar la conexión de Lucía (ver auditoría de seguridad 2026-07-07).
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) {
-    return NextResponse.redirect(new URL("/login", request.url))
+  const auth = await authorizeStaff(supabase, { allowedRoles: INSTAGRAM_OAUTH_ROLES, sensitive: true })
+  if (!auth.ok) {
+    const destination = auth.status === 401 ? "/login" : `/contenido/instagram?ig_error=${auth.code}`
+    return NextResponse.redirect(new URL(destination, request.url))
   }
 
   const appId = process.env.INSTAGRAM_APP_ID
   const redirectUri = getInstagramRedirectUri(request)
 
   if (!appId) {
-    return NextResponse.json({ error: "Instagram OAuth no esta configurado" }, { status: 500 })
+    return NextResponse.json({ error: "Instagram OAuth no está configurado" }, { status: 503 })
   }
 
   const state = createOauthState()

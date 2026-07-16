@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server"
+import { getServiceDb } from "@/lib/supabase/service"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import {
   Users, CheckCircle2, Clock,
@@ -242,6 +243,7 @@ async function getGrowthRecommendationsData(
   period: DashboardPeriod
 ): Promise<{ recommendations: GrowthRecommendation[]; available: boolean }> {
   try {
+    const serviceDb = getServiceDb()
     const now = new Date()
     const since1d = new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString()
     const staleCutoff = new Date(now.getTime() - 2 * 60 * 60 * 1000).toISOString()
@@ -262,8 +264,8 @@ async function getGrowthRecommendationsData(
       getWhatsAppSettings(),
       supabase.from("templates").select("id", { count: "exact", head: true }).neq("status", "aprobado"),
       supabase.from("whatsapp_sessions").select("state, updated_at"),
-      supabase.from("app_config").select("value").eq("key", "instagram_access_token").maybeSingle(),
-      supabase.from("app_config").select("value").eq("key", "google_refresh_token").maybeSingle(),
+      serviceDb.from("app_config").select("key").eq("key", "instagram_access_token").maybeSingle(),
+      serviceDb.from("app_config").select("key").eq("key", "google_refresh_token").maybeSingle(),
       readAutoPublishSettings(supabase),
       getGooglePlaceReviews(),
     ])
@@ -293,12 +295,12 @@ async function getGrowthRecommendationsData(
         abandonedConversations,
       },
       instagram: {
-        connected: Boolean(instagramConn?.value),
+        connected: Boolean(instagramConn?.key),
         post: autoPublishSettings.post,
         historia: autoPublishSettings.historia,
       },
       google: {
-        businessConnected: Boolean(googleConn?.value),
+        businessConnected: Boolean(googleConn?.key),
         placesReviews,
       },
     })

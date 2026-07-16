@@ -8,14 +8,18 @@ import {
   GOOGLE_OAUTH_VERIFIER_COOKIE,
   getGoogleRedirectUri,
 } from "@/lib/google-oauth"
+import { authorizeStaff } from "@/lib/staff-authz"
+
+const GOOGLE_OAUTH_ROLES = ["owner"] as const
 
 export async function GET(req: NextRequest) {
   // Mismo motivo que /api/google-business/auth: sin sesión, no se completa el intercambio de
   // tokens (evita que alguien sin login termine de conectar su propia cuenta de Google).
   const authClient = await createClient()
-  const { data: { user } } = await authClient.auth.getUser()
-  if (!user) {
-    return NextResponse.redirect(new URL("/login", req.url))
+  const auth = await authorizeStaff(authClient, { allowedRoles: GOOGLE_OAUTH_ROLES, sensitive: true })
+  if (!auth.ok) {
+    const destination = auth.status === 401 ? "/login" : `/google-local?error=${auth.code}`
+    return NextResponse.redirect(new URL(destination, req.url))
   }
 
   const code = req.nextUrl.searchParams.get("code")

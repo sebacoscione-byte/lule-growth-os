@@ -5,10 +5,11 @@ el aviso de "borrador" de `/privacidad`. No reemplaza la lectura del texto compl
 — es un resumen para orientar la revisión y dejar explícitas las preguntas concretas que necesitan
 una respuesta de un abogado, no de un desarrollador.
 
-**Por qué hace falta esta revisión:** la app procesa datos de salud (motivo de consulta, síntomas,
-edad, obra social) de pacientes reales de la Dra. Lucía Chahin. Eso la sujeta a un estándar de
-cuidado más alto que un sitio comercial común — de ahí que el texto de `/privacidad` esté marcado
-como borrador hasta que alguien con criterio legal lo confirme.
+**Por qué hace falta esta revisión:** la app procesa datos administrativos vinculados con atención
+de salud (teléfono, cobertura, servicio y sede) y puede recibir espontáneamente texto clínico de
+pacientes reales de la Dra. Lucía Chahin, aunque el bot no lo solicite ni lo incorpore al intake.
+Eso exige un estándar de cuidado más alto que un sitio comercial común — de ahí que el texto de
+`/privacidad` esté marcado como borrador hasta que alguien con criterio legal lo confirme.
 
 ---
 
@@ -23,11 +24,13 @@ diagnostica, no interpreta estudios**.
 
 `https://draluciachahin.ar/privacidad` (código fuente: `src/app/privacidad/page.tsx`). Describe,
 en lenguaje llano:
-- Qué datos se recolectan (contacto, motivo de consulta, edad, obra social, contenido de
-  WhatsApp, navegación agregada del sitio).
+- Qué datos se recolectan (contacto, categoría administrativa, obra social, sede, contenido
+  administrativo posterior al consentimiento y navegación agregada del sitio). El bot no pide
+  edad, síntomas ni estudios.
 - Para qué se usan (contactar, derivar a la sede correcta, clasificar automáticamente el motivo).
 - Con qué terceros se comparten (ver punto 3).
-- Cuánto tiempo se conservan (ver punto 4 — política implementada el 2026-07-12).
+- Cuánto tiempo se conservan (ver punto 4 — propuesta técnica ampliada localmente, todavía sin
+  despliegue ni aprobación legal).
 - Cómo pedir acceso, corrección o eliminación (hoy manual, por WhatsApp).
 
 ## 3. Terceros que reciben datos
@@ -35,7 +38,7 @@ en lenguaje llano:
 | Proveedor | Qué recibe | Para qué | ¿Procesa fuera de Argentina? |
 |---|---|---|---|
 | Meta (WhatsApp Business Platform) | Mensajes de WhatsApp completos | Enviar/recibir mensajes | Sí (EE.UU./infraestructura global de Meta) |
-| Anthropic (Claude) y/o Google (Gemini) | El texto del mensaje del paciente | Clasificar el motivo de consulta, sugerir respuestas — no toman decisiones médicas | Sí (EE.UU.) |
+| Anthropic (Claude) y/o Google (Gemini) | Sólo texto administrativo mínimo cuando hace falta clasificación; el contenido clínico detectado se filtra antes | Devolver una categoría cerrada; no redactan la respuesta al paciente | Sí (EE.UU.) |
 | Supabase | Toda la base de datos de la app | Almacenamiento | Sí (el proyecto usa una región de EE.UU./AWS) |
 | Vercel | — (aloja la app) | Hosting | Sí (EE.UU./red global) |
 | Google Analytics (opcional, opt-in) | Navegación agregada, sin nombre/teléfono | Medir visitas | Sí (EE.UU.) |
@@ -55,22 +58,31 @@ guarde un Data Processing Agreement (DPA) firmado o aceptado de cada proveedor (
 Google, Supabase, Vercel) — la mayoría los ofrece como parte de sus términos estándar — o alcanza
 con la descripción de `/privacidad` sin un documento adicional por proveedor?
 
-## 4. Política de retención (implementada 2026-07-12, DATA-02)
+## 4. Política de retención (ampliada en el PR #96, pendiente del cutover)
 
-Definida por Seba, ya implementada en código:
+Propuesta técnica incluida en el PR #96, sujeta a revisión legal y al cutover coordinado:
 
 - **Leads que nunca se convirtieron en pacientes, o con solo datos administrativos**: se
   anonimizan/eliminan automáticamente tras **24 meses de inactividad**.
-- **Datos de participación en un protocolo de investigación clínica**: **nunca se eliminan
-  automáticamente** — se conservan por el plazo legal aplicable, con un piso de **10 años** desde
-  la última actuación registrada. Tras 24 meses de inactividad se deja de usarlos para contactar
-  al paciente (no más mensajes comerciales), pero el dato permanece intacto.
+- **Datos vinculados con protocolo de investigación clínica**: **no se eliminan automáticamente**
+  mientras se define el plazo legal aplicable. Tras 24 meses de inactividad se bloquea su uso para
+  contacto comercial, pero el dato permanece bajo una retención especial.
+- **Datos técnicos de WhatsApp**: eventos procesados 30 días, dead letter 90 días, evaluaciones
+  shadow/estados de entrega/ledger finalizado 180 días y auditoría de seguridad 24 meses.
+- **Supresión posterior al borrado**: se conserva por 90 días un seudónimo HMAC no reversible en la
+  práctica sin su clave local, no el teléfono ni el ID de Meta. Se sigue tratando como dato personal
+  protegido. El teléfono bloquea escrituras genéricas durante 15 minutos y los eventos viejos se
+  siguen rechazando según su `occurred_at`; los IDs estables de evento/salida se bloquean durante
+  los 90 días.
+- **Registro de solicitudes de borrado (`data_erasure_log`)**: queda seudonimizado como evidencia,
+  pero todavía no tiene un plazo de eliminación automática definido.
 - Cualquier paciente puede pedir el borrado manual en cualquier momento, sin esperar estos plazos
   (ver `docs/BACKLOG.md` → DATA-02 para el detalle técnico completo).
 
-**Pregunta para el abogado**: ¿los plazos de 24 meses y 10 años son razonables/defendibles para
-este tipo de dato en Argentina, o hay una normativa específica (ej. de historias clínicas, aunque
-esta app no almacena historias clínicas completas) que sugiera otro plazo?
+**Pregunta para el abogado**: ¿los plazos técnicos propuestos —incluidos los 90 días de tombstone
+HMAC— son razonables/defendibles para este tipo de dato en Argentina, qué plazo corresponde a datos
+vinculados con protocolos y cuánto tiempo debe conservarse `data_erasure_log` como prueba de haber
+atendido la solicitud, considerando que esta app no almacena una historia clínica completa?
 
 ## 5. Consentimiento de analítica (DATA-03)
 
@@ -87,27 +99,27 @@ tanto se mantiene la versión más cuidadosa.
 
 ## 6. Texto de consentimiento en el primer contacto por WhatsApp
 
-Antes de registrar cualquier dato, el bot le muestra este texto exacto al paciente y espera que
-conteste que sí (o continúa si ya había aceptado antes):
+Antes de registrar el contenido administrativo, el bot muestra este texto y exige el botón o una
+aceptación positiva inequívoca. Los consentimientos legacy no habilitan el flujo:
 
-> "Para ayudarte, podemos registrar tus datos de contacto, cobertura médica y motivo de consulta.
-> No reemplaza una consulta médica. ¿Aceptás continuar?"
+> "Para orientarte sobre cómo pedir turno, necesitamos registrar tu número, cobertura, sede elegida
+> y motivo administrativo de contacto. No usamos este canal para diagnóstico ni para recibir
+> estudios. Podés consultar la política de privacidad en [URL]. ¿Aceptás que tratemos esos datos
+> para responder esta consulta?"
 
 Si el paciente contesta algo como "no acepto"/"no quiero"/"no autorizo", no se registra nada y se
 lo aclara explícitamente. Queda guardado (fecha, versión del texto, si aceptó o no) en
 `consent_records` — ver `src/lib/whatsapp-consent.ts`.
 
-**Pregunta para el abogado**: ¿este texto alcanza como consentimiento informado válido para
-recolectar datos de salud (motivo de consulta), o hace falta un texto más específico (ej.
-mencionar explícitamente "datos de salud", los terceros involucrados, o el derecho a retirar el
-consentimiento en cualquier momento)?
+**Pregunta para el abogado**: ¿este texto alcanza para tratar los datos administrativos indicados y
+recibir una consulta por un canal de salud, o hace falta mencionar de otro modo los datos sensibles
+enviados espontáneamente, los terceros o el derecho a retirar el consentimiento?
 
-## 7. Menores de edad — hoy sin ningún tratamiento especial
+## 7. Menores de edad — el bot no pide edad, pero falta una decisión legal
 
-El bot pregunta la edad del paciente como parte de la conversación (para saber si aplica algún
-criterio clínico), pero **no hay ninguna lógica distinta si la persona que escribe es menor de
-edad** — ni un aviso adicional, ni un pedido de que sea un adulto responsable quien continúe la
-conversación. Es una laguna real, no una decisión tomada a propósito.
+El intake administrativo ya no pregunta ni extrae edad. Sin embargo, una persona menor podría
+escribir por iniciativa propia y **no hay una lógica específica para identificar ese caso o pedir
+que continúe un adulto responsable**. Es una decisión pendiente, no una autorización implícita.
 
 **Pregunta para el abogado**: ¿hace falta algún tratamiento especial (aviso, derivación directa a
 un adulto responsable, restricción de qué se pregunta) cuando la edad informada es menor a 18
@@ -119,11 +131,10 @@ producto que hay que diseñar aparte — no algo para resolver solo en el texto 
 - No da diagnósticos ni interpreta estudios.
 - No confirma turnos ni disponibilidad.
 - No usa los datos de salud para ningún fin comercial ni los publica.
-- Ante un síntoma de alarma, siempre deriva a que el paciente llame al **107 (SAME)** o vaya a una
-  guardia (lógica determinística en `src/lib/medical-safety.ts`, no depende de IA). *Corregido el
-  2026-07-12: el bot decía 911 en este mensaje puntual mientras el resto del sitio ya decía 107 —
-  quedaron unificados en 107, el número del sistema de emergencias médicas de CABA y provincia de
-  Buenos Aires, donde están las 3 sedes.*
+- Ante una señal de alarma determinística, indica buscar atención inmediata en una guardia o llamar
+  al servicio de emergencias de la zona, sin esperar por WhatsApp. La IA no redacta ese texto.
+- Las respuestas visibles del bot salen de textos fijos; el modelo solo puede devolver categorías
+  validadas y su salida no se usa para dar diagnóstico, tratamiento o interpretación clínica.
 
 ## 9. Qué falta después de esta revisión
 
@@ -134,3 +145,28 @@ producto que hay que diseñar aparte — no algo para resolver solo en el texto 
 3. Sacar el aviso de "borrador" de la página una vez confirmado.
 4. Si corresponde, cargar `https://draluciachahin.ar/privacidad` como Privacy Policy URL en el
    Meta Developer Console (solo urgente si se saca la app de Instagram del modo desarrollo).
+5. Reaprobar en Meta `alerta_interna_derivacion`: la versión endurecida es genérica, usa una sola
+   variable con un ID opaco de caso y no incluye nombre, teléfono, síntoma ni motivo. La migración
+   la deja en borrador hasta completar esa aprobación.
+
+## 10. Estado técnico previo a producción (para no confundir código con despliegue)
+
+El PR #96 pasó CI/Vercel y el lote se ejecutó contra el esquema real dentro de una transacción con
+rollback completo. La aplicación persistente mantiene este orden obligatorio: 0A → 0B → 1 → 1B →
+1C → 1D → 1E → policy → privacy, correspondiente a:
+
+1. `20260715_whatsapp_phase0a_safety.sql`.
+2. `20260716_whatsapp_phase0b_operations.sql`.
+3. `20260716_whatsapp_phase1_durable_transport.sql`.
+4. `20260716_whatsapp_phase1b_outbound_ledger.sql`.
+5. `20260716_whatsapp_phase1c_queue_checkpoint.sql`.
+6. `20260716_whatsapp_phase1d_atomic_routing.sql`.
+7. `20260716_whatsapp_phase1e_erasure_suppression.sql`.
+8. `20260716_whatsapp_policy_shadow.sql`.
+9. `20260716_whatsapp_privacy_roles_retention.sql`.
+
+El dry-run transaccional valida el SQL y sus dependencias sobre PostgreSQL real, pero no reemplaza
+staging para carreras concurrentes ni un ensayo de restauración. Después del cutover todavía hacen
+falta roles en `app_metadata`, enrolamiento MFA, una cuenta probada por rol, versión de Meta
+configurada y sedes/configuración operativa verificadas. Estos son gates técnicos separados de la
+aprobación médica y de esta revisión legal.

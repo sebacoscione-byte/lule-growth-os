@@ -7,14 +7,18 @@ import {
   INSTAGRAM_OAUTH_STATE_COOKIE,
   getInstagramRedirectUri,
 } from "@/lib/instagram-oauth"
+import { authorizeStaff } from "@/lib/staff-authz"
+
+const INSTAGRAM_OAUTH_ROLES = ["owner"] as const
 
 export async function GET(req: NextRequest) {
   // Mismo motivo que /api/instagram-business/auth: sin sesión, no se completa el intercambio de
   // tokens (evita que alguien sin login termine de conectar su propia cuenta de Instagram).
   const authClient = await createClient()
-  const { data: { user } } = await authClient.auth.getUser()
-  if (!user) {
-    return NextResponse.redirect(new URL("/login", req.url))
+  const auth = await authorizeStaff(authClient, { allowedRoles: INSTAGRAM_OAUTH_ROLES, sensitive: true })
+  if (!auth.ok) {
+    const destination = auth.status === 401 ? "/login" : `/contenido/instagram?ig_error=${auth.code}`
+    return NextResponse.redirect(new URL(destination, req.url))
   }
 
   const code = req.nextUrl.searchParams.get("code")

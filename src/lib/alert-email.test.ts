@@ -16,7 +16,7 @@ describe("sendCronFailureAlert", () => {
     const fetchMock = jest.fn()
     global.fetch = fetchMock as unknown as typeof fetch
 
-    await sendCronFailureAlert("publish-content", "algo falló")
+    await expect(sendCronFailureAlert("publish-content", "algo falló")).resolves.toBe(false)
 
     expect(fetchMock).not.toHaveBeenCalled()
   })
@@ -27,7 +27,7 @@ describe("sendCronFailureAlert", () => {
     const fetchMock = jest.fn()
     global.fetch = fetchMock as unknown as typeof fetch
 
-    await sendCronFailureAlert("publish-content", "algo falló")
+    await expect(sendCronFailureAlert("publish-content", "algo falló")).resolves.toBe(false)
 
     expect(fetchMock).not.toHaveBeenCalled()
   })
@@ -38,7 +38,7 @@ describe("sendCronFailureAlert", () => {
     const fetchMock = jest.fn().mockResolvedValue({ ok: true })
     global.fetch = fetchMock as unknown as typeof fetch
 
-    await sendCronFailureAlert("weekly-report", "el upsert falló")
+    await expect(sendCronFailureAlert("weekly-report", "el upsert falló")).resolves.toBe(true)
 
     expect(fetchMock).toHaveBeenCalledTimes(1)
     const [url, init] = fetchMock.mock.calls[0]
@@ -48,6 +48,7 @@ describe("sendCronFailureAlert", () => {
     expect(body.to).toBe("seba@example.com")
     expect(body.subject).toContain("weekly-report")
     expect(body.text).toBe("el upsert falló")
+    expect(init.signal).toBeDefined()
   })
 
   it("no lanza si la llamada a fetch falla", async () => {
@@ -55,6 +56,14 @@ describe("sendCronFailureAlert", () => {
     process.env.ALERT_EMAIL_TO = "seba@example.com"
     global.fetch = jest.fn().mockRejectedValue(new Error("network down")) as unknown as typeof fetch
 
-    await expect(sendCronFailureAlert("publish-content", "algo falló")).resolves.toBeUndefined()
+    await expect(sendCronFailureAlert("publish-content", "algo falló")).resolves.toBe(false)
+  })
+
+  it("no confirma una alerta si Resend responde sin 2xx", async () => {
+    process.env.RESEND_API_KEY = "re_test_key"
+    process.env.ALERT_EMAIL_TO = "seba@example.com"
+    global.fetch = jest.fn().mockResolvedValue({ ok: false }) as unknown as typeof fetch
+
+    await expect(sendCronFailureAlert("publish-content", "algo falló")).resolves.toBe(false)
   })
 })

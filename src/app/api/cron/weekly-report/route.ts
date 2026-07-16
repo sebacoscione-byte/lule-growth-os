@@ -104,9 +104,8 @@ async function buildAndSaveWeeklyReport() {
   let retention: Awaited<ReturnType<typeof runDataRetentionSweep>> | { errors: string[] }
   try {
     retention = await runDataRetentionSweep(supabase)
-  } catch (retentionError) {
-    const message = retentionError instanceof Error ? retentionError.message : String(retentionError)
-    retention = { errors: [message] }
+  } catch {
+    retention = { errors: ["retention_sweep_failed"] }
   }
   if (retention.errors.length > 0) {
     await sendCronFailureAlert("weekly-report", `Barrida de retención de datos: ${retention.errors.join("; ")}`)

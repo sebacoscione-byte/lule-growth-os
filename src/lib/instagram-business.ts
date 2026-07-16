@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
+import { getServiceDb } from "@/lib/supabase/service"
 
 // "Instagram API with Instagram Login": no requiere una Facebook Page vinculada,
 // solo una cuenta de Instagram profesional (Business o Creator).
@@ -17,7 +18,7 @@ export async function exchangeCodeForToken(code: string, redirectUri: string) {
     code,
   })
   const res = await fetch(OAUTH_TOKEN_URL, { method: "POST", body })
-  if (!res.ok) throw new Error(`Instagram token exchange failed: ${await res.text()}`)
+  if (!res.ok) throw new Error("instagram_token_exchange_failed")
   return res.json() as Promise<{ access_token: string; user_id: string }>
 }
 
@@ -28,46 +29,58 @@ export async function exchangeForLongLivedToken(shortLivedToken: string) {
     access_token: shortLivedToken,
   })
   const res = await fetch(`${GRAPH_BASE}/access_token?${params}`)
-  if (!res.ok) throw new Error(`Instagram long-lived exchange failed: ${await res.text()}`)
+  if (!res.ok) throw new Error("instagram_long_lived_exchange_failed")
   return res.json() as Promise<{ access_token: string; token_type: string; expires_in: number }>
 }
 
 async function refreshLongLivedToken(accessToken: string) {
   const params = new URLSearchParams({ grant_type: "ig_refresh_token", access_token: accessToken })
   const res = await fetch(`${GRAPH_BASE}/refresh_access_token?${params}`)
-  if (!res.ok) throw new Error(`Instagram token refresh failed: ${await res.text()}`)
+  if (!res.ok) throw new Error("instagram_token_refresh_failed")
   return res.json() as Promise<{ access_token: string; token_type: string; expires_in: number }>
 }
 
 export async function saveTokens(
-  supabase: SupabaseClient,
+  _supabase: SupabaseClient,
   tokens: { access_token: string; expires_in: number; user_id: string; issued_at?: number }
 ) {
+  void _supabase // Compatibility-only: token writes are service-role-only.
+  const supabase = getServiceDb()
   const expiry = new Date(Date.now() + tokens.expires_in * 1000).toISOString()
   const issuedAt = new Date(tokens.issued_at ?? Date.now()).toISOString()
-  await Promise.all([
+  const writes = await Promise.all([
     supabase.from("app_config").upsert({ key: "instagram_access_token", value: tokens.access_token }, { onConflict: "key" }),
     supabase.from("app_config").upsert({ key: "instagram_user_id", value: tokens.user_id }, { onConflict: "key" }),
     supabase.from("app_config").upsert({ key: "instagram_token_expires_at", value: expiry }, { onConflict: "key" }),
     supabase.from("app_config").upsert({ key: "instagram_token_issued_at", value: issuedAt }, { onConflict: "key" }),
   ])
+  if (writes.some(write => write.error)) throw new Error("instagram_token_storage_failed")
 }
 
-export async function getConnectionInfo(supabase: SupabaseClient) {
+export async function getConnectionInfo(_supabase: SupabaseClient) {
+  void _supabase // Never trust a cookie-backed client for integration metadata.
+  const supabase = getServiceDb()
   const keys = ["instagram_access_token", "instagram_user_id", "instagram_username"]
-  const { data } = await supabase.from("app_config").select("key, value").in("key", keys)
+  const { data, error } = await supabase.from("app_config").select("key, value").in("key", keys)
+  if (error) throw new Error("instagram_connection_read_failed")
   if (!data?.length) return null
 
   const map: Record<string, string> = {}
   data.forEach((r: { key: string; value: unknown }) => { map[r.key] = r.value as string })
 
   if (!map.instagram_access_token) return null
-  return map
+  return {
+    instagram_user_id: map.instagram_user_id,
+    instagram_username: map.instagram_username,
+  }
 }
 
-export async function getValidToken(supabase: SupabaseClient): Promise<string | null> {
+export async function getValidToken(_supabase: SupabaseClient): Promise<string | null> {
+  void _supabase // Compatibility-only: secrets must always be read with the server-only client.
+  const supabase = getServiceDb()
   const keys = ["instagram_access_token", "instagram_token_expires_at", "instagram_token_issued_at"]
-  const { data } = await supabase.from("app_config").select("key, value").in("key", keys)
+  const { data, error } = await supabase.from("app_config").select("key, value").in("key", keys)
+  if (error) throw new Error("instagram_token_read_failed")
   if (!data?.length) return null
 
   const map: Record<string, string> = {}
@@ -84,20 +97,24 @@ export async function getValidToken(supabase: SupabaseClient): Promise<string | 
 
   const fresh = await refreshLongLivedToken(map.instagram_access_token)
   const newExpiry = new Date(Date.now() + fresh.expires_in * 1000).toISOString()
-  await Promise.all([
+  const refreshWrites = await Promise.all([
     supabase.from("app_config").upsert({ key: "instagram_access_token", value: fresh.access_token }, { onConflict: "key" }),
     supabase.from("app_config").upsert({ key: "instagram_token_expires_at", value: newExpiry }, { onConflict: "key" }),
     supabase.from("app_config").upsert({ key: "instagram_token_issued_at", value: new Date().toISOString() }, { onConflict: "key" }),
   ])
+  if (refreshWrites.some(write => write.error)) throw new Error("instagram_token_storage_failed")
   return fresh.access_token
 }
 
-export async function clearTokens(supabase: SupabaseClient) {
+export async function clearTokens(_supabase: SupabaseClient) {
+  void _supabase // Compatibility-only: token deletes are service-role-only.
+  const supabase = getServiceDb()
   const keys = [
     "instagram_access_token", "instagram_user_id", "instagram_username",
     "instagram_token_expires_at", "instagram_token_issued_at",
   ]
-  await supabase.from("app_config").delete().in("key", keys)
+  const { error } = await supabase.from("app_config").delete().in("key", keys)
+  if (error) throw new Error("instagram_token_delete_failed")
 }
 
 // ─── Perfil ───────────────────────────────────────────────────────────────

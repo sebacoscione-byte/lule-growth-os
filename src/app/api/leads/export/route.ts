@@ -2,6 +2,8 @@ import { createClient } from "@/lib/supabase/server"
 import { NextResponse } from "next/server"
 import { CHANNEL_LABELS, SERVICE_LABELS, STATUS_LABELS, LOCATION_LABELS, type Lead } from "@/types"
 import { escapeCsvCell } from "@/lib/csv"
+import { authorizeStaff } from "@/lib/staff-authz"
+import { recordSecurityAudit } from "@/lib/security-audit"
 
 // PostgREST (la API REST de Supabase) tiene un tope de filas por respuesta (db-max-rows, 1000 por
 // default) que un select("*") sin range() respeta en silencio — si los leads reales superaran ese
@@ -29,11 +31,26 @@ async function fetchAllLeads(supabase: Awaited<ReturnType<typeof createClient>>)
 
 export async function GET() {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  const auth = await authorizeStaff(supabase, {
+    allowedRoles: ["owner", "doctor"],
+    sensitive: true,
+  })
+  if (!auth.ok) return NextResponse.json({ error: auth.error, code: auth.code }, { status: auth.status })
 
   const { leads, error } = await fetchAllLeads(supabase)
   if (error) return NextResponse.json({ error }, { status: 500 })
+
+  try {
+    await recordSecurityAudit({
+      actorUserId: auth.user.id,
+      actorRole: auth.role,
+      action: "lead_export",
+      resourceType: "lead_collection",
+      metadata: { row_count: leads.length, format: "csv" },
+    })
+  } catch {
+    return NextResponse.json({ error: "No se pudo registrar la exportación" }, { status: 503 })
+  }
 
   const headers = [
     "ID", "Nombre", "Teléfono", "Instagram", "Canal", "Servicio", "Ubicación", "Día",

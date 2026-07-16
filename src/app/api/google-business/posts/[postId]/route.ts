@@ -2,14 +2,17 @@ import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { getServiceDb } from "@/lib/supabase/service"
 import { getValidToken, getConnectionInfo, deletePost } from "@/lib/google-business"
+import { authorizeStaff } from "@/lib/staff-authz"
+
+const GOOGLE_BUSINESS_ROLES = ["owner", "doctor"] as const
 
 export async function DELETE(
   _req: NextRequest,
   { params }: { params: Promise<{ postId: string }> }
 ) {
   const userClient = await createClient()
-  const { data: { user } } = await userClient.auth.getUser()
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  const auth = await authorizeStaff(userClient, { allowedRoles: GOOGLE_BUSINESS_ROLES, sensitive: true })
+  if (!auth.ok) return NextResponse.json({ error: auth.error, code: auth.code }, { status: auth.status })
 
   const { postId } = await params
   const supabase = getServiceDb()
@@ -26,6 +29,6 @@ export async function DELETE(
     return NextResponse.json({ ok: true })
   } catch (e) {
     console.error(`[google-business/posts] DELETE post=${postId}: ${String(e)}`)
-    return NextResponse.json({ error: String(e) }, { status: 500 })
+    return NextResponse.json({ error: "No se pudo eliminar la publicación de Google Business" }, { status: 500 })
   }
 }

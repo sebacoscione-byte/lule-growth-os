@@ -7,15 +7,14 @@ import {
   type HourPeriod
 } from "@/lib/google-business"
 import { parseJsonBody } from "@/lib/api-validation"
+import { authorizeStaff } from "@/lib/staff-authz"
 
-async function requireAuth() {
-  const userClient = await createClient()
-  const { data: { user } } = await userClient.auth.getUser()
-  return user
-}
+const GOOGLE_BUSINESS_ROLES = ["owner", "doctor"] as const
 
 export async function GET() {
-  if (!await requireAuth()) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  const userClient = await createClient()
+  const auth = await authorizeStaff(userClient, { allowedRoles: GOOGLE_BUSINESS_ROLES })
+  if (!auth.ok) return NextResponse.json({ error: auth.error, code: auth.code }, { status: auth.status })
 
   const supabase = getServiceDb()
   const info = await getConnectionInfo(supabase)
@@ -29,12 +28,14 @@ export async function GET() {
     return NextResponse.json(data)
   } catch (e) {
     console.error(`[google-business/profile] ${String(e)}`)
-    return NextResponse.json({ error: String(e) }, { status: 500 })
+    return NextResponse.json({ error: "No se pudo consultar el perfil de Google Business" }, { status: 500 })
   }
 }
 
 export async function PATCH(req: NextRequest) {
-  if (!await requireAuth()) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  const userClient = await createClient()
+  const auth = await authorizeStaff(userClient, { allowedRoles: GOOGLE_BUSINESS_ROLES, sensitive: true })
+  if (!auth.ok) return NextResponse.json({ error: auth.error, code: auth.code }, { status: auth.status })
 
   const parsedBody = await parseJsonBody(req)
   if (!parsedBody.ok) return NextResponse.json({ error: parsedBody.error }, { status: 400 })
@@ -81,6 +82,6 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ ok: true })
   } catch (e) {
     console.error(`[google-business/profile] ${String(e)}`)
-    return NextResponse.json({ error: String(e) }, { status: 500 })
+    return NextResponse.json({ error: "No se pudo actualizar el perfil de Google Business" }, { status: 500 })
   }
 }

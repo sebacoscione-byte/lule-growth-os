@@ -302,6 +302,14 @@ export interface WhatsAppTemplate {
 }
 
 export interface WhatsAppSettings {
+  /** Interruptor operativo global. Los guardrails deterministas siguen activos aunque el bot este apagado. */
+  bot_enabled: boolean
+  /** Una sesion inactiva se reinicia en silencio al volver a escribir; nunca dispara mensajes a terceros. */
+  session_ttl_hours: number
+  /** Reservado para una activación futura; el runtime actual lo fuerza a false. */
+  shadow_mode_enabled: boolean
+  /** Reservado para una activación futura; el runtime actual lo fuerza a 0. */
+  policy_rollout_percent: number
   cost_saving_mode: boolean
   enable_service_message_charging: boolean
   warning_message_threshold: number
@@ -316,6 +324,7 @@ export type HandoffReason =
   | "conversacion_larga"
   | "intent_no_entendido"
   | "sin_template_valido"
+  | "entrega_ambigua"
 
 export interface DashboardMetrics {
   total_leads: number

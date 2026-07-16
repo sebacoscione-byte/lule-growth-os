@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto"
 import { getServiceDb } from "@/lib/supabase/service"
 import { sendHandoffAlert, sendHandoffReminderAlert } from "@/lib/alert-email"
 import { sendTemplate } from "@/lib/whatsapp"
@@ -21,6 +22,7 @@ const HANDOFF_REASON_LABELS: Record<HandoffReason, string> = {
   conversacion_larga: "Conversación larga sin resolver",
   intent_no_entendido: "El bot no entendió varias veces",
   sin_template_valido: "No hay template de WhatsApp aprobado para seguir la conversación",
+  entrega_ambigua: "La entrega de una respuesta quedó en estado ambiguo y requiere revisión",
 }
 
 // Evita mandar un mail nuevo por cada mensaje de una misma conversación larga (escalateToHuman se
@@ -60,6 +62,13 @@ export interface HandoffSummary {
   proximo_paso_recomendado: string
 }
 
+interface HandoffEscalationParams {
+  leadId: string | null
+  reason: HandoffReason
+  summary: HandoffSummary
+  sourceWaMessageId?: string | null
+}
+
 export function buildHandoffSummary(params: {
   phone: string
   lead: HandoffLeadInfo | null
@@ -83,26 +92,30 @@ export function buildHandoffSummary(params: {
   }
 }
 
-function formatHandoffAlertText(reason: HandoffReason, summary: HandoffSummary, leadId: string | null): string {
+export function formatHandoffAlertText(reason: HandoffReason, leadId: string | null): string {
+  const priority = reason === "urgencia_medica" ? "Alta" : "Normal"
   const lines = [
-    `Motivo: ${HANDOFF_REASON_LABELS[reason]}`,
-    `Paciente: ${summary.nombre}`,
-    `Teléfono: ${summary.telefono}`,
-    `Consulta: ${summary.motivo}`,
-    `Cobertura: ${summary.cobertura}`,
-    summary.edad ? `Edad: ${summary.edad}` : null,
-    `Próximo paso: ${summary.proximo_paso_recomendado}`,
-    summary.ultimo_mensaje ? `Último mensaje: "${summary.ultimo_mensaje}"` : null,
-    leadId ? `Ver conversación: ${PUBLIC_SITE_ORIGIN}/inbox?lead_id=${leadId}` : null,
+    `Tipo: ${HANDOFF_REASON_LABELS[reason]}`,
+    `Prioridad: ${priority}`,
+    `Referencia: ${leadId ? `caso ${leadId.slice(0, 8)}` : "caso sin ficha"}`,
+    `Abrir Inbox: ${PUBLIC_SITE_ORIGIN}/inbox`,
   ]
   return lines.filter((line): line is string => line !== null).join("\n")
 }
 
-export async function escalateToHuman(params: {
-  leadId: string | null
-  reason: HandoffReason
-  summary: HandoffSummary
-}): Promise<void> {
+async function sendHandoffNotifications(params: HandoffEscalationParams): Promise<void> {
+  await sendHandoffAlert(formatHandoffAlertText(params.reason, params.leadId))
+  await sendInternalWhatsAppAlert(
+    params.sourceWaMessageId
+      ?? `${params.leadId ?? "unlinked"}:${params.reason}:${Math.floor(Date.now() / (HANDOFF_ALERT_THROTTLE_MINUTES * 60_000))}`
+  )
+}
+
+/** Returns a deferred notifier only when requested and when this event actually needs one. */
+export async function escalateToHuman(
+  params: HandoffEscalationParams,
+  options: { deferNotifications?: boolean } = {}
+): Promise<(() => Promise<void>) | null> {
   const db = getServiceDb()
 
   let recentlyAlerted = false
@@ -111,6 +124,8 @@ export async function escalateToHuman(params: {
       .from("handoff_events")
       .select("created_at")
       .eq("lead_id", params.leadId)
+      .eq("reason", params.reason)
+      .is("resolved_at", null)
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle()
@@ -120,62 +135,76 @@ export async function escalateToHuman(params: {
     }
   }
 
-  await db.from("handoff_events").insert({
-    lead_id: params.leadId,
-    reason: params.reason,
-    summary: params.summary,
-    messages_sent_count: params.summary.mensajes_enviados,
-    cost_estimated_total: params.summary.costo_estimado,
+  // La pausa, el evento y la marca del lead se escriben en una sola transacción de base. Las
+  // alertas externas se mandan únicamente después de que esa operación durable tuvo éxito.
+  const { data: handoffCreated, error: handoffError } = await db.rpc("create_whatsapp_handoff", {
+    p_phone: params.summary.telefono,
+    p_lead_id: params.leadId,
+    p_reason: params.reason,
+    p_summary: params.summary,
+    p_messages_sent_count: params.summary.mensajes_enviados,
+    p_cost_estimated_total: params.summary.costo_estimado,
+    p_source_wa_message_id: params.sourceWaMessageId ?? null,
   })
+  if (handoffError) throw new Error("No se pudo registrar y pausar la derivación")
 
-  if (params.leadId) {
-    await db
-      .from("leads")
-      .update({ requires_human: true, ai_summary: JSON.stringify(params.summary) })
-      .eq("id", params.leadId)
-  }
-
-  if (!recentlyAlerted) {
-    await sendHandoffAlert(formatHandoffAlertText(params.reason, params.summary, params.leadId))
-    await sendInternalWhatsAppAlert(params.summary.nombre, HANDOFF_REASON_LABELS[params.reason])
-  }
+  if (handoffCreated === false || recentlyAlerted) return null
+  if (options.deferNotifications) return () => sendHandoffNotifications(params)
+  await sendHandoffNotifications(params)
+  return null
 }
 
-async function sendInternalWhatsAppAlert(nombrePaciente: string, motivo: string): Promise<void> {
+async function sendInternalWhatsAppAlert(stableReference: string): Promise<void> {
   const to = process.env.ALERT_WHATSAPP_TO
   if (!to) return // fail-open: sin número configurado, no manda nada (igual que el resto de las alertas)
 
-  const template = await getApprovedTemplate(INTERNAL_ALERT_TEMPLATE_NAME)
-  if (!template) return // fail-open: template todavía no aprobado por Meta
-
   try {
+    const template = await getApprovedTemplate(INTERNAL_ALERT_TEMPLATE_NAME)
+    if (!template) return // fail-open: template todavía no aprobado por Meta
     const settings = await getWhatsAppSettings()
-    await sendTemplate(to, INTERNAL_ALERT_TEMPLATE_NAME, template.language, [nombrePaciente, motivo], {
+    const caseReference = `CASO-${createHash("sha256").update(stableReference).digest("hex").slice(0, 8).toUpperCase()}`
+    await sendTemplate(to, INTERNAL_ALERT_TEMPLATE_NAME, template.language, [caseReference], {
       windowState: "closed",
       entryPoint: "organic",
       leadId: null,
+      deliveryKey: `handoff-alert:${caseReference}`,
+      outboundStep: "internal_handoff_alert",
+      flowIntent: "internal_handoff_alert",
       serviceMessageChargingEnabled: settings.enable_service_message_charging,
     })
   } catch (error) {
-    console.error(
-      `Error mandando alerta interna de WhatsApp a ${to}:`,
-      error instanceof Error ? error.message : error
-    )
+    console.error("Error mandando alerta interna de WhatsApp", error instanceof Error ? error.name : "unknown_error")
     // No relanza -- el email ya se mandó (o se intentó) arriba, este es un canal adicional.
   }
 }
 
-// Se llama cuando el equipo responde de verdad al paciente desde el Inbox (ver /api/messages) --
-// esa respuesta manual ES la señal de que alguien tomó la conversación, así que cierra el handoff
-// sin necesitar un botón aparte. Ver [[feedback_minimize_manual_work]].
-export async function resolveHandoffForLead(leadId: string, resolvedBy: string): Promise<void> {
+// La primera respuesta manual significa que el equipo tomó la conversación. Resolver/reactivar y
+// cerrar son acciones separadas: responder nunca vuelve a encender el bot implícitamente.
+type HandoffTransition = "take" | "reactivate" | "close"
+
+async function transitionHandoffForLead(leadId: string, actor: string, action: HandoffTransition): Promise<void> {
   const db = getServiceDb()
-  await db
-    .from("handoff_events")
-    .update({ resolved_at: new Date().toISOString(), resolved_by: resolvedBy })
-    .eq("lead_id", leadId)
-    .is("resolved_at", null)
-  await db.from("leads").update({ requires_human: false }).eq("id", leadId)
+  const { error } = await db.rpc("transition_whatsapp_handoff", {
+    p_lead_id: leadId,
+    p_action: action,
+    p_actor: actor,
+  })
+  if (error) throw new Error("No se pudo actualizar la derivación")
+}
+
+/** La primera respuesta manual toma la conversación, pero no la cierra ni reactiva al bot. */
+export async function takeHandoffForLead(leadId: string, takenBy: string): Promise<void> {
+  await transitionHandoffForLead(leadId, takenBy, "take")
+}
+
+/** Cierra el handoff y permite que el bot vuelva al último estado seguro de la conversación. */
+export async function resolveHandoffForLead(leadId: string, resolvedBy: string): Promise<void> {
+  await transitionHandoffForLead(leadId, resolvedBy, "reactivate")
+}
+
+/** Cierra la conversación sin permitir nuevas respuestas automáticas hasta una reactivación manual. */
+export async function closeHandoffForLead(leadId: string, closedBy: string): Promise<void> {
+  await transitionHandoffForLead(leadId, closedBy, "close")
 }
 
 // Handoffs sin resolver, el más antiguo primero -- una fila por lead (su handoff abierto más
@@ -222,20 +251,12 @@ export async function runHandoffReminderCheck(now: Date): Promise<HandoffReminde
     )
     if (stale.length === 0) return { pending: 0 }
 
-    const db = getServiceDb()
-    const { data: leads } = await db
-      .from("leads")
-      .select("id, name, phone")
-      .in("id", stale.map(([leadId]) => leadId))
-    const leadById = new Map((leads ?? []).map(l => [l.id, l]))
-
-    const lines = stale.map(([leadId, h]) => {
-      const lead = leadById.get(leadId)
-      return `- ${lead?.name ?? "Sin nombre"} (${lead?.phone ?? "sin teléfono"}) — esperando ${timeAgo(h.createdAt)} — ${HANDOFF_REASON_LABELS[h.reason]} — ${PUBLIC_SITE_ORIGIN}/inbox?lead_id=${leadId}`
-    })
+    const lines = stale.map(([leadId, h]) =>
+      `- Caso ${leadId.slice(0, 8)} — esperando ${timeAgo(h.createdAt)} — ${HANDOFF_REASON_LABELS[h.reason]} — ${PUBLIC_SITE_ORIGIN}/inbox?lead_id=${leadId}`
+    )
     await sendHandoffReminderAlert(lines.join("\n"))
     return { pending: stale.length }
-  } catch (error) {
-    return { pending: 0, error: error instanceof Error ? error.message : String(error) }
+  } catch {
+    return { pending: 0, error: "handoff_reminder_failed" }
   }
 }

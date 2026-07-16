@@ -4,8 +4,10 @@ import { AUTO_CHECKLIST_KEYS, computeChecklistAutoStatus, getConnectionInfo, get
 import { NextResponse } from "next/server"
 import { z } from "zod"
 import { parseJsonBody, formatZodError } from "@/lib/api-validation"
+import { authorizeStaff } from "@/lib/staff-authz"
 
 const AUTO_KEYS = new Set<string>(AUTO_CHECKLIST_KEYS)
+const CHECKLIST_ROLES = ["owner", "doctor"] as const
 
 // Los 14 items reales sembrados en docs/schema.sql — un item_key fuera de esta lista no rompe
 // nada a nivel base (no hay check constraint), pero ensucia la tabla con una fila que ninguna
@@ -45,14 +47,14 @@ async function getAutoStatus(): Promise<Record<string, boolean> | null> {
 
 export async function GET() {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  const auth = await authorizeStaff(supabase, { allowedRoles: CHECKLIST_ROLES })
+  if (!auth.ok) return NextResponse.json({ error: auth.error, code: auth.code }, { status: auth.status })
 
   const { data, error } = await supabase
     .from("google_local_checklist")
     .select("*")
     .order("item_key")
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return NextResponse.json({ error: "No se pudo consultar el checklist" }, { status: 500 })
 
   const autoStatus = await getAutoStatus()
 
@@ -80,8 +82,8 @@ export async function GET() {
 
 export async function PATCH(request: Request) {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  const auth = await authorizeStaff(supabase, { allowedRoles: CHECKLIST_ROLES })
+  if (!auth.ok) return NextResponse.json({ error: auth.error, code: auth.code }, { status: auth.status })
 
   const parsedBody = await parseJsonBody(request)
   if (!parsedBody.ok) return NextResponse.json({ error: parsedBody.error }, { status: 400 })
@@ -100,6 +102,6 @@ export async function PATCH(request: Request) {
     .select()
     .single()
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return NextResponse.json({ error: "No se pudo actualizar el checklist" }, { status: 500 })
   return NextResponse.json(data)
 }
