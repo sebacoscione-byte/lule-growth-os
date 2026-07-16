@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import type { ContentSource } from "@/types"
+import { authorizeStaff } from "@/lib/staff-authz"
+
+const CONTENT_ROLES = ["owner", "doctor"] as const
 
 interface EuropePmcResult {
   title?: string
@@ -28,8 +31,8 @@ function cleanText(value: string) {
 
 export async function GET(request: NextRequest) {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  const auth = await authorizeStaff(supabase, { allowedRoles: CONTENT_ROLES })
+  if (!auth.ok) return NextResponse.json({ error: auth.error, code: auth.code }, { status: auth.status })
 
   const topic = request.nextUrl.searchParams.get("topic")?.trim()
   if (!topic) return NextResponse.json({ error: "topic required" }, { status: 400 })

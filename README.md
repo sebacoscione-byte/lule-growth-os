@@ -61,6 +61,29 @@ npm run dev
 
 En Supabase → Authentication → Users → Add user
 
+## Seguridad del staff y estado operativo
+
+Los PR #96 y #97 ya están en producción: hardening de WhatsApp, transporte durable, scheduler,
+audit agregado y preflight cerrado de Meta. WhatsApp sólo permite clasificación por enums; ninguna
+IA redacta respuestas médicas libres para pacientes.
+
+El cierre actual incorpora MFA TOTP central con varios factores, el gate de roles/política, el
+callback seguro, la autorización de rutas internas y la verificación individual por sede. El orden
+operativo es:
+
+1. asignar `app_metadata.role` a cada cuenta;
+2. enrolar un factor por usuario y un autenticador de respaldo por cada `owner`, y probar un login
+   fresco y recuperación;
+3. activar primero `enforce_roles` y, tras validar cada rol, activar MFA;
+4. revisar y confirmar cada sede por separado desde Configuración.
+
+Los flags siguen en `false`. El audit productivo encontró cuatro usuarios sin rol, cero factores
+MFA verificados y las tres sedes inactivas/no verificadas. Al activar MFA, todo el CRM exige AAL2
+porque RLS protege también las lecturas PII. La recuperación no tiene endpoint público: requiere
+verificación de identidad fuera de banda, eliminación del factor desde Supabase Admin/Dashboard y
+nuevo enrolamiento; nunca registrar secretos TOTP ni PII. El runbook completo está en
+[`docs/WHATSAPP_SECURITY_ROLES_RETENTION.md`](docs/WHATSAPP_SECURITY_ROLES_RETENTION.md).
+
 ## Estructura
 
 ```
@@ -75,7 +98,7 @@ src/
 │   │   ├── landings/       # Panel de landing pages
 │   │   ├── experimentos/   # Growth experiments
 │   │   └── configuracion/  # Datos de la doctora
-│   ├── (auth)/login/
+│   ├── (auth)/             # Login + enrolamiento/step-up TOTP
 │   ├── api/
 │   ├── [slug]/              # Slugs SEO públicos en raíz
 │   └── landings/[slug]/    # Landing pages SEO públicas

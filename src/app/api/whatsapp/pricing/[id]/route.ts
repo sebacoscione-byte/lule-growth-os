@@ -1,12 +1,15 @@
 import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { parseJsonBody } from "@/lib/api-validation"
+import { authorizeStaff } from "@/lib/staff-authz"
+
+const PRICING_WRITE_ROLES = ["owner"] as const
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  const auth = await authorizeStaff(supabase, { allowedRoles: PRICING_WRITE_ROLES, sensitive: true })
+  if (!auth.ok) return NextResponse.json({ error: auth.error, code: auth.code }, { status: auth.status })
 
   const parsedBody = await parseJsonBody(request)
   if (!parsedBody.ok) return NextResponse.json({ error: parsedBody.error }, { status: 400 })

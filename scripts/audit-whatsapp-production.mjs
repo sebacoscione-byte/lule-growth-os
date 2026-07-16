@@ -120,6 +120,15 @@ function printSection(label, value) {
   console.log(`${label}: ${JSON.stringify(value)}`)
 }
 
+function isHttpsOrEmpty(value) {
+  if (value === undefined || value === null || value === "") return true
+  try {
+    return typeof value === "string" && new URL(value).protocol === "https:"
+  } catch {
+    return false
+  }
+}
+
 const env = loadLocalEnvironment()
 const dbPassword = env.SUPABASE_DB_PASSWORD
 const supabaseUrl = env.NEXT_PUBLIC_SUPABASE_URL
@@ -241,6 +250,8 @@ try {
         has_verified_at: typeof location?.verified_at === "string" && location.verified_at.length > 0,
         has_verified_by: typeof location?.verified_by === "string" && location.verified_by.length > 0,
         has_valid_from: typeof location?.valid_from === "string" && location.valid_from.length > 0,
+        links_https_only: isHttpsOrEmpty(location?.google_maps_link)
+          && isHttpsOrEmpty(location?.booking_url),
         services_count: Array.isArray(location?.services)
           ? location.services.length
           : Array.isArray(location?.practices) ? location.practices.length : 0,

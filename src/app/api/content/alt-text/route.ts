@@ -1,12 +1,15 @@
 import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { generateImageAltText, getPublicAiError } from "@/lib/ai"
+import { authorizeStaff } from "@/lib/staff-authz"
+
+const CONTENT_ROLES = ["owner", "doctor"] as const
 
 export async function POST(request: Request) {
   try {
     const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    const auth = await authorizeStaff(supabase, { allowedRoles: CONTENT_ROLES, sensitive: true })
+    if (!auth.ok) return NextResponse.json({ error: auth.error, code: auth.code }, { status: auth.status })
 
     const body = await request.json() as Record<string, unknown>
     const required = ["topic", "visual_headline", "visual_subtitle", "image_prompt"]

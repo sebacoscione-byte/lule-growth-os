@@ -3,11 +3,14 @@ import { createClient } from "@/lib/supabase/server"
 import { generateFollowupSuggestion, getPublicAiError } from "@/lib/ai"
 import { toChronologicalContext } from "@/lib/conversation-context"
 import { parseJsonBody } from "@/lib/api-validation"
+import { authorizeStaff } from "@/lib/staff-authz"
+
+const PATIENT_DATA_ROLES = ["owner", "doctor", "reception"] as const
 
 export async function POST(request: Request) {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  const auth = await authorizeStaff(supabase, { allowedRoles: PATIENT_DATA_ROLES, sensitive: true })
+  if (!auth.ok) return NextResponse.json({ error: auth.error, code: auth.code }, { status: auth.status })
 
   const parsedBody = await parseJsonBody(request)
   if (!parsedBody.ok) return NextResponse.json({ error: parsedBody.error }, { status: 400 })

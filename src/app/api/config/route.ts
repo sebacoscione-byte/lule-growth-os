@@ -2,7 +2,11 @@ import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { parseJsonBody } from "@/lib/api-validation"
 import { mergeWhatsAppSettings, whatsAppSettingsSchema } from "@/lib/whatsapp-settings"
-import { whatsappLocationsSchema } from "@/lib/whatsapp-location-config"
+import {
+  createWhatsAppLocationsVersion,
+  getWhatsAppLocationsStatus,
+  parseWhatsAppLocations,
+} from "@/lib/whatsapp-location-config"
 import { authorizeStaff } from "@/lib/staff-authz"
 import { recordSecurityAudit } from "@/lib/security-audit"
 
@@ -24,12 +28,32 @@ export async function GET() {
     .from("app_config")
     .select("key, value")
     .in("key", CONFIG_KEYS)
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) {
+    return NextResponse.json(
+      { error: "No se pudo cargar la configuración", code: "config_unavailable" },
+      { status: 503 }
+    )
+  }
+
+  const locationsValue = data?.find((row: { key: string }) => row.key === "locations")?.value
+  const parsedLocations = parseWhatsAppLocations(locationsValue)
+  if (!parsedLocations.success) {
+    return NextResponse.json(
+      { error: "La configuración de sedes no es válida", code: "invalid_locations_config" },
+      { status: 503 }
+    )
+  }
 
   const map: Record<string, unknown> = {}
   data?.forEach((row: { key: string; value: unknown }) => {
     map[row.key] = row.value
   })
+  map.locations = parsedLocations.data
+  map.locations_status = getWhatsAppLocationsStatus(
+    parsedLocations.data,
+    parsedLocations.usedLegacyPractices
+  )
+  map.version = createWhatsAppLocationsVersion(locationsValue)
   return NextResponse.json(map)
 }
 
@@ -51,30 +75,21 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "key no permitida" }, { status: 400 })
   }
 
+  // Las sedes tienen una ruta por ID con confirmación, evidencia y CAS independientes.
+  // Aceptar el documento completo acá permitiría volver a sellar filas que nadie revisó.
+  if (key === "locations") {
+    return NextResponse.json(
+      { error: "Usá la ruta dedicada para modificar una sede", code: "location_route_required" },
+      { status: 400 }
+    )
+  }
+
   if (key === "whatsapp_settings") {
     const settings = whatsAppSettingsSchema.safeParse(value)
     if (!settings.success) {
       return NextResponse.json({ error: "Configuración de WhatsApp inválida" }, { status: 400 })
     }
     value = mergeWhatsAppSettings(settings.data)
-  }
-
-  if (key === "locations") {
-    const locations = whatsappLocationsSchema.safeParse(value)
-    if (!locations.success) {
-      return NextResponse.json({ error: "Configuración de sedes inválida" }, { status: 400 })
-    }
-
-    // Guardar el documento completo desde esta ruta restringida constituye la verificación
-    // operativa. El servidor firma la identidad/fecha: el navegador no puede atribuirlas.
-    const verifiedAt = new Date().toISOString()
-    value = locations.data.map(location => ({
-      ...location,
-      active: location.active ?? true,
-      verified_at: verifiedAt,
-      verified_by: auth.user.id,
-      valid_from: location.valid_from ?? verifiedAt,
-    }))
   }
 
   try {
@@ -94,6 +109,11 @@ export async function POST(req: Request) {
     .from("app_config")
     .upsert({ key, value }, { onConflict: "key" })
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) {
+    return NextResponse.json(
+      { error: "No se pudo guardar la configuración", code: "config_update_failed" },
+      { status: 503 }
+    )
+  }
   return NextResponse.json({ ok: true })
 }

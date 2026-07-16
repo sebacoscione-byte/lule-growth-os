@@ -3,10 +3,12 @@ jest.mock("@/lib/ai", () => ({
   generateFollowupSuggestion: jest.fn(),
   getPublicAiError: jest.fn(() => "error de IA"),
 }))
+jest.mock("@/lib/staff-authz", () => ({ authorizeStaff: jest.fn() }))
 
 import { POST } from "./route"
 import { createClient } from "@/lib/supabase/server"
 import { generateFollowupSuggestion } from "@/lib/ai"
+import { authorizeStaff } from "@/lib/staff-authz"
 
 function mockSupabase(lead: Record<string, unknown> | null) {
   const single = jest.fn().mockResolvedValue({ data: lead, error: null })
@@ -42,9 +44,30 @@ function postRequest(leadId: string) {
 
 beforeEach(() => {
   jest.clearAllMocks()
+  ;(authorizeStaff as jest.Mock).mockResolvedValue({ ok: true })
 })
 
 describe("POST /api/ai/suggest", () => {
+  it("falla cerrado antes de leer el lead o invocar IA", async () => {
+    const { from } = mockSupabase(null)
+    ;(authorizeStaff as jest.Mock).mockResolvedValue({
+      ok: false,
+      status: 403,
+      code: "forbidden",
+      error: "Sin permisos",
+    })
+
+    const response = await POST(postRequest("lead-1"))
+
+    expect(response.status).toBe(403)
+    expect(from).not.toHaveBeenCalled()
+    expect(generateFollowupSuggestion).not.toHaveBeenCalled()
+    expect(authorizeStaff).toHaveBeenCalledWith(expect.anything(), {
+      allowedRoles: ["owner", "doctor", "reception"],
+      sensitive: true,
+    })
+  })
+
   it("rechaza leads de WhatsApp antes de leer mensajes o generar texto libre", async () => {
     const { from } = mockSupabase({
       id: "lead-wa",

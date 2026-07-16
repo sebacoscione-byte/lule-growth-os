@@ -2,6 +2,9 @@ import { createClient } from "@/lib/supabase/server"
 import { NextResponse } from "next/server"
 import { z } from "zod"
 import { parseJsonBody, formatZodError } from "@/lib/api-validation"
+import { authorizeStaff } from "@/lib/staff-authz"
+
+const EXPERIMENT_ROLES = ["owner", "doctor"] as const
 
 // Mismos canales que el check constraint de growth_experiments en la base (docs/schema.sql) — un
 // valor fuera de esta lista rompería el insert igual, pero acá se rechaza con un mensaje claro.
@@ -18,8 +21,8 @@ const createExperimentSchema = z.object({
 
 export async function GET() {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  const auth = await authorizeStaff(supabase, { allowedRoles: EXPERIMENT_ROLES })
+  if (!auth.ok) return NextResponse.json({ error: auth.error, code: auth.code }, { status: auth.status })
 
   const { data, error } = await supabase
     .from("growth_experiments")
@@ -31,8 +34,8 @@ export async function GET() {
 
 export async function POST(request: Request) {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  const auth = await authorizeStaff(supabase, { allowedRoles: EXPERIMENT_ROLES, sensitive: true })
+  if (!auth.ok) return NextResponse.json({ error: auth.error, code: auth.code }, { status: auth.status })
 
   const parsedBody = await parseJsonBody(request)
   if (!parsedBody.ok) return NextResponse.json({ error: parsedBody.error }, { status: 400 })

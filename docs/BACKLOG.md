@@ -8,7 +8,9 @@
 El hardening derivado de `Investigacion_y_plan_bot_WhatsApp_Dra_Lucia_Chahin_para_Claude.md` y de
 los 180 casos del CSV está activo en producción. El PR #96 fue mergeado (`dcc0e47`), las nueve
 migraciones se aplicaron atómicamente y el re-run no encontró pendientes. CI, Vercel producción,
-el smoke público y el rechazo esperado del webhook inválido quedaron verdes.
+el smoke público y el rechazo esperado del webhook inválido quedaron verdes. El PR #97 también
+fue mergeado (`d9434d7`) y dejó productivos el scheduler, el audit agregado y el preflight cerrado
+de Meta.
 
 - [x] **Cutover médico/técnico:** detector, textos fijos y límites clínicos integrados con la pausa
   excepcional correspondiente. La IA no redacta respuestas para pacientes; sólo devuelve enums.
@@ -28,20 +30,30 @@ el smoke público y el rechazo esperado del webhook inválido quedaron verdes.
   llamada manual autenticada respondió 200 con la cola vacía y la ejecución automática posterior
   terminó correctamente con HTTP 2xx.
 - [ ] **Accesos:** asignar `app_metadata.role`, enrolar MFA, probar una cuenta por rol y recién luego
-  activar los flags de autorización documentados en `docs/WHATSAPP_SECURITY_ROLES_RETENTION.md`.
-- [ ] **Flujo MFA en producto:** el backend ya exige AAL2 cuando se active el flag, pero la app aún
-  no ofrece `mfa.enroll`/`challenge`/`verify` ni step-up. Implementarlo antes de activar MFA; hoy
-  hacerlo dejaría las operaciones sensibles sin un camino de elevación.
-- [ ] **Sedes verificadas:** revisar y guardar individualmente CIMEL Lanús, Hospital Británico y
-  Swiss Medical Lomas con `active`, `verified_at`, `verified_by` y `valid_from` válidos. El runtime
-  falla cerrado si falta evidencia; la UI todavía no muestra esos metadatos de forma explícita.
+  activar primero `enforce_roles` y después el flag MFA, siguiendo el runbook de
+  `docs/WHATSAPP_SECURITY_ROLES_RETENTION.md`. Estado auditado: cuatro cuentas sin rol y cero MFA.
+- [x] **Flujo MFA en producto:** enrolamiento y step-up TOTP,
+  administración de múltiples factores, gate central del CRM, callback seguro y autorización de
+  rutas internas completados técnicamente. Al activar el flag, todo el CRM exige AAL2 porque RLS
+  protege también las lecturas de PII.
+- [ ] **Enrolamiento y recuperación MFA:** después del deploy, enrolar cada cuenta y un factor de
+  respaldo por cada `owner`; probar login fresco y recuperación. Sin endpoint público: validar
+  identidad fuera de banda, eliminar el factor por Supabase Admin/Dashboard y reenrolar, sin copiar
+  secretos ni PII a logs o tickets.
+- [x] **Verificación individual de sedes:** UI/API con evidencia,
+  control de versión y escritura atómica por sede completadas; una edición ya no verifica a las
+  otras ubicaciones.
+- [ ] **Confirmar sedes reales:** revisar y confirmar desde la UI, una por una, CIMEL Lanús,
+  Hospital Británico y Swiss Medical Lomas. Las tres siguen inactivas y sin evidencia; el runtime
+  falla cerrado hasta que una persona autorizada valide cada dato.
 - [x] **Preflight de Meta:** Vercel Production fija `META_GRAPH_API_VERSION=v25.0`; un GET read-only
   valida versión, token e ID sin enviar mensajes ni devolver credenciales/identificadores. El cron
   diario alerta por email con códigos cerrados si deja de funcionar.
 - [ ] **Template interno de Meta:** reaprobar la versión genérica de una variable de
   `alerta_interna_derivacion` y configurar su destino. El email sigue funcionando como respaldo.
 - [x] **Deploy y smoke:** PR #96 mergeado (`dcc0e47`), CI/Vercel producción verdes y smoke público
-  más caso negativo del webhook aprobados.
+  más caso negativo del webhook aprobados. PR #97 mergeado (`d9434d7`) y scheduler/preflight/audit
+  verificados en producción.
 
 Estado técnico productivo: contención Fase 0 y transporte durable Fase 1 activos; scaffolding de
 Fases 2/3 permanece apagado y Fases 4/5 no se habilitaron. El outbox evita reintentos automáticos

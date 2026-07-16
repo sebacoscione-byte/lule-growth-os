@@ -4,12 +4,15 @@ import { sanitizePostgrestValue } from "@/lib/utils"
 import { parseJsonBody, formatZodError } from "@/lib/api-validation"
 import { leadFieldsSchema } from "@/lib/lead-schema"
 import { getOpenHandoffs } from "@/lib/whatsapp-handoff"
+import { authorizeStaff } from "@/lib/staff-authz"
 import type { Lead } from "@/types"
+
+const PATIENT_DATA_ROLES = ["owner", "doctor", "reception"] as const
 
 export async function GET(request: Request) {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  const auth = await authorizeStaff(supabase, { allowedRoles: PATIENT_DATA_ROLES, sensitive: true })
+  if (!auth.ok) return NextResponse.json({ error: auth.error, code: auth.code }, { status: auth.status })
 
   const { searchParams } = new URL(request.url)
   const status = searchParams.get("status")
@@ -62,8 +65,8 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  const auth = await authorizeStaff(supabase, { allowedRoles: PATIENT_DATA_ROLES, sensitive: true })
+  if (!auth.ok) return NextResponse.json({ error: auth.error, code: auth.code }, { status: auth.status })
 
   const parsedBody = await parseJsonBody(request)
   if (!parsedBody.ok) return NextResponse.json({ error: parsedBody.error }, { status: 400 })
