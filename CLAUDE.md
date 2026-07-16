@@ -1,7 +1,7 @@
 # Lule Growth OS — Contexto para Claude
 
 ## Estado actual
-- 2026-07-16 (**estado vigente del bot de WhatsApp; supersede las notas históricas de Ola 0/WA-02/WA-03 y DATA-02 que describen la implementación anterior**): el webhook valida firma sobre el body crudo, limita tamaño, normaliza con esquema cerrado y persiste un envelope mínimo en una cola durable. El worker usa leases, reintentos, DLQ, checkpoint `handler_completed_at` y ACK idempotente; no se vuelve a ejecutar el handler después de completar el efecto de negocio. Las salidas usan un outbox/ledger con identidad estable, CAS antes de Meta y cuarentena ante resultado ambiguo. El borrado crea tombstones HMAC y coordina writers/workers con advisory locks. La IA de WhatsApp solo puede devolver enums de clasificación validados: **nunca genera texto médico libre visible al paciente**, y todo contenido médico/sensible se responde con catálogo fijo determinístico sin persistir el texto. Presión arterial de alarma: sistólica `>180` o diastólica `>120`, con manejo de negación, antecedentes y terceros. El seguimiento requiere consentimiento específico `appointment_followup` vigente, además del estado/claim correspondiente. **PR #96 fue mergeado** (`dcc0e47`); las nueve migraciones se aplicaron atómicamente en producción y el re-run confirmó que no quedaban pendientes. CI, Vercel producción, el smoke público y el rechazo esperado del webhook ante una solicitud inválida quedaron verdes. **PR #97 también fue mergeado** (`d9434d7`) y dejó productivos el scheduler, el audit agregado y el preflight cerrado de Meta. El worker frecuente usa un único job `lule-whatsapp-worker-every-minute` de `pg_cron` (`* * * * *`) que invoca mediante `pg_net` la URL y el `CRON_SECRET` cifrados en Supabase Vault; la prueba manual autenticada respondió 200 con la cola vacía y la ejecución automática posterior terminó con HTTP 2xx. Vercel Production fija `META_GRAPH_API_VERSION=v25.0`; el preflight read-only valida diariamente versión/token/ID y sólo devuelve códigos cerrados. El cierre actual incorpora MFA TOTP central/multifactor, gate de roles y política, callback seguro, autorización de rutas internas y verificación individual de sedes. Los flags siguen en `false`; el audit encontró cuatro usuarios sin rol, cero MFA y tres sedes inactivas/no verificadas. Gates humanos: asignar roles, enrolar un factor por cuenta y respaldo para cada `owner`, probar login/recuperación, activar primero roles y después MFA, confirmar cada sede desde la UI, reaprobar el template interno de Meta (aún borrador), completar revisión legal y disponer de staging.
+- 2026-07-16 (**estado vigente del bot de WhatsApp; supersede las notas históricas de Ola 0/WA-02/WA-03 y DATA-02 que describen la implementación anterior**): el webhook valida firma sobre el body crudo, limita tamaño, normaliza con esquema cerrado y persiste un envelope mínimo en una cola durable. El worker usa leases, reintentos, DLQ, checkpoint `handler_completed_at` y ACK idempotente; no se vuelve a ejecutar el handler después de completar el efecto de negocio. Las salidas usan un outbox/ledger con identidad estable, CAS antes de Meta y cuarentena ante resultado ambiguo. El borrado crea tombstones HMAC y coordina writers/workers con advisory locks. La IA de WhatsApp solo puede devolver enums de clasificación validados: **nunca genera texto médico libre visible al paciente**, y todo contenido médico/sensible se responde con catálogo fijo determinístico sin persistir el texto. Presión arterial de alarma: sistólica `>180` o diastólica `>120`, con manejo de negación, antecedentes y terceros. El seguimiento requiere consentimiento específico `appointment_followup` vigente, además del estado/claim correspondiente. Los PR #96–#100 están mergeados; las diez migraciones están aplicadas y producción quedó verificada. El worker frecuente usa un único job `lule-whatsapp-worker-every-minute` de `pg_cron` (`* * * * *`) que invoca mediante `pg_net` la URL y el `CRON_SECRET` cifrados en Supabase Vault. Vercel Production fija `META_GRAPH_API_VERSION=v25.0`; el preflight read-only devuelve 200 y sólo códigos cerrados. Los flags de roles/MFA siguen en `false`: existe una cuenta `owner` con MFA, una `doctor` sin MFA y dos cuentas deliberadamente sin rol. Las tres sedes están activas; CIMEL Lanús y Swiss Medical Lomas tienen evidencia, Hospital Británico todavía no. `ALERT_WHATSAPP_TO` está configurado como sensible y el redeploy quedó `Ready`; `alerta_interna_derivacion` sigue `pendiente_meta`. Gates humanos: refrescar/probar ambas sesiones, enrolar MFA de `doctor` y respaldo de `owner`, activar primero roles y después MFA, confirmar Hospital Británico, aprobar el template en Meta, completar revisión legal y disponer de staging.
 - 2026-07-16 (runbook de acceso): al activar el flag MFA, el gate central exige AAL2 antes de todo el CRM porque RLS protege también lecturas PII. Recuperación sin endpoint público: verificar identidad fuera de banda, eliminar el factor por Supabase Admin/Dashboard y reenrolar; nunca imprimir ni copiar secretos TOTP o PII. Ver `docs/WHATSAPP_SECURITY_ROLES_RETENTION.md`.
 - 2026-06-11: Setup inicial del proyecto. MVP Fase 1 en construcción.
 - 2026-07-05: Se sumó el Hospital Británico como tercera sede de derivación (miércoles), junto a CIMEL Lanús (martes) y Swiss Medical Lomas (viernes).
@@ -284,9 +284,10 @@
   `turno_ya_resuelto` (`whatsapp-intents.ts`, chequeado antes que `pedir_turno`), responde con un
   cierre cálido en su lugar. (2) A pedido explícito de Seba, **alerta también por WhatsApp** (además
   del email) cuando el bot deriva a un humano — nuevo template `alerta_interna_derivacion`
-  (migración `20260715_internal_alert_template.sql`, aplicada), variables `ALERT_WHATSAPP_TO` +
-  aprobación del template en WhatsApp Manager pendientes de Seba (fail-open en ambos: sin eso
-  configurado, sigue llegando solo el email). Tiene costo real por mensaje (a diferencia del email),
+  (migración `20260715_internal_alert_template.sql`, aplicada). `ALERT_WHATSAPP_TO` quedó
+  configurado como sensible en Vercel Production el 2026-07-16; sigue pendiente la aprobación del
+  template en WhatsApp Manager (fail-open: mientras tanto llega solo el email). Tiene costo real
+  por mensaje (a diferencia del email),
   aclarado en la documentación. (3) Preguntando por el costo de sumar IA de respaldo al bot, se
   encontró que **Gemini 2.0 Flash** (el modelo default hardcodeado en `ai.ts` cuando `GEMINI_MODEL`
   no está seteado) **fue dado de baja por Google el 1/6/2026** — corregido a `gemini-3.5-flash`
@@ -637,13 +638,13 @@ sin reemplazar el email — si Meta rechaza el template o vos todavía no lo apr
 funcionando exactamente igual que antes.
 1. El template **`alerta_interna_derivacion`** debe volver a aprobarse en WhatsApp Manager después de
    aplicar `20260715_whatsapp_phase0a_safety.sql`. El texto vigente es genérico y usa una sola
-   variable (`CASO-XXXXXXXX`); no envía nombre, motivo ni contenido del paciente. La migración lo
-   deja en `borrador` deliberadamente hasta esa reaprobación.
+   variable (`CASO-XXXXXXXX`); no envía nombre, motivo ni contenido del paciente. Su estado local
+   actual es `pendiente_meta` hasta esa reaprobación.
 2. Una vez que Meta lo apruebe, marcalo "Aprobado" en `Configuración → Templates de WhatsApp` (igual
    que el resto).
-3. Cargá `ALERT_WHATSAPP_TO` con tu número en formato wa.me (ej. `5491100000000`).
-4. Sin el número cargado, o mientras el template no esté aprobado, no se manda nada por WhatsApp —
-   fail-open, no rompe ni afecta la alerta por email.
+3. [x] `ALERT_WHATSAPP_TO` ya está cargado como variable sensible de Producción, en formato wa.me.
+4. Mientras el template no esté aprobado, no se manda la alerta por WhatsApp — fail-open, no rompe
+   ni afecta la alerta por email.
 5. **Tiene costo real por mensaje** (a diferencia del email): es un mensaje de negocio iniciado
    fuera de cualquier ventana de conversación, así que siempre usa template y siempre es facturable
    según las reglas de Meta — hoy la tarifa pública para Argentina dio `$0` en las 4 categorías
