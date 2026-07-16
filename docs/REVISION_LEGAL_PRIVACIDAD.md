@@ -58,9 +58,9 @@ guarde un Data Processing Agreement (DPA) firmado o aceptado de cada proveedor (
 Google, Supabase, Vercel) — la mayoría los ofrece como parte de sus términos estándar — o alcanza
 con la descripción de `/privacidad` sin un documento adicional por proveedor?
 
-## 4. Política de retención (ampliada localmente 2026-07-16, sin desplegar)
+## 4. Política de retención (ampliada en el PR #96, pendiente del cutover)
 
-Propuesta técnica implementada localmente, todavía sin desplegar y sujeta a revisión legal:
+Propuesta técnica incluida en el PR #96, sujeta a revisión legal y al cutover coordinado:
 
 - **Leads que nunca se convirtieron en pacientes, o con solo datos administrativos**: se
   anonimizan/eliminan automáticamente tras **24 meses de inactividad**.
@@ -151,8 +151,9 @@ producto que hay que diseñar aparte — no algo para resolver solo en el texto 
 
 ## 10. Estado técnico previo a producción (para no confundir código con despliegue)
 
-Los cambios siguen locales y no se aplicaron a la base. El orden obligatorio es 0A → 0B → 1 → 1B
-→ 1C → 1D → 1E → policy → privacy, correspondiente a:
+El PR #96 pasó CI/Vercel y el lote se ejecutó contra el esquema real dentro de una transacción con
+rollback completo. La aplicación persistente mantiene este orden obligatorio: 0A → 0B → 1 → 1B →
+1C → 1D → 1E → policy → privacy, correspondiente a:
 
 1. `20260715_whatsapp_phase0a_safety.sql`.
 2. `20260716_whatsapp_phase0b_operations.sql`.
@@ -164,8 +165,8 @@ Los cambios siguen locales y no se aplicaron a la base. El orden obligatorio es 
 8. `20260716_whatsapp_policy_shadow.sql`.
 9. `20260716_whatsapp_privacy_roles_retention.sql`.
 
-Las pruebas SQL existentes validan contratos estáticos y mocks; no ejecutan el lote sobre
-PostgreSQL real. Antes de producción hacen falta staging/backup, revisión de duplicados históricos,
-pruebas concurrentes de cola/outbox/borrado, roles en `app_metadata`, enrolamiento MFA, una cuenta
-probada por rol, versión de Meta configurada y sedes/configuración operativa verificadas. Estos son
-gates técnicos separados de la aprobación médica y de esta revisión legal.
+El dry-run transaccional valida el SQL y sus dependencias sobre PostgreSQL real, pero no reemplaza
+staging para carreras concurrentes ni un ensayo de restauración. Después del cutover todavía hacen
+falta roles en `app_metadata`, enrolamiento MFA, una cuenta probada por rol, versión de Meta
+configurada y sedes/configuración operativa verificadas. Estos son gates técnicos separados de la
+aprobación médica y de esta revisión legal.

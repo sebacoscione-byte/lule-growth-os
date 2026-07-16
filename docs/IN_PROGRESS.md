@@ -3,9 +3,9 @@
 ## Objetivo
 
 Comparar la investigación externa y los 180 casos del CSV con el bot real, documentar las brechas
-y aplicar por etapas los controles críticos sin habilitar un rollout clínico. Esta tarea es
-exclusivamente local por pedido del usuario: no se hace commit, push, PR, migración, deploy ni
-cambio de variables de entorno.
+y aplicar por etapas los controles críticos sin habilitar un rollout clínico prematuro. El trabajo
+está publicado en el PR #96; la base y el merge se coordinan como un único cutover y no se modifican
+variables de entorno.
 
 ## Alcance implementado localmente
 
@@ -35,7 +35,9 @@ cambio de variables de entorno.
       ledger para envíos manuales, reconciliación de delivery status, DLQ alertable y secretos de
       integraciones fuera de RLS/historial del cliente.
 - [x] Ejecutar el build de producción final, lint, TypeScript, suite completa y revisar el diff
-      sin commitear.
+      antes de publicar el PR.
+- [x] Ejecutar las nueve migraciones contra el esquema real dentro de una única transacción y
+      confirmar el rollback completo antes del cutover.
 
 ## Resultado local
 
@@ -69,8 +71,9 @@ cambio de variables de entorno.
   durante 15 minutos; después de esa ventana, un evento de Meta sigue bloqueado si su `occurred_at`
   es anterior o igual al borrado. Los IDs estables de evento/salida también se bloquean 90 días.
 - Los tests de migraciones validan contratos estáticos del SQL y los mocks validan la integración
-  TypeScript. No ejecutan las migraciones ni carreras concurrentes contra PostgreSQL real; eso
-  permanece como gate obligatorio de staging.
+  TypeScript. Además, las nueve migraciones pasaron una ejecución real y ordenada contra el esquema
+  de producción dentro de una única transacción con rollback. Esto valida SQL/dependencias reales,
+  pero no reemplaza pruebas de interleavings concurrentes en una base aislada.
 - Verificación final posterior al hardening: `npm run lint` sin errores ni warnings,
   `npx tsc --noEmit` limpio, 78 suites/715 tests aprobados, `npm run build` exitoso y
   `git diff --check` sin errores. El build necesitó ejecutarse fuera del sandbox porque Windows
@@ -78,14 +81,15 @@ cambio de variables de entorno.
 - La revisión estática final encontró una dependencia de orden: 1E instalaba un trigger sobre
   `whatsapp_policy_evaluations` antes de que existiera. El trigger quedó movido a la migración
   `policy_shadow`, inmediatamente después de crear la tabla, y el contrato de migración lo cubre.
-- Rama local `codex/whatsapp-fase0-safety`; sin commit, push, PR, migración ni deploy.
+- PR #96 (`codex/whatsapp-fase0-safety`), commit base `2b7db23`; CI y Vercel aprobados. La
+  aplicación persistente de migraciones y el merge quedan acoplados al cutover final.
 
 ## Plan por etapas y estado
 
 1. **Fase 0 — contención:** implementada y probada localmente; requiere revisión médica/legal antes
    de cualquier despliegue.
-2. **Fase 1 — transporte durable:** implementada y probada localmente; las migraciones y el código
-   todavía no fueron desplegados, por lo que el worker integrado al cron aún no corre en producción.
+2. **Fase 1 — transporte durable:** implementada, probada y validada transaccionalmente contra el
+   esquema real; queda completar el cutover coordinado y programar el worker frecuente externo.
 3. **Fase 2 — NLU shadow:** contrato, adaptador mockeable, dataset y persistencia mínima listos,
    pero no conectados a mensajes reales ni habilitados.
 4. **Fase 3 — políticas y fuentes:** motor/catalogo y configuración de sedes implementados; falta
@@ -111,9 +115,10 @@ Aplicar exactamente en este orden, con backup y primero en staging:
 8. `20260716_whatsapp_policy_shadow.sql` — evaluación shadow auditable, todavía apagada.
 9. `20260716_whatsapp_privacy_roles_retention.sql` — roles, MFA, RLS, auditoría y limpieza.
 
-Antes de producción hay que ejecutar este lote en una base clonada/staging, revisar las filas
-históricas duplicadas o incompatibles que 1D reconcilia, probar carreras reales de cola/outbox/
-borrado y verificar rollback/restauración. Las suites Jest actuales no sustituyen ese ensayo SQL.
+El lote completo ya pasó sobre el esquema real con `--dry-run`: las nueve migraciones se ejecutaron
+en orden y se revirtieron juntas. La aplicación persistente usa `--atomic`, por lo que confirma las
+nueve o revierte todo. Sigue pendiente como mejora operativa disponer de una base clonada/staging
+para probar interleavings reales de cola/outbox/borrado y ensayar restauración sin tocar producción.
 
 ## Riesgo y pausa
 

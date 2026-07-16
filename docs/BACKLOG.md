@@ -6,8 +6,9 @@
 ## Bot de WhatsApp — gates para activar el hardening local (2026-07-16)
 
 El hardening derivado de `Investigacion_y_plan_bot_WhatsApp_Dra_Lucia_Chahin_para_Claude.md` y de
-los 180 casos del CSV está implementado y probado solamente en la rama local
-`codex/whatsapp-fase0-safety`. No hay commit, push, migración ni deploy.
+los 180 casos del CSV está publicado en el PR #96 (`codex/whatsapp-fase0-safety`), con CI y Vercel
+aprobados. Las nueve migraciones pasaron una ejecución transaccional real con rollback; la
+aplicación persistente y el merge se coordinan en el cutover.
 
 - [ ] **Revisión médica de Lucía:** aprobar detector y textos fijos de guardia, límites clínicos y
   derivación. La IA no redacta respuestas para pacientes; solo puede devolver categorías cerradas.
@@ -27,10 +28,12 @@ los 180 casos del CSV está implementado y probado solamente en la rama local
   `20260716_whatsapp_policy_shadow.sql` (policy) →
   `20260716_whatsapp_privacy_roles_retention.sql` (privacy). Después comprobar el worker interno
   con `CRON_SECRET` sin exponerlo.
-- [ ] **Gate SQL real:** ejecutar el lote en una base clonada/staging con backup, inspeccionar los
-  duplicados históricos de identidad/IDs de Meta que 1D reconcilia y probar concurrencia real entre
-  cola, outbox, handoff y borrado. Los tests actuales de migraciones son contratos estáticos del
-  texto SQL y mocks de integración; no ejecutan PostgreSQL ni demuestran esas carreras.
+- [x] **Compatibilidad SQL real:** las nueve migraciones se ejecutaron en orden contra el esquema
+  real dentro de una única transacción y terminaron en rollback completo. El runner soporta
+  `--dry-run`, `--atomic` y `--from` para que el cutover sea todo-o-nada.
+- [ ] **Staging de concurrencia:** disponer de una base clonada, inspeccionar duplicados históricos
+  de identidad/IDs de Meta que 1D reconcilia y probar interleavings reales entre cola, outbox,
+  handoff y borrado. El dry-run real valida SQL y dependencias, no esas carreras temporales.
 - [ ] **Programar recuperación frecuente:** después del deploy, guardar URL de producción y
   `CRON_SECRET` en Supabase Vault y crear un Supabase Cron/`pg_net` que llame cada minuto a
   `POST /api/internal/whatsapp-worker`. `after()` acelera el caso normal y el cron diario es sólo
