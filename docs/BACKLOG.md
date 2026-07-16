@@ -33,8 +33,8 @@ de Meta.
 - [ ] **Accesos:** `owner` y `doctor` ya tienen `app_metadata.role`; las otras dos cuentas quedan
   deliberadamente sin rol. Falta completar MFA de `doctor`, probar ambas cuentas y recién luego
   activar primero `enforce_roles` y después el flag MFA, siguiendo el runbook de
-  `docs/WHATSAPP_SECURITY_ROLES_RETENTION.md`. Estado auditado: cuatro cuentas sin rol; una ya tiene
-  MFA verificado y tres siguen pendientes.
+  `docs/WHATSAPP_SECURITY_ROLES_RETENTION.md`. Estado auditado: una `owner` con MFA, una `doctor`
+  sin MFA y dos cuentas deliberadamente sin rol.
 - [x] **Flujo MFA en producto:** enrolamiento y step-up TOTP,
   administración de múltiples factores, gate central del CRM, callback seguro y autorización de
   rutas internas completados técnicamente. Al activar el flag, todo el CRM exige AAL2 porque RLS
@@ -46,14 +46,15 @@ de Meta.
 - [x] **Verificación individual de sedes:** UI/API con evidencia,
   control de versión y escritura atómica por sede completadas; una edición ya no verifica a las
   otras ubicaciones.
-- [ ] **Confirmar sedes reales:** revisar y confirmar desde la UI, una por una, CIMEL Lanús,
-  Hospital Británico y Swiss Medical Lomas. Las tres siguen inactivas y sin evidencia; el runtime
-  falla cerrado hasta que una persona autorizada valide cada dato.
+- [ ] **Confirmar sedes reales:** las tres están activas y se revisan individualmente. CIMEL Lanús
+  y Swiss Medical Lomas ya tienen evidencia; falta confirmar Hospital Británico desde la UI. El
+  runtime falla cerrado para datos sin evidencia vigente.
 - [x] **Preflight de Meta:** Vercel Production fija `META_GRAPH_API_VERSION=v25.0`; un GET read-only
   valida versión, token e ID sin enviar mensajes ni devolver credenciales/identificadores. El cron
   diario alerta por email con códigos cerrados si deja de funcionar.
-- [ ] **Template interno de Meta:** reaprobar la versión genérica de una variable de
-  `alerta_interna_derivacion` y configurar su destino. El email sigue funcionando como respaldo.
+- [ ] **Template interno de Meta:** `ALERT_WHATSAPP_TO` ya está configurado como sensible en Vercel
+  Production y el redeploy quedó `Ready`. Falta que Meta apruebe la versión genérica de una variable
+  de `alerta_interna_derivacion`, hoy `pendiente_meta`; el email sigue funcionando como respaldo.
 - [x] **Deploy y smoke:** PR #96 mergeado (`dcc0e47`), CI/Vercel producción verdes y smoke público
   más caso negativo del webhook aprobados. PR #97 mergeado (`d9434d7`) y scheduler/preflight/audit
   verificados en producción.
@@ -109,9 +110,9 @@ por qué tipo de acción es, para que sepas qué esperar de cada uno. El detalle
   verificado en vivo contra la API real. Ver CLAUDE.md → entrada 2026-07-15 para el detalle completo.
 - [ ] **Reaprobar el template `alerta_interna_derivacion` (actualizado 2026-07-16)**: el hardening
   lo redujo a un texto genérico con **una sola variable**, un ID opaco `CASO-…`; ya no envía nombre
-  ni motivo por el aviso interno. La migración 0A lo deja en `borrador`, por lo que hay que enviar
-  esta versión a aprobación en WhatsApp Manager y después configurar `ALERT_WHATSAPP_TO`. Hasta
-  entonces, solo llega el email, que funciona de manera independiente.
+  ni motivo por el aviso interno. El estado actual es `pendiente_meta`; hay que completar la
+  aprobación en WhatsApp Manager. `ALERT_WHATSAPP_TO` ya está configurado como
+  sensible en Producción; hasta que Meta apruebe el template, solo llega el email independiente.
 - [x] **Acceso a las APIs de Google Business Profile** (proyecto `app-lule`) — **solicitud enviada
   el 2026-07-12**, caso de asistencia de Google **`2-7574000041506`**, tiempo de revisión
   informado por Google: 7-10 días hábiles (no es instantáneo, y con volumen chico existe la
