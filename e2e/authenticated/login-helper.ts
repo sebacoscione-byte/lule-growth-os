@@ -1,12 +1,7 @@
-import { test as setup, type Page } from "@playwright/test"
+import { type Page } from "@playwright/test"
 import fs from "fs"
 import path from "path"
 import * as OTPAuth from "otpauth"
-
-// Tiene que matchear exactamente el storageState del proyecto "authenticated" en
-// playwright.config.ts ("e2e/.auth/user.json") -- __dirname acá es e2e/authenticated/, por eso
-// sube un nivel con "..".
-const authFile = path.join(__dirname, "../.auth/user.json")
 
 // Secreto TOTP de la cuenta de prueba, persistido localmente entre corridas (gitignored, ver
 // .gitignore → "/e2e/.auth/"). Nunca en .env.local: es un artefacto de test, no una credencial que
@@ -44,11 +39,37 @@ function writeStoredTotpSecret(secret: string): void {
  * escanear un QR con un celular, así que resuelve el TOTP por código: en la primera corrida enrola
  * un factor nuevo y guarda el secreto localmente; en corridas siguientes, si el factor ya quedó
  * verificado, solo hace el paso de verificación (challenge) con un código fresco.
+ *
+ * Importante: esta cuenta de prueba solo admite **una sesión activa a la vez** -- Supabase invalida
+ * la sesión existente si se loguea de nuevo mientras la anterior sigue en pie (se ve como
+ * `session_not_found` al crear un challenge de MFA). Por eso `crm-smoke.spec.ts` llama a esta
+ * función una única vez por corrida completa (en `test.beforeAll`, reusando la misma `page` en
+ * todos los tests del archivo con `test.describe.configure({ mode: "serial" })`), nunca una vez
+ * por spec/archivo -- dos logins concurrentes para el mismo usuario se pisan entre sí.
  */
-async function resolveMfaGate(page: Page): Promise<void> {
+export async function loginAsTestUser(page: Page): Promise<void> {
+  const email = process.env.E2E_TEST_EMAIL
+  const password = process.env.E2E_TEST_PASSWORD
+  if (!email || !password) return
+
+  await page.goto("/login")
+  await page.getByLabel("Email").fill(email)
+  await page.getByLabel("Contraseña").fill(password)
+  await page.getByRole("button", { name: "Ingresar" }).click()
+
+  // Hay un flash transitorio del router client-side a /dashboard ANTES de que el layout
+  // server-side redirija a /seguridad/mfa si corresponde -- esperar por contenido real evita la
+  // carrera de un chequeo por URL.
+  const dashboardHeading = page.getByRole("heading", { name: "Dashboard", level: 1 })
+  const mfaHeading = page.getByRole("heading", { name: "Seguridad de la cuenta", level: 1 })
+  await Promise.race([
+    dashboardHeading.waitFor({ state: "visible", timeout: 15000 }),
+    mfaHeading.waitFor({ state: "visible", timeout: 15000 }),
+  ])
+  if (!(await mfaHeading.isVisible())) return
+
   const challengeInput = page.locator("#challenge-code")
   const enrollButton = page.getByRole("button", { name: "Generar código QR" })
-
   await Promise.race([
     challengeInput.waitFor({ state: "visible", timeout: 15000 }),
     enrollButton.waitFor({ state: "visible", timeout: 15000 }),
@@ -65,6 +86,7 @@ async function resolveMfaGate(page: Page): Promise<void> {
     }
     await challengeInput.fill(currentTotpCode(storedSecret))
     await page.getByRole("button", { name: "Verificar" }).click()
+    await page.waitForURL("/dashboard")
     return
   }
 
@@ -75,44 +97,6 @@ async function resolveMfaGate(page: Page): Promise<void> {
 
   await page.locator("#enrollment-code").fill(currentTotpCode(secretCode))
   await page.getByRole("button", { name: "Activar y verificar" }).click()
+  await page.waitForURL("/dashboard")
   writeStoredTotpSecret(secretCode)
 }
-
-// QA-02: usuario de prueba dedicado (ver CLAUDE.md → "Tests E2E") — nunca la cuenta real de
-// Lucía/Seba. Sin estas variables configuradas, este setup se salta y escribe un storageState
-// vacío (contexto sin sesión) para que la creación del browser context no rompa; cada test
-// autenticado además se salta a sí mismo explícitamente (ver los .spec.ts), así que el resultado
-// queda como "saltado" con motivo claro, nunca como un fallo confuso por archivo faltante.
-setup("autenticar usuario de prueba E2E", async ({ page }) => {
-  const email = process.env.E2E_TEST_EMAIL
-  const password = process.env.E2E_TEST_PASSWORD
-
-  if (!email || !password) {
-    fs.mkdirSync(path.dirname(authFile), { recursive: true })
-    fs.writeFileSync(authFile, JSON.stringify({ cookies: [], origins: [] }))
-    setup.skip(true, "Requiere E2E_TEST_EMAIL/E2E_TEST_PASSWORD configurados — ver CLAUDE.md → Tests E2E")
-    return
-  }
-
-  await page.goto("/login")
-  await page.getByLabel("Email").fill(email)
-  await page.getByLabel("Contraseña").fill(password)
-  await page.getByRole("button", { name: "Ingresar" }).click()
-
-  // Ojo: justo después de loguearse hay un flash transitorio del router client-side a /dashboard
-  // ANTES de que el layout server-side redirija a /seguridad/mfa si corresponde -- esperar por URL
-  // agarra ese estado intermedio equivocado. Se espera por contenido real en su lugar.
-  const dashboardHeading = page.getByRole("heading", { name: "Dashboard", level: 1 })
-  const mfaHeading = page.getByRole("heading", { name: "Seguridad de la cuenta", level: 1 })
-  await Promise.race([
-    dashboardHeading.waitFor({ state: "visible", timeout: 15000 }),
-    mfaHeading.waitFor({ state: "visible", timeout: 15000 }),
-  ])
-
-  if (await mfaHeading.isVisible()) {
-    await resolveMfaGate(page)
-    await page.waitForURL("/dashboard")
-  }
-
-  await page.context().storageState({ path: authFile })
-})

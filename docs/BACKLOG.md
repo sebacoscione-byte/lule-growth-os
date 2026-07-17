@@ -135,8 +135,13 @@ por qué tipo de acción es, para que sepas qué esperar de cada uno. El detalle
   posibilidad de que la rechacen — ver [[reference_google_business_api_surface]] si se retoma).
   Mientras se resuelve, seguí editando perfil/publicaciones/reseñas desde el panel oficial de
   Google Business (Etapa 4).
-- [ ] **Google Search Console**: configurar con el sitemap (ahora sí es alcanzable — un bug lo
-  bloqueaba antes) y verificar que las 8 páginas públicas queden indexadas (Etapa 3).
+- [x] ~~Google Search Console: configurar con el sitemap~~ **Resuelto (2026-07-17)** — propiedad
+  `https://draluciachahin.ar` verificada (archivo HTML) y `sitemap.xml` enviado, estado "Correcto"
+  con las 9 URLs (8 páginas públicas + `/privacidad`). De paso se corrigió el mismo bug de siempre
+  (`src/proxy.ts` redirigía a `/login` el archivo de verificación de Google — ver PR #108).
+- [ ] Verificar que las 8 páginas públicas queden **indexadas** (no solo que el sitemap se haya
+  leído bien) — la indexación real tarda de días a 1-2 semanas, revisar periódicamente en
+  Search Console → "Páginas".
 - [ ] **Google Cloud (reseñas)**: revisar antes de octubre 2026 si se activa la cuenta completa o
   se deja pausar la prueba gratuita (Etapa 2).
 
@@ -149,7 +154,9 @@ por qué tipo de acción es, para que sepas qué esperar de cada uno. El detalle
 - [ ] Agregar a Lucía como administradora del Business Manager de Meta — falta decidir el rol
   (administrador completo vs. acceso acotado).
 - [ ] Definir estrategia de reseñas de Google: cómo y cuándo pedirlas a pacientes actuales.
-- [ ] Evaluar si crear una ficha de Google Business separada para Swiss Medical Lomas.
+- [x] ~~Evaluar si crear una ficha de Google Business separada para Swiss Medical Lomas~~
+  **Decidido (2026-07-17):** no se crea ficha separada — Swiss Medical Lomas sigue usando
+  únicamente la ficha única existente ("Dra. Lucía Chahin"). No requiere ningún cambio de código.
 - [ ] **Evaluar separar `lule-chahin` a su propio team de Vercel en plan Pro (2026-07-13).** No
   es por aislamiento de datos entre proyectos — Vercel ya aísla cada proyecto por completo (env
   vars, dominios, deployments) sin importar si comparten cuenta/team con `gastos-personales`. El
@@ -168,15 +175,31 @@ por qué tipo de acción es, para que sepas qué esperar de cada uno. El detalle
   volumen del proyecto.
 
 ### ✍️ Contenido para cargar/publicar (no requiere código)
-- [ ] Publicar los 3 posts fijados de Instagram (ya generados en Estudio de contenido).
-- [ ] Crear las 7 historias destacadas de Instagram (Turnos · CIMEL · Hospital Británico · Swiss
-  · Ecocardiograma · Cardiología · FAQ).
-- [ ] Cargar las obras sociales reales por sede en Configuración (hoy están vacías).
-- [ ] Cargar el link de Google Maps del Hospital Británico en Configuración.
-- [ ] Confirmar que el `$0` (tarifa pública de Meta para Argentina) haya quedado guardado en
-  `Configuración → Precios de WhatsApp`. Los templates de seguimiento existentes conservan su
-  estado; `alerta_interna_derivacion` es la excepción y debe reaprobarse por separado en su nueva
-  versión genérica de una variable.
+- [x] ~~Publicar los 3 posts fijados de Instagram~~ **Verificado contra producción (2026-07-17)**:
+  el pipeline real muestra 4 posts ya `published`, 1 `approved` (listo para publicar, solo falta
+  que corra el auto-publish o tocar "Publicar ahora") y 1 en `draft`. Ya no quedan 3 posts fijados
+  sin publicar — se deja como pendiente menor solo el `approved` suelto, no bloquea nada.
+- [x] ~~Crear historias destacadas de Instagram por sede~~ **Resuelto** — confirmado por captura
+  real del perfil (2026-07-17): existen 3 destacadas, una por sede (Lomas de Zamora, CABA, Lanús),
+  cubriendo la duda más frecuente ("¿dónde atendés?"). El "7" del PRD original
+  (`docs/PRD-estrategia-captacion.md`) era una sugerencia de cobertura por ángulo, no un requisito
+  — decisión explícita de Seba: 3 alcanza.
+- [ ] **Opcional, no bloqueante** — destacada "Turnos" (explica el paso a paso de 4 pasos para
+  pedir turno, reduce preguntas repetidas por DM). Es la única de las 4 restantes del PRD
+  (Turnos/Ecocardiograma/Cardiología/FAQ) con impacto real de fricción; las otras tres son
+  contenido educativo "nice to have". Acción nativa de Instagram (Highlights) — no queda
+  registrada en ninguna tabla de esta app, no se puede confirmar por código.
+- [x] ~~Cargar las obras sociales reales por sede en Configuración~~ **Resuelto, verificado contra
+  producción (2026-07-17)**: CIMEL Lanús (3 coberturas), Swiss Medical Lomas (1), Hospital
+  Británico (7) ya tienen `obras_sociales` cargado — ya no están vacías.
+- [x] ~~Cargar el link de Google Maps del Hospital Británico en Configuración~~ **Resuelto,
+  verificado contra producción (2026-07-17)**: las 3 sedes tienen `google_maps_link` cargado.
+- [x] ~~Confirmar que el `$0` (tarifa pública de Meta para Argentina) haya quedado guardado~~
+  **Resuelto, verificado contra producción (2026-07-17)**: las combinaciones vigentes
+  (marketing/service vía CTWA, y service/utility dentro de ventana hasta 2026-09-30) tienen
+  `cost_amount = 0` en `whatsapp_pricing_rules`. Los templates de seguimiento existentes conservan
+  su estado (9/10 `aprobado`); `alerta_interna_derivacion` sigue siendo la única excepción
+  (`pendiente_meta`, ver más abajo) — sigue pendiente esa reaprobación puntual.
 
 ### 🕐 Cuando tengas tiempo (no urgente)
 - [ ] **Conectar la CLI de Vercel para que un agente pueda tocar env vars directamente (2026-07-15).**
@@ -189,18 +212,43 @@ por qué tipo de acción es, para que sepas qué esperar de cada uno. El detalle
   sesiones futuras del agente en esta misma máquina podrían heredar esa sesión sin pedirte nada de
   nuevo. No es urgente — mientras tanto, cargar env vars a mano en el dashboard (2 minutos) sigue
   funcionando bien.
-- [ ] **Cargar `E2E_TEST_EMAIL`/`E2E_TEST_PASSWORD` en tu `.env.local` (2026-07-14, contraseña
-  rotada de nuevo el 2026-07-15).** El usuario de prueba (`e2e-agent-test@lule-internal.local`,
-  aislado de leads/pacientes reales) ya se usó dos veces para verificar visualmente con Playwright
-  (dashboard el 14/07, Inbox/leads con la priorización nueva el 15/07). La contraseña anterior no
-  se había guardado, así que se rotó de nuevo — se mostró una única vez en el chat de la sesión del
-  2026-07-15. Falta que vos cargues esas dos variables para que quede permanente entre sesiones
-  (mías y de Codex) y para que `npm run test:e2e` corra los tests `authenticated` en vez de
-  saltarlos. Si no la guardaste esta vez tampoco, hay que rotarla de nuevo (ver
-  [[reference_e2e_test_account]] en memoria, o pedirle a un agente que la regenere).
-- [ ] **Correr el resto del smoke E2E autenticado al menos una vez** (`e2e/authenticated/*.spec.ts`
-  — dashboard, crear/editar/buscar un lead, abrir una conversación del inbox), no solo el login. Con
-  las credenciales ya cargadas: `npm run test:e2e`. Cierra QA-02 del todo (ver más abajo).
+- [x] ~~Cargar `E2E_TEST_EMAIL`/`E2E_TEST_PASSWORD` en tu `.env.local`~~ **Resuelto (2026-07-17)** —
+  cargadas por Seba.
+- [x] ~~Correr el resto del smoke E2E autenticado al menos una vez~~ **Resuelto, con un hallazgo
+  crítico en el camino (2026-07-17)**:
+  - El hardening del 16/07 (`enforce_roles` + `require_mfa_for_sensitive_actions`) dejó a la cuenta
+    de prueba sin rol y sin MFA enrolado — la suite autenticada quedó bloqueada en silencio desde
+    esa fecha. Se le asignó rol `owner` y se automatizó el enrolamiento/verificación TOTP en
+    `auth.setup.ts` (librería `otpauth`, secreto persistido en `e2e/.auth/totp-secret.json`,
+    gitignored) — PR #110, mergeado por Seba tras revisar el diff (tocaba el área de MFA/seguridad).
+  - **Bug crítico real encontrado y ya corregido en producción (PR #109, mergeado)**:
+    `leads.landing_page`, `origin_url`, `clicked_cimel_cta`, `clicked_swiss_cta` y
+    `booking_instruction_viewed` nunca existían en la base real — `20260612_utm_fields.sql` ya
+    estaba marcado aplicado cuando alguien le agregó estas 5 columnas más tarde (GROWTH-01), y
+    `npm run migrate` nunca volvió a correr ese archivo por nombre. Esto rompía
+    `upsert_whatsapp_intake_lead()` en **cada mensaje nuevo de un paciente por WhatsApp** (no solo
+    con código de referencia) desde el 16/07, y también `POST /api/leads` (alta manual). Migración
+    nueva aplicada, ya verificado que las columnas existen y que crear un lead funciona de punta a
+    punta.
+  - **Cerrado del todo (2026-07-17, segundo incremento)** — encontrados y corregidos 3 bugs reales
+    más en el camino, ninguno era la app en producción sino la suite de tests en sí:
+    1. La cuenta de prueba solo admite **una sesión activa a la vez**: Supabase invalida la sesión
+       vieja si se loguea de nuevo mientras la anterior sigue en pie (`session_not_found` al crear
+       un challenge de MFA). `dashboard.spec.ts`/`inbox.spec.ts`/`leads.spec.ts` vivían en archivos
+       separados, cada uno con su propio login — al correr en paralelo, se pisaban entre sí.
+       Consolidados en un único archivo (`crm-smoke.spec.ts`) con
+       `test.describe.configure({ mode: "serial" })` y una sola sesión compartida (`login-helper.ts`).
+    2. `inbox.spec.ts` tenía un locator real mal acotado (`page.locator("aside button").first()`):
+       el sidebar de toda la app también es un `<aside>` con su propio botón "Cerrar sesión" que
+       queda primero en el DOM — el test estaba cerrando la sesión en vez de abrir un lead, sin que
+       ninguna aserción lo notara.
+    3. Al crear/editar/buscar un lead, el nombre en la tabla desktop es texto plano (no navega); lo
+       que navega es el botón "Ver" de esa fila — un click a ciegas sobre el texto no hacía nada.
+    Con los tres corregidos, `npm run test:e2e` (public + authenticated juntos) pasa 22/22 de forma
+    reproducible. PR de este cierre: rearma `auth.setup.ts`/`dashboard.spec.ts`/`inbox.spec.ts`/
+    `leads.spec.ts` en `login-helper.ts` + `crm-smoke.spec.ts`, agrega `npm run
+    test:e2e:authenticated`. **Sigue pendiente**: configurar que la suite corra en CI/GitHub Actions
+    con las credenciales como secret (no se hizo en esta sesión).
 - [x] ~~Aplicar en producción las 2 migraciones del PR #64~~ **Resuelto** — confirmado en vivo el
   2026-07-14: "Clicks por sede: llamada y WhatsApp" ya muestra datos reales (Swiss 1 WhatsApp,
   Británico 2 WhatsApp). El snapshot de seguidores de Instagram todavía no tiene datos, pero no por
@@ -538,7 +586,7 @@ deliberado: primero integridad de WhatsApp y datos de pacientes; luego medición
     ambos callbacks de OAuth— fallarían en CI si la ruta perdiera autenticación, dejara de
     deduplicar, la validación de CSV se rompiera, o el logging de un fallo de OAuth desapareciera.
 
-- [x] **QA-02 — Smoke E2E móvil y desktop.** ⏳ Parcial (2026-07-12, actualizado 2026-07-14) — falta correr los `.spec.ts` autenticados con un usuario real (el login en sí ya se probó)
+- [x] **QA-02 — Smoke E2E móvil y desktop.** ✅ Resuelto (2026-07-12, actualizado 2026-07-14 y 2026-07-17)
   - Se sumó **Playwright** (`e2e/`, ver CLAUDE.md → "Tests E2E") en dos proyectos:
     - **`public`** (sin sesión): landing principal, las 6 landings SEO, `/login` (validación de
       campos vacíos + error real de Supabase con credenciales inválidas), y que las rutas del CRM
@@ -569,12 +617,16 @@ deliberado: primero integridad de WhatsApp y datos de pacientes; luego medición
     bugs, ver CLAUDE.md → 2026-07-14). Lo que **todavía no se corrió** es el resto de la suite
     autenticada (`dashboard.spec.ts`, `leads.spec.ts`, `inbox.spec.ts`) — la sesión se usó para
     verificación visual manual con un script aparte, no para `npm run test:e2e` completo.
-  - **Pendiente real**: correr `npm run test:e2e` completo con las credenciales cargadas en
-    `.env.local` (no dar QA-02 por completamente cerrado hasta entonces), y configurar que corran en
-    CI/GitHub Actions con esas credenciales como secret.
-  - **Aceptación parcial cumplida**: el smoke público corre y pasa contra un build de producción,
-    con evidencia (reporte HTML de Playwright). El login autenticado ya se verificó corriendo de
-    verdad; falta correr los `.spec.ts` que dependen de esa sesión para la aceptación completa.
+  - **Cerrado del todo 2026-07-17**: con las credenciales cargadas, `npm run test:e2e` corre 22/22
+    de forma reproducible (public + authenticated juntos, verificado dos corridas seguidas). Ver la
+    entrada de "Correr el resto del smoke E2E autenticado" más arriba para el hallazgo crítico
+    (columnas faltantes en `leads`), el bug de MFA/rol que bloqueaba la suite, y los 3 bugs reales
+    de la suite en sí (sesión única compartida, locator del botón "Cerrar sesión", click sobre texto
+    no interactivo) que quedaron corregidos en `crm-smoke.spec.ts`/`login-helper.ts`. **Sigue
+    pendiente**: configurar que la suite corra en CI/GitHub Actions con esas credenciales como
+    secret (no se hizo en esta sesión).
+  - **Aceptación cumplida**: el smoke público y el autenticado corren y pasan juntos contra un build
+    de producción, con evidencia (reporte HTML de Playwright) y verificado reproducible.
 
 - [x] **CRM-01 — Contexto reciente correcto en el inbox.** ✅ Resuelto (2026-07-11)
   - `src/app/api/ai/suggest/route.ts` (botón "Sugerir mensaje de seguimiento") pedía
@@ -642,11 +694,22 @@ deliberado: primero integridad de WhatsApp y datos de pacientes; luego medición
 
 ### Ola 3 — UX, SEO, rendimiento y mantenimiento (P2)
 
-- [ ] **WEB-01 — QA visual y simplificación de la landing.**
-  - Revisar móvil/desktop con navegador real y prueba rápida con usuarios.
-  - Medir si la repetición de “Dónde atiende” y “Pedir turno” ayuda o alarga el recorrido; consolidar
-    sin perder instrucciones por sede si los datos muestran fricción.
-  - **Aceptación:** no hay regresiones visuales y el CTA principal queda accesible en teclado y móvil.
+- [x] **WEB-01 — QA visual y simplificación de la landing.** ✅ Parte técnica resuelta (2026-07-17)
+  - Revisado `/dra-lucia-chahin` con Playwright (Chromium real, no el msedge headless poco confiable
+    para mobile — ver [[reference_headless_mobile_screenshot_unreliable]]) en 1440px y 390px, full
+    page: sin regresiones visuales, tarjetas por sede y acordeón de FAQ se ven bien en ambos anchos.
+  - **CTA accesible por teclado**: el botón "Pedir turno" del hero recibe foco al 5º Tab desde el
+    inicio de la página, con anillo de foco visible (outline del navegador, no removido por CSS).
+  - **CTA sticky mobile** (`fixed inset-x-0 bottom-0`, solo `sm:hidden`) verificado con scroll hasta
+    el final: no tapa el footer ni el aviso de "no reemplaza una consulta médica".
+  - **La repetición de "Dónde atiende"/"Pedir turno" no se tocó a propósito**: son 4 apariciones con
+    propósito distinto (ancla fija en el nav, CTA del hero, botón por sede con contexto ya elegido,
+    sección de formulario + cierre final) — patrón estándar de conversión, no una regresión de
+    código. Decidir si conviene recortarla requiere datos de comportamiento real (scroll/click por
+    sección) que hoy no se miden — **sigue pendiente como decisión de producto**, no es algo que el
+    código pueda resolver solo.
+  - **Aceptación cumplida** en la parte verificable: no hay regresiones visuales y el CTA principal
+    es accesible en teclado y móvil.
 
 - [x] **SEO-01 — Cobertura de Hospital Británico y vista al compartir.** ✅ Resuelto (2026-07-11)
   - Nueva landing `/cardiologa-caba` (mismo patrón data-driven que las 6 existentes, en
@@ -919,7 +982,7 @@ Google Maps, Instagram, WhatsApp y búsqueda orgánica.
 - [x] CTA sticky en mobile ("Pedir turno con la Dra. Chahin") en todas las landings
 - [x] Cards de sede con botones de acción reales: "Pedir turno online" (si hay `booking_url` cargado, ej. Swiss Medical), "Llamar" (`tel:`) y "Consultar por WhatsApp" (`wa.me`) — antes eran solo texto/instrucciones sin acción directa
 - [x] Servicios como cards con microcopy orientado a síntomas/motivo de consulta
-- [x] Sección "Obras sociales y formas de atención" — muestra coberturas cargadas por sede en Configuración, o mensaje honesto invitando a consultar si todavía no hay datos cargados *(pendiente: cargar `obras_sociales` reales por sede en Configuración — hoy están vacías)*
+- [x] Sección "Obras sociales y formas de atención" — muestra coberturas cargadas por sede en Configuración, o mensaje honesto invitando a consultar si todavía no hay datos cargados *(ya cargadas por sede — ver "✍️ Contenido para cargar/publicar", verificado 2026-07-17)*
 - [x] Sección "Opiniones de pacientes" — reseñas reales de Google vía Places API (New) desde el 2026-07-04 (`GOOGLE_PLACES_API_KEY` + `GOOGLE_PLACE_ID`, ver CLAUDE.md). Cae al placeholder honesto si la API no está disponible.
 - [x] JSON-LD: `Physician` + `FAQPage` en todas las landings, `BreadcrumbList` en landings SEO, `identifier` (matrícula) cuando esté cargada *(pendiente: `MedicalClinic` por sede)*
 - [x] Eventos de analítica ampliados (2026-07-06) — `landing_events` ahora también registra `page_view` (una vez por carga de landing) y clicks separados por acción (`click_booking`/`click_call`/`click_whatsapp`/`click_maps`) con `location_key` por sede, además de los `cta_*` históricos que se mantienen para no romper las métricas globales existentes. El link "Cómo llegar" no trackeaba nada antes; ahora sí.
@@ -970,12 +1033,10 @@ orgánico de búsqueda y convierten con instrucciones claras para pedir turno.
 - [ ] ~~Formulario "No pude pedir turno" en cada landing SEO~~ — revertido, ver nota en Etapa 2
 
 ### Acciones externas (las hace el equipo)
-- [ ] Configurar Google Search Console con el sitemap — **antes de esto (2026-07-11, SEO-01) el
-      sitemap no era alcanzable en absoluto**: `/sitemap.xml` y `/robots.txt` quedaban atrapados
-      por el auth gate de `proxy.ts` y devolvían un redirect a `/login`, así que si esto se había
-      intentado antes probablemente falló. Ya corregido, ahora ambos son públicos.
+- [x] ~~Configurar Google Search Console con el sitemap~~ ver "✍️ Contenido para cargar/publicar"
+      más arriba — resuelto (2026-07-17)
 - [ ] Verificar indexación de las 8 páginas públicas en Search Console (7 + `/cardiologa-caba`
-      nueva)
+      nueva) — pendiente real, ver más arriba (tarda días, no es instantáneo)
 
 ---
 
@@ -1001,7 +1062,8 @@ intención de turno: quien busca "cardióloga en Lanús" tiene alta probabilidad
 - [x] Crear o reclamar el perfil "Dra. Lucía Chahin" en Google Business — verificado (confirmado 2026-07-11, ícono azul "Verificada")
 - [x] Completar perfil: foto, horarios, descripción — confirmado 2026-07-11 (13 reseñas 5,0★, foto y descripción cargadas)
 - [x] Configurar sitio web del perfil → confirmado 2026-07-11: `https://draluciachahin.ar/` (la raíz redirige a `/dra-lucia-chahin` para visitantes sin sesión, ver `src/middleware.ts`)
-- [ ] Evaluar si crear ficha separada para Swiss Medical Lomas (dirección ya confirmada: Oliden 141, Lomas de Zamora)
+- [x] ~~Evaluar si crear ficha separada para Swiss Medical Lomas~~ **Decidido (2026-07-17):** no,
+  se mantiene una sola ficha ("Dra. Lucía Chahin") para las 3 sedes.
 - [ ] Definir estrategia de reseñas: cómo y cuándo pedirlas a pacientes actuales
 
 ### Pendiente: cuota 0 en la GBP API (bloquea Perfil/Publicaciones/Reseñas dentro de la app)
@@ -1034,8 +1096,11 @@ público para pedir turno.
 ### Acciones externas pendientes (las hace Lucía)
 - [x] Actualizar bio de Instagram con el texto sugerido en la app — confirmado en producción (@draluciachahin) 2026-07-07
 - [x] Cambiar el link de la bio a `/dra-lucia-chahin` — usa el dominio propio `draluciachahin.ar`
-- [ ] Publicar los 3 posts fijados (cómo pedir turno / servicios / dónde atiende)
-- [ ] Crear las 7 historias destacadas: Turnos · CIMEL · Hospital Británico · Swiss · Ecocardiograma · Cardiología · FAQ
+- [x] ~~Publicar los 3 posts fijados (cómo pedir turno / servicios / dónde atiende)~~ ver
+  "✍️ Contenido para cargar/publicar" más arriba — resuelto (2026-07-17)
+- [x] ~~Crear las 7 historias destacadas: Turnos · CIMEL · Hospital Británico · Swiss ·
+  Ecocardiograma · Cardiología · FAQ~~ ver "✍️ Contenido para cargar/publicar" más arriba —
+  resuelto con 3 destacadas por sede (2026-07-17), el resto queda opcional no bloqueante
 - [ ] Establecer ritmo de publicación mensual: 2-3 conversión + 4-6 educativo + 2-3 local
 
 ### Automatización (Etapa 7)
@@ -1404,3 +1469,18 @@ evento (más robusto, cubre cualquier dominio no-producción, pero agrega una en
 superficie del endpoint público), o (b) mantener un allowlist de dominio (`draluciachahin.ar`) en el
 cliente. Bajo impacto real hoy (los previews se navegan poco, casi todo el volumen sospechoso venía
 de local), no urgente.
+
+### [TECH] `click_instagram` no tiene ninguna card en el dashboard todavía (2026-07-16)
+El PR #104 agregó un link de confianza a Instagram cerca del inicio de las 7 landings públicas
+(`src/app/landings/[slug]/instagram-trust-link.tsx`) y trackea el click como `click_instagram` en
+`landing_events` (migración `20260716_landing_events_instagram_click.sql`, ya aplicada en
+producción) — pero a propósito **no** se sumó al `IN`-list de "acciones de contacto/engaged" que usan
+las funciones SQL de `dashboard_growth_metrics` (no es un paso hacia pedir turno, mezclarlo ahí
+infla la tasa de conversión de forma engañosa). Resultado: el dato ya se está guardando desde que se
+aplicó la migración, pero hoy no se ve en ningún lado de `/dashboard` — no hay ninguna card ni número
+que lo muestre. Si en algún momento se quiere ver "cuánta gente clickeó Instagram desde la web",
+hace falta un query/RPC nuevo y chico (conteo simple de `landing_events` filtrado por
+`event_type = 'click_instagram'` y fecha, mismo patrón que `getClicksByLocation` en
+`src/app/(app)/dashboard/page.tsx`) — deliberadamente separado de `ACTION_META`/`contact_actions`
+por el motivo de arriba. No se hizo en el mismo PR porque no fue parte de lo pedido (Seba solo pidió
+el link en la web); se dejó como mejora futura opcional.
