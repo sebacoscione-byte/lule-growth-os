@@ -808,6 +808,17 @@ powershell.exe -NoProfile -Command "[System.Environment]::SetEnvironmentVariable
 - **Solo preguntar cuando hay una decisión real entre múltiples opciones** con consecuencias
   distintas que no se pueden inferir del contexto — no para pedir permiso de ejecutar algo que
   ya se decidió hacer.
+- **`npm run migrate` contra producción NO requiere pedir permiso** (actualizado 2026-07-16 a
+  pedido explícito de Seba — "no me pidas permiso para hacerlo, hacelo"). Si una migración nueva
+  es parte de un cambio que ya se está haciendo (ej. la tarea en curso la generó), aplicarla
+  directamente y avisar en el resumen de cierre que se corrió, junto con qué migración fue — no
+  preguntar antes ni esperar un "dale". Esto reemplaza cualquier expectativa anterior (ver
+  `docs/BACKLOG.md`/memoria histórica) de tratar `npm run migrate` como una categoría aparte que
+  necesita autorización nombrada cada vez. Sigue valiendo el cuidado de siempre al escribir la
+  migración en sí (ver "Migraciones que tocan `app_config`" más abajo), y sigue sin ser válido
+  saltear la excepción explícita vigente para la tarea de hardening de WhatsApp del 2026-07-16
+  (no commit/push sin autorización, "dale" antes de mergear cambios de lógica médica) — esa
+  excepción es sobre commit/push/merge, no sobre correr una migración ya escrita.
 - **Auto-continuar tras compresión de contexto**: Al iniciar una tarea multi-paso (3+ pasos), creá `docs/IN_PROGRESS.md`.
 - **Cerrar tareas con documentación al día**.
 
