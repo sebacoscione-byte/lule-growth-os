@@ -125,7 +125,8 @@ export async function PATCH(request: NextRequest) {
     if (body.slides && (!Array.isArray(body.slides) || body.slides.some(slide =>
       typeof slide?.headline !== "string" || typeof slide?.text !== "string" ||
       slide.headline.length > 60 || slide.text.length > 300 ||
-      (slide.visual_url !== undefined && typeof slide.visual_url !== "string")
+      (slide.visual_url !== undefined && typeof slide.visual_url !== "string") ||
+      (slide.image_prompt !== undefined && (typeof slide.image_prompt !== "string" || slide.image_prompt.length > 2400))
     ))) {
       return NextResponse.json({ error: "Slides invalidos" }, { status: 400 })
     }
