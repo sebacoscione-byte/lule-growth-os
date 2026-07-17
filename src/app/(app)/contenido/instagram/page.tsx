@@ -20,6 +20,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { parseAiJson } from "@/lib/parse-ai-json"
 import { DEFAULT_AUTO_PUBLISH_SETTINGS, alreadyPublishedToday, estimateAutoPublishDrainDays, estimateAutoPublishDateForPosition, findRecentDuplicateTopic, pickNextPublishableItems } from "@/lib/content-pipeline"
 import type { AutoPublishSettings, AutoPublishTrackSettings, ContentItem, ContentObjective, ContentScene, ContentSlide, ContentSource, ContentStatus } from "@/types"
+import type { InstagramMediaInsights } from "@/lib/instagram-business"
 import { CONTENT_OBJECTIVE_GOALS, CONTENT_OBJECTIVE_LABELS, WEEKDAY_OPTIONS } from "@/types"
 
 const IS_MANUAL_MODE = process.env.NEXT_PUBLIC_AI_MODE !== "gemini_api"
@@ -770,6 +771,7 @@ export default function ContentStudioPage() {
   const [researching, setResearching] = useState(false)
   const [generating, setGenerating] = useState(false)
   const [working, setWorking] = useState<string | null>(null)
+  const [insights, setInsights] = useState<Record<string, InstagramMediaInsights | "loading" | "error">>({})
   const [error, setError] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
   const [tab, setTab] = useState("crear")
@@ -1254,6 +1256,24 @@ export default function ContentStudioPage() {
       setError("No se pudieron guardar los cambios. Revisá tu conexión e intentá nuevamente.")
     } finally {
       setWorking(null)
+    }
+  }
+
+  // Insights nativos (reach/likes/comments) se piden en vivo, a pedido — no hay un historial
+  // guardado, ver docs/BACKLOG.md. Solo disponible para piezas publicadas con este sistema desde
+  // que se agregó instagram_media_id (content-publish.ts).
+  async function loadInsights(item: ContentItem) {
+    setInsights(previous => ({ ...previous, [item.id]: "loading" }))
+    try {
+      const response = await fetch(`/api/content/insights/${item.id}`)
+      const data = await response.json()
+      if (!response.ok || data.error) {
+        setInsights(previous => ({ ...previous, [item.id]: "error" }))
+        return
+      }
+      setInsights(previous => ({ ...previous, [item.id]: data.insights }))
+    } catch {
+      setInsights(previous => ({ ...previous, [item.id]: "error" }))
     }
   }
 
@@ -1807,6 +1827,33 @@ export default function ContentStudioPage() {
                       <p className="text-xs text-gray-500">
                         {item.tracked_visits} visitas · {item.tracked_interactions} interacciones (link de seguimiento)
                       </p>
+                    )}
+                    {item.status === "published" && item.instagram_media_id && (
+                      insights[item.id] && insights[item.id] !== "loading" && insights[item.id] !== "error" ? (
+                        <p className="text-xs text-gray-500">
+                          {(() => {
+                            const stats = insights[item.id] as InstagramMediaInsights
+                            return [
+                              stats.reach != null && `${stats.reach} alcance`,
+                              stats.likes != null && `${stats.likes} me gusta`,
+                              stats.comments != null && `${stats.comments} comentarios`,
+                              stats.saved != null && `${stats.saved} guardados`,
+                              stats.shares != null && `${stats.shares} compartidos`,
+                            ].filter(Boolean).join(" · ") || "Instagram no devolvió datos para este post."
+                          })()}
+                        </p>
+                      ) : (
+                        <Button
+                          type="button"
+                          variant="link"
+                          size="sm"
+                          className="h-auto p-0 text-xs"
+                          disabled={insights[item.id] === "loading"}
+                          onClick={() => loadInsights(item)}
+                        >
+                          {insights[item.id] === "loading" ? "Cargando insights..." : insights[item.id] === "error" ? "No se pudo cargar — reintentar" : "Ver insights de Instagram"}
+                        </Button>
+                      )
                     )}
                     {item.status === "approved" && queueInfo.get(item.id) && (
                       <p className="text-xs text-gray-500">
