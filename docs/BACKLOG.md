@@ -148,11 +148,17 @@ por qué tipo de acción es, para que sepas qué esperar de cada uno. El detalle
   se deja pausar la prueba gratuita (Etapa 2).
 
 ### 🤔 Decisiones tuyas (o de Lucía)
-- [ ] **Decidir cuándo activar el clasificador estructurado nuevo.** El schema jerárquico, la
-  política determinista y las categorías sociales/administrativas ya están implementados offline.
-  Primero deben medirse contra el dataset en shadow y revisarse las discrepancias; recién después
-  corresponde un canary mínimo. La IA seguirá devolviendo enums validados, nunca texto para el
-  paciente.
+- [ ] **Revisar la señal del modo sombra y decidir el siguiente paso del clasificador estructurado
+  nuevo.** ✅ Conectado en producción (2026-07-17, PR #116) — corre en paralelo a cada mensaje real,
+  sin ningún efecto sobre lo que recibe el paciente (ver CLAUDE.md → entrada 2026-07-17 y
+  `whatsapp-policy-shadow-runner.ts`). Cobertura fase 1: solo las categorías de seguridad/derivación
+  con equivalencia inequívoca contra el bot actual (urgencia, baja de contacto, adjunto no
+  soportado, límite clínico, derivación forzada, pedido explícito de humano, botones de protocolo,
+  cierre/derivación de la conversación ya en curso) — el flujo conversacional rutinario de intake/
+  sede/cobertura queda fuera de esta fase. Pendiente real: dejar acumular datos reales en
+  `whatsapp_policy_evaluations` unos días, revisar las coincidencias/discrepancias, y recién
+  entonces decidir si conviene una fase 2 (ampliar cobertura) o un canary mínimo. La IA seguirá
+  devolviendo enums validados, nunca texto para el paciente.
 - [ ] Agregar a Lucía como administradora del Business Manager de Meta — falta decidir el rol
   (administrador completo vs. acceso acotado).
 - [ ] Definir estrategia de reseñas de Google: cómo y cuándo pedirlas a pacientes actuales.
