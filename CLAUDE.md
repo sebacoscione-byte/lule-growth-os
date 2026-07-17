@@ -1,6 +1,12 @@
 # Lule Growth OS — Contexto para Claude
 
 ## Estado actual
+- 2026-07-17 (template de Meta aprobado): `alerta_interna_derivacion` pasó a `status: "aprobado"`
+  — Meta aprobó la versión genérica de una sola variable (`CASO-…`, sin nombre ni motivo del
+  paciente) del hardening del 16/07. Marcado "Aprobado" en Configuración → Templates de WhatsApp.
+  La alerta interna por WhatsApp ante una derivación a humano ya funciona de verdad, no solo el
+  email de respaldo. De los gates externos que quedaban (template, revisión legal, staging), este
+  ya cerró — legal y staging siguen pendientes.
 - 2026-07-17 (handoff UX): `taken_at` separa una derivación realmente pendiente de una conversación
   ya tomada. El Inbox muestra “Paciente respondió” sólo cuando el último mensaje posterior a la toma
   es entrante y limpia esa señal con la siguiente respuesta manual. Al reactivar, se envía un aviso
