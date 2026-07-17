@@ -598,6 +598,21 @@ export default function ConfiguracionPage() {
             </span>
           </label>
 
+          <label className="flex items-start gap-2 cursor-pointer rounded-md border border-gray-200 p-3">
+            <input type="checkbox" className="mt-1" checked={waSettings.shadow_mode_enabled}
+              onChange={e => saveWaSettings({ shadow_mode_enabled: e.target.checked })} />
+            <span>
+              <span className="font-medium text-gray-900">Modo sombra: clasificador estructurado nuevo (solo medir)</span>
+              <p className="text-xs text-gray-500">
+                Corre en paralelo un motor de clasificación nuevo y compara sus decisiones contra las
+                del bot actual, sin ningún efecto sobre lo que recibe el paciente — el paciente sigue
+                recibiendo exactamente las mismas respuestas de siempre. Solo guarda métricas anónimas
+                (sin teléfono, nombre ni texto) para decidir más adelante si conviene activarlo de
+                verdad.
+              </p>
+            </span>
+          </label>
+
           <Field label="Proveedor de IA para clasificar intents (respaldo, no obligatorio)">
             <Select value={waSettings.ai_provider} onValueChange={v => saveWaSettings({ ai_provider: v as WhatsAppAiProvider })}>
               <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
