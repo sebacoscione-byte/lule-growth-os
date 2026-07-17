@@ -1101,7 +1101,10 @@ público para pedir turno.
 - [x] ~~Crear las 7 historias destacadas: Turnos · CIMEL · Hospital Británico · Swiss ·
   Ecocardiograma · Cardiología · FAQ~~ ver "✍️ Contenido para cargar/publicar" más arriba —
   resuelto con 3 destacadas por sede (2026-07-17), el resto queda opcional no bloqueante
-- [ ] Establecer ritmo de publicación mensual: 2-3 conversión + 4-6 educativo + 2-3 local
+- [ ] Establecer ritmo de publicación mensual: 2-3 conversión + 4-6 educativo + 2-3 local — es una
+  decisión editorial (qué mezcla de temas generar/aprobar en Biblioteca), no un gap de código: la
+  app ya deja fijar "veces por semana" por track (posts/historias/carrusel) en "Publicación
+  automática", pero no fuerza una mezcla de categorías — eso lo decide quien aprueba cada pieza.
 
 ### Automatización (Etapa 7)
 - [x] Publicar contenido aprobado directamente desde la app vía Instagram Graph API — primer post real
@@ -1199,7 +1202,11 @@ público para pedir turno.
       dos cronogramas independientes: posts de feed y historias, cada uno con su propia frecuencia
       "veces por semana"). Ver `src/lib/content-publish.ts`, `src/app/api/cron/publish-content/`,
       `docs/CONTENT_STUDIO.md` → "Publicacion automatica".
-- [ ] Automatización de flujos de seguimiento con n8n
+- [x] ~~Automatización de flujos de seguimiento con n8n~~ **Superado** — la necesidad real (reintentar
+      contacto con leads sin confirmar turno) ya está resuelta arriba con `whatsapp-followup.ts`
+      corriendo dentro del cron de `publish-content`, sin sumar n8n ni un tercer cron. Mismo criterio
+      ya aplicado para las alertas de cron (ver "[FEATURE] Alerta proactiva..." más abajo): los flujos
+      repetitivos de este proyecto corren directo en Vercel Cron, no hace falta una herramienta aparte.
 - [x] Reportes automáticos semanales (2026-07-06, movido a domingo 2026-07-07) — cron semanal
       (`/api/cron/weekly-report`, domingo 08:00 UTC = 05:00 ART) calcula leads nuevos, confirmados,
       tasa de conversión, canales y visitas/interacciones
