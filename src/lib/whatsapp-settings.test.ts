@@ -51,8 +51,14 @@ describe("mergeWhatsAppSettings", () => {
   it("acota TTL y rollout a rangos operativos seguros", () => {
     expect(mergeWhatsAppSettings({ session_ttl_hours: 0, policy_rollout_percent: -20 }).session_ttl_hours).toBe(24)
     expect(mergeWhatsAppSettings({ session_ttl_hours: 500, policy_rollout_percent: 140, shadow_mode_enabled: true })).toEqual(
-      expect.objectContaining({ session_ttl_hours: 168, policy_rollout_percent: 0, shadow_mode_enabled: false })
+      expect.objectContaining({ session_ttl_hours: 168, policy_rollout_percent: 0, shadow_mode_enabled: true })
     )
+  })
+
+  it("shadow_mode_enabled pasa tal cual (solo mide, no sirve v2 de verdad); policy_rollout_percent siempre queda en 0", () => {
+    expect(mergeWhatsAppSettings({ shadow_mode_enabled: true }).shadow_mode_enabled).toBe(true)
+    expect(mergeWhatsAppSettings({ shadow_mode_enabled: false }).shadow_mode_enabled).toBe(false)
+    expect(mergeWhatsAppSettings({ policy_rollout_percent: 50 }).policy_rollout_percent).toBe(0)
   })
 
   it("activar enable_service_message_charging fuerza cost_saving_mode automaticamente", () => {

@@ -27,6 +27,7 @@ import {
 import { buildHandoffSummary, escalateToHuman, type HandoffLeadInfo } from "@/lib/whatsapp-handoff"
 import { logWhatsAppMessage } from "@/lib/whatsapp-cost-tracking"
 import { getWhatsAppSettings, isHighValueLead, shouldForceHandoff } from "@/lib/whatsapp-settings"
+import { evaluateWhatsAppPolicyShadow } from "@/lib/whatsapp-policy-shadow-runner"
 import {
   getOperationalWhatsAppLocations,
   type WhatsAppLocationConfig,
@@ -34,7 +35,7 @@ import {
 } from "@/lib/whatsapp-location-config"
 import type { HandoffReason, Lead, WhatsAppEntryPoint } from "@/types"
 
-type BotState =
+export type BotState =
   | "nuevo"
   | "esperando_consentimiento"
   | "intake_pendiente"
@@ -635,6 +636,29 @@ export async function handleIncomingMessage(params: {
           : null,
     serviceMessageChargingEnabled: settings.enable_service_message_charging,
   })
+
+  // Fase 1 del shadow mode (2026-07-17, ver whatsapp-policy-shadow-runner.ts): mide la política v2
+  // contra esta misma decisión, sin ningún efecto sobre lo que sigue. Nunca lanza ni bloquea.
+  if (settings.shadow_mode_enabled) {
+    await evaluateWhatsAppPolicyShadow({
+      phone,
+      text,
+      messageType,
+      buttonId,
+      waMessageId,
+      leadId: session.lead_id,
+      sessionState: session.state,
+      messagesSentCount: session.messages_sent_count,
+      handoffMessageThreshold: settings.handoff_message_threshold,
+      emergencyDetected,
+      marketingOptOut: messageType === "text" && isMarketingOptOutMessage(text),
+      unsupportedMessage,
+      botPaused: session.bot_paused,
+      medicalBoundaryDetected,
+      sensitiveMedicalContentDetected,
+      botEnabled: settings.bot_enabled,
+    })
+  }
 
   if (emergencyDetected) {
     await escalateEmergency(session, phone, ctx)

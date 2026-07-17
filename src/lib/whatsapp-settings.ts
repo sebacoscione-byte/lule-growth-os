@@ -34,9 +34,11 @@ export const whatsAppSettingsSchema = z.object({
 export function mergeWhatsAppSettings(stored: Partial<WhatsAppSettings> | null | undefined): WhatsAppSettings {
   const candidate = { ...DEFAULT_WHATSAPP_SETTINGS, ...(stored ?? {}) }
   candidate.session_ttl_hours = Math.min(168, Math.max(1, Number(candidate.session_ttl_hours) || 24))
-  // La política v2 todavía es un artefacto offline. Estos campos se conservan para poder leer
-  // configuraciones previas, pero no pueden activar un rollout que el runtime aún no ejecuta.
-  candidate.shadow_mode_enabled = false
+  // 2026-07-17: la política v2 puede correr en modo sombra (mide sus decisiones contra las del bot
+  // actual, sin tocar ninguna respuesta real — ver whatsapp-policy-shadow-runner.ts), así que
+  // shadow_mode_enabled ya pasa tal cual. El rollout real (servir v2 de verdad a un porcentaje de
+  // conversaciones) sigue bloqueado: el runtime todavía no lo ejecuta, así que
+  // policy_rollout_percent se ignora sin importar lo guardado.
   candidate.policy_rollout_percent = 0
   const parsed = whatsAppSettingsSchema.safeParse(candidate)
   const merged = parsed.success ? parsed.data : { ...DEFAULT_WHATSAPP_SETTINGS, bot_enabled: false }
