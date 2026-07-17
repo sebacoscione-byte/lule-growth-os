@@ -67,10 +67,15 @@ import { handleIncomingMessage, UNSUPPORTED_MEDIA_REPLY } from "@/lib/whatsapp-b
 import { getServiceDb } from "@/lib/supabase/service"
 import { sendText, sendButtons } from "@/lib/whatsapp"
 import { escalateToHuman } from "@/lib/whatsapp-handoff"
-import { isEmergencyMessage } from "@/lib/medical-safety"
+import {
+  containsSensitiveMedicalContent,
+  isEmergencyMessage,
+  isMedicalBoundaryMessage,
+} from "@/lib/medical-safety"
 import { isMarketingOptOutMessage } from "@/lib/whatsapp-intents"
 import { classifyIntent, classifyProtocolButtonReply } from "@/lib/whatsapp-intents"
 import {
+  hasConsented,
   interpretConsentReply,
   recordAppointmentFollowupConsent,
   recordResearchProtocolConsent,
@@ -139,7 +144,10 @@ beforeEach(() => {
   jest.clearAllMocks()
   ;(sendText as jest.Mock).mockResolvedValue({})
   ;(isEmergencyMessage as jest.Mock).mockReturnValue(false)
+  ;(isMedicalBoundaryMessage as jest.Mock).mockReturnValue(false)
+  ;(containsSensitiveMedicalContent as jest.Mock).mockReturnValue(false)
   ;(isMarketingOptOutMessage as jest.Mock).mockReturnValue(false)
+  ;(hasConsented as jest.Mock).mockResolvedValue(true)
   ;(getWhatsAppSettings as jest.Mock).mockResolvedValue({
     bot_enabled: true,
     session_ttl_hours: 24,
@@ -153,6 +161,70 @@ beforeEach(() => {
 })
 
 describe("handleIncomingMessage — bot_paused", () => {
+  it("persiste el mensaje normal del handoff con retencion transitoria", async () => {
+    mockDb({ session: baseSession({ bot_paused: true }) })
+
+    await handleIncomingMessage({ phone: PHONE, text: "hola, queria preguntar algo" })
+
+    expect(logWhatsAppMessage).toHaveBeenCalledWith(expect.objectContaining({
+      leadId: "lead-1",
+      content: "hola, queria preguntar algo",
+      retentionClass: "handoff_transient",
+    }))
+    expect(sendText).not.toHaveBeenCalled()
+    expect(classifyIntent).not.toHaveBeenCalled()
+  })
+
+  it("mantiene visible el handoff aunque el consentimiento administrativo no este vigente", async () => {
+    mockDb({ session: baseSession({ bot_paused: true }) })
+    ;(hasConsented as jest.Mock).mockResolvedValue(false)
+
+    await handleIncomingMessage({ phone: PHONE, text: "gracias doc", waMessageId: "wamid.handoff.1" })
+
+    expect(logWhatsAppMessage).toHaveBeenCalledWith(expect.objectContaining({
+      leadId: "lead-1",
+      content: "gracias doc",
+      retentionClass: "handoff_transient",
+      waMessageId: "wamid.handoff.1",
+    }))
+    expect(sendText).not.toHaveBeenCalled()
+    expect(classifyIntent).not.toHaveBeenCalled()
+  })
+
+  it("muestra una consulta sensible al equipo durante el handoff sin IA ni respuesta", async () => {
+    mockDb({ session: baseSession({ bot_paused: true }) })
+    ;(isMedicalBoundaryMessage as jest.Mock).mockReturnValue(true)
+
+    const text = "Puedo hacerme el electro la semana que viene?"
+    await handleIncomingMessage({ phone: PHONE, text, waMessageId: "wamid.handoff.2" })
+
+    expect(logWhatsAppMessage).toHaveBeenCalledWith(expect.objectContaining({
+      leadId: "lead-1",
+      content: text,
+      retentionClass: "handoff_transient",
+      flowIntent: "medical_boundary",
+    }))
+    expect(sendText).not.toHaveBeenCalled()
+    expect(sendButtons).not.toHaveBeenCalled()
+    expect(classifyIntent).not.toHaveBeenCalled()
+  })
+
+  it("fuera del handoff sigue redactando el contenido sensible antes del CRM", async () => {
+    mockDb({ session: baseSession({ bot_paused: false }) })
+    ;(containsSensitiveMedicalContent as jest.Mock).mockReturnValue(true)
+
+    await handleIncomingMessage({ phone: PHONE, text: "tengo un sintoma" })
+
+    expect(logWhatsAppMessage).toHaveBeenCalledWith(expect.objectContaining({
+      leadId: null,
+      content: "",
+    }))
+    expect(logWhatsAppMessage).not.toHaveBeenCalledWith(expect.objectContaining({
+      retentionClass: "handoff_transient",
+    }))
+    expect(classifyIntent).not.toHaveBeenCalled()
+  })
+
   it("con el bot pausado, un mensaje normal no dispara ninguna respuesta automática", async () => {
     mockDb({ session: baseSession({ bot_paused: true }) })
 

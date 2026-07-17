@@ -1,3 +1,20 @@
+# EN CURSO (2026-07-17) — mensajes de handoff e Inbox móvil
+
+- [x] Confirmar que el Inbox refresca mensajes cada 8 segundos y que el problema ocurre antes de la UI.
+- [x] Identificar que el filtro de contenido elimina del CRM consultas clínicas incluso cuando el bot
+      ya está pausado y una persona atiende la conversación.
+- [x] Conservar durante 30 días el texto entrante sólo en handoff humano, visible sólo para roles
+      autorizados con MFA, sin enviarlo a IA ni generar una respuesta automática.
+- [x] Incorporar esa limpieza a la barrida semanal existente, sin agregar un tercer cron de Vercel.
+- [x] Reordenar la cabecera móvil del Inbox para que nombre, estado y acciones no se superpongan.
+- [x] Actualizar política de privacidad, documentación operativa y auditoría de migraciones.
+- [x] Ejecutar regresiones, suite completa, lint y build. La verificación visual automatizada quedó
+      reemplazada por un contrato de layout porque no había navegador conectado en esta sesión.
+- [x] Publicar por PR #106; CI y Vercel Preview quedaron verdes. El contenido del preview está
+      protegido por SSO de Vercel, por lo que el smoke HTTP sólo pudo confirmar esa protección.
+
+---
+
 # HOTFIX APLICADO (2026-07-16) — acceso a Configuración y roles iniciales
 
 - [x] Asignar dos cuentas autorizadas: una `owner` y una `doctor`, sin guardar emails en docs/logs.

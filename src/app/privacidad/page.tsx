@@ -38,7 +38,7 @@ export default function PrivacidadPage() {
           </p>
           <h1 className="font-display text-3xl font-semibold text-ink">Política de privacidad</h1>
           <p className="mt-2 text-sm text-ink-soft">
-            Última actualización: 16 de julio de 2026.
+            Última actualización: 17 de julio de 2026.
           </p>
 
           <div className="mt-5 flex items-start gap-3 rounded-2xl border border-orange-200 bg-orange-50 p-4">
@@ -74,8 +74,10 @@ export default function PrivacidadPage() {
           <li>Nombre, teléfono, obra social/prepaga, servicio administrativo y sede elegida, si los compartís.</li>
           <li>
             El contenido administrativo de la conversación de WhatsApp después de que aceptás el
-            aviso de privacidad. El bot no pide edad, síntomas ni estudios y no conserva el texto
-            detectado como urgencia o consulta clínica.
+            aviso de privacidad. Mientras atiende el bot, no pide edad, síntomas ni estudios y no
+            conserva el texto detectado como urgencia o consulta clínica. Si una persona del equipo
+            toma la conversación, los mensajes siguientes quedan visibles en un Inbox restringido
+            durante un máximo de 30 días para que esa persona pueda responderte.
           </li>
           <li>
             Sede/institución elegida, canal de origen (Google Maps, Instagram, búsqueda,
@@ -96,7 +98,8 @@ export default function PrivacidadPage() {
           <strong>No recolectamos ni pedimos</strong> resultados de estudios médicos, historia
           clínica completa, edad ni síntomas para operar el bot. Si enviás espontáneamente una
           consulta clínica, el asistente aplica una respuesta fija de seguridad y no la usa para
-          elaborar una respuesta médica.
+          elaborar una respuesta médica. Durante una conversación ya derivada al equipo, el texto
+          sólo se muestra a las personas autorizadas; no se envía a la IA.
         </p>
       </Section>
 
@@ -166,6 +169,11 @@ export default function PrivacidadPage() {
           una retención especial y no se vuelve a utilizar comercialmente.
         </p>
         <p>
+          Los mensajes recibidos mientras una persona del equipo atiende manualmente la conversación
+          se eliminan automáticamente después de 30 días. Ese plazo corto permite responder desde el
+          Inbox sin convertir WhatsApp en una historia clínica permanente.
+        </p>
+        <p>
           En cualquier momento podés pedirnos el borrado manual de tus datos, sin esperar a que se
           cumplan estos plazos (ver la sección siguiente).
         </p>
@@ -212,9 +220,10 @@ export default function PrivacidadPage() {
         <p>
           Entendemos que cualquier síntoma, estudio o consulta clínica que envíes espontáneamente
           puede ser un dato sensible. El bot no lo solicita, no lo usa para elegir una sede ni para
-          elaborar una respuesta médica y evita conservar ese texto en el CRM cuando lo detecta.
-          Aplica una respuesta fija de seguridad o deriva a una persona; nunca lo publica ni lo usa
-          con fines comerciales.
+          elaborar una respuesta médica y evita conservar ese texto en el CRM mientras la atención
+          siga automatizada. Si la conversación ya fue tomada por una persona, el texto se muestra
+          únicamente en el Inbox restringido y se elimina a los 30 días. No se envía a la IA, nunca
+          se publica ni se usa con fines comerciales.
         </p>
       </Section>
 

@@ -5,6 +5,7 @@ import {
   WHATSAPP_COST_EVENT_RETENTION_MONTHS,
   WHATSAPP_DEAD_LETTER_RETENTION_DAYS,
   WHATSAPP_DELIVERY_STATUS_RETENTION_DAYS,
+  WHATSAPP_HANDOFF_MESSAGE_RETENTION_DAYS,
   WHATSAPP_ORPHAN_SESSION_RETENTION_DAYS,
   WHATSAPP_ORPHAN_CONSENT_RETENTION_MONTHS,
   WHATSAPP_PROCESSED_EVENT_RETENTION_DAYS,
@@ -59,6 +60,7 @@ describe("RETENTION_INACTIVITY_MONTHS", () => {
     expect(WHATSAPP_DEAD_LETTER_RETENTION_DAYS).toBe(90)
     expect(WHATSAPP_SHADOW_RETENTION_DAYS).toBe(180)
     expect(WHATSAPP_DELIVERY_STATUS_RETENTION_DAYS).toBe(180)
+    expect(WHATSAPP_HANDOFF_MESSAGE_RETENTION_DAYS).toBe(30)
     expect(WHATSAPP_OUTBOUND_LEDGER_RETENTION_DAYS).toBe(180)
     expect(SECURITY_AUDIT_RETENTION_MONTHS).toBe(24)
     expect(WHATSAPP_COST_EVENT_RETENTION_MONTHS).toBe(24)
@@ -85,12 +87,16 @@ describe("runDataRetentionSweep", () => {
           expired_leases_deleted: 1,
         }], error: null }
       }
+      if (name === "run_whatsapp_handoff_message_retention") {
+        return { data: 6, error: null }
+      }
       throw new Error(`rpc inesperada: ${name}`)
     })
     const result = await runDataRetentionSweep({ rpc } as never)
     expect(result.operational).toEqual(expect.objectContaining({
       queue_processed_deleted: 4,
       shadow_deleted: 3,
+      handoff_messages_deleted: 6,
     }))
     expect(rpc).toHaveBeenCalledWith("run_whatsapp_operational_retention", expect.objectContaining({
       p_processed_days: 30,
@@ -99,6 +105,9 @@ describe("runDataRetentionSweep", () => {
       p_orphan_session_days: 30,
       p_orphan_consent_months: 24,
     }))
+    expect(rpc).toHaveBeenCalledWith("run_whatsapp_handoff_message_retention", {
+      p_retention_days: 30,
+    })
   })
 
   it("sanea errores por candidato y nunca devuelve UUID ni mensaje crudo de DB", async () => {

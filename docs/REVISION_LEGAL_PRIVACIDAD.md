@@ -26,7 +26,8 @@ diagnostica, no interpreta estudios**.
 en lenguaje llano:
 - Qué datos se recolectan (contacto, categoría administrativa, obra social, sede, contenido
   administrativo posterior al consentimiento y navegación agregada del sitio). El bot no pide
-  edad, síntomas ni estudios.
+  edad, síntomas ni estudios. Cuando una persona toma la conversación, el Inbox conserva por hasta
+  30 días los mensajes siguientes para que el equipo pueda responder, sin enviarlos a la IA.
 - Para qué se usan (contactar, derivar a la sede correcta, clasificar automáticamente el motivo).
 - Con qué terceros se comparten (ver punto 3).
 - Cuánto tiempo se conservan (ver punto 4 — controles técnicos ya desplegados, todavía pendientes
@@ -69,6 +70,9 @@ Implementación técnica desplegada por el PR #96, todavía sujeta a revisión l
   contacto comercial, pero el dato permanece bajo una retención especial.
 - **Datos técnicos de WhatsApp**: eventos procesados 30 días, dead letter 90 días, evaluaciones
   shadow/estados de entrega/ledger finalizado 180 días y auditoría de seguridad 24 meses.
+- **Mensajes durante un handoff humano**: texto visible sólo para `owner`/`doctor`/`reception` con
+  MFA, eliminado automáticamente tras **30 días**. No se manda a clasificadores de IA ni se usa
+  para marketing; fuera del handoff se mantiene la redacción de contenido clínico detectado.
 - **Supresión posterior al borrado**: se conserva por 90 días un seudónimo HMAC no reversible en la
   práctica sin su clave local, no el teléfono ni el ID de Meta. Se sigue tratando como dato personal
   protegido. El teléfono bloquea escrituras genéricas durante 15 minutos y los eventos viejos se
@@ -113,7 +117,10 @@ lo aclara explícitamente. Queda guardado (fecha, versión del texto, si aceptó
 
 **Pregunta para el abogado**: ¿este texto alcanza para tratar los datos administrativos indicados y
 recibir una consulta por un canal de salud, o hace falta mencionar de otro modo los datos sensibles
-enviados espontáneamente, los terceros o el derecho a retirar el consentimiento?
+enviados espontáneamente, los terceros o el derecho a retirar el consentimiento? Cuando el equipo
+ya tomó manualmente una conversación, ¿la conservación restringida por 30 días de los mensajes
+siguientes puede fundarse en la necesidad de responder esa solicitud, o debe exigirse una nueva
+aceptación antes de mostrarlos en el Inbox?
 
 ## 7. Menores de edad — el bot no pide edad, pero falta una decisión legal
 

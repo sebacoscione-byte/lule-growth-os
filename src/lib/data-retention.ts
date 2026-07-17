@@ -6,6 +6,7 @@ export const WHATSAPP_PROCESSED_EVENT_RETENTION_DAYS = 30
 export const WHATSAPP_DEAD_LETTER_RETENTION_DAYS = 90
 export const WHATSAPP_SHADOW_RETENTION_DAYS = 180
 export const WHATSAPP_DELIVERY_STATUS_RETENTION_DAYS = 180
+export const WHATSAPP_HANDOFF_MESSAGE_RETENTION_DAYS = 30
 export const WHATSAPP_OUTBOUND_LEDGER_RETENTION_DAYS = 180
 export const SECURITY_AUDIT_RETENTION_MONTHS = 24
 export const WHATSAPP_COST_EVENT_RETENTION_MONTHS = 24
@@ -36,6 +37,7 @@ export interface OperationalRetentionCounts {
   orphan_sessions_deleted: number
   orphan_consents_anonymized: number
   expired_leases_deleted: number
+  handoff_messages_deleted: number
 }
 
 export interface DataRetentionSweepResult {
@@ -56,6 +58,7 @@ const EMPTY_OPERATIONAL_COUNTS: OperationalRetentionCounts = {
   orphan_sessions_deleted: 0,
   orphan_consents_anonymized: 0,
   expired_leases_deleted: 0,
+  handoff_messages_deleted: 0,
 }
 
 function parseOperationalCounts(data: unknown): OperationalRetentionCounts {
@@ -72,6 +75,7 @@ function parseOperationalCounts(data: unknown): OperationalRetentionCounts {
     orphan_sessions_deleted: Number(row.orphan_sessions_deleted ?? 0),
     orphan_consents_anonymized: Number(row.orphan_consents_anonymized ?? 0),
     expired_leases_deleted: Number(row.expired_leases_deleted ?? 0),
+    handoff_messages_deleted: Number(row.handoff_messages_deleted ?? 0),
   }
 }
 
@@ -135,6 +139,17 @@ export async function runDataRetentionSweep(supabase: SupabaseClient): Promise<D
     errors.push("operational_cleanup_failed")
   } else {
     operational = parseOperationalCounts(operationalData)
+  }
+
+  const { data: handoffDeleted, error: handoffError } = await supabase.rpc(
+    "run_whatsapp_handoff_message_retention",
+    { p_retention_days: WHATSAPP_HANDOFF_MESSAGE_RETENTION_DAYS }
+  )
+  if (handoffError) {
+    errors.push("handoff_message_cleanup_failed")
+  } else {
+    const count = Number(handoffDeleted ?? 0)
+    operational.handoff_messages_deleted = Number.isFinite(count) ? count : 0
   }
 
   return { erased, blocked, operational, errors }
