@@ -8,7 +8,7 @@ import { PUBLIC_LANDING_SLUGS } from "@/lib/public-landings"
 const EVENT_TYPES = [
   "cta_cimel", "cta_swiss", "cta_britanico", "instructions_viewed", "form_started", "form_submitted",
   "page_view", "click_booking", "click_call", "click_whatsapp", "click_maps",
-  "click_hero_primary", "click_hero_secondary",
+  "click_hero_primary", "click_hero_secondary", "click_instagram",
 ] as const
 
 const clickEventSchema = z.object({
