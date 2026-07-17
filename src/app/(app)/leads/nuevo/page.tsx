@@ -70,6 +70,11 @@ export default function NuevoLeadPage() {
       body: JSON.stringify(payload),
     })
     const lead = await res.json()
+    if (!res.ok) {
+      alert(lead.error ?? "No se pudo guardar el lead.")
+      setSaving(false)
+      return
+    }
 
     // Un alta manual marcada como WhatsApp no puede usar /api/messages para registrar texto: esa
     // ruta envía de verdad al paciente si encuentra una sesión abierta. Nunca reenviar el mensaje
