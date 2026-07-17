@@ -3,7 +3,9 @@
 ## Estado de despliegue
 
 La implementación del PR #96 está activa en producción. Las nueve migraciones iniciales se aplicaron
-en una única transacción; el hotfix posterior de `search_path` dejó 10/10 aplicadas. El PR #97 también está productivo: dejó
+en una única transacción; el hotfix posterior de `search_path` dejó 10/10 aplicadas. La migración
+de handoff quedó aplicada como número 11 y mantiene su limpieza dentro del cron semanal existente.
+El PR #97 también está productivo: dejó
 activos el scheduler durable, el audit agregado y el preflight cerrado de Meta. La limpieza de
 retención sigue dentro de `weekly-report`, uno de los dos cron jobs de Vercel; el worker usa aparte
 Supabase Cron y no consume un tercer slot.
@@ -25,6 +27,7 @@ El orden obligatorio del lote es:
 8. `20260716_whatsapp_policy_shadow.sql` (policy).
 9. `20260716_whatsapp_privacy_roles_retention.sql` (privacy).
 10. `20260716_whatsapp_security_pgcrypto_search_path.sql` (pgcrypto en `extensions`).
+11. `20260717_whatsapp_handoff_inbox_retention.sql` (mensajes transitorios de handoff humano).
 
 1C persiste un checkpoint cuando termina el handler para que un fallo del ACK no reprocese la
 respuesta al paciente. 1D unifica la identidad lead/conversación, hace routing y handoff atómicos,
@@ -207,6 +210,7 @@ público de autoservicio para exportar o borrar datos.
 | Dato | Plazo | Acción |
 | --- | ---: | --- |
 | Eventos de cola procesados | 30 días | Borrado |
+| Mensajes visibles durante handoff humano | 30 días | Borrado; no se envían a IA |
 | Dead letter sin contenido crudo | 90 días | Borrado |
 | Evaluaciones shadow/canary | 180 días | Borrado |
 | Eventos de estado de entrega | 180 días | Borrado |

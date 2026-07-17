@@ -606,7 +606,13 @@ export async function handleIncomingMessage(params: {
   const sensitiveMedicalContentDetected = emergencyDetected || medicalBoundaryDetected ||
     (messageType === "text" && containsSensitiveMedicalContent(text))
   const unsupportedMessage = isUnsupportedMessageType(messageType)
-  const mayPersistInboundContent = administrativeConsentGranted && !sensitiveMedicalContentDetected && !unsupportedMessage
+  // Cuando una persona ya tomó la conversación, el Inbox necesita ver lo que el paciente escribe
+  // para poder responderle. Esos textos no vuelven al bot ni a un modelo: se guardan con retención
+  // corta y acceso restringido. Fuera del handoff se mantiene el filtro conservador original.
+  const humanHandoffInboxActive = session.bot_paused && Boolean(session.lead_id) && !unsupportedMessage
+  const mayPersistInboundContent = humanHandoffInboxActive || (
+    administrativeConsentGranted && !sensitiveMedicalContentDetected && !unsupportedMessage
+  )
 
   await logWhatsAppMessage({
     waId: phone,
@@ -618,6 +624,7 @@ export async function handleIncomingMessage(params: {
     windowState,
     entryPoint,
     content: mayPersistInboundContent ? text : "",
+    retentionClass: humanHandoffInboxActive ? "handoff_transient" : "standard",
     waMessageId,
     flowIntent: emergencyDetected
       ? "urgencia_medica"

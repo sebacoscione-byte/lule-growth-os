@@ -100,7 +100,9 @@ create table if not exists messages (
   read_at timestamptz,
   failed_at timestamptz,
   delivery_error_code text,
-  outbound_ledger_key text unique
+  outbound_ledger_key text unique,
+  retention_class text not null default 'standard'
+    check (retention_class in ('standard', 'handoff_transient'))
 );
 
 -- ============================================================

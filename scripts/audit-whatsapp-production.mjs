@@ -19,6 +19,7 @@ const EXPECTED_MIGRATIONS = [
   "20260716_whatsapp_policy_shadow.sql",
   "20260716_whatsapp_privacy_roles_retention.sql",
   "20260716_whatsapp_security_pgcrypto_search_path.sql",
+  "20260717_whatsapp_handoff_inbox_retention.sql",
 ]
 const EXPECTED_RELATIONS = [
   "public.whatsapp_webhook_events",
@@ -35,6 +36,7 @@ const EXPECTED_FUNCTIONS = [
   "public.claim_whatsapp_outbound_intent(text,text,text,text,text,text,text)",
   "public.erase_lead(uuid,text)",
   "public.recover_stale_whatsapp_webhook_events()",
+  "public.run_whatsapp_handoff_message_retention(integer)",
 ]
 const KNOWN_LOCATION_IDS = new Set([
   "cimel_lanus",

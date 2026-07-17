@@ -49,12 +49,46 @@ describe("outbound ledger accounting", () => {
     )
     expect(JSON.stringify(costUpsert.mock.calls)).not.toContain("5491100000000")
     expect(messageUpsert).toHaveBeenCalledWith(
-      expect.objectContaining({ outbound_ledger_key: "a".repeat(64), wa_message_id: "wamid.outbound" }),
+      expect.objectContaining({
+        outbound_ledger_key: "a".repeat(64),
+        wa_message_id: "wamid.outbound",
+        retention_class: "standard",
+      }),
       { onConflict: "outbound_ledger_key", ignoreDuplicates: true }
     )
     expect(rpc).toHaveBeenCalledWith("reconcile_whatsapp_delivery_status", {
       p_wa_message_id: "wamid.outbound",
     })
+  })
+
+  it("marca como transitorio el texto que solo debe vivir durante un handoff humano", async () => {
+    const costInsert = jest.fn().mockResolvedValue({ error: null })
+    const messageInsert = jest.fn().mockResolvedValue({ error: null })
+    ;(getServiceDb as jest.Mock).mockReturnValue({
+      from: (table: string) => table === "whatsapp_cost_events"
+        ? { insert: costInsert }
+        : { insert: messageInsert },
+    })
+
+    await logWhatsAppMessage({
+      waId: "5491100000000",
+      leadId: "lead-1",
+      direction: "inbound",
+      messageType: "text",
+      category: "service",
+      isTemplate: false,
+      windowState: "open",
+      entryPoint: "organic",
+      content: "mensaje visible para el equipo",
+      retentionClass: "handoff_transient",
+      serviceMessageChargingEnabled: false,
+    })
+
+    expect(messageInsert).toHaveBeenCalledWith(expect.objectContaining({
+      lead_id: "lead-1",
+      content: "mensaje visible para el equipo",
+      retention_class: "handoff_transient",
+    }))
   })
 
   it("delega contador y accounted_at a una única transacción SQL", async () => {

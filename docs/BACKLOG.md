@@ -1,5 +1,16 @@
 # Backlog — Lule Growth OS
-**Actualizado:** 2026-07-16 | **Basado en:** PRD Estrategia de Captación v2.1
+**Actualizado:** 2026-07-17 | **Basado en:** PRD Estrategia de Captación v2.1
+
+---
+
+## Inbox — handoff humano y móvil (2026-07-17)
+
+- [x] Mantener visibles los mensajes recibidos después de que el equipo toma una conversación,
+  incluso si contienen una consulta clínica espontánea o el consentimiento administrativo anterior
+  no es vigente. Sólo se conservan 30 días, con acceso de staff+MFA, sin IA ni respuesta automática.
+- [x] Ejecutar el borrado dentro de la barrida semanal existente; no se agrega un tercer cron.
+- [x] Apilar nombre/estado y acciones en móvil, con botones en dos columnas y texto multilínea.
+- [ ] Validar con asesoría legal el fundamento y plazo de esta retención transitoria.
 
 ---
 

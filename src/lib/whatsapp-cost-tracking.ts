@@ -16,6 +16,7 @@ export interface LogMessageParams {
   windowState: WhatsAppWindowState
   entryPoint: WhatsAppEntryPoint
   content: string
+  retentionClass?: "standard" | "handoff_transient"
   flowIntent?: string | null
   waMessageId?: string | null
   outboundLedgerKey?: string | null
@@ -85,6 +86,7 @@ export async function logWhatsAppMessage(params: LogMessageParams): Promise<{ co
       flow_intent: params.flowIntent ?? null,
       cost_estimated: costEstimated,
       outbound_ledger_key: params.outboundLedgerKey ?? null,
+      retention_class: params.retentionClass ?? "standard",
     }
     const messageWrite = params.outboundLedgerKey
       ? await db.from("messages").upsert(messageRow, { onConflict: "outbound_ledger_key", ignoreDuplicates: true })

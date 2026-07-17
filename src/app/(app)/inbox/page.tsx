@@ -230,22 +230,25 @@ export default function InboxPage() {
           ${showConversationOnMobile ? "flex" : "hidden md:flex"}
         `}>
           {/* Header con botón volver en móvil */}
-          <div className="p-3 md:p-4 border-b border-gray-200 flex items-center gap-2">
-            <button
-              onClick={() => setSelectedLeadId(null)}
-              className="md:hidden p-1 rounded-md hover:bg-gray-100"
-            >
-              <ArrowLeft className="h-5 w-5 text-gray-600" />
-            </button>
-            <div className="flex-1 min-w-0">
-              <p className="font-semibold text-gray-900 truncate text-sm md:text-base">
-                {selectedLead.name ?? selectedLead.instagram_username ?? selectedLead.phone ?? "Anónimo"}
-              </p>
-              <span className={`text-xs px-2 py-0.5 rounded-full ${STATUS_COLORS[selectedLead.status]}`}>
-                {STATUS_LABELS[selectedLead.status]}
-              </span>
+          <div className="p-3 md:p-4 border-b border-gray-200 flex flex-col gap-2 md:flex-row md:items-center">
+            <div className="flex items-center gap-2 min-w-0 w-full md:flex-1">
+              <button
+                onClick={() => setSelectedLeadId(null)}
+                className="md:hidden p-1 rounded-md hover:bg-gray-100 shrink-0"
+                aria-label="Volver a la lista de conversaciones"
+              >
+                <ArrowLeft className="h-5 w-5 text-gray-600" />
+              </button>
+              <div className="flex-1 min-w-0">
+                <p className="font-semibold text-gray-900 truncate text-sm md:text-base">
+                  {selectedLead.name ?? selectedLead.instagram_username ?? selectedLead.phone ?? "Anónimo"}
+                </p>
+                <span className={`inline-flex max-w-full text-xs px-2 py-0.5 rounded-full ${STATUS_COLORS[selectedLead.status]}`}>
+                  <span className="truncate">{STATUS_LABELS[selectedLead.status]}</span>
+                </span>
+              </div>
             </div>
-            <div className="flex items-center gap-1.5 shrink-0 flex-wrap justify-end">
+            <div className="grid grid-cols-2 gap-2 w-full md:flex md:w-auto md:flex-wrap md:justify-end">
               {selectedLead.status !== "confirmo_que_pidio_turno" &&
                selectedLead.status !== "no_pudo_pedir_turno" &&
                selectedLead.status !== "descartado" &&
@@ -254,21 +257,21 @@ export default function InboxPage() {
                   <Button
                     size="sm"
                     variant="outline"
-                    className="border-green-300 text-green-700 hover:bg-green-50 text-xs h-7 px-2"
+                    className="border-green-300 text-green-700 hover:bg-green-50 text-xs min-h-9 h-auto whitespace-normal leading-tight px-2 w-full md:w-auto"
                     disabled={closingAction}
                     onClick={() => closeWithStatus("confirmo_que_pidio_turno")}
                   >
-                    <CheckCircle2 className="h-3 w-3 mr-1" />
+                    <CheckCircle2 className="h-3 w-3 mr-1 shrink-0" />
                     Ya pidió turno
                   </Button>
                   <Button
                     size="sm"
                     variant="outline"
-                    className="border-red-300 text-red-700 hover:bg-red-50 text-xs h-7 px-2"
+                    className="border-red-300 text-red-700 hover:bg-red-50 text-xs min-h-9 h-auto whitespace-normal leading-tight px-2 w-full md:w-auto"
                     disabled={closingAction}
                     onClick={() => closeWithStatus("no_pudo_pedir_turno")}
                   >
-                    <XCircle className="h-3 w-3 mr-1" />
+                    <XCircle className="h-3 w-3 mr-1 shrink-0" />
                     No pudo
                   </Button>
                 </>
@@ -277,13 +280,13 @@ export default function InboxPage() {
                 botPaused ? (
                   <>
                     <Button size="sm" variant="outline"
-                      className="text-xs h-7 px-2 border-green-300 text-green-700 hover:bg-green-50"
+                      className="text-xs min-h-9 h-auto whitespace-normal leading-tight px-2 w-full md:w-auto border-green-300 text-green-700 hover:bg-green-50"
                       disabled={togglingBot} onClick={() => changeHandoff("reactivate")}>
-                      <Bot className="h-3 w-3 mr-1" /> Resolver y reactivar
+                      <Bot className="h-3 w-3 mr-1 shrink-0" /> Resolver y reactivar
                     </Button>
                     {botPauseState?.state !== "closed" && (
                       <Button size="sm" variant="outline"
-                        className="text-xs h-7 px-2 border-gray-300 text-gray-600 hover:bg-gray-50"
+                        className="text-xs min-h-9 h-auto whitespace-normal leading-tight px-2 w-full md:w-auto border-gray-300 text-gray-600 hover:bg-gray-50"
                         disabled={togglingBot} onClick={() => changeHandoff("close")}>
                         Cerrar conversación
                       </Button>
@@ -291,9 +294,9 @@ export default function InboxPage() {
                   </>
                 ) : (
                   <Button size="sm" variant="outline"
-                    className="text-xs h-7 px-2 border-amber-300 text-amber-700 hover:bg-amber-50"
+                    className="text-xs min-h-9 h-auto whitespace-normal leading-tight px-2 w-full md:w-auto border-amber-300 text-amber-700 hover:bg-amber-50"
                     disabled={togglingBot} onClick={() => changeHandoff("take")}>
-                    <Users className="h-3 w-3 mr-1" /> Tomar conversación
+                    <Users className="h-3 w-3 mr-1 shrink-0" /> Tomar conversación
                   </Button>
                 )
               )}
@@ -309,8 +312,8 @@ export default function InboxPage() {
                   <span>IA</span>
                 </label>
               )}
-              <Link href={`/leads/${selectedLead.id}`}>
-                <Button variant="outline" size="sm" className="text-xs h-7 px-2">Ver</Button>
+              <Link href={`/leads/${selectedLead.id}`} className="w-full md:w-auto">
+                <Button variant="outline" size="sm" className="text-xs min-h-9 h-auto px-2 w-full md:w-auto">Ver</Button>
               </Link>
             </div>
           </div>
