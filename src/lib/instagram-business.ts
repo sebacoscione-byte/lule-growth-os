@@ -215,6 +215,50 @@ export async function getInstagramAccountInsights(token: string): Promise<Instag
   }
 }
 
+export type InstagramMediaInsightMetric = "reach" | "likes" | "comments" | "saved" | "shares"
+
+export interface InstagramMediaInsights {
+  reach: number | null
+  likes: number | null
+  comments: number | null
+  saved: number | null
+  shares: number | null
+}
+
+async function getMediaInsightMetric(
+  token: string,
+  mediaId: string,
+  metric: InstagramMediaInsightMetric
+): Promise<number | null> {
+  const params = new URLSearchParams({ metric, access_token: token })
+  const res = await fetch(`${GRAPH_BASE}/${mediaId}/insights?${params}`)
+  const data = await res.json() as InstagramInsightResponse
+  if (!res.ok || data.error) {
+    throw new Error(data.error?.message || `IG media insights error ${res.status}`)
+  }
+  return parseInstagramInsightValue(data)
+}
+
+/**
+ * Insights nativos de un post/carrusel ya publicado (requiere el media_id devuelto por
+ * publishContainer() al publicar, ver content-publish.ts). Igual que las métricas de cuenta: cada
+ * métrica se pide por separado porque Meta puede no habilitarla para un tipo de media puntual sin
+ * que eso deba ocultar las demás.
+ */
+export async function getInstagramMediaInsights(token: string, mediaId: string): Promise<InstagramMediaInsights> {
+  const metrics: InstagramMediaInsightMetric[] = ["reach", "likes", "comments", "saved", "shares"]
+  const results = await Promise.all(metrics.map(async metric => {
+    try {
+      return await getMediaInsightMetric(token, mediaId, metric)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      console.error(`[instagram-media-insights] media=${mediaId} metric=${metric}: ${message}`)
+      return null
+    }
+  }))
+  return { reach: results[0], likes: results[1], comments: results[2], saved: results[3], shares: results[4] }
+}
+
 interface BusinessDiscoveryData {
   username: string
   name?: string

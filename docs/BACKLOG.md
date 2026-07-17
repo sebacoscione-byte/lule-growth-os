@@ -1152,14 +1152,19 @@ público para pedir turno.
       Instagram, métricas/reputación de Google y enlaces medibles `/go/instagram` + `/go/google`.
       `landing_events.session_id` deduplica acciones por sesión anónima; las RPC agregan en SQL sin
       descargar eventos crudos. Los snapshots nuevos comparten `publish-content`, sin tercer cron.
-- [ ] **Insights por post de Instagram** (reach, likes, comments) — evaluado el 2026-07-13, no
-      implementado: `publishContainer()` en `src/lib/instagram-business.ts` devuelve el `mediaId`
-      de Meta pero **no se persiste en ninguna tabla** hoy (se pierde apenas termina el request de
-      publicar). Sin guardar ese ID no se puede pedir `/insights` de un post después de publicado.
-      Requiere primero agregar una tabla/columna que guarde `media_id` + `item_id` al publicar
-      (cambio de esquema), después sí una función de insights análoga a `getFollowerCount()`. El
-      scope de OAuth (`instagram_business_manage_insights`) ya está cargado, no hace falta
-      reconectar nada para esto.
+- [x] **Insights por post de Instagram** (reach, likes, comments) ✅ Resuelto (2026-07-17) —
+      evaluado el 2026-07-13, bloqueado por no persistir el `mediaId`. Ahora `content-publish.ts`
+      captura el `mediaId` que ya devolvía `publishContainer()` y lo guarda como
+      `instagram_media_id` en la pieza (`content_pipeline`, mismo mecanismo que el resto de los
+      campos — no hizo falta tabla nueva). `getInstagramMediaInsights()` en `instagram-business.ts`
+      pide reach/likes/comments/guardados/compartidos igual que `getInstagramAccountInsights()`
+      (cada métrica por separado, para que una no habilitada no tape las demás). Se piden **en
+      vivo, a pedido** (botón "Ver insights de Instagram" en cada card publicada de Biblioteca,
+      `GET /api/content/insights/[itemId]`) en vez de guardar un historial — evita pegarle a la API
+      de Meta en cada carga de la página. Solo disponible para piezas publicadas por este sistema
+      desde ahora en adelante; las publicadas antes no tienen `instagram_media_id` guardado.
+      Verificado con `npm run build`/`lint`/`test` (820/820) — no se pudo probar contra la cuenta
+      real de Instagram en este entorno (sin credenciales de Meta acá).
 - [x] **Tendencia de rating/reseñas de Google + Performance API** (2026-07-13): rating y cantidad
       de reseñas se toman de Places API, que ya funcionaba y no depende de la cuota de GBP. La tabla
       `google_business_snapshots` también está preparada para impresiones Search/Maps, clicks al

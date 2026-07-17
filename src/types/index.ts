@@ -204,6 +204,8 @@ export interface ContentItem {
   /** Calculado en /api/content/items desde landing_events (utm_content = id) — no se persiste en content_pipeline. */
   tracked_visits?: number
   tracked_interactions?: number
+  /** ID de media de Instagram devuelto por publishContainer() al publicar (post o carrusel). Permite pedir insights nativos (reach/likes/comments) después de publicado. null/undefined = nunca se publicó por API o se publicó antes de que esto existiera. */
+  instagram_media_id?: string | null
 }
 
 export interface AutoPublishTrackSettings {

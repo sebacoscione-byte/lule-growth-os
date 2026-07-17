@@ -21,25 +21,28 @@ export async function publishApprovedItem(
   options: { instagramImageDataUrl?: string } = {}
 ): Promise<{ item: ContentItem; allPublished: boolean }> {
   const result: NonNullable<ContentItem["auto_publish_result"]> = { ...item.auto_publish_result }
+  let instagramMediaId: string | null | undefined
 
   if (channelsToTry.includes("instagram")) {
     try {
       if (item.format === "carrusel") {
-        await publishCarouselToInstagram(supabase, {
+        const published = await publishCarouselToInstagram(supabase, {
           imageUrls: carouselImageUrls(item),
           caption: `${item.hook}\n\n${item.caption}\n\n${item.hashtags}`,
         })
+        instagramMediaId = published.mediaId
       } else {
         if (!item.visual_url && !options.instagramImageDataUrl) {
           throw new Error("Generá la placa final antes de publicar en Instagram.")
         }
-        await publishImageToInstagram(supabase, {
+        const published = await publishImageToInstagram(supabase, {
           itemId: item.id,
           imageUrl: item.visual_url,
           imageDataUrl: options.instagramImageDataUrl,
           caption: `${item.hook}\n\n${item.caption}\n\n${item.hashtags}`,
           format: item.format,
         })
+        instagramMediaId = published.mediaId
       }
       result.instagram = "published"
     } catch (error) {
@@ -66,6 +69,9 @@ export async function publishApprovedItem(
     auto_publish_result: result,
     status: allPublished ? "published" : item.status,
     updated_at: new Date().toISOString(),
+    // Se guarda el mismo media_id ante una republicación evergreen (repeat_interval_days): siempre
+    // corresponde al post más reciente, que es el que va a seguir acumulando insights.
+    ...(instagramMediaId ? { instagram_media_id: instagramMediaId } : {}),
   }
   return { item: nextItem, allPublished }
 }
