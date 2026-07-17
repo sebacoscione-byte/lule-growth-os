@@ -1,6 +1,11 @@
 # Lule Growth OS — Contexto para Claude
 
 ## Estado actual
+- 2026-07-17 (handoff UX): `taken_at` separa una derivación realmente pendiente de una conversación
+  ya tomada. El Inbox muestra “Paciente respondió” sólo cuando el último mensaje posterior a la toma
+  es entrante y limpia esa señal con la siguiente respuesta manual. Al reactivar, se envía un aviso
+  administrativo fijo —sin IA—; si la ventana de Meta está cerrada o el envío falla, el estado se
+  reactiva igual y la UI informa que el aviso no quedó confirmado.
 - 2026-07-17: el Inbox conserva durante 30 días los mensajes entrantes posteriores a que una persona
   toma la conversación (`messages.retention_class = handoff_transient`). Esos textos sólo se exponen
   a roles autorizados con MFA, no pasan por IA y no producen respuestas automáticas; la barrida

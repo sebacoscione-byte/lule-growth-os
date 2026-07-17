@@ -2,7 +2,7 @@ jest.mock("@/lib/supabase/server", () => ({ createClient: jest.fn() }))
 jest.mock("@/lib/supabase/service", () => ({ getServiceDb: jest.fn() }))
 jest.mock("@/lib/whatsapp-handoff", () => ({
   takeHandoffForLead: jest.fn().mockResolvedValue(undefined),
-  resolveHandoffForLead: jest.fn().mockResolvedValue(undefined),
+  resolveHandoffForLead: jest.fn().mockResolvedValue({ noticeSent: true, noticeStatus: "sent" }),
 }))
 jest.mock("@/lib/staff-authz", () => ({
   authorizeStaff: jest.fn(async (supabase: { auth: { getUser: () => Promise<{ data: { user: unknown } }> } }) => {
@@ -108,6 +108,11 @@ describe("PATCH /api/whatsapp/bot-pause", () => {
     const response = await PATCH(patchRequest({ lead_id: "lead-1", paused: false }))
 
     expect(response.status).toBe(200)
+    expect(await response.json()).toEqual({
+      paused: false,
+      notice_sent: true,
+      notice_status: "sent",
+    })
     expect(resolveHandoffForLead).toHaveBeenCalledWith("lead-1", "staff-1")
     expect(takeHandoffForLead).not.toHaveBeenCalled()
   })

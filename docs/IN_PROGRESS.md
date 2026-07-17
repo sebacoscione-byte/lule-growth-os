@@ -1,3 +1,15 @@
+# EN CURSO (2026-07-17) — estados del handoff y aviso de reactivación
+
+- [x] Confirmar que el Inbox trataba todo handoff abierto como “esperando”, incluso después de `taken_at`.
+- [x] Mostrar “esperando” sólo antes de que alguien tome la conversación.
+- [x] Alertar si el último mensaje posterior a la toma es del paciente y limpiar la alerta al responderle.
+- [x] Enviar un aviso administrativo fijo al reactivar el bot, sin IA y respetando la ventana de Meta.
+- [x] Cubrir reactivación idempotente, ventana cerrada, estados del Inbox y rutas con tests.
+- [x] Ejecutar lint, 87 suites/820 tests y build de producción.
+- [ ] Publicar por PR, verificar CI/Vercel y comprobar producción.
+
+---
+
 # EN CURSO (2026-07-17) — mensajes de handoff e Inbox móvil
 
 - [x] Confirmar que el Inbox refresca mensajes cada 8 segundos y que el problema ocurre antes de la UI.

@@ -1,12 +1,13 @@
 import { createHash } from "node:crypto"
 import { getServiceDb } from "@/lib/supabase/service"
 import { sendHandoffAlert, sendHandoffReminderAlert } from "@/lib/alert-email"
-import { sendTemplate } from "@/lib/whatsapp"
+import { sendTemplate, sendText } from "@/lib/whatsapp"
 import { getApprovedTemplate } from "@/lib/whatsapp-templates"
 import { getWhatsAppSettings } from "@/lib/whatsapp-settings"
+import { getWindowState } from "@/lib/whatsapp-window"
 import { PUBLIC_SITE_ORIGIN } from "@/lib/tracked-links"
 import { timeAgo } from "@/lib/utils"
-import type { HandoffReason } from "@/types"
+import type { HandoffReason, WhatsAppEntryPoint } from "@/types"
 
 // Segundo canal (además del email) para la alerta en tiempo real -- a pedido explícito de Seba
 // (2026-07-15), más probable de notarse al toque que un mail. Requiere un template aprobado por
@@ -15,6 +16,15 @@ import type { HandoffReason } from "@/types"
 // que el resto de las alertas del proyecto). No reemplaza el email: si Meta rechaza el template o
 // tarda en aprobarlo, el email sigue funcionando igual que antes.
 const INTERNAL_ALERT_TEMPLATE_NAME = "alerta_interna_derivacion"
+
+export const BOT_REACTIVATED_NOTICE =
+  "Finalizó la atención manual de la Dra. Lucía o su equipo. Desde ahora, el asistente automático continuará ayudándote con la gestión administrativa. Este canal no brinda diagnósticos ni indicaciones médicas."
+
+export type BotReactivationNoticeStatus = "sent" | "window_closed" | "send_failed" | "already_active"
+export interface BotReactivationResult {
+  noticeSent: boolean
+  noticeStatus: BotReactivationNoticeStatus
+}
 
 const HANDOFF_REASON_LABELS: Record<HandoffReason, string> = {
   urgencia_medica: "Posible urgencia médica",
@@ -197,9 +207,51 @@ export async function takeHandoffForLead(leadId: string, takenBy: string): Promi
   await transitionHandoffForLead(leadId, takenBy, "take")
 }
 
-/** Cierra el handoff y permite que el bot vuelva al último estado seguro de la conversación. */
-export async function resolveHandoffForLead(leadId: string, resolvedBy: string): Promise<void> {
+/** Cierra el handoff, reactiva el bot y avisa al paciente con un texto fijo, nunca generado por IA. */
+export async function resolveHandoffForLead(
+  leadId: string,
+  resolvedBy: string
+): Promise<BotReactivationResult> {
+  const db = getServiceDb()
+  const { data: session, error } = await db
+    .from("whatsapp_sessions")
+    .select("phone, last_inbound_at, entry_point, bot_paused, state_version")
+    .eq("lead_id", leadId)
+    .maybeSingle()
+  if (error || !session?.phone) throw new Error("No se pudo encontrar la conversación de WhatsApp")
+
+  // Hace idempotente una repetición del request: no vuelve a cambiar el estado ni duplica el aviso.
+  if (session.bot_paused !== true) {
+    return { noticeSent: false, noticeStatus: "already_active" }
+  }
+
   await transitionHandoffForLead(leadId, resolvedBy, "reactivate")
+
+  const entryPoint: WhatsAppEntryPoint = session.entry_point === "ctwa" || session.entry_point === "referral"
+    ? session.entry_point
+    : "organic"
+  if (getWindowState(session.last_inbound_at ?? null, entryPoint) === "closed") {
+    return { noticeSent: false, noticeStatus: "window_closed" }
+  }
+
+  const previousVersion = Number.isSafeInteger(session.state_version) ? Number(session.state_version) : 0
+  try {
+    const settings = await getWhatsAppSettings()
+    await sendText(session.phone, BOT_REACTIVATED_NOTICE, {
+      windowState: "open",
+      entryPoint,
+      leadId,
+      deliveryKey: `handoff-reactivated:${leadId}:${previousVersion}`,
+      outboundStep: "handoff_reactivated_notice",
+      flowIntent: "handoff_reactivated_notice",
+      requireActiveBot: true,
+      expectedStateVersion: previousVersion + 1,
+      serviceMessageChargingEnabled: settings.enable_service_message_charging,
+    })
+    return { noticeSent: true, noticeStatus: "sent" }
+  } catch {
+    return { noticeSent: false, noticeStatus: "send_failed" }
+  }
 }
 
 /** Cierra la conversación sin permitir nuevas respuestas automáticas hasta una reactivación manual. */
@@ -212,7 +264,12 @@ export async function closeHandoffForLead(leadId: string, closedBy: string): Pro
 // Inbox/`/leads` (Ola 4, P2). Sin filtro de leadIds recorre toda la tabla (es chica).
 export async function getOpenHandoffs(
   leadIds?: string[]
-): Promise<Map<string, { createdAt: string; reason: HandoffReason }>> {
+): Promise<Map<string, {
+  createdAt: string
+  reason: HandoffReason
+  takenAt: string | null
+  patientRepliedAt: string | null
+}>> {
   // `leadIds` distingue "sin filtro" (undefined) de "filtro vacío" (array vacío) -- este último no
   // debe devolver la tabla entera sin querer.
   if (leadIds && leadIds.length === 0) return new Map()
@@ -220,17 +277,85 @@ export async function getOpenHandoffs(
   const db = getServiceDb()
   let query = db
     .from("handoff_events")
-    .select("lead_id, reason, created_at")
+    .select("lead_id, reason, created_at, taken_at")
     .is("resolved_at", null)
     .not("lead_id", "is", null)
     .order("created_at", { ascending: true })
   if (leadIds) query = query.in("lead_id", leadIds)
 
   const { data } = await query
-  const result = new Map<string, { createdAt: string; reason: HandoffReason }>()
+  const result = new Map<string, {
+    createdAt: string
+    reason: HandoffReason
+    takenAt: string | null
+    patientRepliedAt: string | null
+  }>()
   for (const row of data ?? []) {
     if (!row.lead_id || result.has(row.lead_id)) continue
-    result.set(row.lead_id, { createdAt: row.created_at, reason: row.reason as HandoffReason })
+    result.set(row.lead_id, {
+      createdAt: row.created_at,
+      reason: row.reason as HandoffReason,
+      takenAt: row.taken_at ?? null,
+      patientRepliedAt: null,
+    })
+  }
+
+  // Tomar manualmente una conversación que no venía de una derivación también pausa el bot. En
+  // ese caso puede no existir un handoff_event previo; la sesión es la fuente de verdad de la toma.
+  if (leadIds) {
+    const missingLeadIds = leadIds.filter(leadId => !result.has(leadId))
+    if (missingLeadIds.length > 0) {
+      const { data: activeSessions } = await db
+        .from("whatsapp_sessions")
+        .select("lead_id, handoff_started_at")
+        .in("lead_id", missingLeadIds)
+        .eq("bot_paused", true)
+        .eq("state", "human_active")
+      for (const session of activeSessions ?? []) {
+        if (!session.lead_id || !session.handoff_started_at) continue
+        result.set(session.lead_id, {
+          createdAt: session.handoff_started_at,
+          reason: "solicitud_explicita",
+          takenAt: session.handoff_started_at,
+          patientRepliedAt: null,
+        })
+      }
+    }
+  }
+
+  const taken = [...result.entries()].filter(([, handoff]) => handoff.takenAt !== null)
+  if (taken.length === 0) return result
+
+  const takenIds = taken.map(([leadId]) => leadId)
+  const earliestTakenAt = taken
+    .map(([, handoff]) => handoff.takenAt as string)
+    .sort()[0]
+  const { data: messageRows } = await db
+    .from("messages")
+    .select("lead_id, direction, created_at")
+    .in("lead_id", takenIds)
+    .in("direction", ["inbound", "outbound"])
+    .gte("created_at", earliestTakenAt)
+    .order("created_at", { ascending: false })
+    .limit(2000)
+
+  const latestInbound = new Map<string, string>()
+  const latestOutbound = new Map<string, string>()
+  for (const row of messageRows ?? []) {
+    const handoff = result.get(row.lead_id)
+    if (!handoff?.takenAt || row.created_at < handoff.takenAt) continue
+    const target = row.direction === "inbound" ? latestInbound : latestOutbound
+    const current = target.get(row.lead_id)
+    if (!current || row.created_at > current) target.set(row.lead_id, row.created_at)
+  }
+
+  for (const [leadId, handoff] of taken) {
+    const inboundAt = latestInbound.get(leadId) ?? null
+    const outboundAt = latestOutbound.get(leadId) ?? null
+    result.set(leadId, {
+      ...handoff,
+      patientRepliedAt: inboundAt && (!outboundAt || inboundAt > outboundAt) ? inboundAt : null,
+    })
   }
   return result
 }
@@ -247,7 +372,8 @@ export async function runHandoffReminderCheck(now: Date): Promise<HandoffReminde
   try {
     const open = await getOpenHandoffs()
     const stale = [...open.entries()].filter(
-      ([, h]) => now.getTime() - new Date(h.createdAt).getTime() >= HANDOFF_REMINDER_STALE_MINUTES * 60_000
+      ([, h]) => !h.takenAt &&
+        now.getTime() - new Date(h.createdAt).getTime() >= HANDOFF_REMINDER_STALE_MINUTES * 60_000
     )
     if (stale.length === 0) return { pending: 0 }
 
