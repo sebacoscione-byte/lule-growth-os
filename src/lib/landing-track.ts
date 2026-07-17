@@ -8,7 +8,7 @@ export type LandingEventType =
   | "instructions_viewed" | "form_started" | "form_submitted"
   | "page_view"
   | "click_booking" | "click_call" | "click_whatsapp" | "click_maps"
-  | "click_hero_primary" | "click_hero_secondary"
+  | "click_hero_primary" | "click_hero_secondary" | "click_instagram"
 
 function getLandingSessionId(): string | undefined {
   if (typeof window === "undefined") return undefined

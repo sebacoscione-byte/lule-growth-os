@@ -20,6 +20,7 @@ import { AnalyticsConsentBanner } from "@/components/analytics-consent-banner"
 import { EcgDivider } from "@/components/ecg-divider"
 import { LandingInteractions, type SedeAction } from "./landing-interactions"
 import { HeroCtaLink } from "./hero-cta-link"
+import { InstagramTrustLink } from "./instagram-trust-link"
 
 export const dynamic = "force-dynamic"
 
@@ -197,6 +198,21 @@ async function getConfigDoctor(): Promise<ConfigDoctor> {
   }
 }
 
+// Username real solo si Instagram está conectado (queda guardado en app_config al conectar,
+// ver src/lib/instagram-business.ts, y sobrevive aunque el token de acceso venza -- no depende de
+// un token válido, solo de que se haya conectado alguna vez y no se haya desconectado). Sin esto,
+// no se muestra ningún link -- mismo criterio que el resto de la página (nunca mostrar un dato
+// inventado o un link roto).
+async function getInstagramUsername(): Promise<string | null> {
+  try {
+    const supabase = getServiceDb()
+    const { data } = await supabase.from("app_config").select("value").eq("key", "instagram_username").single()
+    return typeof data?.value === "string" && data.value ? data.value : null
+  } catch {
+    return null
+  }
+}
+
 function matchConfigLocation(locName: string, configLocations: ConfigLocation[]): ConfigLocation | undefined {
   const lower = locName.toLowerCase()
   return configLocations.find(c => {
@@ -289,10 +305,11 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
 
   const isMain = slug === "dra-lucia-chahin"
   const heroVariant = isMain ? await getHeroVariant() : undefined
-  const [configLocations, configDoctor, placeReviews] = await Promise.all([
+  const [configLocations, configDoctor, placeReviews, instagramUsername] = await Promise.all([
     getConfigLocations(),
     getConfigDoctor(),
     isMain ? getGooglePlaceReviews() : Promise.resolve(null),
+    getInstagramUsername(),
   ])
   const specializations = configDoctor.specializations ?? []
   const conditionsTreated = configDoctor.conditions_treated ?? []
@@ -437,6 +454,12 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
                   Consultas cardiológicas y ecocardiogramas · {isMain ? "Lanús, CABA y Lomas de Zamora" : "Lanús y Lomas de Zamora"}
                 </p>
 
+                {instagramUsername && (
+                  <div className="mt-4 flex justify-center sm:justify-start">
+                    <InstagramTrustLink slug={slug} username={instagramUsername} />
+                  </div>
+                )}
+
                 <div className="mt-6 flex flex-wrap justify-center gap-3 sm:justify-start">
                   {/* Test A/B del hero: variante "b" invierte cual boton es primario. Ver getHeroVariant arriba. */}
                   {(() => {
@@ -489,6 +512,11 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
           <div className="mx-auto max-w-2xl text-center">
             <h1 className="font-display text-3xl font-semibold text-ink mb-4">{data.h1}</h1>
             <p className="text-lg text-ink-soft mb-6">{data.intro}</p>
+            {instagramUsername && (
+              <div className="mb-6 flex justify-center">
+                <InstagramTrustLink slug={slug} username={instagramUsername} />
+              </div>
+            )}
             <div className="flex flex-wrap justify-center gap-3">
               <a
                 href="#pedir-turno"
