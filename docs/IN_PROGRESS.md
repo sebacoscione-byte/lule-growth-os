@@ -6,7 +6,8 @@
 - [x] Enviar un aviso administrativo fijo al reactivar el bot, sin IA y respetando la ventana de Meta.
 - [x] Cubrir reactivación idempotente, ventana cerrada, estados del Inbox y rutas con tests.
 - [x] Ejecutar lint, 87 suites/820 tests y build de producción.
-- [ ] Publicar por PR, verificar CI/Vercel y comprobar producción.
+- [x] Publicar por PR #107 y verificar CI/Vercel; la revisión visual interactiva no estuvo disponible
+      en esta sesión y se reemplazó por build, tests y comprobaciones de despliegue.
 
 ---
 
