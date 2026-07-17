@@ -68,9 +68,11 @@ de Meta.
 - [x] **Preflight de Meta:** Vercel Production fija `META_GRAPH_API_VERSION=v25.0`; un GET read-only
   valida versión, token e ID sin enviar mensajes ni devolver credenciales/identificadores. El cron
   diario alerta por email con códigos cerrados si deja de funcionar.
-- [ ] **Template interno de Meta:** `ALERT_WHATSAPP_TO` ya está configurado como sensible en Vercel
-  Production y el redeploy quedó `Ready`. Falta que Meta apruebe la versión genérica de una variable
-  de `alerta_interna_derivacion`, hoy `pendiente_meta`; el email sigue funcionando como respaldo.
+- [x] ~~**Template interno de Meta:** falta que Meta apruebe `alerta_interna_derivacion`~~
+  **Resuelto (2026-07-17)** — Meta lo aprobó, Seba lo marcó "Aprobado" en Configuración →
+  Templates de WhatsApp, verificado en la base (`status: "aprobado"`). `ALERT_WHATSAPP_TO` ya
+  estaba configurado como sensible en Vercel Production — la alerta interna por WhatsApp ante una
+  derivación a humano ya puede mandarse de verdad, no solo por email.
 - [x] **Deploy y smoke:** PR #96 mergeado (`dcc0e47`), CI/Vercel producción verdes y smoke público
   más caso negativo del webhook aprobados. PR #97 mergeado (`d9434d7`) y scheduler/preflight/audit
   verificados en producción.
@@ -124,11 +126,11 @@ por qué tipo de acción es, para que sepas qué esperar de cada uno. El detalle
   mano por Seba en el dashboard); (2) `classifyWhatsAppIntent()` pedía `maxTokens: 20`, insuficiente
   para el modo JSON de Gemini (siempre cortaba la respuesta a mitad de camino) — corregido a `60`,
   verificado en vivo contra la API real. Ver CLAUDE.md → entrada 2026-07-15 para el detalle completo.
-- [ ] **Reaprobar el template `alerta_interna_derivacion` (actualizado 2026-07-16)**: el hardening
-  lo redujo a un texto genérico con **una sola variable**, un ID opaco `CASO-…`; ya no envía nombre
-  ni motivo por el aviso interno. El estado actual es `pendiente_meta`; hay que completar la
-  aprobación en WhatsApp Manager. `ALERT_WHATSAPP_TO` ya está configurado como
-  sensible en Producción; hasta que Meta apruebe el template, solo llega el email independiente.
+- [x] ~~**Reaprobar el template `alerta_interna_derivacion`**~~ **Resuelto (2026-07-17)** — Meta
+  aprobó la versión genérica de una sola variable (`CASO-…`, sin nombre ni motivo del paciente).
+  Marcado "Aprobado" en Configuración → Templates de WhatsApp, verificado `status: "aprobado"` en
+  la base. La alerta interna por WhatsApp ante una derivación a humano ya funciona de verdad,
+  además del email de respaldo.
 - [x] **Acceso a las APIs de Google Business Profile** (proyecto `app-lule`) — **solicitud enviada
   el 2026-07-12**, caso de asistencia de Google **`2-7574000041506`**, tiempo de revisión
   informado por Google: 7-10 días hábiles (no es instantáneo, y con volumen chico existe la
@@ -197,9 +199,8 @@ por qué tipo de acción es, para que sepas qué esperar de cada uno. El detalle
 - [x] ~~Confirmar que el `$0` (tarifa pública de Meta para Argentina) haya quedado guardado~~
   **Resuelto, verificado contra producción (2026-07-17)**: las combinaciones vigentes
   (marketing/service vía CTWA, y service/utility dentro de ventana hasta 2026-09-30) tienen
-  `cost_amount = 0` en `whatsapp_pricing_rules`. Los templates de seguimiento existentes conservan
-  su estado (9/10 `aprobado`); `alerta_interna_derivacion` sigue siendo la única excepción
-  (`pendiente_meta`, ver más abajo) — sigue pendiente esa reaprobación puntual.
+  `cost_amount = 0` en `whatsapp_pricing_rules`. Los 10 templates ya están `aprobado` —
+  `alerta_interna_derivacion` (la última que faltaba) se aprobó el 2026-07-17.
 
 ### 🕐 Cuando tengas tiempo (no urgente)
 - [x] ~~Conectar la CLI de Vercel para que un agente pueda tocar env vars directamente~~ **Resuelto
