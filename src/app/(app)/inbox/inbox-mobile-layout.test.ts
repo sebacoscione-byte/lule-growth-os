@@ -15,4 +15,10 @@ describe("Inbox mobile conversation header", () => {
   it("permite que los textos largos de las acciones ocupen mas de una linea", () => {
     expect(source).toContain("min-h-9 h-auto whitespace-normal leading-tight")
   })
+
+  it("distingue espera, conversacion tomada y nueva respuesta del paciente", () => {
+    expect(source).toContain("Esperando a una persona")
+    expect(source).toContain("Conversación tomada")
+    expect(source).toContain("Paciente respondió")
+  })
 })

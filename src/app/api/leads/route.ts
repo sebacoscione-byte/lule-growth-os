@@ -49,7 +49,11 @@ export async function GET(request: Request) {
 
   const withWait = leads.map(l => ({
     ...l,
-    handoff_waiting_since: openHandoffs.get(l.id)?.createdAt ?? null,
+    handoff_waiting_since: openHandoffs.get(l.id)?.takenAt
+      ? null
+      : openHandoffs.get(l.id)?.createdAt ?? null,
+    handoff_taken_at: openHandoffs.get(l.id)?.takenAt ?? null,
+    handoff_patient_replied_at: openHandoffs.get(l.id)?.patientRepliedAt ?? null,
   }))
   withWait.sort((a, b) => {
     if (a.handoff_waiting_since && b.handoff_waiting_since) {
@@ -57,6 +61,11 @@ export async function GET(request: Request) {
     }
     if (a.handoff_waiting_since) return -1
     if (b.handoff_waiting_since) return 1
+    if (a.handoff_patient_replied_at && b.handoff_patient_replied_at) {
+      return new Date(b.handoff_patient_replied_at).getTime() - new Date(a.handoff_patient_replied_at).getTime()
+    }
+    if (a.handoff_patient_replied_at) return -1
+    if (b.handoff_patient_replied_at) return 1
     return 0 // Array.prototype.sort es estable: conserva el orden por created_at desc ya traído.
   })
 

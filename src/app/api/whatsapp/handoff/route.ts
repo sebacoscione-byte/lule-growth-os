@@ -40,12 +40,20 @@ export async function POST(request: Request) {
     })
 
     const actor = auth.user.id
+    let reactivation = null
     if (body.data.action === "take") await takeHandoffForLead(body.data.lead_id, actor)
-    if (body.data.action === "reactivate") await resolveHandoffForLead(body.data.lead_id, actor)
+    if (body.data.action === "reactivate") reactivation = await resolveHandoffForLead(body.data.lead_id, actor)
     if (body.data.action === "close") await closeHandoffForLead(body.data.lead_id, actor)
+
+    return NextResponse.json({
+      ok: true,
+      action: body.data.action,
+      ...(reactivation ? {
+        notice_sent: reactivation.noticeSent,
+        notice_status: reactivation.noticeStatus,
+      } : {}),
+    })
   } catch {
     return NextResponse.json({ error: "No se pudo ejecutar la acción de handoff" }, { status: 503 })
   }
-
-  return NextResponse.json({ ok: true, action: body.data.action })
 }

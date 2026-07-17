@@ -1,7 +1,7 @@
 jest.mock("@/lib/supabase/server", () => ({ createClient: jest.fn() }))
 jest.mock("@/lib/whatsapp-handoff", () => ({
   takeHandoffForLead: jest.fn(),
-  resolveHandoffForLead: jest.fn(),
+  resolveHandoffForLead: jest.fn().mockResolvedValue({ noticeSent: true, noticeStatus: "sent" }),
   closeHandoffForLead: jest.fn(),
 }))
 jest.mock("@/lib/staff-authz", () => ({
@@ -60,5 +60,19 @@ describe("POST /api/whatsapp/handoff", () => {
       method: "POST", body: JSON.stringify({ lead_id: "lead-1", action: "delete" }),
     }))
     expect(response.status).toBe(400)
+  })
+
+  it("devuelve al Inbox si el aviso de reactivacion llego al paciente", async () => {
+    auth({ id: "staff-1" })
+    const response = await POST(new Request("http://localhost/api/whatsapp/handoff", {
+      method: "POST", body: JSON.stringify({ lead_id: "lead-1", action: "reactivate" }),
+    }))
+
+    expect(await response.json()).toEqual({
+      ok: true,
+      action: "reactivate",
+      notice_sent: true,
+      notice_status: "sent",
+    })
   })
 })

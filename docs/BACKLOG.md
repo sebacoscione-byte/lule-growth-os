@@ -5,6 +5,13 @@
 
 ## Inbox — handoff humano y móvil (2026-07-17)
 
+- [x] Separar handoff pendiente de conversación tomada usando `taken_at`; una conversación tomada ya
+  no muestra ni dispara recordatorios de “esperando a una persona”.
+- [x] Señalar “Paciente respondió” cuando el último movimiento posterior a la toma es entrante y
+  quitar la señal después de la siguiente respuesta manual.
+- [x] Al reactivar el bot, enviar un aviso administrativo fijo al paciente. No usa IA; si la ventana
+  de Meta está cerrada o el proveedor no confirma el envío, el Inbox lo informa sin revertir la
+  reactivación ya completada.
 - [x] Mantener visibles los mensajes recibidos después de que el equipo toma una conversación,
   incluso si contienen una consulta clínica espontánea o el consentimiento administrativo anterior
   no es vigente. Sólo se conservan 30 días, con acceso de staff+MFA, sin IA ni respuesta automática.

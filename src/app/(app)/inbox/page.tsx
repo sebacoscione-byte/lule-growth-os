@@ -9,10 +9,13 @@ import { Input } from "@/components/ui/input"
 import { STATUS_LABELS, STATUS_COLORS, type Lead, type Message } from "@/types"
 import { timeAgo, formatDate } from "@/lib/utils"
 
-// Ola 4 (P2, incidente real 2026-07-14): /api/leads agrega este campo (no es parte de la tabla
-// `leads`) para los leads que están esperando a una persona del equipo, ya ordenados por el que
-// espera hace más tiempo.
-type LeadWithWait = Lead & { handoff_waiting_since?: string | null }
+// Estado operativo agregado por /api/leads; no son columnas de `leads`. Distingue una derivación
+// pendiente, una conversación ya tomada y una respuesta nueva del paciente.
+type LeadWithWait = Lead & {
+  handoff_waiting_since?: string | null
+  handoff_taken_at?: string | null
+  handoff_patient_replied_at?: string | null
+}
 
 export default function InboxPage() {
   const searchParams = useSearchParams()
@@ -89,10 +92,31 @@ export default function InboxPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ lead_id: selectedLeadId, action }),
     })
+    const data = await res.json()
     if (res.ok) {
       const nextPaused = action !== "reactivate"
       const nextState = action === "take" ? "human_active" : action === "close" ? "closed" : "nuevo"
       setBotPauseState({ leadId: selectedLeadId, value: nextPaused, state: nextState })
+      const now = new Date().toISOString()
+      setLeads(prev => prev.map(lead => lead.id === selectedLeadId
+        ? {
+            ...lead,
+            handoff_waiting_since: null,
+            handoff_taken_at: action === "take" ? now : null,
+            handoff_patient_replied_at: null,
+            requires_human: action !== "reactivate" && action !== "close",
+          }
+        : lead
+      ))
+      if (action === "reactivate" && data.notice_sent === false) {
+        if (data.notice_status === "window_closed") {
+          alert("El bot quedó reactivado, pero Meta no permite enviar el aviso porque la ventana de conversación está cerrada.")
+        } else if (data.notice_status === "send_failed") {
+          alert("El bot quedó reactivado, pero Meta no confirmó el envío del aviso automático.")
+        }
+      }
+    } else {
+      alert(data.error ?? "No se pudo cambiar el estado de la conversación.")
     }
     setTogglingBot(false)
   }
@@ -162,7 +186,20 @@ export default function InboxPage() {
     ])
     // El envío real por WhatsApp pausa el bot para esta conversación del lado del servidor —
     // reflejarlo acá al toque, sin esperar al próximo fetch de estado.
-    if (canSendWhatsApp) setBotPauseState({ leadId: selectedLeadId, value: true, state: "human_active" })
+    if (canSendWhatsApp) {
+      setBotPauseState({ leadId: selectedLeadId, value: true, state: "human_active" })
+      const now = new Date().toISOString()
+      setLeads(prev => prev.map(lead => lead.id === selectedLeadId
+        ? {
+            ...lead,
+            handoff_waiting_since: null,
+            handoff_taken_at: lead.handoff_taken_at ?? now,
+            handoff_patient_replied_at: null,
+            requires_human: true,
+          }
+        : lead
+      ))
+    }
     deliveryAttemptRef.current = null
     setInput("")
     setSending(false)
@@ -191,7 +228,7 @@ export default function InboxPage() {
             <button
               key={lead.id}
               onClick={() => setSelectedLeadId(lead.id)}
-              className={`w-full text-left p-3 border-b border-gray-100 hover:bg-gray-50 transition-colors ${selectedLeadId === lead.id ? "bg-blue-50 border-l-2 border-l-blue-600" : lead.handoff_waiting_since ? "bg-red-50/60" : ""}`}
+              className={`w-full text-left p-3 border-b border-gray-100 hover:bg-gray-50 transition-colors ${selectedLeadId === lead.id ? "bg-blue-50 border-l-2 border-l-blue-600" : lead.handoff_waiting_since ? "bg-red-50/60" : lead.handoff_patient_replied_at ? "bg-amber-50/70" : ""}`}
             >
               <div className="flex items-center justify-between gap-2">
                 <p className="text-sm font-medium text-gray-900 truncate">
@@ -207,6 +244,14 @@ export default function InboxPage() {
               {lead.handoff_waiting_since ? (
                 <p className="text-xs font-medium text-red-600 mt-0.5">
                   Esperando a una persona {timeAgo(lead.handoff_waiting_since)}
+                </p>
+              ) : lead.handoff_patient_replied_at ? (
+                <p className="text-xs font-semibold text-amber-700 mt-0.5">
+                  Paciente respondió {timeAgo(lead.handoff_patient_replied_at)}
+                </p>
+              ) : lead.handoff_taken_at ? (
+                <p className="text-xs font-medium text-blue-600 mt-0.5">
+                  Conversación tomada
                 </p>
               ) : (
                 <p className="text-xs text-gray-300 mt-0.5">{timeAgo(lead.created_at)}</p>

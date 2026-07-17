@@ -64,13 +64,20 @@ export async function PATCH(request: Request) {
       resourceId: result.data.lead_id,
       metadata: { paused: result.data.paused },
     })
+    let reactivation = null
     if (result.data.paused) {
       await takeHandoffForLead(result.data.lead_id, auth.user.id)
     } else {
-      await resolveHandoffForLead(result.data.lead_id, auth.user.id)
+      reactivation = await resolveHandoffForLead(result.data.lead_id, auth.user.id)
     }
+    return NextResponse.json({
+      paused: result.data.paused,
+      ...(reactivation ? {
+        notice_sent: reactivation.noticeSent,
+        notice_status: reactivation.noticeStatus,
+      } : {}),
+    })
   } catch {
     return NextResponse.json({ error: "No se pudo cambiar el estado del bot" }, { status: 503 })
   }
-  return NextResponse.json({ paused: result.data.paused })
 }

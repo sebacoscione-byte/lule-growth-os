@@ -3,7 +3,10 @@ jest.mock("@/lib/alert-email", () => ({
   sendHandoffAlert: jest.fn().mockResolvedValue(undefined),
   sendHandoffReminderAlert: jest.fn().mockResolvedValue(undefined),
 }))
-jest.mock("@/lib/whatsapp", () => ({ sendTemplate: jest.fn().mockResolvedValue({}) }))
+jest.mock("@/lib/whatsapp", () => ({
+  sendTemplate: jest.fn().mockResolvedValue({}),
+  sendText: jest.fn().mockResolvedValue({}),
+}))
 jest.mock("@/lib/whatsapp-templates", () => ({ getApprovedTemplate: jest.fn() }))
 jest.mock("@/lib/whatsapp-settings", () => ({
   getWhatsAppSettings: jest.fn().mockResolvedValue({ enable_service_message_charging: false }),
@@ -11,6 +14,7 @@ jest.mock("@/lib/whatsapp-settings", () => ({
 
 import {
   buildHandoffSummary,
+  BOT_REACTIVATED_NOTICE,
   closeHandoffForLead,
   escalateToHuman,
   formatHandoffAlertText,
@@ -21,12 +25,13 @@ import {
 } from "@/lib/whatsapp-handoff"
 import { getServiceDb } from "@/lib/supabase/service"
 import { sendHandoffAlert, sendHandoffReminderAlert } from "@/lib/alert-email"
-import { sendTemplate } from "@/lib/whatsapp"
+import { sendTemplate, sendText } from "@/lib/whatsapp"
 import { getApprovedTemplate } from "@/lib/whatsapp-templates"
+import { getWhatsAppSettings } from "@/lib/whatsapp-settings"
 
 function makeThenableBuilder(result: { data: unknown; error: unknown }) {
   const builder: Record<string, unknown> = {}
-  for (const method of ["select", "eq", "order", "limit", "is", "not", "in"]) {
+  for (const method of ["select", "eq", "order", "limit", "is", "not", "in", "gte"]) {
     builder[method] = jest.fn(() => builder)
   }
   builder.maybeSingle = jest.fn(() => Promise.resolve(result))
@@ -36,18 +41,33 @@ function makeThenableBuilder(result: { data: unknown; error: unknown }) {
 
 function mockDb(options: {
   handoffEvents?: { data: unknown; error: unknown }
+  messages?: { data: unknown; error: unknown }
+  session?: { data: unknown; error: unknown }
   rpcError?: unknown
 } = {}) {
   const handoffEvents = makeThenableBuilder(
     options.handoffEvents ?? { data: null, error: null }
   )
+  const messages = makeThenableBuilder(options.messages ?? { data: [], error: null })
+  const session = makeThenableBuilder(options.session ?? {
+    data: {
+      phone: "5491100000000",
+      last_inbound_at: new Date().toISOString(),
+      entry_point: "organic",
+      bot_paused: true,
+      state_version: 7,
+    },
+    error: null,
+  })
   const rpc = jest.fn().mockResolvedValue({ data: null, error: options.rpcError ?? null })
   const from = jest.fn((table: string) => {
-    if (table !== "handoff_events") throw new Error(`tabla inesperada: ${table}`)
-    return handoffEvents
+    if (table === "handoff_events") return handoffEvents
+    if (table === "messages") return messages
+    if (table === "whatsapp_sessions") return session
+    throw new Error(`tabla inesperada: ${table}`)
   })
   ;(getServiceDb as jest.Mock).mockReturnValue({ from, rpc })
-  return { handoffEvents, rpc, from }
+  return { handoffEvents, messages, session, rpc, from }
 }
 
 const SUMMARY = buildHandoffSummary({
@@ -70,6 +90,8 @@ const SUMMARY = buildHandoffSummary({
 
 beforeEach(() => {
   jest.clearAllMocks()
+  ;(sendText as jest.Mock).mockResolvedValue({})
+  ;(getWhatsAppSettings as jest.Mock).mockResolvedValue({ enable_service_message_charging: false })
   delete process.env.ALERT_WHATSAPP_TO
 })
 
@@ -212,7 +234,81 @@ describe("getOpenHandoffs", () => {
     expect(result.get("a")).toEqual({
       createdAt: "2026-07-14T10:00:00.000Z",
       reason: "solicitud_explicita",
+      takenAt: null,
+      patientRepliedAt: null,
     })
+  })
+
+  it("marca una respuesta del paciente solo si es posterior a la ultima salida del equipo", async () => {
+    mockDb({
+      handoffEvents: {
+        data: [{
+          lead_id: "a",
+          reason: "solicitud_explicita",
+          created_at: "2026-07-14T10:00:00.000Z",
+          taken_at: "2026-07-14T10:05:00.000Z",
+        }],
+        error: null,
+      },
+      messages: {
+        data: [
+          { lead_id: "a", direction: "inbound", created_at: "2026-07-14T10:10:00.000Z" },
+          { lead_id: "a", direction: "outbound", created_at: "2026-07-14T10:07:00.000Z" },
+        ],
+        error: null,
+      },
+    })
+
+    const result = await getOpenHandoffs(["a"])
+
+    expect(result.get("a")).toEqual(expect.objectContaining({
+      takenAt: "2026-07-14T10:05:00.000Z",
+      patientRepliedAt: "2026-07-14T10:10:00.000Z",
+    }))
+  })
+
+  it("limpia la alerta de respuesta cuando el equipo contesta despues", async () => {
+    mockDb({
+      handoffEvents: {
+        data: [{
+          lead_id: "a",
+          reason: "solicitud_explicita",
+          created_at: "2026-07-14T10:00:00.000Z",
+          taken_at: "2026-07-14T10:05:00.000Z",
+        }],
+        error: null,
+      },
+      messages: {
+        data: [
+          { lead_id: "a", direction: "outbound", created_at: "2026-07-14T10:12:00.000Z" },
+          { lead_id: "a", direction: "inbound", created_at: "2026-07-14T10:10:00.000Z" },
+        ],
+        error: null,
+      },
+    })
+
+    const result = await getOpenHandoffs(["a"])
+    expect(result.get("a")?.patientRepliedAt).toBeNull()
+  })
+
+  it("reconoce una toma manual aunque no existiera una derivacion previa", async () => {
+    mockDb({
+      handoffEvents: { data: [], error: null },
+      session: {
+        data: [{
+          lead_id: "a",
+          handoff_started_at: "2026-07-14T10:05:00.000Z",
+        }],
+        error: null,
+      },
+    })
+
+    const result = await getOpenHandoffs(["a"])
+
+    expect(result.get("a")).toEqual(expect.objectContaining({
+      takenAt: "2026-07-14T10:05:00.000Z",
+      patientRepliedAt: null,
+    }))
   })
 
   it("no consulta la tabla con un filtro vacio", async () => {
@@ -222,11 +318,78 @@ describe("getOpenHandoffs", () => {
   })
 })
 
+describe("aviso al reactivar el bot", () => {
+  it("envia un texto fijo administrativo despues de reactivar", async () => {
+    mockDb()
+
+    const result = await resolveHandoffForLead("lead-1", "staff-1")
+
+    expect(result).toEqual({ noticeSent: true, noticeStatus: "sent" })
+    expect(sendText).toHaveBeenCalledWith(
+      "5491100000000",
+      BOT_REACTIVATED_NOTICE,
+      expect.objectContaining({
+        leadId: "lead-1",
+        flowIntent: "handoff_reactivated_notice",
+        requireActiveBot: true,
+        expectedStateVersion: 8,
+      })
+    )
+  })
+
+  it("reactiva igual pero informa si Meta ya cerro la ventana de texto libre", async () => {
+    mockDb({
+      session: {
+        data: {
+          phone: "5491100000000",
+          last_inbound_at: "2026-07-10T10:00:00.000Z",
+          entry_point: "organic",
+          bot_paused: true,
+          state_version: 7,
+        },
+        error: null,
+      },
+    })
+
+    const result = await resolveHandoffForLead("lead-1", "staff-1")
+
+    expect(result).toEqual({ noticeSent: false, noticeStatus: "window_closed" })
+    expect(sendText).not.toHaveBeenCalled()
+  })
+
+  it("no revierte la reactivacion si Meta no confirma el aviso", async () => {
+    mockDb()
+    ;(sendText as jest.Mock).mockRejectedValue(new Error("provider unavailable"))
+
+    await expect(resolveHandoffForLead("lead-1", "staff-1")).resolves.toEqual({
+      noticeSent: false,
+      noticeStatus: "send_failed",
+    })
+  })
+})
+
 describe("runHandoffReminderCheck", () => {
   it("no alerta si no hay handoffs vencidos", async () => {
     mockDb({
       handoffEvents: {
         data: [{ lead_id: "a", reason: "solicitud_explicita", created_at: "2026-07-14T11:45:00.000Z" }],
+        error: null,
+      },
+    })
+
+    await expect(runHandoffReminderCheck(new Date("2026-07-14T12:00:00.000Z"))).resolves.toEqual({ pending: 0 })
+    expect(sendHandoffReminderAlert).not.toHaveBeenCalled()
+  })
+
+  it("no sigue avisando que espera una persona despues de que el equipo lo tomo", async () => {
+    mockDb({
+      handoffEvents: {
+        data: [{
+          lead_id: "a",
+          reason: "solicitud_explicita",
+          created_at: "2026-07-14T05:00:00.000Z",
+          taken_at: "2026-07-14T05:10:00.000Z",
+        }],
         error: null,
       },
     })
