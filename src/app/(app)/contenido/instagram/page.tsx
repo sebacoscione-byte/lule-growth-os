@@ -1090,7 +1090,11 @@ export default function ContentStudioPage() {
     const slides = Array.isArray(rawSlides)
       ? (rawSlides as Array<Record<string, unknown>>)
           .filter(s => typeof s.headline === "string" && typeof s.text === "string")
-          .map(s => ({ headline: (s.headline as string).slice(0, 60), text: (s.text as string).slice(0, 300) }))
+          .map(s => ({
+            headline: (s.headline as string).slice(0, 60),
+            text: (s.text as string).slice(0, 300),
+            image_prompt: typeof s.image_prompt === "string" ? s.image_prompt.slice(0, 2400) : undefined,
+          }))
       : undefined
     const rawScenes = generated.scenes
     const scenes = Array.isArray(rawScenes)
@@ -2025,6 +2029,9 @@ function Editor({
   const [slideErrors, setSlideErrors] = useState<Record<number, string>>({})
   const [bulkGenerating, setBulkGenerating] = useState(false)
   const [bulkError, setBulkError] = useState<string | null>(null)
+  const [expandedSlideScene, setExpandedSlideScene] = useState<Set<number>>(new Set())
+  const [slideSceneGeneratingIndex, setSlideSceneGeneratingIndex] = useState<number | null>(null)
+  const [slideSceneErrors, setSlideSceneErrors] = useState<Record<number, string>>({})
   const fileInputRef = useRef<HTMLInputElement>(null)
   const imagePrompt = item.image_prompt?.trim() || fallbackImagePrompt(item)
   const displayedVisualUrl = generatedVisual?.itemId === item.id ? generatedVisual.url : item.visual_url
@@ -2042,7 +2049,7 @@ function Editor({
   // el resto de las acciones que tocan "slides": todas leen/escriben el array completo del item en un
   // closure fijo al momento de arrancar, asi que dos acciones superpuestas (ej. generar la slide 0 y
   // editar el texto de la slide 1 mientras tanto) pueden pisarse -- serializar evita la carrera.
-  const carruselBusy = bulkGenerating || slideGeneratingIndex !== null || busy
+  const carruselBusy = bulkGenerating || slideGeneratingIndex !== null || slideSceneGeneratingIndex !== null || busy
 
   function updateSlide(index: number, changes: Partial<ContentSlide>) {
     if (!item.slides) return
@@ -2062,9 +2069,11 @@ function Editor({
   function removeSlide(index: number) {
     if (carruselBusy || !item.slides) return
     onChange({ ...item, slides: item.slides.filter((_, slideIndex) => slideIndex !== index) })
-    // Los errores quedan indexados por posicion -- tras sacar una slide, los indices se corren y un
-    // error viejo podria mostrarse bajo la slide equivocada. Mas simple limpiar todo que reindexar.
+    // Los errores/estado quedan indexados por posicion -- tras sacar una slide, los indices se corren
+    // y quedarian mostrados bajo la slide equivocada. Mas simple limpiar todo que reindexar.
     setSlideErrors({})
+    setSlideSceneErrors({})
+    setExpandedSlideScene(new Set())
   }
 
   function updateScene(index: number, changes: Partial<ContentScene>) {
@@ -2147,10 +2156,10 @@ function Editor({
   /**
    * Genera y persiste una imagen individual (portada o una slide puntual) vía /api/content/visual,
    * sin tocar el estado del item — quien llama decide qué hacer con la URL resultante. Se usa tanto
-   * para la portada como para cada slide del carrusel, reusando el mismo "look" (imagePrompt) con un
-   * titular/subtítulo distinto por imagen.
+   * para la portada (con imagePrompt, el look compartido) como para cada slide del carrusel (con la
+   * escena propia de esa slide vía promptOverride), con un titular/subtítulo distinto por imagen.
    */
-  async function generateOneVisual(headline: string, subtitle: string, idSuffix: string): Promise<{ visual_url?: string; error?: string }> {
+  async function generateOneVisual(headline: string, subtitle: string, idSuffix: string, promptOverride?: string): Promise<{ visual_url?: string; error?: string }> {
     try {
       const response = await fetch("/api/content/visual", {
         method: "POST",
@@ -2162,7 +2171,7 @@ function Editor({
           format: item.format,
           visual_headline: headline || item.topic.slice(0, 90),
           visual_subtitle: subtitle,
-          image_prompt: imagePrompt,
+          image_prompt: promptOverride ?? imagePrompt,
         }),
       })
       const data = await response.json()
@@ -2171,6 +2180,35 @@ function Editor({
       return { visual_url: data.visual_url }
     } catch {
       return { error: "No se pudo conectar con Gemini para generar esta imagen." }
+    }
+  }
+
+  /**
+   * Pide una escena propia para una slide (distinta a la portada) vía /api/content/image-direction.
+   * Se usa tanto para completar automaticamente una slide sin descripcion propia antes de renderizar
+   * su imagen, como para el boton "Nueva escena" que la reemplaza a pedido. Nunca tira: si falla,
+   * quien llama decide el fallback (hoy, reusar la direccion de la portada).
+   */
+  async function fetchSlideScene(slide: ContentSlide, previous?: string): Promise<{ image_prompt?: string; error?: string }> {
+    try {
+      const response = await fetch("/api/content/image-direction", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          category: item.category,
+          topic: item.topic,
+          format: item.format,
+          visual_headline: slide.headline || item.topic.slice(0, 90),
+          visual_subtitle: slide.text.slice(0, 90),
+          caption: slide.text,
+          previous_image_prompt: previous ?? imagePrompt,
+        }),
+      })
+      const data = await response.json()
+      if (!response.ok || data.error) return { error: data.error ?? "No se pudo generar una escena para esta slide." }
+      return { image_prompt: data.image_prompt as string }
+    } catch {
+      return { error: "No se pudo conectar con la IA para generar la escena de esta slide." }
     }
   }
 
@@ -2184,11 +2222,16 @@ function Editor({
     ) return
     setSlideGeneratingIndex(index)
     setSlideErrors(previous => { const next = { ...previous }; delete next[index]; return next })
-    const result = await generateOneVisual(slide.headline, slide.text.slice(0, 90), `-slide-${index}`)
+    let slidePrompt = slide.image_prompt?.trim()
+    if (!slidePrompt) {
+      const scene = await fetchSlideScene(slide)
+      slidePrompt = scene.image_prompt
+    }
+    const result = await generateOneVisual(slide.headline, slide.text.slice(0, 90), `-slide-${index}`, slidePrompt)
     if (result.error) {
       setSlideErrors(previous => ({ ...previous, [index]: result.error as string }))
     } else {
-      onSave({ slides: (item.slides ?? []).map((s, i) => i === index ? { ...s, visual_url: result.visual_url } : s) })
+      onSave({ slides: (item.slides ?? []).map((s, i) => i === index ? { ...s, visual_url: result.visual_url, image_prompt: slidePrompt ?? s.image_prompt } : s) })
     }
     setSlideGeneratingIndex(null)
   }
@@ -2215,13 +2258,18 @@ function Editor({
     const slides = item.slides ?? []
     const nextSlides: ContentSlide[] = [...slides]
     for (let index = 0; index < slides.length; index++) {
-      const result = await generateOneVisual(slides[index].headline, slides[index].text.slice(0, 90), `-slide-${index}`)
+      let slidePrompt = slides[index].image_prompt?.trim()
+      if (!slidePrompt) {
+        const scene = await fetchSlideScene(slides[index])
+        slidePrompt = scene.image_prompt
+      }
+      const result = await generateOneVisual(slides[index].headline, slides[index].text.slice(0, 90), `-slide-${index}`, slidePrompt)
       if (result.error) {
         setBulkError(`Slide ${index + 1}: ${result.error} Las imágenes generadas hasta acá ya quedaron guardadas.`)
         setBulkGenerating(false)
         return
       }
-      nextSlides[index] = { ...slides[index], visual_url: result.visual_url }
+      nextSlides[index] = { ...slides[index], visual_url: result.visual_url, image_prompt: slidePrompt ?? slides[index].image_prompt }
       onSave({ slides: [...nextSlides] })
     }
     setBulkGenerating(false)
@@ -2288,6 +2336,35 @@ function Editor({
     } finally {
       setDirectionGenerating(false)
     }
+  }
+
+  function toggleSlideScene(index: number) {
+    setExpandedSlideScene(previous => {
+      const next = new Set(previous)
+      if (next.has(index)) next.delete(index)
+      else next.add(index)
+      return next
+    })
+  }
+
+  async function regenerateSlideScene(index: number) {
+    if (carruselBusy) return
+    const slide = item.slides?.[index]
+    if (!slide) return
+    if (
+      slide.image_prompt?.trim() &&
+      !window.confirm("Esto va a reemplazar la escena de esta slide por un concepto nuevo. ¿Continuar?")
+    ) return
+    setSlideSceneGeneratingIndex(index)
+    setSlideSceneErrors(previous => { const next = { ...previous }; delete next[index]; return next })
+    const scene = await fetchSlideScene(slide, slide.image_prompt || imagePrompt)
+    if (scene.error) {
+      setSlideSceneErrors(previous => ({ ...previous, [index]: scene.error as string }))
+    } else {
+      onSave({ slides: (item.slides ?? []).map((s, i) => i === index ? { ...s, image_prompt: scene.image_prompt } : s) })
+      setExpandedSlideScene(previous => new Set(previous).add(index))
+    }
+    setSlideSceneGeneratingIndex(null)
   }
 
   function saveChanges() {
@@ -2446,8 +2523,9 @@ function Editor({
               </CardTitle>
               <p className="text-xs text-gray-600">
                 Cada slide necesita su propia imagen para poder aprobar y publicar el carrusel completo.
-                Generalas todas juntas o de a una — todas usan la misma dirección visual de arriba, con el
-                titular y texto de cada slide.
+                Cada una tiene su propia escena (mismo estilo y paleta que la portada, pero un sujeto
+                distinto) para que no se repita la misma foto de fondo con solo el texto cambiado — si
+                no le cargás una descripción propia, se genera una automáticamente al crear la imagen.
               </p>
             </CardHeader>
             <CardContent className="space-y-3">
@@ -2463,7 +2541,11 @@ function Editor({
                 <p className="text-xs text-gray-500">Agregá al menos una slide (más abajo, en la sección de texto) antes de generar imágenes.</p>
               )}
               {bulkError && <p className="text-xs text-red-600 bg-red-50 rounded p-2">{bulkError}</p>}
-              <p className="text-xs text-gray-400">Usa hasta {1 + (item.slides ?? []).length} llamadas a Gemini, una por imagen. Mientras se generan, no se puede editar el texto ni agregar/quitar slides.</p>
+              <p className="text-xs text-gray-400">
+                Usa 1 llamada a Gemini por imagen, más 1 llamada de texto adicional por cada slide que
+                todavía no tenga su propia escena (para proponerle una distinta a la portada). Mientras
+                se generan, no se puede editar el texto ni agregar/quitar slides.
+              </p>
               {(item.slides ?? []).length > 0 && (
                 <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
                   {(item.slides ?? []).map((slide, index) => (
@@ -2481,6 +2563,37 @@ function Editor({
                         {slide.visual_url ? "Regenerar" : "Generar"}
                       </Button>
                       {slideErrors[index] && <p className="text-xs text-red-600">{slideErrors[index]}</p>}
+                      <button
+                        type="button"
+                        onClick={() => toggleSlideScene(index)}
+                        className="w-full text-center text-[11px] text-violet-700 hover:text-violet-800 underline"
+                      >
+                        {expandedSlideScene.has(index) ? "Ocultar escena" : slide.image_prompt ? "Ver escena" : "Sin escena propia todavía"}
+                      </button>
+                      {expandedSlideScene.has(index) && (
+                        <div className="space-y-1">
+                          <Textarea
+                            rows={3}
+                            value={slide.image_prompt ?? ""}
+                            onChange={event => updateSlide(index, { image_prompt: event.target.value })}
+                            placeholder="Se completa sola al generar la imagen — o escribila a mano acá."
+                            className="bg-white text-gray-900 text-[11px]"
+                            disabled={carruselBusy}
+                          />
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => regenerateSlideScene(index)}
+                            disabled={carruselBusy || slideSceneGeneratingIndex === index}
+                            className="h-auto w-full gap-1.5 px-2 py-1 text-[11px] text-violet-700 hover:text-violet-800"
+                          >
+                            {slideSceneGeneratingIndex === index ? <Loader2 className="h-3 w-3 animate-spin" /> : <WandSparkles className="h-3 w-3" />}
+                            Nueva escena
+                          </Button>
+                          {slideSceneErrors[index] && <p className="text-[11px] text-red-600">{slideSceneErrors[index]}</p>}
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>

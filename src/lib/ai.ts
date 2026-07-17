@@ -168,6 +168,7 @@ const IMAGE_PROMPT_RULES = `DIRECCION VISUAL PARA GEMINI:
 - El texto debe ser breve, grande, legible en pantalla chica y con jerarquia clara. Usa como maximo dos familias o pesos tipograficos.
 - Para historia, manten texto y elementos importantes dentro de la zona segura central, lejos de los bordes superior e inferior.
 - Para carrusel, crea una portada que abra una brecha de curiosidad y se entienda en menos de tres segundos.
+- Para carrusel, ademas de "image_prompt" de portada, cada slide necesita su propio "image_prompt": una escena distinta que corresponda a lo que dice esa slide en particular (no repitas la escena de la portada ni la de otra slide). Todas las escenas del carrusel deben compartir la misma paleta de color y el mismo tratamiento editorial de arriba para que se sientan una sola pieza, aunque el sujeto de cada imagen sea distinto.
 - Pedi iluminacion natural o cinematografica suave, profundidad, textura y una paleta sobria con acentos bordo, azul profundo o verde azulado.
 - Prioriza escenas humanas cotidianas, objetos o metaforas visuales inteligentes. Evita la placa de texto generica.
 - Si aparecen personas: adultas, aspecto argentino o latino diverso, expresion serena, nunca con dolor ni en una urgencia.
@@ -281,7 +282,10 @@ RESPUESTA ESPERADA:
 Devolvé ÚNICAMENTE el JSON válido, sin markdown, sin bloques de código, sin explicaciones.
 Si un texto necesita comillas, escapalas como \\\" o usa comillas simples para no romper el JSON.
 ${input.format === "carrusel" ? `Formato CARRUSEL: incluí un array "slides" con 4-5 slides de contenido (además de la portada).
-Cada slide tiene "headline" (máx. 40 caracteres) y "text" (1-2 oraciones del contenido de esa slide).
+Cada slide tiene "headline" (máx. 40 caracteres), "text" (1-2 oraciones del contenido de esa slide) e
+"image_prompt" (prompt visual en inglés para esa slide puntual, siguiendo la DIRECCION VISUAL PARA GEMINI
+de arriba — una escena distinta a la portada y al resto de las slides, que corresponda a lo que dice esa
+slide, pero con la misma paleta y tratamiento editorial que la portada).
 Usá exactamente estas claves:
 
 {
@@ -295,10 +299,10 @@ Usá exactamente estas claves:
   "image_prompt": "prompt visual detallado listo para que Gemini genere la portada final",
   "image_alt_text": "descripcion accesible breve en espanol",
   "slides": [
-    {"headline": "Slide 1 — título", "text": "Contenido de esta slide en 1-2 oraciones."},
-    {"headline": "Slide 2 — título", "text": "Contenido de esta slide."},
-    {"headline": "Slide 3 — título", "text": "Contenido de esta slide."},
-    {"headline": "Slide 4 — título", "text": "Contenido de esta slide."}
+    {"headline": "Slide 1 — título", "text": "Contenido de esta slide en 1-2 oraciones.", "image_prompt": "escena distinta para esta slide"},
+    {"headline": "Slide 2 — título", "text": "Contenido de esta slide.", "image_prompt": "escena distinta para esta slide"},
+    {"headline": "Slide 3 — título", "text": "Contenido de esta slide.", "image_prompt": "escena distinta para esta slide"},
+    {"headline": "Slide 4 — título", "text": "Contenido de esta slide.", "image_prompt": "escena distinta para esta slide"}
   ]
 }` : input.format === "reel" ? `Formato REEL SILENCIOSO: incluí "reel_duration_seconds" (número entre 8 y 25) y un array "scenes" de 3 a 5 escenas.
 Usá exactamente estas claves:
@@ -729,7 +733,7 @@ export async function generateContentPlan(input: {
   visual_style: "rose" | "blue" | "teal"
   image_prompt: string
   image_alt_text: string
-  slides?: Array<{ headline: string; text: string }>
+  slides?: Array<{ headline: string; text: string; image_prompt?: string }>
   scenes?: ContentScene[]
   reel_duration_seconds?: number
 }> {
@@ -751,10 +755,10 @@ El caption debe cerrar invitando a pedir turno con la Dra. Lucia Chahin usando e
   const slidesSchema = input.format === "carrusel"
     ? `,
   "slides": [
-    {"headline": "Slide 1 — titulo, max 40 chars", "text": "1-2 oraciones del contenido."},
-    {"headline": "Slide 2", "text": "..."},
-    {"headline": "Slide 3", "text": "..."},
-    {"headline": "Slide 4", "text": "..."}
+    {"headline": "Slide 1 — titulo, max 40 chars", "text": "1-2 oraciones del contenido.", "image_prompt": "escena distinta a la portada para esta slide"},
+    {"headline": "Slide 2", "text": "...", "image_prompt": "escena distinta a la portada y a la slide 1"},
+    {"headline": "Slide 3", "text": "...", "image_prompt": "escena distinta a las anteriores"},
+    {"headline": "Slide 4", "text": "...", "image_prompt": "escena distinta a las anteriores"}
   ]`
     : input.format === "reel"
     ? `,
@@ -778,7 +782,7 @@ ${appointmentContext}
 
 ${sourceContext}
 
-${input.format === "carrusel" ? "Es un CARRUSEL: generá 4-5 slides con headline y texto corto para cada slide, ademas de la portada.\n\n" : ""}${input.format === "reel" ? "Es un REEL SILENCIOSO: generá reel_duration_seconds y de 3 a 5 escenas en 'scenes', siguiendo las reglas de guion mudo de arriba.\n\n" : ""}Devolve:
+${input.format === "carrusel" ? "Es un CARRUSEL: generá 4-5 slides con headline, texto corto e image_prompt propio para cada slide, ademas de la portada. Cada image_prompt tiene que ser una escena distinta, relacionada al contenido puntual de esa slide, no una repeticion de la portada.\n\n" : ""}${input.format === "reel" ? "Es un REEL SILENCIOSO: generá reel_duration_seconds y de 3 a 5 escenas en 'scenes', siguiendo las reglas de guion mudo de arriba.\n\n" : ""}Devolve:
 {
   "hook": "...",
   "caption": "...",
@@ -831,6 +835,7 @@ ${REEL_SCENE_RULES}
         .map(s => ({
           headline: stripMarkdownArtifacts((s.headline as string).slice(0, 60)),
           text: stripMarkdownArtifacts((s.text as string).slice(0, 300)),
+          image_prompt: typeof s.image_prompt === "string" ? s.image_prompt.slice(0, 2400) : undefined,
         }))
     : undefined
 

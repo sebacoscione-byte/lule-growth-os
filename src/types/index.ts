@@ -156,6 +156,8 @@ export interface ContentSlide {
   text: string
   /** Placa generada para esta slide puntual (Gemini o subida a mano). Sin esto, la slide no tiene imagen propia y el carrusel no se puede aprobar/publicar. */
   visual_url?: string
+  /** Escena propia de esta slide (mismo estilo/paleta que la portada, pero un sujeto distinto). Sin esto, se genera una automáticamente antes de renderizar la imagen, para no repetir la escena de la portada en cada slide. */
+  image_prompt?: string
 }
 
 /** Un segmento del guion de un reel silencioso: se entiende sin audio, texto en pantalla + direccion de la toma. */
