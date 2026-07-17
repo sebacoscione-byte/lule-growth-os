@@ -202,16 +202,11 @@ por qué tipo de acción es, para que sepas qué esperar de cada uno. El detalle
   (`pendiente_meta`, ver más abajo) — sigue pendiente esa reaprobación puntual.
 
 ### 🕐 Cuando tengas tiempo (no urgente)
-- [ ] **Conectar la CLI de Vercel para que un agente pueda tocar env vars directamente (2026-07-15).**
-  Hoy ningún agente puede cargar/editar variables de entorno de producción por su cuenta — ni la
-  CLI de Vercel está instalada, ni el login (OAuth interactivo) se puede completar en una sesión no
-  interactiva. Dos formas de resolverlo, ninguna aplicada todavía: (1) generar un token en
-  vercel.com/account/tokens y pasárselo a un agente — da permisos amplios sobre tu cuenta de
-  Vercel, no solo env vars, tenelo en cuenta; (2) correr `vercel login` una sola vez vos mismo en tu
-  propia terminal en esta máquina — si la CLI queda logueada a nivel de tu usuario de Windows,
-  sesiones futuras del agente en esta misma máquina podrían heredar esa sesión sin pedirte nada de
-  nuevo. No es urgente — mientras tanto, cargar env vars a mano en el dashboard (2 minutos) sigue
-  funcionando bien.
+- [x] ~~Conectar la CLI de Vercel para que un agente pueda tocar env vars directamente~~ **Resuelto
+  (2026-07-17)** — Seba instaló la CLI (`npm i -g vercel`), corrió `vercel login` y `vercel link`
+  en su propia terminal (vinculado a `sebacoscione-bytes-projects/lule-chahin`). Verificado
+  `vercel env ls production` desde una sesión de agente: lista las variables reales sin exponer
+  valores (`Encrypted`). La sesión quedó logueada a nivel de usuario de Windows en esta máquina.
 - [x] ~~Cargar `E2E_TEST_EMAIL`/`E2E_TEST_PASSWORD` en tu `.env.local`~~ **Resuelto (2026-07-17)** —
   cargadas por Seba.
 - [x] ~~Correr el resto del smoke E2E autenticado al menos una vez~~ **Resuelto, con un hallazgo
@@ -992,7 +987,9 @@ Google Maps, Instagram, WhatsApp y búsqueda orgánica.
 
 ### Acciones externas (las hace Lucía)
 - [x] Configurar `/dra-lucia-chahin` como link de la bio en Instagram — hecho vía dominio propio `draluciachahin.ar`, ver Etapa 5
-- [ ] Configurar `/dra-lucia-chahin` como sitio web en Google Business Profile *(acción de Lucía)*
+- [x] ~~Configurar `/dra-lucia-chahin` como sitio web en Google Business Profile~~ **Resuelto** —
+  duplicado del ítem ya confirmado más abajo (Etapa 4, 2026-07-11): el sitio web del perfil ya
+  apunta a `https://draluciachahin.ar/`.
 
 ### Decisión pendiente: Google Cloud — fin de la prueba gratuita (~90 días desde 2026-07-04)
 El proyecto de Google Cloud usado para Places API (reseñas) quedó en modo prueba gratuita
@@ -1196,7 +1193,7 @@ público para pedir turno.
       **aprobados en Meta** desde el 2026-07-07 — este flujo ya puede mandar mensajes reales, no
       sigue bloqueado. Los demás templates (`recordatorio_turno`, `seguimiento_post_consulta`, etc.)
       siguen sin automatizar porque necesitan una fecha de turno real que la app no gestiona.
-- [ ] Configurar `WHATSAPP_VERIFY_TOKEN` en `.env.local` + webhook de prueba separado (vía ngrok) para poder testear localmente cambios en la lógica de recepción de mensajes (`src/lib/whatsapp-bot.ts`) sin tocar el webhook de producción. Sin esto, cualquier cambio en cómo el bot procesa mensajes entrantes solo se puede probar directo en producción. No es urgente mientras no se toque esa lógica.
+- [ ] *(Descartado por ahora, 2026-07-17)* Configurar `WHATSAPP_VERIFY_TOKEN` en `.env.local` + webhook de prueba separado (vía ngrok) para testear localmente cambios en la lógica de recepción de mensajes (`src/lib/whatsapp-bot.ts`) sin tocar el webhook de producción. Seba confirmó que no hace falta armarlo por adelantado — se retoma el día que haya un cambio real de esa lógica en curso.
 - [x] Instagram Graph API: publicación directa desde la app del contenido aprobado (2026-07-06/07) —
       manual ("Publicar ahora" y botones por canal en el editor) y automática (Vercel Cron diario,
       dos cronogramas independientes: posts de feed y historias, cada uno con su propia frecuencia
