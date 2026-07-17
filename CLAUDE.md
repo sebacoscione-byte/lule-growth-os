@@ -1,6 +1,24 @@
 # Lule Growth OS — Contexto para Claude
 
 ## Estado actual
+- 2026-07-17 (clasificador v2 conectado en modo sombra, PR #116): `whatsapp-policy-shadow-runner.ts`
+  llama a `evaluateWhatsAppPolicy()` (`whatsapp-policy.ts`, construido el 16/07 pero nunca conectado)
+  en paralelo a cada mensaje real, sin ningún efecto sobre la respuesta al paciente — corre desde un
+  único punto de entrada en `handleIncomingMessage`, envuelto en try/catch que nunca puede afectar el
+  flujo real. Cobertura fase 1, deliberadamente parcial: solo las categorías de seguridad/derivación
+  con equivalencia inequívoca contra el bot legacy (urgencia, baja de contacto, adjunto no soportado,
+  límite clínico, derivación forzada por longitud, pedido explícito de humano, botones de protocolo,
+  y los intents determinísticos de la conversación ya derivada que cierran o escalan) — el flujo
+  conversacional rutinario de intake/sede/cobertura queda afuera a propósito, porque ahí el bot
+  legacy no tiene un `response_key` comparable y forzar una equivalencia daría una métrica engañosa.
+  Guarda solo hashes SHA-256 y enums cerrados en `whatsapp_policy_evaluations` (sin PII, RLS forzada,
+  ya creada el 16/07); el hash de conversación reutiliza `hashWhatsAppPhone()` para que el trigger de
+  erasure existente también la cubra. `shadow_mode_enabled` ya no se fuerza a `false` en
+  `mergeWhatsAppSettings` (nuevo checkbox en Configuración → Bot de WhatsApp) y quedó activado en
+  producción vía migración (`20260717_whatsapp_policy_shadow_enable.sql`, `jsonb_set` puntual, no
+  reemplaza el objeto entero) a pedido explícito de Seba. `policy_rollout_percent` sigue bloqueado en
+  0 — servirle v2 de verdad a un paciente sigue sin implementarse. Próximo paso: dejar acumular datos
+  reales unos días y revisar la señal antes de decidir una fase 2 (ampliar cobertura) o un canary.
 - 2026-07-17 (template de Meta aprobado): `alerta_interna_derivacion` pasó a `status: "aprobado"`
   — Meta aprobó la versión genérica de una sola variable (`CASO-…`, sin nombre ni motivo del
   paciente) del hardening del 16/07. Marcado "Aprobado" en Configuración → Templates de WhatsApp.
