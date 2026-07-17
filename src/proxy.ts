@@ -38,6 +38,10 @@ export async function proxy(request: NextRequest) {
 
   const isLoginRoute = request.nextUrl.pathname === "/login"
   const isMfaRoute = request.nextUrl.pathname.startsWith("/seguridad/mfa")
+  // Archivo de verificacion de Google Search Console (convencion google-site-verification):
+  // se sirve desde public/, pero sin esta excepcion el gate de auth lo redirige a /login antes de
+  // que Next.js llegue a servirlo -- mismo bug ya visto con /sitemap.xml y /robots.txt.
+  const isGoogleSiteVerificationFile = /^\/google[a-f0-9]{16}\.html$/.test(request.nextUrl.pathname)
   const isPublicRoute =
     request.nextUrl.pathname.startsWith("/landings") ||
     request.nextUrl.pathname.startsWith("/go/") ||
@@ -46,6 +50,7 @@ export async function proxy(request: NextRequest) {
     request.nextUrl.pathname === "/privacidad" ||
     request.nextUrl.pathname === "/sitemap.xml" ||
     request.nextUrl.pathname === "/robots.txt" ||
+    isGoogleSiteVerificationFile ||
     PUBLIC_ROOT_PATHS.has(firstSegment)
 
   const isLandingRoute =
