@@ -10,7 +10,8 @@
 - [x] Actualizar política de privacidad, documentación operativa y auditoría de migraciones.
 - [x] Ejecutar regresiones, suite completa, lint y build. La verificación visual automatizada quedó
       reemplazada por un contrato de layout porque no había navegador conectado en esta sesión.
-- [ ] Publicar por PR y verificar el despliegue antes del merge.
+- [x] Publicar por PR #106; CI y Vercel Preview quedaron verdes. El contenido del preview está
+      protegido por SSO de Vercel, por lo que el smoke HTTP sólo pudo confirmar esa protección.
 
 ---
 
