@@ -398,6 +398,9 @@ insert into templates (name, category, body_text, variables, variable_samples) v
   ('alerta_interna_derivacion', 'utility', 'Hay una derivación pendiente en Lule Growth OS. Caso {{1}}. Revisá el Inbox autenticado para más detalle.', '["referencia_caso"]', '["CASO-1234ABCD"]')
 on conflict (name) do nothing;
 
+-- Meta approved this internal template under generic Spanish (`es`), not `es_AR`.
+update templates set language = 'es' where name = 'alerta_interna_derivacion';
+
 -- ============================================================
 -- INDEXES
 -- ============================================================

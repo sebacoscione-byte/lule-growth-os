@@ -128,9 +128,9 @@ por qué tipo de acción es, para que sepas qué esperar de cada uno. El detalle
   verificado en vivo contra la API real. Ver CLAUDE.md → entrada 2026-07-15 para el detalle completo.
 - [x] ~~**Reaprobar el template `alerta_interna_derivacion`**~~ **Resuelto (2026-07-17)** — Meta
   aprobó la versión genérica de una sola variable (`CASO-…`, sin nombre ni motivo del paciente).
-  Marcado "Aprobado" en Configuración → Templates de WhatsApp, verificado `status: "aprobado"` en
-  la base. La alerta interna por WhatsApp ante una derivación a humano ya funciona de verdad,
-  además del email de respaldo.
+  Marcado "Aprobado" en Configuración → Templates de WhatsApp. El 2026-07-18 se corrigió el idioma
+  local de `es_AR` a `es`, que es la variante realmente aprobada por Meta; antes Cloud API rechazaba
+  el envío con código `132001`. Envío real aceptado por Meta después de la corrección.
 - [x] **Acceso a las APIs de Google Business Profile** (proyecto `app-lule`) — **solicitud enviada
   el 2026-07-12**, caso de asistencia de Google **`2-7574000041506`**, tiempo de revisión
   informado por Google: 7-10 días hábiles (no es instantáneo, y con volumen chico existe la
