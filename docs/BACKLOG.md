@@ -118,6 +118,11 @@ por qué tipo de acción es, para que sepas qué esperar de cada uno. El detalle
   retención, consentimiento de analítica, si el texto de consentimiento de WhatsApp alcanza como
   consentimiento informado, y si hace falta un tratamiento especial para menores de edad (hoy no
   hay ninguno — laguna real, no decisión tomada a propósito).
+  - **(2026-07-18)** El material ya está redactado como email completo, listo para pegar y mandar
+    — se intentó crear un borrador directo en Gmail pero el conector estaba desconectado (token
+    vencido). Reconectalo en la configuración de conectores de claude.ai y pedile a un agente que
+    lo reintente, o simplemente copiá el texto vos (armado en la sesión del 2026-07-18) y armá el
+    mail a mano con el mail del abogado.
 
 ### 🔑 Trámites en cuentas externas (Meta/Google) que solo vos podés hacer
 - [ ] **2FA del Business Manager**: Facebook te bloqueó activarlo en tu cuenta personal ("no
