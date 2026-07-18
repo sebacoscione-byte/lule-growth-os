@@ -174,7 +174,12 @@ const IMAGE_PROMPT_RULES = `DIRECCION VISUAL PARA GEMINI:
 - No representar a una medica real ni inventar el rostro de la Dra. Lucia Chahin.
 - PROHIBIDO dentro de la imagen: texto adicional al titular y subtitulo solicitados, logos, marcas de agua, interfaces, diagnosticos, estudios legibles, anatomia gore, personas angustiadas, corazon rojo de stock, estetoscopio flotante o ECG decorativo.
 - No pedir collages, infografias, posters, flyers, marcos, placas, fondos con gradiente ni composiciones divididas.
-- El prompt debe terminar reforzando: "Render only the exact requested Spanish headline and subtitle. No extra text, no logos, no watermark."
+- El prompt debe terminar reforzando, en ingles y de forma 100% GENERICA (nunca citando el titular o
+  subtitulo especifico entre comillas dentro del prompt): "Render only the exact requested Spanish
+  headline and subtitle exactly as provided separately. No extra text, no logos, no watermark." El
+  titular y subtitulo real se van a pasar aparte al momento de generar la imagen final -- si citas el
+  texto especifico dentro de esta direccion visual, esa cita puede quedar vieja/desactualizada mas
+  adelante si el titular o subtitulo cambian despues sin regenerar esta misma direccion visual.
 - Inclui "image_alt_text": descripcion accesible en espanol, factual y breve, maximo 180 caracteres.`
 
 // 2026-07-15: Instagram y Google Business NO interpretan Markdown -- un post real salio publicado
@@ -906,6 +911,10 @@ FINAL ART DIRECTION:
 - The visual must stop the scroll, communicate one idea in under three seconds and feel trustworthy to an adult patient in Argentina.
 - Use a clear focal point, strong visual hierarchy, high text/background contrast and generous breathing room.
 - Render the exact Spanish headline and subtitle once, with correct accents and no spelling changes.
+- The headline and subtitle to render are ONLY the ones given above under CONTENT, character for
+  character. If the CREATIVE DIRECTION text above happens to mention, quote or reference any other
+  headline or subtitle wording, IGNORE that wording completely -- it may be outdated. Never render
+  any text that is not the exact headline and subtitle given under CONTENT.
 - Headline must dominate; subtitle must remain readable on a small phone screen.
 - ${input.format === "historia"
     ? "Keep all text and essential elements inside the central Story safe zone, away from the top and bottom interface areas."
