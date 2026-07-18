@@ -60,7 +60,7 @@ jest.mock("@/lib/whatsapp-settings", () => ({
 
 import { handleIncomingMessage } from "@/lib/whatsapp-bot"
 import { getServiceDb } from "@/lib/supabase/service"
-import { sendList, sendText } from "@/lib/whatsapp"
+import { sendButtons, sendList, sendText } from "@/lib/whatsapp"
 
 const PHONE = "5491100000000"
 
@@ -117,6 +117,49 @@ function mockDb(locations: unknown, sessionOverrides: Record<string, unknown> = 
 beforeEach(() => jest.clearAllMocks())
 
 describe("fuente única de sedes en el bot", () => {
+  it("no deriva a una sede incompatible y ofrece directamente una sede compatible", async () => {
+    const locations = [{
+      id: "cimel_lanus",
+      name: "CIMEL Lanús",
+      obras_sociales: ["Medife", "Particular"],
+      services: [],
+      verified_at: "2026-07-15T12:00:00.000Z",
+      verified_by: "test-user",
+      valid_from: "2026-07-01T00:00:00.000Z",
+      active: true,
+    }, {
+      id: "hospital_britanico",
+      name: "Hospital Británico",
+      obras_sociales: ["OSDE"],
+      services: [],
+      verified_at: "2026-07-15T12:00:00.000Z",
+      verified_by: "test-user",
+      valid_from: "2026-07-01T00:00:00.000Z",
+      active: true,
+    }]
+    const { leadsBuilder } = mockDb(locations, { obra_social: "OSDE 410" })
+
+    await handleIncomingMessage({
+      phone: PHONE,
+      text: "CIMEL Lanús",
+      messageType: "button_reply",
+      buttonId: "cimel_lanus",
+    })
+
+    expect(sendButtons).toHaveBeenCalledWith(
+      PHONE,
+      expect.stringContaining("Sí figura en *Hospital Británico*"),
+      expect.arrayContaining([
+        expect.objectContaining({ id: "hospital_britanico" }),
+        expect.objectContaining({ id: "cambiar_obra_social" }),
+        expect.objectContaining({ id: "hablar_humano" }),
+      ]),
+      expect.objectContaining({ flowIntent: "consultar_cobertura" })
+    )
+    expect(leadsBuilder.update).not.toHaveBeenCalled()
+    expect(sendText).not.toHaveBeenCalled()
+  })
+
   it("responde servicios exclusivamente desde `app_config.locations[].services` verificado", async () => {
     mockDb([{
       id: "cimel_lanus",

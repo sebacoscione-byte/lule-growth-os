@@ -161,6 +161,24 @@ beforeEach(() => {
 })
 
 describe("handleIncomingMessage — bot_paused", () => {
+  it("pide consentimiento vigente antes de continuar una sesion administrativa historica", async () => {
+    const { sessionsBuilder } = mockDb({ session: baseSession({ state: "derivado" }) })
+    ;(hasConsented as jest.Mock).mockResolvedValue(false)
+
+    await handleIncomingMessage({ phone: PHONE, text: "Quiero elegir CIMEL" })
+
+    expect(sendButtons).toHaveBeenCalledWith(
+      PHONE,
+      "texto de consentimiento",
+      expect.any(Array),
+      expect.objectContaining({ flowIntent: "consent_request" })
+    )
+    expect(sessionsBuilder.update).toHaveBeenCalledWith(
+      expect.objectContaining({ state: "esperando_consentimiento" })
+    )
+    expect(classifyIntent).not.toHaveBeenCalled()
+  })
+
   it("persiste el mensaje normal del handoff con retencion transitoria", async () => {
     mockDb({ session: baseSession({ bot_paused: true }) })
 

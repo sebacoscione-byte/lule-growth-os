@@ -1,3 +1,14 @@
+# EN CURSO (2026-07-18) — respuesta esperada en conversación de Seba Coscione
+
+- [x] Leer conversación, sesión, handoffs, consentimiento y cola durable de producción.
+- [x] Confirmar sesión histórica sin consentimiento vigente y mensajes procesados pero no visibles.
+- [x] Exigir consentimiento vigente antes de continuar y retomar el lead sin repetir el intake.
+- [x] Evitar derivar a una sede incompatible y ofrecer una alternativa compatible.
+- [x] Ejecutar lint, 91 suites/859 tests y build de producción.
+- [ ] Verificar preview y publicar por PR.
+
+---
+
 # EN CURSO (2026-07-18) — Inbox y coberturas del caso Sebastián Coscione
 
 - [x] Reconstruir la conversación real sin guardar PII en el repositorio.
