@@ -1,3 +1,14 @@
+# EN CURSO (2026-07-18) — Inbox y coberturas del caso Sebastián Coscione
+
+- [x] Reconstruir la conversación real sin guardar PII en el repositorio.
+- [x] Confirmar que el filtro del receptor de alertas descartaba sus respuestas antes de la cola.
+- [x] Volver a persistir esos mensajes y cubrir el webhook con una regresión.
+- [x] Validar obra social contra la sede elegida y evitar listas globales incompatibles.
+- [x] Ejecutar lint, 91 suites/856 tests y build de producción.
+- [ ] Verificar preview y publicar por PR.
+
+---
+
 # HOTFIX EN CURSO (2026-07-18) — bot apagado para el receptor de alertas
 
 - [x] Confirmar que no existía una exclusión entrante para `ALERT_WHATSAPP_TO`.

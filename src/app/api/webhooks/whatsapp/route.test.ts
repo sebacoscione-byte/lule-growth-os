@@ -9,7 +9,7 @@ jest.mock("@/lib/whatsapp-inbound-queue", () => ({
 }))
 
 import { after } from "next/server"
-import { GET, POST, isInternalAlertInboundEvent } from "./route"
+import { GET, POST } from "./route"
 import { isValidWhatsAppSignature } from "@/lib/whatsapp-webhook-signature"
 import { drainWhatsAppInboundQueue, enqueueWhatsAppEvents } from "@/lib/whatsapp-inbound-queue"
 
@@ -73,7 +73,7 @@ describe("GET /api/webhooks/whatsapp", () => {
 })
 
 describe("POST /api/webhooks/whatsapp — durable ACK", () => {
-  it("mantiene apagado el bot para el numero interno que recibe alertas", async () => {
+  it("persiste los mensajes del receptor de alertas si tambien usa el numero para probar el bot", async () => {
     process.env.ALERT_WHATSAPP_TO = "+54 9 11 2384-2117"
     const payload = incomingMessagePayload({ from: "5491123842117" })
     payload.entry[0].changes[0].value.contacts[0].wa_id = "5491123842117"
@@ -82,17 +82,12 @@ describe("POST /api/webhooks/whatsapp — durable ACK", () => {
 
     expect(response.status).toBe(200)
     expect(await response.json()).toEqual({
-      status: "accepted", queued: 0, invalid_events: 0, ignored_numbers: 1,
+      status: "accepted", queued: 1, invalid_events: 0, ignored_numbers: 0,
     })
-    expect(enqueueWhatsAppEvents).toHaveBeenCalledWith([])
-    expect(after).not.toHaveBeenCalled()
-  })
-
-  it("no confunde estados de entrega con mensajes entrantes del numero interno", () => {
-    expect(isInternalAlertInboundEvent(
-      { event_type: "status", phone: "5491123842117" },
-      "5491123842117"
-    )).toBe(false)
+    expect(enqueueWhatsAppEvents).toHaveBeenCalledWith([
+      expect.objectContaining({ event_type: "inbound", phone: "5491123842117" }),
+    ])
+    expect(after).toHaveBeenCalledTimes(1)
   })
 
   it("rechaza firma inválida fail-closed sin persistir", async () => {
