@@ -1,4 +1,4 @@
-import { buildCoverageNotice } from "@/lib/whatsapp-bot"
+import { buildCoverageNotice, isCoverageListedAtLocation } from "@/lib/whatsapp-bot"
 
 describe("cobertura por sede del bot de WhatsApp", () => {
   const cimel = {
@@ -29,5 +29,11 @@ describe("cobertura por sede del bot de WhatsApp", () => {
 
   it("no agrega aviso si el paciente todavía no informó cobertura", () => {
     expect(buildCoverageNotice(cimel, null)).toBeNull()
+  })
+
+  it("expone una decisión reutilizable para impedir derivaciones incompatibles", () => {
+    expect(isCoverageListedAtLocation(cimel, "OSDE 410")).toBe(false)
+    expect(isCoverageListedAtLocation(britanico, "OSDE 410")).toBe(true)
+    expect(isCoverageListedAtLocation(cimel, null)).toBeNull()
   })
 })

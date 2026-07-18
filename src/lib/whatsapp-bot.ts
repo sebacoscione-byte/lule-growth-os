@@ -315,6 +315,53 @@ export function buildCoverageNotice(
   return `La cobertura *${declared}* no figura en la lista verificada de *${location.name}*. Confirmala directamente con la sede antes de pedir el turno o consultá por atención particular.`
 }
 
+export function isCoverageListedAtLocation(
+  location: Pick<WhatsAppLocationConfig, "obras_sociales">,
+  insurance: string | null | undefined
+): boolean | null {
+  const declared = insurance?.trim()
+  if (!declared) return null
+  const normalizedDeclared = normalizeCoverageName(declared)
+  const isParticular = normalizedDeclared === "particular"
+    || normalizedDeclared === "particular sin cobertura"
+    || normalizedDeclared === "sin cobertura"
+  return location.obras_sociales.some(item => {
+    const normalizedItem = normalizeCoverageName(item)
+    return normalizedItem === normalizedDeclared
+      || (normalizedItem.length >= 4 && normalizedDeclared.startsWith(`${normalizedItem} `))
+      || (isParticular && normalizedItem === "particular")
+  })
+}
+
+async function sendCoverageMismatchOptions(
+  phone: string,
+  selectedLocation: WhatsAppLocationConfig,
+  insurance: string,
+  locations: WhatsAppLocationConfig[],
+  ctx: SendContext
+): Promise<void> {
+  const compatible = locations.filter(location =>
+    location.id !== selectedLocation.id && isCoverageListedAtLocation(location, insurance) === true
+  )
+  const compatibleButtons = compatible.slice(0, 1).map(location => ({
+    id: location.id,
+    title: location.name.slice(0, 20),
+  }))
+  const compatibleLine = compatible.length > 0
+    ? ` Sí figura en *${compatible.map(location => location.name).join(", ")}*.`
+    : ""
+  await sendButtons(
+    phone,
+    `La cobertura *${insurance}* no figura en la lista verificada de *${selectedLocation.name}*.${compatibleLine}\n\n¿Preferís una sede compatible, cambiar la cobertura/atenderte particular, o hablar con una persona?`,
+    [
+      ...compatibleButtons,
+      { id: "cambiar_obra_social", title: "Cambiar cobertura" },
+      { id: "hablar_humano", title: "Hablar con humano" },
+    ].slice(0, 3),
+    { ...ctx, flowIntent: "consultar_cobertura" }
+  )
+}
+
 // Ola 4 (P1, incidente real 2026-07-14): mientras se espera que una persona del equipo responda,
 // dar de una un contacto directo de la sede que el paciente ya eligió -- antes el mensaje de
 // derivación no tenía ningún dato de contacto propio.
@@ -775,6 +822,17 @@ export async function handleIncomingMessage(params: {
 
   if (session.state === "handoff_pending" || session.state === "human_active" || session.state === "closed") return
 
+  // Las sesiones creadas antes de la versión vigente de consentimiento podían conservar un estado
+  // avanzado aunque su evidencia ya no existiera. No se procesa más contenido administrativo en
+  // ese estado: se pide consentimiento nuevamente y luego se retoma el lead existente.
+  if (!administrativeConsentGranted
+    && session.state !== "nuevo"
+    && session.state !== "esperando_consentimiento") {
+    await sendButtons(phone, CONSENT_TEXT, CONSENT_BUTTONS, { ...ctx, flowIntent: "consent_request" })
+    await updateSession(phone, { state: "esperando_consentimiento" })
+    return
+  }
+
   const lead = session.lead_id ? await getLead(session.lead_id) : null
 
   if (shouldForceHandoff(session.messages_sent_count, settings.handoff_message_threshold, isHighValueLead(lead))) {
@@ -893,6 +951,18 @@ export async function handleIncomingMessage(params: {
           { ...ctx, flowIntent: "consent_declined" }
         )
         await updateSession(phone, { state: "nuevo" })
+        return
+      }
+
+      const existingLead = session.lead_id ? await getLead(session.lead_id) : null
+      const existingSede = leadPreferredSede(existingLead)
+      if (existingLead && existingSede) {
+        await sendSedeOptions(
+          phone,
+          ctx,
+          "Gracias. Retomamos tu consulta administrativa anterior; no hace falta que vuelvas a cargar todos tus datos."
+        )
+        await updateSession(phone, { state: "derivado", wa_name: waName ?? session.wa_name })
         return
       }
 
@@ -1067,7 +1137,7 @@ export async function handleIncomingMessage(params: {
     }
 
     case "derivado": {
-      if (messageType === "text" && wantsToChangeObraSocial(text)) {
+      if ((messageType === "text" && wantsToChangeObraSocial(text)) || buttonId === "cambiar_obra_social") {
         const currentLead = session.lead_id ? await getLead(session.lead_id) : null
         const options = await getObraSocialOptions(leadPreferredSede(currentLead))
         await sendList(phone, `Tenés cargada la obra social *${session.obra_social ?? "no informada"}*. Elegí la nueva (o "Particular" si no tenés cobertura):`, "Elegir", options, { ...ctx, flowIntent: "consultar_cobertura" })
@@ -1086,8 +1156,13 @@ export async function handleIncomingMessage(params: {
       const locations = await getLocations()
       const sede = parseSede(text, locations, buttonId)
       if (sede) {
-        if (session.lead_id) await updateLeadLocation(session.lead_id, sede)
         const location = locations.find(item => item.id === sede)
+        if (location && session.obra_social
+          && isCoverageListedAtLocation(location, session.obra_social) === false) {
+          await sendCoverageMismatchOptions(phone, location, session.obra_social, locations, ctx)
+          return
+        }
+        if (session.lead_id) await updateLeadLocation(session.lead_id, sede)
         const coverageNotice = location ? buildCoverageNotice(location, session.obra_social) : null
         const intro = coverageNotice
           ? `Listo, actualicé tu sede preferida.\n\n${coverageNotice}`
