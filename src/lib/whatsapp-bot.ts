@@ -611,10 +611,45 @@ async function getSessionPreferredLocation(session: WhatsAppSession): Promise<Se
   return leadPreferredSede(await getLead(session.lead_id))
 }
 
+const COVERAGE_LOOKUP_PATTERN = /\b(?:donde|en que (?:lugar|sede)|que (?:lugar|sede)|atiende|acepta|aceptan|cubre|trabaja con|tienen)\b/i
+
+export function buildCoverageLocationsReply(
+  text: string,
+  locations: WhatsAppLocationConfig[]
+): string | null {
+  const normalizedText = normalizeCoverageName(text)
+  if (!COVERAGE_LOOKUP_PATTERN.test(normalizedText) && !/[?¿]/.test(text)) return null
+
+  const configuredCoverages = [...new Set(locations.flatMap(location => location.obras_sociales))]
+  const candidates = [...configuredCoverages, "PAMI"].sort((left, right) => right.length - left.length)
+  const requested = candidates.find(candidate => {
+    const normalizedCandidate = normalizeCoverageName(candidate)
+    return normalizedCandidate.length >= 4 && normalizedText.includes(normalizedCandidate)
+  })
+  const asksParticular = /\bparticular\b|\bsin cobertura\b/.test(normalizedText)
+  const coverage = asksParticular ? "Particular" : requested
+  if (!coverage) return null
+
+  const matchingLocations = locations.filter(location =>
+    isCoverageListedAtLocation(location, coverage) === true
+  )
+  if (matchingLocations.length === 0) {
+    return `La cobertura *${coverage}* no figura en ninguna de las sedes con datos verificados. Podés pedir hablar con una persona del equipo para confirmarlo.`
+  }
+
+  const rows = matchingLocations.map(location => {
+    const day = location.day ? ` (${location.day})` : ""
+    return `🏥 *${location.name}*${day}`
+  })
+  return `La Dra. Lucía Chahin atiende con *${coverage}* en:\n\n${rows.join("\n")}\n\nLa cobertura de cada plan debe confirmarse directamente con la sede al pedir el turno.`
+}
+
 // ── Preguntas frecuentes fuera del guion ────────────────────
 async function answerFaq(text: string, sede: Sede | null): Promise<string | null> {
   const lower = text.toLowerCase()
   const locations = await getLocations()
+  const coverageLocationsReply = buildCoverageLocationsReply(text, locations)
+  if (coverageLocationsReply) return coverageLocationsReply
   const loc = sede ? locations.find(l => l.id === sede) : undefined
   const sedeName = loc?.name ?? null
   const unverifiedLocationReply =
@@ -1137,6 +1172,14 @@ export async function handleIncomingMessage(params: {
     }
 
     case "derivado": {
+      if (messageType === "text") {
+        const coverageLocationsReply = buildCoverageLocationsReply(text, await getLocations())
+        if (coverageLocationsReply) {
+          await sendText(phone, coverageLocationsReply, { ...ctx, flowIntent: "consultar_cobertura" })
+          return
+        }
+      }
+
       if ((messageType === "text" && wantsToChangeObraSocial(text)) || buttonId === "cambiar_obra_social") {
         const currentLead = session.lead_id ? await getLead(session.lead_id) : null
         const options = await getObraSocialOptions(leadPreferredSede(currentLead))

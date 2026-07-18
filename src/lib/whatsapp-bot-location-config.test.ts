@@ -117,6 +117,46 @@ function mockDb(locations: unknown, sessionOverrides: Record<string, unknown> = 
 beforeEach(() => jest.clearAllMocks())
 
 describe("fuente única de sedes en el bot", () => {
+  it("responde por otra cobertura sin cambiar la guardada ni la sede del paciente", async () => {
+    const locations = [{
+      id: "cimel_lanus",
+      name: "CIMEL Lanús",
+      obras_sociales: ["Medife", "Particular"],
+      services: [],
+      verified_at: "2026-07-15T12:00:00.000Z",
+      verified_by: "test-user",
+      valid_from: "2026-07-01T00:00:00.000Z",
+      active: true,
+    }, {
+      id: "hospital_britanico",
+      name: "Hospital Británico",
+      obras_sociales: ["OSDE", "Particular"],
+      services: [],
+      verified_at: "2026-07-15T12:00:00.000Z",
+      verified_by: "test-user",
+      valid_from: "2026-07-01T00:00:00.000Z",
+      active: true,
+    }]
+    const { sessionsBuilder, leadsBuilder } = mockDb(locations, { obra_social: "OSDE 410" })
+
+    await handleIncomingMessage({ phone: PHONE, text: "¿Dónde puedo atenderme con Medife?" })
+
+    expect(sendText).toHaveBeenCalledWith(
+      PHONE,
+      expect.stringContaining("atiende con *Medife*"),
+      expect.objectContaining({ flowIntent: "consultar_cobertura" })
+    )
+    expect(sendText).toHaveBeenCalledWith(
+      PHONE,
+      expect.stringContaining("*CIMEL Lanús*"),
+      expect.anything()
+    )
+    expect(leadsBuilder.update).not.toHaveBeenCalled()
+    expect(sessionsBuilder.update).not.toHaveBeenCalledWith(
+      expect.objectContaining({ obra_social: expect.anything() })
+    )
+  })
+
   it("no deriva a una sede incompatible y ofrece directamente una sede compatible", async () => {
     const locations = [{
       id: "cimel_lanus",
