@@ -282,6 +282,39 @@ async function buildSedeInstructions(sede: Sede, intro: string): Promise<string 
   return lines.join("\n")
 }
 
+function normalizeCoverageName(value: string): string {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/\b(?:plan)?\s*\d+[a-z]?\b/g, "")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim()
+}
+
+export function buildCoverageNotice(
+  location: Pick<WhatsAppLocationConfig, "name" | "obras_sociales">,
+  insurance: string | null | undefined
+): string | null {
+  const declared = insurance?.trim()
+  if (!declared) return null
+
+  const normalizedDeclared = normalizeCoverageName(declared)
+  const isParticular = normalizedDeclared === "particular"
+    || normalizedDeclared === "particular sin cobertura"
+    || normalizedDeclared === "sin cobertura"
+  const listed = location.obras_sociales.some(item => {
+    const normalizedItem = normalizeCoverageName(item)
+    return normalizedItem === normalizedDeclared
+      || (normalizedItem.length >= 4 && normalizedDeclared.startsWith(`${normalizedItem} `))
+  })
+
+  if (listed || (isParticular && location.obras_sociales.some(item => normalizeCoverageName(item) === "particular"))) {
+    return `La cobertura *${declared}* figura en la lista verificada de *${location.name}*.`
+  }
+  return `La cobertura *${declared}* no figura en la lista verificada de *${location.name}*. Confirmala directamente con la sede antes de pedir el turno o consultá por atención particular.`
+}
+
 // Ola 4 (P1, incidente real 2026-07-14): mientras se espera que una persona del equipo responda,
 // dar de una un contacto directo de la sede que el paciente ya eligió -- antes el mensaje de
 // derivación no tenía ningún dato de contacto propio.
@@ -434,9 +467,13 @@ async function sendSedeOptions(
   return true
 }
 
-async function getObraSocialOptions(): Promise<{ id: string; title: string }[]> {
+async function getObraSocialOptions(sede?: Sede | null): Promise<{ id: string; title: string }[]> {
   const locations = await getLocations()
-  const dynamic = Array.from(new Set(locations.flatMap(l => l.obras_sociales ?? []).filter(Boolean)))
+  const selectedLocation = sede ? locations.find(location => location.id === sede) : null
+  const dynamic = Array.from(new Set(
+    (selectedLocation ? selectedLocation.obras_sociales : locations.flatMap(location => location.obras_sociales))
+      .filter(name => Boolean(name) && normalizeCoverageName(name) !== "particular")
+  ))
   const dynamicRows = dynamic.slice(0, 8).map((name, i) => ({ id: `os_${i}`, title: name.length > 24 ? name.slice(0, 24) : name }))
   return [...dynamicRows, { id: "particular", title: "Particular" }, { id: "otra_obra_social", title: "Otra obra social" }]
 }
@@ -455,9 +492,16 @@ async function sendInstructionsAndOfferFollowup(
   phone: string,
   sede: Sede,
   intro: string,
-  ctx: SendContext
+  ctx: SendContext,
+  insurance?: string | null
 ): Promise<void> {
-  const instructions = await buildSedeInstructions(sede, intro)
+  const locations = await getLocations()
+  const location = locations.find(item => item.id === sede)
+  const coverageNotice = location ? buildCoverageNotice(location, insurance) : null
+  const instructions = await buildSedeInstructions(
+    sede,
+    coverageNotice ? `${intro}\n\n${coverageNotice}` : intro
+  )
   if (!instructions) {
     await sendButtons(
       phone,
@@ -905,9 +949,9 @@ export async function handleIncomingMessage(params: {
         await updateLeadLocation(leadId, verifiedSede)
         if (extraction.obraSocial) {
           await updateSession(phone, { obra_social: extraction.obraSocial })
-          await sendInstructionsAndOfferFollowup(phone, verifiedSede, "Perfecto.", ctx)
+          await sendInstructionsAndOfferFollowup(phone, verifiedSede, "Perfecto.", ctx, extraction.obraSocial)
         } else {
-          const options = await getObraSocialOptions()
+          const options = await getObraSocialOptions(verifiedSede)
           await sendList(phone, "Para terminar, elegí tu obra social o prepaga (o \"Particular\" si no tenés cobertura):", "Elegir", options, { ...ctx, flowIntent: "consultar_cobertura" })
           await updateSession(phone, { state: "esperando_obra_social" })
         }
@@ -936,7 +980,7 @@ export async function handleIncomingMessage(params: {
         await updateSession(phone, { obra_social: obraSocial })
         const routedSede = leadPreferredSede(currentLead)
         if (routedSede) {
-          await sendInstructionsAndOfferFollowup(phone, routedSede, "Perfecto.", ctx)
+          await sendInstructionsAndOfferFollowup(phone, routedSede, "Perfecto.", ctx, obraSocial)
         } else {
           await sendText(phone, `Listo, actualicé tu obra social a *${obraSocial}*. ✅`, { ...ctx, flowIntent: "consultar_cobertura" })
           await updateSession(phone, { state: "derivado" })
@@ -947,7 +991,7 @@ export async function handleIncomingMessage(params: {
       const sede = currentLead?.preferred_location === "cimel_lanus" || currentLead?.preferred_location === "swiss_lomas" || currentLead?.preferred_location === "hospital_britanico" ? currentLead.preferred_location : null
       await updateSession(phone, { obra_social: obraSocial })
       if (sede) {
-        await sendInstructionsAndOfferFollowup(phone, sede, "Perfecto.", ctx)
+        await sendInstructionsAndOfferFollowup(phone, sede, "Perfecto.", ctx, obraSocial)
       } else {
         await sendSedeOptions(phone, ctx, `Listo, guardamos tu obra social *${obraSocial}*.`)
         await updateSession(phone, { state: "esperando_sede" })
@@ -966,9 +1010,9 @@ export async function handleIncomingMessage(params: {
       if (session.lead_id) await updateLeadLocation(session.lead_id, sede)
 
       if (session.obra_social) {
-        await sendInstructionsAndOfferFollowup(phone, sede, "Perfecto.", ctx)
+        await sendInstructionsAndOfferFollowup(phone, sede, "Perfecto.", ctx, session.obra_social)
       } else {
-        const options = await getObraSocialOptions()
+        const options = await getObraSocialOptions(sede)
         await sendList(phone, "Para terminar, elegí tu obra social o prepaga (o \"Particular\" si no tenés cobertura):", "Elegir", options, { ...ctx, flowIntent: "consultar_cobertura" })
         await updateSession(phone, { state: "esperando_obra_social" })
       }
@@ -1024,7 +1068,8 @@ export async function handleIncomingMessage(params: {
 
     case "derivado": {
       if (messageType === "text" && wantsToChangeObraSocial(text)) {
-        const options = await getObraSocialOptions()
+        const currentLead = session.lead_id ? await getLead(session.lead_id) : null
+        const options = await getObraSocialOptions(leadPreferredSede(currentLead))
         await sendList(phone, `Tenés cargada la obra social *${session.obra_social ?? "no informada"}*. Elegí la nueva (o "Particular" si no tenés cobertura):`, "Elegir", options, { ...ctx, flowIntent: "consultar_cobertura" })
         await updateSession(phone, { state: "esperando_obra_social" })
         return
@@ -1042,7 +1087,12 @@ export async function handleIncomingMessage(params: {
       const sede = parseSede(text, locations, buttonId)
       if (sede) {
         if (session.lead_id) await updateLeadLocation(session.lead_id, sede)
-        const body = await buildSedeInstructions(sede, "Listo, actualicé tu sede preferida.")
+        const location = locations.find(item => item.id === sede)
+        const coverageNotice = location ? buildCoverageNotice(location, session.obra_social) : null
+        const intro = coverageNotice
+          ? `Listo, actualicé tu sede preferida.\n\n${coverageNotice}`
+          : "Listo, actualicé tu sede preferida."
+        const body = await buildSedeInstructions(sede, intro)
         if (body) {
           await sendText(phone, body, { ...ctx, flowIntent: "pedir_turno" })
         } else {
