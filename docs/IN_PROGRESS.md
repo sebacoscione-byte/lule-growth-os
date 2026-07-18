@@ -1,3 +1,14 @@
+# HOTFIX EN CURSO (2026-07-18) — alerta interna de derivación por WhatsApp
+
+- [x] Confirmar dos rechazos reales de Meta en el ledger de salida (`provider_rejected`).
+- [x] Corregir el destino de alerta al formato internacional completo.
+- [x] Identificar el código Meta `132001`: el template fue aprobado como `es`, no `es_AR`.
+- [x] Verificar un envío real aceptado por Meta usando el idioma aprobado.
+- [x] Sincronizar Supabase mediante migración y ejecutar lint, 90 suites/851 tests y build.
+- [ ] Publicar por PR, verificar preview y mergear a producción.
+
+---
+
 # EN CURSO (2026-07-17) — estados del handoff y aviso de reactivación
 
 - [x] Confirmar que el Inbox trataba todo handoff abierto como “esperando”, incluso después de `taken_at`.
