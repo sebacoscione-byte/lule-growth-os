@@ -168,7 +168,6 @@ const IMAGE_PROMPT_RULES = `DIRECCION VISUAL PARA GEMINI:
 - El texto debe ser breve, grande, legible en pantalla chica y con jerarquia clara. Usa como maximo dos familias o pesos tipograficos.
 - Para historia, manten texto y elementos importantes dentro de la zona segura central, lejos de los bordes superior e inferior.
 - Para carrusel, crea una portada que abra una brecha de curiosidad y se entienda en menos de tres segundos.
-- Para carrusel, ademas de "image_prompt" de portada, cada slide necesita su propio "image_prompt": una escena distinta que corresponda a lo que dice esa slide en particular (no repitas la escena de la portada ni la de otra slide). Todas las escenas del carrusel deben compartir la misma paleta de color y el mismo tratamiento editorial de arriba para que se sientan una sola pieza, aunque el sujeto de cada imagen sea distinto.
 - Pedi iluminacion natural o cinematografica suave, profundidad, textura y una paleta sobria con acentos bordo, azul profundo o verde azulado.
 - Prioriza escenas humanas cotidianas, objetos o metaforas visuales inteligentes. Evita la placa de texto generica.
 - Si aparecen personas: adultas, aspecto argentino o latino diverso, expresion serena, nunca con dolor ni en una urgencia.
@@ -1004,18 +1003,23 @@ export async function regenerateImageDirection(input: {
     system: `${IMAGE_PROMPT_RULES}
 
 Te paso una pieza de contenido ya escrita (categoria, tema, titular, subtitulo y el caption completo
-que va a acompañar la placa). Tu tarea es proponer una direccion visual nueva para esa pieza puntual,
-siguiendo las reglas de arriba. La escena tiene que guardar correlacion concreta con lo que dice el
-caption (el gancho, el ejemplo o la idea central que desarrolla), no solo con el titular corto —
-si el caption habla de un habito, una situacion o un dato puntual, la imagen deberia reflejar eso
-mismo en vez de una escena generica de la categoria.
-Devolve SOLO un JSON con esta forma exacta: { "image_prompt": "...", "image_alt_text": "..." }`,
+que va a acompañar la placa). Tu tarea es proponer una direccion visual nueva para esa UNICA imagen
+puntual (la portada, o si el titular/subtitulo corresponden a una slide de un carrusel, esa slide
+puntual nada mas -- nunca el carrusel completo), siguiendo las reglas de arriba. La escena tiene que
+guardar correlacion concreta con lo que dice el caption (el gancho, el ejemplo o la idea central que
+desarrolla), no solo con el titular corto — si el caption habla de un habito, una situacion o un dato
+puntual, la imagen deberia reflejar eso mismo en vez de una escena generica de la categoria.
+Devolve SOLO un JSON PLANO con esta forma exacta, sin importar el formato: { "image_prompt": "...", "image_alt_text": "..." }
+Nunca devuelvas un array "slides" ni ninguna otra forma -- es SIEMPRE este unico objeto con esas dos claves.`,
     messages: [{
       role: "user",
       content: `Categoria: ${input.category}\nTema: ${input.topic}\nFormato: ${input.format}\nTitular: "${input.visual_headline}"\nSubtitulo: "${input.visual_subtitle}"\nCaption completo:\n${input.caption}${avoidPrevious}`,
     }],
   })
-  const parsed = parseJson<{ image_prompt: string; image_alt_text: string }>(text)
+  const parsed = parseJson<{ image_prompt?: unknown; image_alt_text?: unknown }>(text)
+  if (typeof parsed.image_prompt !== "string" || typeof parsed.image_alt_text !== "string") {
+    throw new Error("La IA devolvió una respuesta incompleta para la dirección visual.")
+  }
   return {
     image_prompt: parsed.image_prompt.slice(0, 2400),
     image_alt_text: parsed.image_alt_text.slice(0, 180),
