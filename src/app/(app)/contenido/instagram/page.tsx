@@ -18,6 +18,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
 import { parseAiJson } from "@/lib/parse-ai-json"
+import { truncateForImagePlate } from "@/lib/content-text"
 import { DEFAULT_AUTO_PUBLISH_SETTINGS, alreadyPublishedToday, estimateAutoPublishDrainDays, estimateAutoPublishDateForPosition, findRecentDuplicateTopic, pickNextPublishableItems } from "@/lib/content-pipeline"
 import type { AutoPublishSettings, AutoPublishTrackSettings, ContentItem, ContentObjective, ContentScene, ContentSlide, ContentSource, ContentStatus } from "@/types"
 import type { InstagramMediaInsights } from "@/lib/instagram-business"
@@ -2238,7 +2239,7 @@ function Editor({
             topic: item.topic,
             format: item.format,
             visual_headline: slide.headline || item.topic.slice(0, 90),
-            visual_subtitle: slide.text.slice(0, 90),
+            visual_subtitle: truncateForImagePlate(slide.text),
             caption: slide.text,
             previous_image_prompt: previous ?? imagePrompt,
           }),
@@ -2278,7 +2279,7 @@ function Editor({
         }))
       }
     }
-    const result = await generateOneVisual(slide.headline, slide.text.slice(0, 90), `-slide-${index}`, slidePrompt)
+    const result = await generateOneVisual(slide.headline, truncateForImagePlate(slide.text), `-slide-${index}`, slidePrompt)
     if (result.error) {
       setSlideErrors(previous => ({ ...previous, [index]: result.error as string }))
     } else {
@@ -2321,7 +2322,7 @@ function Editor({
           }))
         }
       }
-      const result = await generateOneVisual(slides[index].headline, slides[index].text.slice(0, 90), `-slide-${index}`, slidePrompt)
+      const result = await generateOneVisual(slides[index].headline, truncateForImagePlate(slides[index].text), `-slide-${index}`, slidePrompt)
       if (result.error) {
         setBulkError(`Slide ${index + 1}: ${result.error} Las imágenes generadas hasta acá ya quedaron guardadas.`)
         setBulkGenerating(false)

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { generateContentVisual, getPublicAiError } from "@/lib/ai"
+import { truncateForImagePlate } from "@/lib/content-text"
 import { createClient } from "@/lib/supabase/server"
 import { getServiceDb } from "@/lib/supabase/service"
 import { authorizeStaff } from "@/lib/staff-authz"
@@ -27,7 +28,7 @@ export async function POST(request: Request) {
       topic: (body.topic as string).slice(0, 200),
       format: body.format as typeof FORMATS[number],
       visual_headline: (body.visual_headline as string).slice(0, 90),
-      visual_subtitle: (body.visual_subtitle as string).slice(0, 90),
+      visual_subtitle: truncateForImagePlate(body.visual_subtitle as string, 120),
       image_prompt: (body.image_prompt as string).slice(0, 2400),
     })
 
