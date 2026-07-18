@@ -4,7 +4,7 @@
 - [x] Excluir sólo mensajes inbound del teléfono interno antes de la cola durable y del bot.
 - [x] Mantener los eventos de estado de Meta para no perder seguimiento de entrega.
 - [x] Ejecutar lint, 90 suites/853 tests y build.
-- [ ] Publicar por PR y verificar preview.
+- [x] Publicar por PR #124; CI y Vercel Preview quedaron verdes.
 - [ ] Mergear a producción y comprobar el despliegue final.
 
 ---
