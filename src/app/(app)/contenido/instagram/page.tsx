@@ -105,10 +105,13 @@ function fallbackImagePrompt(item: ContentItem) {
   return `Create a scroll-stopping premium editorial plate for a cardiology social media post about "${item.topic}". ${ratio}. Use one instantly understandable focal point and a relatable everyday moment that makes a potential patient feel recognized or motivated to take a preventive step. Create gentle visual tension between postponing care and choosing to take care of oneself, without fear, pain or urgency. Sophisticated deep blue, burgundy and warm neutral palette, natural cinematic lighting, realistic texture and depth. Reserve a clean, high-contrast area for the exact requested Spanish headline and subtitle. Avoid cold hospital imagery, generic medical stock photography, recognizable real physicians and advertising clichés. No extra text, no logos, no watermark.`
 }
 
-function VisualCard({ item, compact = false }: { item: ContentItem; compact?: boolean }) {
+function VisualCard({ item, compact = false, trueAspect = false }: { item: ContentItem; compact?: boolean; trueAspect?: boolean }) {
+  // trueAspect: para vistas donde importa mostrar la proporcion real que se publica (4:5 feed, 9:16
+  // historia), no el recorte cuadrado que usan las miniaturas chicas de las grillas.
+  const aspectClass = trueAspect ? (item.format === "historia" ? "aspect-[9/16]" : "aspect-[4/5]") : "aspect-square"
   if (item.visual_url) {
     return (
-      <div className="relative aspect-square overflow-hidden rounded-2xl border border-gray-200 shadow-sm">
+      <div className={`relative ${aspectClass} overflow-hidden rounded-2xl border border-gray-200 shadow-sm`}>
         <Image
           src={item.visual_url}
           alt={item.image_alt_text || `Placa visual sobre ${item.topic}`}
@@ -123,7 +126,7 @@ function VisualCard({ item, compact = false }: { item: ContentItem; compact?: bo
     )
   }
   return (
-    <div className={`aspect-square rounded-2xl bg-gradient-to-br ${STYLE_CLASSES[item.visual_style]} p-6 text-white flex flex-col justify-between shadow-sm`}>
+    <div className={`${aspectClass} rounded-2xl bg-gradient-to-br ${STYLE_CLASSES[item.visual_style]} p-6 text-white flex flex-col justify-between shadow-sm`}>
       <div className="flex items-center justify-between text-xs uppercase tracking-[0.2em] text-white/75">
         <span>Concepto generado por IA</span>
         <ImageIcon className="h-4 w-4" />
@@ -137,16 +140,18 @@ function VisualCard({ item, compact = false }: { item: ContentItem; compact?: bo
   )
 }
 
-function SlideCard({ slide, index, style, compact = false }: { slide: ContentSlide; index: number; style: ContentItem["visual_style"]; compact?: boolean }) {
+function SlideCard({ slide, index, style, compact = false, trueAspect = false }: { slide: ContentSlide; index: number; style: ContentItem["visual_style"]; compact?: boolean; trueAspect?: boolean }) {
+  // Las slides de un carrusel siempre son formato feed (4:5) -- nunca historia.
+  const aspectClass = trueAspect ? "aspect-[4/5]" : "aspect-square"
   if (slide.visual_url) {
     return (
-      <div className={`relative ${compact ? "w-28 flex-shrink-0" : "w-full"} aspect-square overflow-hidden rounded-xl border border-gray-200 shadow-sm`}>
+      <div className={`relative ${compact ? "w-28 flex-shrink-0" : "w-full"} ${aspectClass} overflow-hidden rounded-xl border border-gray-200 shadow-sm`}>
         <Image src={slide.visual_url} alt={slide.headline || `Slide ${index + 1}`} fill unoptimized className="object-cover" />
       </div>
     )
   }
   return (
-    <div className={`${compact ? "w-28 flex-shrink-0" : "w-full"} aspect-square rounded-xl bg-gradient-to-br ${STYLE_CLASSES[style]} p-3 text-white flex flex-col justify-between shadow-sm`}>
+    <div className={`${compact ? "w-28 flex-shrink-0" : "w-full"} ${aspectClass} rounded-xl bg-gradient-to-br ${STYLE_CLASSES[style]} p-3 text-white flex flex-col justify-between shadow-sm`}>
       <span className="text-[10px] font-bold text-white/50 uppercase tracking-widest">{index + 1}</span>
       <div>
         <p className={`${compact ? "text-xs" : "text-base"} font-bold leading-tight`}>{slide.headline}</p>
@@ -182,8 +187,8 @@ function CarouselPreview({ item, compact = false }: { item: ContentItem; compact
     <div className="space-y-2">
       <div className="relative">
         {index === 0
-          ? <VisualCard item={item} />
-          : <SlideCard slide={slides[index - 1]} index={index - 1} style={item.visual_style} />}
+          ? <VisualCard item={item} trueAspect />
+          : <SlideCard slide={slides[index - 1]} index={index - 1} style={item.visual_style} trueAspect />}
         {total > 1 && (
           <>
             <button
