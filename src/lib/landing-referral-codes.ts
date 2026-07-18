@@ -31,6 +31,10 @@ const REFERRAL_CODES: ReferralCodeInfo[] = [
   // sociales cargadas) — un único código compartido entre todas las landings a propósito: es un
   // link de bajísimo uso, no justifica un código por slug.
   { code: "WEB-GRAL-01", landingSlug: "*", locationKey: null, specialty: "general", description: "CTA de respaldo 'Consultanos por WhatsApp' (cualquier landing)" },
+  // Botón "Chatear"/"Usuario de chat" del perfil de Google Business (Google Maps/Búsqueda) — no
+  // corresponde a ninguna landing real, pero usa el mismo mecanismo para que esos leads no queden
+  // indistinguibles de tráfico orgánico en utm_content/landing_page.
+  { code: "MAPS-GRAL-01", landingSlug: "google-maps", locationKey: null, specialty: "general", description: "Botón de chat del perfil de Google Business (Maps/Búsqueda)" },
 ]
 
 const BY_KEY = new Map(REFERRAL_CODES.map(info => [`${info.landingSlug}:${info.locationKey ?? "general"}`, info]))

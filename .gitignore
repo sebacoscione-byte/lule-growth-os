@@ -13,6 +13,9 @@
 # testing
 /coverage
 
+# capturas temporales generadas por la skill local de verificación visual
+/.claude/skills/run-lule-growth-os/*.png
+
 # Playwright (QA-02) — /e2e/.auth guarda una sesión real (storageState), nunca commitear
 /test-results/
 /playwright-report/
@@ -30,6 +33,7 @@
 *.pem
 
 # debug
+dev-server.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
