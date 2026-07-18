@@ -5,7 +5,7 @@ import type { ChangeEvent } from "react"
 import Image from "next/image"
 import Link from "next/link"
 import {
-  Archive, ArchiveRestore, BookOpen, Check, ChevronDown, ChevronUp, Copy, Download, ExternalLink, Link2, Loader2,
+  Archive, ArchiveRestore, BookOpen, Check, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Copy, Download, ExternalLink, Link2, Loader2,
   ImageIcon, Plus, Save, Search, Send, ShieldCheck, Sparkles, Pin, Undo2, Unlink, WandSparkles, X,
 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
@@ -157,6 +157,7 @@ function SlideCard({ slide, index, style, compact = false }: { slide: ContentSli
 
 function CarouselPreview({ item, compact = false }: { item: ContentItem; compact?: boolean }) {
   const slides = item.slides
+  const [previewIndex, setPreviewIndex] = useState(0)
   if (!slides || slides.length === 0) return <VisualCard item={item} compact={compact} />
   if (compact) {
     return (
@@ -171,21 +172,54 @@ function CarouselPreview({ item, compact = false }: { item: ContentItem; compact
       </div>
     )
   }
+  // Vista tipo Instagram: una imagen grande a la vez (portada + cada slide), con flechas y puntos
+  // para "deslizar" entre ellas -- deja ver de un vistazo cómo quedaría la publicación completa,
+  // sin tener que ir mirando cada card chica por separado.
+  const total = slides.length + 1
+  const index = Math.min(previewIndex, total - 1)
   return (
-    <div className="space-y-3">
-      <div>
-        <p className="text-xs font-medium text-gray-500 mb-1.5 uppercase tracking-wide">Portada</p>
-        <VisualCard item={item} />
+    <div className="space-y-2">
+      <div className="relative">
+        {index === 0
+          ? <VisualCard item={item} />
+          : <SlideCard slide={slides[index - 1]} index={index - 1} style={item.visual_style} />}
+        {total > 1 && (
+          <>
+            <button
+              type="button"
+              onClick={() => setPreviewIndex(i => (Math.min(i, total - 1) - 1 + total) % total)}
+              aria-label="Imagen anterior"
+              className="absolute left-2 top-1/2 -translate-y-1/2 rounded-full bg-white/90 p-1.5 shadow hover:bg-white"
+            >
+              <ChevronLeft className="h-4 w-4 text-gray-700" />
+            </button>
+            <button
+              type="button"
+              onClick={() => setPreviewIndex(i => (Math.min(i, total - 1) + 1) % total)}
+              aria-label="Imagen siguiente"
+              className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full bg-white/90 p-1.5 shadow hover:bg-white"
+            >
+              <ChevronRight className="h-4 w-4 text-gray-700" />
+            </button>
+          </>
+        )}
       </div>
-      <div>
-        <p className="text-xs font-medium text-gray-500 mb-1.5 uppercase tracking-wide">Slides de contenido ({slides.length})</p>
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-          {slides.map((slide, i) => (
-            <SlideCard key={i} slide={slide} index={i} style={item.visual_style} />
+      {total > 1 && (
+        <div className="flex items-center justify-center gap-1.5">
+          {Array.from({ length: total }).map((_, i) => (
+            <button
+              key={i}
+              type="button"
+              onClick={() => setPreviewIndex(i)}
+              aria-label={i === 0 ? "Ver portada" : `Ver slide ${i}`}
+              className={`h-2 w-2 rounded-full transition-colors ${i === index ? "bg-blue-600" : "bg-gray-300 hover:bg-gray-400"}`}
+            />
           ))}
         </div>
-      </div>
-      <p className="text-xs text-gray-400 text-center">Total: {slides.length + 1} slides. Usá estos contenidos en Canva o Instagram para armar las placas.</p>
+      )}
+      <p className="text-center text-xs text-gray-500">
+        {index === 0 ? "Portada" : `Slide ${index} de ${slides.length}`} · {index + 1}/{total}
+      </p>
     </div>
   )
 }
@@ -2411,6 +2445,24 @@ function Editor({
   return (
     <div className="grid gap-5 lg:grid-cols-2">
       <div className="space-y-3">
+        {isCarrusel && (
+          <Card className="border-blue-200 bg-blue-50/40">
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2 text-base text-gray-900">
+                <BookOpen className="h-4 w-4 text-blue-600" />
+                Vista previa de la publicación
+              </CardTitle>
+              <p className="text-xs text-gray-600">
+                Así se vería en Instagram: usá las flechas o los puntos para deslizar entre la portada y
+                cada slide, una por una. Las que todavía no generaste muestran el titular/texto sobre un
+                fondo de color, en su lugar.
+              </p>
+            </CardHeader>
+            <CardContent>
+              <CarouselPreview item={item} />
+            </CardContent>
+          </Card>
+        )}
         <Card className="border-violet-200 bg-violet-50/40">
           <CardHeader className="pb-3">
             <CardTitle className="flex items-center gap-2 text-base text-gray-900">
@@ -2594,7 +2646,7 @@ function Editor({
                         onClick={() => toggleSlideScene(index)}
                         className="w-full text-center text-[11px] text-violet-700 hover:text-violet-800 underline"
                       >
-                        {expandedSlideScene.has(index) ? "Ocultar escena" : slide.image_prompt ? "Ver escena" : "Sin escena propia todavía"}
+                        {expandedSlideScene.has(index) ? "Ocultar descripción (texto)" : slide.image_prompt ? "Ver descripción (texto)" : "Sin descripción propia todavía"}
                       </button>
                       {expandedSlideScene.has(index) && (
                         <div className="space-y-1">
