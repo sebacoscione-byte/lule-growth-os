@@ -812,9 +812,18 @@ flakiness de `next dev` de abajo):
   falta probar contra `next dev`.
 - Comandos: `npm run test:e2e` (todo), `npm run test:e2e:public` (solo lo que no necesita sesión),
   `npm run test:e2e:ui` (modo interactivo de Playwright, útil para debuggear un test que falla).
-- **Pendiente real**: correr los tests autenticados con un usuario de prueba real al menos una vez
-  (dejar de ser "escritos, sin correr" para pasar a "verificados"), y configurar que corran en
-  CI/GitHub Actions con esas credenciales como secret.
+- **CI configurado, pendiente de primera corrida verificada (2026-07-18)**: `.github/workflows/e2e.yml` corre
+  `test:e2e:public` en cada PR/push a `main`, y `test:e2e:authenticated` en push a `main`,
+  `workflow_dispatch` y una vez al día — deliberadamente no en cada PR, porque esta cuenta de
+  prueba comparte la misma base de Supabase que producción (sin staging) y cada corrida
+  crea/borra un lead real y ocupa la única sesión activa que admite la cuenta. `login-helper.ts`
+  ahora acepta el secreto TOTP también por variable de entorno (`E2E_TEST_TOTP_SECRET`), porque en
+  un runner de CI el archivo local `e2e/.auth/totp-secret.json` nunca existe (checkout limpio) y la
+  cuenta ya tiene un factor MFA verificado desde corridas locales previas. `npm run
+  push-e2e-ci-secrets` (nuevo, `scripts/push-e2e-ci-secrets.mjs`) carga los 6 secrets que el
+  workflow necesita leyendo `.env.local`/`e2e/.auth/totp-secret.json` en tu máquina y llamando
+  `gh secret set` — ningún agente lee esos valores, correlo vos una vez para que el workflow deje
+  de fallar por falta de credenciales.
 
 ## Comandos útiles
 ```bash

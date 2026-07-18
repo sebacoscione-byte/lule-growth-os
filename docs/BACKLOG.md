@@ -249,8 +249,26 @@ por qué tipo de acción es, para que sepas qué esperar de cada uno. El detalle
     Con los tres corregidos, `npm run test:e2e` (public + authenticated juntos) pasa 22/22 de forma
     reproducible. PR de este cierre: rearma `auth.setup.ts`/`dashboard.spec.ts`/`inbox.spec.ts`/
     `leads.spec.ts` en `login-helper.ts` + `crm-smoke.spec.ts`, agrega `npm run
-    test:e2e:authenticated`. **Sigue pendiente**: configurar que la suite corra en CI/GitHub Actions
-    con las credenciales como secret (no se hizo en esta sesión).
+    test:e2e:authenticated`.
+  - **CI configurado (2026-07-18)** — `.github/workflows/e2e.yml`: job `e2e-public` corre en cada
+    PR/push a `main` (sin credenciales sensibles, solo Supabase). Job `e2e-authenticated` corre
+    en push a `main`, `workflow_dispatch` y una vez al día (cron 06:00 ART) — **a propósito no en
+    cada PR**, porque esa cuenta de prueba comparte la misma base de Supabase que producción
+    (sin staging) y cada corrida crea/borra un lead real y consume la única sesión activa que
+    admite la cuenta; correrlo en cada PR multiplicaría esa escritura sin necesidad.
+    **Bug real encontrado antes de que llegara a fallar en CI**: `login-helper.ts` solo sabía leer
+    el secreto TOTP desde `e2e/.auth/totp-secret.json` (gitignored) — en un runner de GitHub
+    Actions ese archivo nunca existe (checkout limpio en cada corrida), pero la cuenta de prueba
+    ya tiene un factor MFA verificado desde las corridas locales, así que el flujo de enrolamiento
+    tampoco se dispara: sin el fix, todas las corridas en CI hubieran fallado con el error explícito
+    que el propio código ya tira ("no hay ningún secreto guardado..."). Corregido agregando
+    `E2E_TEST_TOTP_SECRET` como fallback por variable de entorno.
+    **Sigue pendiente, acción tuya**: correr `npm run push-e2e-ci-secrets` una vez (lee
+    `.env.local` y `e2e/.auth/totp-secret.json` en tu máquina y carga `NEXT_PUBLIC_SUPABASE_URL`,
+    `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `E2E_TEST_EMAIL`,
+    `E2E_TEST_PASSWORD` y `E2E_TEST_TOTP_SECRET` como secrets del repo vía `gh secret set` — el
+    agente nunca lee ni ve esos valores, solo escribió el script). Sin ese paso, el workflow corre
+    pero falla por falta de credenciales.
 - [x] ~~Aplicar en producción las 2 migraciones del PR #64~~ **Resuelto** — confirmado en vivo el
   2026-07-14: "Clicks por sede: llamada y WhatsApp" ya muestra datos reales (Swiss 1 WhatsApp,
   Británico 2 WhatsApp). El snapshot de seguidores de Instagram todavía no tiene datos, pero no por

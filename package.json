@@ -12,7 +12,8 @@
     "test:e2e:public": "playwright test --project=public",
     "test:e2e:authenticated": "playwright test --project=authenticated",
     "test:e2e:ui": "playwright test --ui",
-    "migrate": "npm install --no-save pg && node scripts/migrate.mjs"
+    "migrate": "npm install --no-save pg && node scripts/migrate.mjs",
+    "push-e2e-ci-secrets": "node scripts/push-e2e-ci-secrets.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.104.1",

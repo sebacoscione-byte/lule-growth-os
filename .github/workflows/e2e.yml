@@ -1,0 +1,74 @@
+name: E2E
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  schedule:
+    - cron: "0 9 * * *" # 06:00 ART
+  workflow_dispatch:
+
+jobs:
+  e2e-public:
+    runs-on: ubuntu-latest
+    env:
+      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npm run build
+      - name: Start server
+        run: nohup npm run start > server.log 2>&1 & npx wait-on http://localhost:3000 -t 60000
+      - name: Run public E2E
+        run: npm run test:e2e:public
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report-public
+          path: playwright-report/
+          retention-days: 7
+
+  # No corre en pull_request a propósito: esta cuenta de prueba comparte Supabase con producción
+  # (no hay staging, ver CLAUDE.md) y cada corrida crea/borra un lead real de prueba y consume la
+  # única sesión activa que admite la cuenta. Correrlo en cada PR multiplicaría esa escritura sin
+  # necesidad — el smoke autenticado corre después de mergear, a demanda, o una vez por día.
+  e2e-authenticated:
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    concurrency:
+      group: e2e-authenticated
+      cancel-in-progress: false
+    env:
+      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      E2E_TEST_EMAIL: ${{ secrets.E2E_TEST_EMAIL }}
+      E2E_TEST_PASSWORD: ${{ secrets.E2E_TEST_PASSWORD }}
+      E2E_TEST_TOTP_SECRET: ${{ secrets.E2E_TEST_TOTP_SECRET }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npm run build
+      - name: Start server
+        run: nohup npm run start > server.log 2>&1 & npx wait-on http://localhost:3000 -t 60000
+      - name: Run authenticated E2E
+        run: npm run test:e2e:authenticated
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report-authenticated
+          path: playwright-report/
+          retention-days: 7

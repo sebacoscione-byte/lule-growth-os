@@ -24,7 +24,10 @@ function readStoredTotpSecret(): string | null {
     const raw = JSON.parse(fs.readFileSync(totpSecretFile, "utf-8"))
     return typeof raw.secret === "string" ? raw.secret : null
   } catch {
-    return null
+    // CI checks out a fresh repo on every run, so the gitignored local file never exists there.
+    // The account already has a verified factor from local runs, so CI needs the secret value
+    // itself via a GitHub Actions secret instead of the file.
+    return process.env.E2E_TEST_TOTP_SECRET ?? null
   }
 }
 
