@@ -164,12 +164,21 @@ por qué tipo de acción es, para que sepas qué esperar de cada uno. El detalle
   `whatsapp_policy_evaluations` unos días, revisar las coincidencias/discrepancias, y recién
   entonces decidir si conviene una fase 2 (ampliar cobertura) o un canary mínimo. La IA seguirá
   devolviendo enums validados, nunca texto para el paciente.
-- [ ] **Agregar a Lucía al Business Manager de Meta — rol decidido (2026-07-18): acceso acotado
-  por activo**, no administradora completa. Vos mantenés el control total del Business Manager
-  (facturación, lista de administradores); ella solo necesita ver/administrar los activos
-  puntuales (cuenta de WhatsApp Business, Instagram, la página). Falta el trámite en sí (acción
-  tuya en Meta Business Settings → Personas → Agregar, asignando acceso por activo en vez de rol
-  "Administrador" — no lo puede hacer un agente, requiere tu sesión de Meta Business Manager).
+- [x] ~~Agregar a Lucía al Business Manager de Meta~~ **Resuelto (2026-07-18)**: invitada con
+  "Acceso parcial → Básico" (no "Administrar"), asignada solo a la cuenta de WhatsApp Business
+  ("Dra Lucia Chahin") — sin acceso a la App técnica (API keys/webhook) ni a "WhatsApp Marketing
+  Message Event Sharing" (activo de tracking de campañas, no operativo). Confirmado en la lista de
+  Personas: Lucía queda "Acceso parcial / Básico", Seba mantiene "Acceso total / Todo" con
+  Finanzas. Instagram queda pendiente aparte (ver ítem siguiente) — hoy no está conectado como
+  activo de este portfolio.
+- [ ] **Conectar Instagram como activo del portfolio de Meta para poder asignárselo a Lucía**
+  (2026-07-18): la cuenta de Instagram vive bajo `draluciachahin@gmail.com` (Seba tiene acceso a
+  ese mail y a Instagram), separada de la cuenta que administra el portfolio "Dra Lucia Chahin" —
+  por eso no aparecía en "Asignar activos" junto a WhatsApp. Falta: Configuración del negocio →
+  Cuentas → Cuentas de Instagram → Agregar → iniciar sesión con esas credenciales para conectarla
+  al portfolio; después, en Personas → Lucía → editar acceso, asignarle esa cuenta de Instagram
+  con acceso básico (mismo criterio que WhatsApp). Acción manual de Seba, no la puede hacer un
+  agente.
 - [ ] Definir estrategia de reseñas de Google: cómo y cuándo pedirlas a pacientes actuales.
 - [x] ~~Evaluar si crear una ficha de Google Business separada para Swiss Medical Lomas~~
   **Decidido (2026-07-17):** no se crea ficha separada — Swiss Medical Lomas sigue usando
