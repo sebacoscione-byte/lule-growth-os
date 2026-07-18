@@ -7,16 +7,19 @@ import {
 describe("cobertura por sede del bot de WhatsApp", () => {
   const cimel = {
     name: "CIMEL Lanús",
-    obras_sociales: ["Medife", "Osmecon", "Particular"],
+    obras_sociales: ["Medife", "Osmecon"],
+    accepts_particular: true,
   }
   const britanico = {
     name: "Hospital Británico",
-    obras_sociales: ["Avalian", "Galeno", "Osde", "Particular"],
+    obras_sociales: ["Avalian", "Galeno", "Osde"],
+    accepts_particular: true,
   }
 
-  it("no presenta OSDE como verificada en una sede que no la tiene cargada", () => {
+  it("permite atención particular aunque OSDE no figure en la sede", () => {
+    expect(buildCoverageNotice(cimel, "OSDE 410")).toContain("Podés atenderte")
+    expect(buildCoverageNotice(cimel, "OSDE 410")).toContain("forma particular")
     expect(buildCoverageNotice(cimel, "OSDE 410")).toContain("no figura")
-    expect(buildCoverageNotice(cimel, "OSDE 410")).toContain("Confirmala directamente")
   })
 
   it("reconoce un plan de una cobertura base verificada sin prometer autorización", () => {
@@ -26,8 +29,8 @@ describe("cobertura por sede del bot de WhatsApp", () => {
   })
 
   it("informa particular sólo cuando la sede lo tiene verificado", () => {
-    expect(buildCoverageNotice(cimel, "Particular / sin cobertura")).toContain("figura")
-    expect(buildCoverageNotice({ name: "Sede", obras_sociales: ["Medife"] }, "Particular / sin cobertura"))
+    expect(buildCoverageNotice(cimel, "Particular / sin cobertura")).toContain("acepta atención particular")
+    expect(buildCoverageNotice({ name: "Sede", obras_sociales: ["Medife"], accepts_particular: false }, "Particular / sin cobertura"))
       .toContain("no figura")
   })
 
@@ -45,7 +48,7 @@ describe("cobertura por sede del bot de WhatsApp", () => {
     const reply = buildCoverageLocationsReply("¿Dónde puedo atenderme particular?", [
       { ...cimel, id: "cimel_lanus", day: "martes" } as never,
       { ...britanico, id: "hospital_britanico", day: "miércoles" } as never,
-      { name: "Swiss Medical Lomas", obras_sociales: ["Swiss Medical"], id: "swiss_lomas" } as never,
+      { name: "Swiss Medical Lomas", obras_sociales: ["Swiss Medical"], accepts_particular: false, id: "swiss_lomas" } as never,
     ])
     expect(reply).toContain("*Particular*")
     expect(reply).toContain("*CIMEL Lanús*")

@@ -293,7 +293,7 @@ function normalizeCoverageName(value: string): string {
 }
 
 export function buildCoverageNotice(
-  location: Pick<WhatsAppLocationConfig, "name" | "obras_sociales">,
+  location: Pick<WhatsAppLocationConfig, "name" | "obras_sociales" | "accepts_particular">,
   insurance: string | null | undefined
 ): string | null {
   const declared = insurance?.trim()
@@ -309,14 +309,20 @@ export function buildCoverageNotice(
       || (normalizedItem.length >= 4 && normalizedDeclared.startsWith(`${normalizedItem} `))
   })
 
-  if (listed || (isParticular && location.obras_sociales.some(item => normalizeCoverageName(item) === "particular"))) {
+  if (isParticular && location.accepts_particular) {
+    return `*${location.name}* acepta atención particular, sin obra social ni prepaga.`
+  }
+  if (listed) {
     return `La cobertura *${declared}* figura en la lista verificada de *${location.name}*.`
+  }
+  if (!isParticular && location.accepts_particular) {
+    return `Podés atenderte en *${location.name}* de forma particular, pero tu cobertura *${declared}* no figura entre las aceptadas allí.`
   }
   return `La cobertura *${declared}* no figura en la lista verificada de *${location.name}*. Confirmala directamente con la sede antes de pedir el turno o consultá por atención particular.`
 }
 
 export function isCoverageListedAtLocation(
-  location: Pick<WhatsAppLocationConfig, "obras_sociales">,
+  location: Pick<WhatsAppLocationConfig, "obras_sociales" | "accepts_particular">,
   insurance: string | null | undefined
 ): boolean | null {
   const declared = insurance?.trim()
@@ -325,11 +331,11 @@ export function isCoverageListedAtLocation(
   const isParticular = normalizedDeclared === "particular"
     || normalizedDeclared === "particular sin cobertura"
     || normalizedDeclared === "sin cobertura"
+  if (isParticular) return location.accepts_particular
   return location.obras_sociales.some(item => {
     const normalizedItem = normalizeCoverageName(item)
     return normalizedItem === normalizedDeclared
       || (normalizedItem.length >= 4 && normalizedDeclared.startsWith(`${normalizedItem} `))
-      || (isParticular && normalizedItem === "particular")
   })
 }
 
@@ -522,7 +528,14 @@ async function getObraSocialOptions(sede?: Sede | null): Promise<{ id: string; t
       .filter(name => Boolean(name) && normalizeCoverageName(name) !== "particular")
   ))
   const dynamicRows = dynamic.slice(0, 8).map((name, i) => ({ id: `os_${i}`, title: name.length > 24 ? name.slice(0, 24) : name }))
-  return [...dynamicRows, { id: "particular", title: "Particular" }, { id: "otra_obra_social", title: "Otra obra social" }]
+  const particularAvailable = selectedLocation
+    ? selectedLocation.accepts_particular
+    : locations.some(location => location.accepts_particular)
+  return [
+    ...dynamicRows,
+    ...(particularAvailable ? [{ id: "particular", title: "Particular" }] : []),
+    { id: "otra_obra_social", title: "Otra obra social" },
+  ]
 }
 
 const CONSENT_BUTTONS = [
@@ -1201,7 +1214,8 @@ export async function handleIncomingMessage(params: {
       if (sede) {
         const location = locations.find(item => item.id === sede)
         if (location && session.obra_social
-          && isCoverageListedAtLocation(location, session.obra_social) === false) {
+          && isCoverageListedAtLocation(location, session.obra_social) === false
+          && !location.accepts_particular) {
           await sendCoverageMismatchOptions(phone, location, session.obra_social, locations, ctx)
           return
         }
