@@ -171,14 +171,14 @@ por qué tipo de acción es, para que sepas qué esperar de cada uno. El detalle
   Personas: Lucía queda "Acceso parcial / Básico", Seba mantiene "Acceso total / Todo" con
   Finanzas. Instagram queda pendiente aparte (ver ítem siguiente) — hoy no está conectado como
   activo de este portfolio.
-- [ ] **Conectar Instagram como activo del portfolio de Meta para poder asignárselo a Lucía**
-  (2026-07-18): la cuenta de Instagram vive bajo `draluciachahin@gmail.com` (Seba tiene acceso a
-  ese mail y a Instagram), separada de la cuenta que administra el portfolio "Dra Lucia Chahin" —
-  por eso no aparecía en "Asignar activos" junto a WhatsApp. Falta: Configuración del negocio →
-  Cuentas → Cuentas de Instagram → Agregar → iniciar sesión con esas credenciales para conectarla
-  al portfolio; después, en Personas → Lucía → editar acceso, asignarle esa cuenta de Instagram
-  con acceso básico (mismo criterio que WhatsApp). Acción manual de Seba, no la puede hacer un
-  agente.
+- [x] ~~Conectar Instagram como activo del portfolio de Meta para poder asignárselo a Lucía~~
+  **Resuelto (2026-07-18)**: la cuenta `@draluciachahin` (vivía bajo un login separado del que
+  administra el portfolio) quedó conectada como activo de "Dra Lucia Chahin" y asignada a Lucía
+  con acceso total sobre ese activo puntual (Confirmado: "Personas con acceso total → Lucia
+  Chahin"). Con esto, Lucía administra WhatsApp e Instagram por su cuenta vía Meta Business Suite,
+  sin ser administradora del portfolio completo. No afecta ni depende de la conexión OAuth propia
+  que usa la app para publicar automáticamente en Instagram (Estudio de contenido) — son
+  integraciones independientes.
 - [ ] Definir estrategia de reseñas de Google: cómo y cuándo pedirlas a pacientes actuales.
 - [x] ~~Evaluar si crear una ficha de Google Business separada para Swiss Medical Lomas~~
   **Decidido (2026-07-17):** no se crea ficha separada — Swiss Medical Lomas sigue usando
