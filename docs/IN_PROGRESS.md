@@ -1,4 +1,15 @@
-# HOTFIX EN CURSO (2026-07-18) — alerta interna de derivación por WhatsApp
+# HOTFIX EN CURSO (2026-07-18) — bot apagado para el receptor de alertas
+
+- [x] Confirmar que no existía una exclusión entrante para `ALERT_WHATSAPP_TO`.
+- [x] Excluir sólo mensajes inbound del teléfono interno antes de la cola durable y del bot.
+- [x] Mantener los eventos de estado de Meta para no perder seguimiento de entrega.
+- [x] Ejecutar lint, 90 suites/853 tests y build.
+- [x] Publicar por PR #124; CI y Vercel Preview quedaron verdes.
+- [ ] Mergear a producción y comprobar el despliegue final.
+
+---
+
+# HOTFIX CERRADO (2026-07-18) — alerta interna de derivación por WhatsApp
 
 - [x] Confirmar dos rechazos reales de Meta en el ledger de salida (`provider_rejected`).
 - [x] Corregir el destino de alerta al formato internacional completo.

@@ -34,6 +34,22 @@ function bodyByteLength(body: string): number {
   return new TextEncoder().encode(body).byteLength
 }
 
+function normalizeWhatsAppPhone(value: string | null | undefined): string | null {
+  const digits = value?.replace(/\D/g, "") ?? ""
+  return digits.length >= 8 && digits.length <= 15 ? digits : null
+}
+
+/** The internal alert recipient must never enter the patient automation flow. */
+export function isInternalAlertInboundEvent(event: {
+  event_type: "inbound" | "status"
+  phone: string | null
+}, configuredAlertPhone: string | undefined = process.env.ALERT_WHATSAPP_TO): boolean {
+  if (event.event_type !== "inbound") return false
+  const alertPhone = normalizeWhatsAppPhone(configuredAlertPhone)
+  const senderPhone = normalizeWhatsAppPhone(event.phone)
+  return Boolean(alertPhone && senderPhone && alertPhone === senderPhone)
+}
+
 /**
  * The request path only verifies, normalizes and durably persists. Patient processing starts in
  * `after()` once the 200 response has been produced; the SQL queue remains the source of truth if
@@ -82,6 +98,7 @@ export async function POST(req: NextRequest) {
   }
   const acceptedEvents = normalized.events.filter(
     event => event.phone_number_id === expectedPhoneNumberId
+      && !isInternalAlertInboundEvent(event)
   )
 
   try {
