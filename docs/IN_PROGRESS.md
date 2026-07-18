@@ -1,3 +1,14 @@
+# EN CURSO (2026-07-18) — atención particular como capacidad de sede
+
+- [x] Reconstruir el último intercambio de Sebastián Coscione con consentimiento vigente.
+- [x] Separar `accepts_particular` de `obras_sociales` en configuración y UI.
+- [x] Mantener la cobertura del paciente y permitir una sede que acepte atención particular.
+- [x] Aplicar migración: CIMEL/Británico habilitados; Swiss Lomas deshabilitado.
+- [x] Ejecutar lint, 92 suites/867 tests y build de producción.
+- [ ] Verificar preview y publicar por PR.
+
+---
+
 # EN CURSO (2026-07-18) — consulta informativa de obras sociales
 
 - [x] Separar la cobertura guardada del paciente de una consulta sobre otra cobertura.

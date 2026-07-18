@@ -41,6 +41,26 @@ describe("parseWhatsAppLocations", () => {
     expect(result.data[0]).not.toHaveProperty("practices")
   })
 
+  it("migra Particular legacy a una capacidad separada y lo quita de coberturas", () => {
+    const result = parseWhatsAppLocations([canonicalLocation({
+      obras_sociales: ["Medife", "Particular"],
+    })])
+    if (!result.success) throw new Error("config inesperadamente inválida")
+
+    expect(result.data[0].obras_sociales).toEqual(["Medife"])
+    expect(result.data[0].accepts_particular).toBe(true)
+  })
+
+  it("respeta el booleano canónico de atención particular", () => {
+    const result = parseWhatsAppLocations([canonicalLocation({
+      obras_sociales: ["Medife"],
+      accepts_particular: false,
+    })])
+    if (!result.success) throw new Error("config inesperadamente inválida")
+
+    expect(result.data[0].accepts_particular).toBe(false)
+  })
+
   it("lee `practices` legacy y lo normaliza a `services` sin duplicar claves", () => {
     const legacy = canonicalLocation()
     const withoutServices = {

@@ -121,7 +121,8 @@ describe("fuente única de sedes en el bot", () => {
     const locations = [{
       id: "cimel_lanus",
       name: "CIMEL Lanús",
-      obras_sociales: ["Medife", "Particular"],
+      obras_sociales: ["Medife"],
+      accepts_particular: true,
       services: [],
       verified_at: "2026-07-15T12:00:00.000Z",
       verified_by: "test-user",
@@ -130,7 +131,8 @@ describe("fuente única de sedes en el bot", () => {
     }, {
       id: "hospital_britanico",
       name: "Hospital Británico",
-      obras_sociales: ["OSDE", "Particular"],
+      obras_sociales: ["OSDE"],
+      accepts_particular: true,
       services: [],
       verified_at: "2026-07-15T12:00:00.000Z",
       verified_by: "test-user",
@@ -161,7 +163,8 @@ describe("fuente única de sedes en el bot", () => {
     const locations = [{
       id: "cimel_lanus",
       name: "CIMEL Lanús",
-      obras_sociales: ["Medife", "Particular"],
+      obras_sociales: ["Medife"],
+      accepts_particular: false,
       services: [],
       verified_at: "2026-07-15T12:00:00.000Z",
       verified_by: "test-user",
@@ -171,6 +174,7 @@ describe("fuente única de sedes en el bot", () => {
       id: "hospital_britanico",
       name: "Hospital Británico",
       obras_sociales: ["OSDE"],
+      accepts_particular: false,
       services: [],
       verified_at: "2026-07-15T12:00:00.000Z",
       verified_by: "test-user",
@@ -198,6 +202,46 @@ describe("fuente única de sedes en el bot", () => {
     )
     expect(leadsBuilder.update).not.toHaveBeenCalled()
     expect(sendText).not.toHaveBeenCalled()
+  })
+
+  it("permite elegir CIMEL como particular aunque OSDE no figure allí", async () => {
+    const locations = [{
+      id: "cimel_lanus",
+      name: "CIMEL Lanús",
+      obras_sociales: ["Medife"],
+      accepts_particular: true,
+      services: [],
+      address: "Tucumán 1314, Lanús",
+      phone: "011 4249-3412",
+      day: "martes",
+      hours: "Martes de 13:00 a 16:30hs",
+      verified_at: "2026-07-15T12:00:00.000Z",
+      verified_by: "test-user",
+      valid_from: "2026-07-01T00:00:00.000Z",
+      active: true,
+    }]
+    const { leadsBuilder } = mockDb(locations, { obra_social: "OSDE 410" })
+
+    await handleIncomingMessage({
+      phone: PHONE,
+      text: "Me quiero atender en CIMEL",
+    })
+
+    expect(leadsBuilder.update).toHaveBeenCalledWith(expect.objectContaining({
+      preferred_location: "cimel_lanus",
+      status: "derivado_cimel",
+    }))
+    expect(sendText).toHaveBeenCalledWith(
+      PHONE,
+      expect.stringContaining("Podés atenderte en *CIMEL Lanús* de forma particular, pero tu cobertura *OSDE 410* no figura"),
+      expect.objectContaining({ flowIntent: "pedir_turno" })
+    )
+    expect(sendButtons).not.toHaveBeenCalledWith(
+      PHONE,
+      expect.stringContaining("cambiar la cobertura"),
+      expect.anything(),
+      expect.anything()
+    )
   })
 
   it("responde servicios exclusivamente desde `app_config.locations[].services` verificado", async () => {

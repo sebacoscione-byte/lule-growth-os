@@ -37,6 +37,7 @@ const editableLocationFields = {
   day: optionalText(80),
   booking_instruction: optionalText(1_000),
   obras_sociales: stringList.optional(),
+  accepts_particular: z.boolean().optional(),
   notes: optionalText(1_000),
   active: z.boolean().optional(),
 }
@@ -158,6 +159,7 @@ export interface WhatsAppLocationConfig {
   day?: string
   booking_instruction?: string
   obras_sociales: string[]
+  accepts_particular: boolean
   services: string[]
   notes?: string
   verified_at?: string
@@ -204,6 +206,9 @@ function normalizeLocation(location: RawLocation): WhatsAppLocationConfig {
   const legacyServices = "practices" in location ? location.practices : undefined
   const canonicalServices = "services" in location ? location.services : undefined
 
+  const rawCoverages = unique(location.obras_sociales)
+  const legacyParticular = rawCoverages.some(value => value.toLowerCase() === "particular")
+
   return {
     id: location.id,
     name: location.name.trim(),
@@ -215,7 +220,8 @@ function normalizeLocation(location: RawLocation): WhatsAppLocationConfig {
     booking_url: nonEmpty(location.booking_url),
     day: nonEmpty(location.day),
     booking_instruction: nonEmpty(location.booking_instruction),
-    obras_sociales: unique(location.obras_sociales),
+    obras_sociales: rawCoverages.filter(value => value.toLowerCase() !== "particular"),
+    accepts_particular: location.accepts_particular ?? legacyParticular,
     services: unique(canonicalServices?.length ? canonicalServices : legacyServices ?? canonicalServices),
     notes: nonEmpty(location.notes),
     verified_at: location.verified_at ?? undefined,

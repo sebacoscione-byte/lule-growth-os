@@ -34,6 +34,7 @@ type Location = {
   booking_url: string
   services: string[]
   obras_sociales: string[]
+  accepts_particular: boolean
   booking_instruction: string
   notes: string
   day?: string
@@ -65,6 +66,7 @@ const DEFAULT_LOCATION: Omit<Location, "id" | "name"> = {
   booking_url: "",
   services: [],
   obras_sociales: [],
+  accepts_particular: false,
   booking_instruction: "",
   notes: "",
   active: false,
@@ -139,6 +141,7 @@ function normalizeLocationForEditor(location: LegacyLocation): Location {
     name: location.name,
     services: [...(location.services ?? practices ?? [])],
     obras_sociales: [...(location.obras_sociales ?? [])],
+    accepts_particular: location.accepts_particular ?? false,
   }
 }
 
@@ -395,6 +398,7 @@ export default function ConfiguracionPage() {
       day: locationDraft.day,
       booking_instruction: locationDraft.booking_instruction,
       obras_sociales: locationDraft.obras_sociales.map(value => value.trim()).filter(Boolean),
+      accepts_particular: locationDraft.accepts_particular,
       services: locationDraft.services.map(value => value.trim()).filter(Boolean),
       notes: locationDraft.notes,
       active: locationDraft.active,
@@ -1033,6 +1037,18 @@ export default function ConfiguracionPage() {
                       placeholder="Ej: OSDE, Swiss Medical, PAMI..."
                       addLabel="Agregar cobertura"
                     />
+                    <label className="flex items-start gap-2 rounded-md border border-blue-200 bg-blue-50 p-3 text-sm">
+                      <input
+                        type="checkbox"
+                        className="mt-1"
+                        checked={locationDraft.accepts_particular}
+                        onChange={event => updateLocationDraft({ accepts_particular: event.target.checked })}
+                      />
+                      <span>
+                        <span className="font-medium text-blue-950">Acepta atención particular</span>
+                        <p className="text-xs text-blue-800">La persona puede atenderse sin obra social o prepaga en esta institución.</p>
+                      </span>
+                    </label>
                   </div>
 
                   {/* Instrucción y notas */}
@@ -1151,6 +1167,11 @@ export default function ConfiguracionPage() {
                       </div>
                     </div>
                   )}
+                  <InfoRow
+                    icon={<Shield className="h-3.5 w-3.5 text-gray-400" />}
+                    label="Atención particular"
+                    value={loc.accepts_particular ? "Sí" : "No"}
+                  />
                   {loc.booking_instruction && (
                     <div className="bg-gray-50 rounded-md p-3 text-gray-800 text-xs">
                       {loc.booking_instruction}
