@@ -1107,6 +1107,9 @@ intención de turno: quien busca "cardióloga en Lanús" tiene alta probabilidad
 - [x] Crear o reclamar el perfil "Dra. Lucía Chahin" en Google Business — verificado (confirmado 2026-07-11, ícono azul "Verificada")
 - [x] Completar perfil: foto, horarios, descripción — confirmado 2026-07-11 (13 reseñas 5,0★, foto y descripción cargadas)
 - [x] Configurar sitio web del perfil → confirmado 2026-07-11: `https://draluciachahin.ar/` (la raíz redirige a `/dra-lucia-chahin` para visitantes sin sesión, ver `src/middleware.ts`)
+- [x] Atribuir consultas iniciadas desde el botón de chat de Google Maps/Búsqueda: el mensaje
+      configurado con `Ref: MAPS-GRAL-01` queda reconocido por el bot y el lead se guarda con
+      `utm_content = MAPS-GRAL-01` y `landing_page = google-maps` (2026-07-18).
 - [x] ~~Evaluar si crear ficha separada para Swiss Medical Lomas~~ **Decidido (2026-07-17):** no,
   se mantiene una sola ficha ("Dra. Lucía Chahin") para las 3 sedes.
 - [ ] Definir estrategia de reseñas: cómo y cuándo pedirlas a pacientes actuales

@@ -8,6 +8,7 @@ describe("getReferralCode", () => {
     expect(getReferralCode("cardiologa-lanus", "cimel")?.code).toBe("LAN-CARD-01")
     expect(getReferralCode("cardiologa-lomas", "swiss")?.code).toBe("LOM-CARD-01")
     expect(getReferralCode("ecocardiograma-lanus", "cimel")?.code).toBe("LAN-ECO-01")
+    expect(getReferralCode("google-maps", null)?.code).toBe("MAPS-GRAL-01")
   })
 
   it("devuelve null si la combinación no existe", () => {
@@ -25,6 +26,7 @@ describe("findReferralCodeInfo", () => {
   it("encuentra la info a partir del código, sin importar mayúsculas/minúsculas", () => {
     expect(findReferralCodeInfo("lan-card-01")?.landingSlug).toBe("cardiologa-lanus")
     expect(findReferralCodeInfo("LAN-CARD-01")?.landingSlug).toBe("cardiologa-lanus")
+    expect(findReferralCodeInfo("maps-gral-01")?.landingSlug).toBe("google-maps")
   })
 
   it("devuelve null para un código que no existe", () => {

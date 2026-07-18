@@ -1019,3 +1019,21 @@ conectado (`@draluciachahin`) no tenía el scope necesario: Meta devolvió
   auto-mode (no puede distinguir "solo lectura" de "escritura" a nivel de patrón de
   comando de shell). Sigue pendiente pedir aprobación puntual cada vez, salvo que el
   usuario agregue esa regla manualmente él mismo en `.claude/settings.local.json`.
+
+---
+
+# Atribución de Google Maps y limpieza de artefactos locales
+
+## Objetivo
+
+Cerrar el cambio local que identifica consultas iniciadas desde el botón de chat del perfil de
+Google Business y evitar que logs/capturas temporales vuelvan a ensuciar el worktree.
+
+## Plan
+
+- [x] Registrar `MAPS-GRAL-01` como origen `google-maps` sin sede asociada.
+- [x] Cubrir la búsqueda por landing y por código con tests unitarios.
+- [x] Documentar la atribución en el backlog.
+- [x] Ignorar `dev-server.log` y las capturas PNG generadas por la skill visual local.
+- [x] Ejecutar lint, tests y build.
+- [x] Publicar el cambio por rama + PR, verificar CI/preview y mergear.
