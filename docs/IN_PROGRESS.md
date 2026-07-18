@@ -1,3 +1,14 @@
+# EN CURSO (2026-07-18) — consulta informativa de obras sociales
+
+- [x] Separar la cobertura guardada del paciente de una consulta sobre otra cobertura.
+- [x] Buscar la cobertura consultada en todas las sedes verificadas sin modificar el lead.
+- [x] Mantener IA sólo para reconocer intención libre; responder desde configuración verificada.
+- [x] Cubrir consultas Particular, Medife y cobertura no disponible con tests.
+- [x] Ejecutar lint, 91 suites/863 tests y build de producción.
+- [ ] Verificar preview y publicar por PR.
+
+---
+
 # EN CURSO (2026-07-18) — respuesta esperada en conversación de Seba Coscione
 
 - [x] Leer conversación, sesión, handoffs, consentimiento y cola durable de producción.
