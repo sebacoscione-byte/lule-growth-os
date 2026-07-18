@@ -2032,6 +2032,7 @@ function Editor({
   const [expandedSlideScene, setExpandedSlideScene] = useState<Set<number>>(new Set())
   const [slideSceneGeneratingIndex, setSlideSceneGeneratingIndex] = useState<number | null>(null)
   const [slideSceneErrors, setSlideSceneErrors] = useState<Record<number, string>>({})
+  const [slideSceneFallbackWarning, setSlideSceneFallbackWarning] = useState<Record<number, string>>({})
   const fileInputRef = useRef<HTMLInputElement>(null)
   const imagePrompt = item.image_prompt?.trim() || fallbackImagePrompt(item)
   const displayedVisualUrl = generatedVisual?.itemId === item.id ? generatedVisual.url : item.visual_url
@@ -2073,6 +2074,7 @@ function Editor({
     // y quedarian mostrados bajo la slide equivocada. Mas simple limpiar todo que reindexar.
     setSlideErrors({})
     setSlideSceneErrors({})
+    setSlideSceneFallbackWarning({})
     setExpandedSlideScene(new Set())
   }
 
@@ -2186,30 +2188,38 @@ function Editor({
   /**
    * Pide una escena propia para una slide (distinta a la portada) vía /api/content/image-direction.
    * Se usa tanto para completar automaticamente una slide sin descripcion propia antes de renderizar
-   * su imagen, como para el boton "Nueva escena" que la reemplaza a pedido. Nunca tira: si falla,
-   * quien llama decide el fallback (hoy, reusar la direccion de la portada).
+   * su imagen, como para el boton "Nueva escena" que la reemplaza a pedido. La IA ocasionalmente
+   * devuelve una respuesta que no se puede parsear (ver ai.ts) -- reintenta una vez antes de darse
+   * por vencida, para no perder la escena propia de la slide por un traspie puntual del modelo.
    */
   async function fetchSlideScene(slide: ContentSlide, previous?: string): Promise<{ image_prompt?: string; error?: string }> {
-    try {
-      const response = await fetch("/api/content/image-direction", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          category: item.category,
-          topic: item.topic,
-          format: item.format,
-          visual_headline: slide.headline || item.topic.slice(0, 90),
-          visual_subtitle: slide.text.slice(0, 90),
-          caption: slide.text,
-          previous_image_prompt: previous ?? imagePrompt,
-        }),
-      })
-      const data = await response.json()
-      if (!response.ok || data.error) return { error: data.error ?? "No se pudo generar una escena para esta slide." }
-      return { image_prompt: data.image_prompt as string }
-    } catch {
-      return { error: "No se pudo conectar con la IA para generar la escena de esta slide." }
+    let lastError = "No se pudo generar una escena para esta slide."
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        const response = await fetch("/api/content/image-direction", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            category: item.category,
+            topic: item.topic,
+            format: item.format,
+            visual_headline: slide.headline || item.topic.slice(0, 90),
+            visual_subtitle: slide.text.slice(0, 90),
+            caption: slide.text,
+            previous_image_prompt: previous ?? imagePrompt,
+          }),
+        })
+        const data = await response.json()
+        if (!response.ok || data.error) {
+          lastError = data.error ?? lastError
+          continue
+        }
+        return { image_prompt: data.image_prompt as string }
+      } catch {
+        lastError = "No se pudo conectar con la IA para generar la escena de esta slide."
+      }
     }
+    return { error: lastError }
   }
 
   async function generateSlideVisual(index: number) {
@@ -2222,10 +2232,17 @@ function Editor({
     ) return
     setSlideGeneratingIndex(index)
     setSlideErrors(previous => { const next = { ...previous }; delete next[index]; return next })
+    setSlideSceneFallbackWarning(previous => { const next = { ...previous }; delete next[index]; return next })
     let slidePrompt = slide.image_prompt?.trim()
     if (!slidePrompt) {
       const scene = await fetchSlideScene(slide)
       slidePrompt = scene.image_prompt
+      if (!slidePrompt) {
+        setSlideSceneFallbackWarning(previous => ({
+          ...previous,
+          [index]: `No se pudo generar una escena propia para esta slide (${scene.error}) — se usó la misma escena que la portada. Probá "Nueva escena" para reintentar.`,
+        }))
+      }
     }
     const result = await generateOneVisual(slide.headline, slide.text.slice(0, 90), `-slide-${index}`, slidePrompt)
     if (result.error) {
@@ -2257,11 +2274,18 @@ function Editor({
     onSave({ visual_url: cover.visual_url, image_prompt: imagePrompt })
     const slides = item.slides ?? []
     const nextSlides: ContentSlide[] = [...slides]
+    setSlideSceneFallbackWarning({})
     for (let index = 0; index < slides.length; index++) {
       let slidePrompt = slides[index].image_prompt?.trim()
       if (!slidePrompt) {
         const scene = await fetchSlideScene(slides[index])
         slidePrompt = scene.image_prompt
+        if (!slidePrompt) {
+          setSlideSceneFallbackWarning(previous => ({
+            ...previous,
+            [index]: `No se pudo generar una escena propia para esta slide (${scene.error}) — se usó la misma escena que la portada. Probá "Nueva escena" para reintentar.`,
+          }))
+        }
       }
       const result = await generateOneVisual(slides[index].headline, slides[index].text.slice(0, 90), `-slide-${index}`, slidePrompt)
       if (result.error) {
@@ -2363,6 +2387,7 @@ function Editor({
     } else {
       onSave({ slides: (item.slides ?? []).map((s, i) => i === index ? { ...s, image_prompt: scene.image_prompt } : s) })
       setExpandedSlideScene(previous => new Set(previous).add(index))
+      setSlideSceneFallbackWarning(previous => { const next = { ...previous }; delete next[index]; return next })
     }
     setSlideSceneGeneratingIndex(null)
   }
@@ -2563,6 +2588,7 @@ function Editor({
                         {slide.visual_url ? "Regenerar" : "Generar"}
                       </Button>
                       {slideErrors[index] && <p className="text-xs text-red-600">{slideErrors[index]}</p>}
+                      {slideSceneFallbackWarning[index] && <p className="text-[11px] text-amber-700">{slideSceneFallbackWarning[index]}</p>}
                       <button
                         type="button"
                         onClick={() => toggleSlideScene(index)}
