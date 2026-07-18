@@ -43,6 +43,11 @@ de Meta.
 - [ ] **Staging de concurrencia:** disponer de una base clonada, inspeccionar duplicados históricos
   de identidad/IDs de Meta que 1D reconcilia y probar interleavings reales entre cola, outbox,
   handoff y borrado. La ejecución productiva valida SQL y dependencias, no esas carreras temporales.
+  **Decisión (2026-07-18): pausado a propósito, atado a la decisión ya pendiente de pagar Supabase
+  Pro** (ver "🤔 Decisiones tuyas" más arriba) — Pro incluye branching (bases efímeras clonadas de
+  producción), que resuelve esto sin crear ni mantener un proyecto de staging aparte. Este Windows
+  tampoco tiene Docker/WSL2 instalados (alternativa gratis vía `supabase start` local, descartada
+  por ahora al elegir esperar Pro). Retomar cuando definas el plan de Supabase.
 - [x] **Recuperación frecuente activa:** un único job de `pg_cron`,
   `lule-whatsapp-worker-every-minute`, corre con schedule `* * * * *` y usa `pg_net` para llamar a
   `POST /api/internal/whatsapp-worker`. URL y `CRON_SECRET` están cifrados en Supabase Vault; la
@@ -113,6 +118,11 @@ por qué tipo de acción es, para que sepas qué esperar de cada uno. El detalle
   retención, consentimiento de analítica, si el texto de consentimiento de WhatsApp alcanza como
   consentimiento informado, y si hace falta un tratamiento especial para menores de edad (hoy no
   hay ninguno — laguna real, no decisión tomada a propósito).
+  - **(2026-07-18)** El material ya está redactado como email completo, listo para pegar y mandar
+    — se intentó crear un borrador directo en Gmail pero el conector estaba desconectado (token
+    vencido). Reconectalo en la configuración de conectores de claude.ai y pedile a un agente que
+    lo reintente, o simplemente copiá el texto vos (armado en la sesión del 2026-07-18) y armá el
+    mail a mano con el mail del abogado.
 
 ### 🔑 Trámites en cuentas externas (Meta/Google) que solo vos podés hacer
 - [ ] **2FA del Business Manager**: Facebook te bloqueó activarlo en tu cuenta personal ("no
@@ -159,8 +169,21 @@ por qué tipo de acción es, para que sepas qué esperar de cada uno. El detalle
   `whatsapp_policy_evaluations` unos días, revisar las coincidencias/discrepancias, y recién
   entonces decidir si conviene una fase 2 (ampliar cobertura) o un canary mínimo. La IA seguirá
   devolviendo enums validados, nunca texto para el paciente.
-- [ ] Agregar a Lucía como administradora del Business Manager de Meta — falta decidir el rol
-  (administrador completo vs. acceso acotado).
+- [x] ~~Agregar a Lucía al Business Manager de Meta~~ **Resuelto (2026-07-18)**: invitada con
+  "Acceso parcial → Básico" (no "Administrar"), asignada solo a la cuenta de WhatsApp Business
+  ("Dra Lucia Chahin") — sin acceso a la App técnica (API keys/webhook) ni a "WhatsApp Marketing
+  Message Event Sharing" (activo de tracking de campañas, no operativo). Confirmado en la lista de
+  Personas: Lucía queda "Acceso parcial / Básico", Seba mantiene "Acceso total / Todo" con
+  Finanzas. Instagram queda pendiente aparte (ver ítem siguiente) — hoy no está conectado como
+  activo de este portfolio.
+- [x] ~~Conectar Instagram como activo del portfolio de Meta para poder asignárselo a Lucía~~
+  **Resuelto (2026-07-18)**: la cuenta `@draluciachahin` (vivía bajo un login separado del que
+  administra el portfolio) quedó conectada como activo de "Dra Lucia Chahin" y asignada a Lucía
+  con acceso total sobre ese activo puntual (Confirmado: "Personas con acceso total → Lucia
+  Chahin"). Con esto, Lucía administra WhatsApp e Instagram por su cuenta vía Meta Business Suite,
+  sin ser administradora del portfolio completo. No afecta ni depende de la conexión OAuth propia
+  que usa la app para publicar automáticamente en Instagram (Estudio de contenido) — son
+  integraciones independientes.
 - [ ] Definir estrategia de reseñas de Google: cómo y cuándo pedirlas a pacientes actuales.
 - [x] ~~Evaluar si crear una ficha de Google Business separada para Swiss Medical Lomas~~
   **Decidido (2026-07-17):** no se crea ficha separada — Swiss Medical Lomas sigue usando
