@@ -427,6 +427,22 @@ async function generateText(options: GenerateOptions): Promise<string> {
       const text = provider === "gemini"
         ? await generateWithGemini(options)
         : await generateWithAnthropic(options)
+      // Un proveedor en modo JSON puede devolver texto no vacio pero truncado/invalido (visto en vivo
+      // con Gemini: finishReason "STOP" y candidatesTokenCount muy por debajo de maxOutputTokens, pero
+      // el JSON corta a mitad de un string sin cerrar comillas/llaves -- intermitente, no depende del
+      // prompt). generateWithGemini/generateWithAnthropic no lo detectan porque devuelven texto no
+      // vacio sin error. Validar aca, ANTES de cachear y ANTES de loguear exito, para que se trate
+      // como una falla real de este proveedor: dispara el fallback al proximo proveedor del loop en
+      // vez de propagar un JSON invalido al caller (que antes terminaba en el mensaje generico "No se
+      // pudo generar la respuesta con IA", confundiendo con un problema de configuracion) y evita
+      // cachear para siempre una respuesta truncada bajo el mismo promptHash.
+      if (options.json) {
+        try {
+          JSON.parse(text)
+        } catch {
+          throw new Error(`El proveedor de IA (${provider}) devolvio una respuesta JSON incompleta o invalida.`)
+        }
+      }
       if (cacheMode === "safe_non_personal") {
         await saveCachedOutput(promptHash, purpose, promptText, text)
       }
@@ -471,6 +487,9 @@ export function getPublicAiError(error: unknown): string {
   }
   if (normalized.includes("not found") && normalized.includes("model")) {
     return "El modelo de IA configurado no está disponible. Revisá GEMINI_MODEL."
+  }
+  if (normalized.includes("json incompleta") || normalized.includes("json invalida")) {
+    return "El proveedor de IA devolvió una respuesta incompleta (suele ser algo puntual). Intentá de nuevo."
   }
   return "No se pudo generar la respuesta con IA. Revisá la configuración del proveedor e intentá nuevamente."
 }

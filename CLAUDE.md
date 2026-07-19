@@ -1,6 +1,34 @@
 # Lule Growth OS — Contexto para Claude
 
 ## Estado actual
+- 2026-07-19 (bug real: "Generar propuesta completa" fallaba con "No se pudo generar la respuesta con
+  IA", Seba reportó "rompiste algo" tras la sesión anterior): **investigado y confirmado que NO fue
+  causado por ningún cambio de esta sesión** — `/api/content/route.ts` (el que genera) solo importa
+  de `ai.ts`, `supabase/server` y `staff-authz`, nada de lo tocado antes (repetición/orden de la
+  Biblioteca). Causa real, preexistente: Gemini (`gemini-3.5-flash`) a veces devuelve, en modo JSON,
+  texto **no vacío pero truncado a mitad de un string** (`finishReason: "STOP"`, muy por debajo del
+  límite de tokens — no es un problema de `maxTokens` ni del prompt; confirmado en vivo: 1 de 4
+  llamadas idénticas truncó, las otras 3 salieron perfectas — intermitente). `generateWithGemini` no
+  lo detectaba (solo lanza si el texto viene vacío), así que `generateText` lo **cacheaba y logueaba
+  como éxito**; la falla real recién aparecía un nivel arriba, en el `JSON.parse` de
+  `generateContentPlan`, con un mensaje que no matcheaba ningún caso de `getPublicAiError` y mostraba
+  el genérico de "revisá la configuración" — engañoso, la configuración estaba bien. Fix en
+  `generateText` (`src/lib/ai.ts`): si `options.json`, valida `JSON.parse(text)` **antes** de cachear
+  y de loguear éxito; si falla, lo trata como falla real de ese proveedor → dispara el fallback
+  automático al siguiente proveedor del loop (Anthropic, ya configurado) en vez de propagar el JSON
+  roto. Beneficia a los 5 usos de `json:true` (content_plan, classify, whatsapp_intent —el respaldo de
+  IA del bot—, instagram_content, image_direction), no solo Estudio de contenido. Nuevo caso en
+  `getPublicAiError` para el mensaje claro "revisa la config" → "respuesta incompleta, probá de
+  nuevo" si algún día se agotan todos los proveedores igual. **Bug secundario encontrado en el
+  camino**: como el JSON truncado se cacheaba ANTES del fix, mi primera reproducción del bug (antes de
+  aplicarlo) dejó una fila envenenada en `ai_outputs` bajo el hash exacto de ese prompt (determinístico:
+  misma categoría + tema vacío) — la borré de producción con aprobación explícita de Seba (`DELETE`
+  de una sola fila, sin PII, tabla de caché de IA). Verificado en vivo (Playwright + E2E) contra el
+  escenario EXACTO de la captura de Seba (categoría "Consulta cardiologica", sin tema, Objetivo
+  Confianza, Post estático): antes del fix, 5/5 intentos daban el error; con el fix + caché limpia,
+  HTTP 200 con contenido real. 3 tests nuevos en `src/lib/ai.test.ts` (JSON truncado rechaza y da el
+  mensaje claro; JSON completo sigue funcionando igual, mockeando `@supabase/supabase-js` para no
+  tocar la base real). `npm test` (880/880), build y lint OK.
 - 2026-07-19 (card de repetición + orden cronológico de la Biblioteca): a pedido de Seba, (1) la card
   de una pieza marcada para repetirse ahora muestra **cuándo se publica y cuándo deja de publicarse**:
   "Se repite · próxima: [fecha]" y, si tiene límite, "deja de publicarse ~[fecha] ([N] repeticiones)"
