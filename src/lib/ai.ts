@@ -204,6 +204,17 @@ const PATIENT_ACQUISITION_RULES = `CRITERIO DE CAPTACION DE PACIENTES:
 - El CTA debe reducir friccion y explicar el siguiente paso por canales oficiales. Nunca uses escasez, culpa, miedo o urgencia comercial.
 - Evita hooks vagos o genericos como "cuidar tu corazon es importante", "todo lo que tenes que saber" o "la salud es lo primero".`
 
+// 2026-07-19: un pedido con categoria "Investigacion medica" (sin tema) genero contenido sobre
+// "diferencia entre electro y eco" -- un tema real, pero que no tiene nada que ver con investigacion
+// clinica/evidencia cientifica. La categoria llega como texto libre (no siempre es una de las
+// predefinidas) y sin esta regla el modelo puede reinterpretarla hacia un tema cardiologico generico
+// que le resulte mas comodo/conocido en vez del significado literal de las palabras pedidas.
+const CATEGORY_COHERENCE_RULES = `COHERENCIA CON LA CATEGORIA:
+- El tema final tiene que ser una interpretacion directa y reconocible de la categoria pedida, no un tema "inspirado" o tangencialmente relacionado.
+- Interpreta la categoria de forma literal segun las palabras que usa. Por ejemplo, "Investigacion medica" es sobre evidencia cientifica, estudios clinicos o avances de la medicina -- no la confundas con "Estudios cardiologicos" (electro, eco, y otros estudios diagnosticos), que es una categoria distinta.
+- Si la categoria no es una de las habituales de cardiologia clinica, no la conviertas en la categoria conocida mas parecida: desarrolla el tema tal como fue pedido.
+- Alguien que lea solo el hook o el titular tiene que poder reconocer sin dudar que la pieza pertenece a la categoria pedida.`
+
 const OBJECTIVE_GUIDANCE: Record<ContentObjective, string> = {
   alcance: "Objetivo ALCANCE: priorizá un hook que genere curiosidad, sorpresa o identificación inmediata para maximizar alcance y comentarios. El CTA puede ser una pregunta abierta o invitar a comentar/guardar, no hace falta que invite a pedir turno.",
   educacion: "Objetivo EDUCACION: priorizá dejar un aprendizaje concreto y accionable, algo que valga la pena guardar. El CTA invita a guardar la pieza para el próximo control, no hace falta que invite a pedir turno ahora.",
@@ -261,6 +272,8 @@ ${PLAIN_TEXT_RULES}
 ${IMAGE_PROMPT_RULES}
 
 ${PATIENT_ACQUISITION_RULES}
+
+${CATEGORY_COHERENCE_RULES}
 
 ENFOQUE DEL CONTENIDO:
 El contenido debe captar pacientes potenciales educándolos. Usá datos relevantes,
@@ -839,6 +852,7 @@ Reglas:
 ${PLAIN_TEXT_RULES}
 ${IMAGE_PROMPT_RULES}
 ${PATIENT_ACQUISITION_RULES}
+${CATEGORY_COHERENCE_RULES}
 ${REEL_SCENE_RULES}
 - El texto de Google debe tener maximo 1500 caracteres.
 - Los hashtags deben ser entre 3 y 5, los mas relevantes al tema y a cardiologia. Nunca mas de 5.

@@ -11,6 +11,37 @@
   Tests nuevos/actualizados en `content-pipeline.test.ts` (ignora borradores; detecta publicadas;
   ventana default 15 días). `npm test` (882/882), lint y build OK. Archivos:
   `src/lib/content-pipeline.ts` (+tests), `src/app/(app)/contenido/instagram/page.tsx` (comentario).
+- 2026-07-19 (bug real: categoría libre mal interpretada por la IA — "Investigación medica" generó
+  contenido sobre electro vs eco): Seba escribió "Investigación medica" como categoría (texto libre,
+  no es una de las predefinidas), dejó el tema vacío, y "Generar propuesta completa" devolvió una
+  pieza sobre "diferencia entre electrocardiograma y ecocardiograma" — sin ninguna relación con
+  investigación científica/ensayos clínicos. **Investigado a fondo antes de tocar código** (consultas
+  de solo lectura a producción, sin PII — contenido de marketing, no datos de pacientes): se descartó
+  caché (no había ninguna fila en `ai_outputs` para ese prompt; el hash de `generateText` incluye la
+  categoría, cada categoría distinta genera un hash distinto) y se descartó reutilización de un item
+  ya aprobado (la única pieza con esa categoría en la Biblioteca es justamente ese borrador nuevo). Es
+  una generación real y fresca de Gemini que interpretó mal la categoría: el prompt solo decía
+  `Categoría: ${category}` sin ninguna instrucción de mantenerse fiel al significado literal de una
+  categoría libre, y el modelo derivó hacia un tema cardiológico más conocido/cómodo ("estudios") en
+  vez de "investigación médica" en el sentido de evidencia científica. Fix: nueva regla
+  `CATEGORY_COHERENCE_RULES` en `src/lib/ai.ts`, sumada tanto al prompt de modo manual
+  (`buildContentPlanPrompt`) como al system prompt de `generateContentPlan` — instruye a interpretar
+  la categoría de forma literal, no reemplazarla por la más conocida/cómoda, y usa el propio caso real
+  (Investigación médica vs. Estudios cardiológicos) como ejemplo concreto de desambiguación. Aplica a
+  cualquier categoría, no solo a esta. **Verificado en vivo contra el escenario exacto reportado**
+  (mismo texto de categoría, tema vacío, llamada real a Gemini vía script temporal descartado después):
+  con el fix, la misma categoría generó contenido genuinamente sobre evidencia científica ("Ciencia
+  vs. mitos", "la investigación médica es el motor que nos permite a los cardiólogos saber con
+  seguridad qué tratamientos salvan vidas..."), no sobre electro/eco. **Hallazgo secundario, no
+  corregido, solo para que Seba lo sepa**: en la misma investigación se confirmó por los logs de
+  `ai_requests` que cuando Gemini falló hoy más temprano (el bug de JSON truncado corregido antes en
+  esta misma sesión) **no hubo ningún intento de fallback a Anthropic** pese a que `AI_PROVIDER=""`
+  (modo auto) y ambas API keys están configuradas — la lógica de `generateText` en el código sí
+  contempla ese fallback, así que lo más probable es que el proceso local de `npm run dev` tenga en
+  memoria un valor viejo de `AI_PROVIDER` desde antes de que se editara `.env.local` a `""` (las env
+  vars no siempre se recargan en caliente para código de servidor). Reiniciar `npm run dev` si se
+  quiere confirmar que el fallback a Anthropic funciona de verdad. `npm test` (884/884), lint y build
+  OK. Archivos: `src/lib/ai.ts` (+tests en `ai.test.ts`).
 - 2026-07-19 (bug real: "Generar propuesta completa" fallaba con "No se pudo generar la respuesta con
   IA", Seba reportó "rompiste algo" tras la sesión anterior): **investigado y confirmado que NO fue
   causado por ningún cambio de esta sesión** — `/api/content/route.ts` (el que genera) solo importa

@@ -1,4 +1,5 @@
 import {
+  buildContentPlanPrompt,
   classifyMessage,
   generateContentPlan,
   generateFollowupSuggestion,
@@ -60,6 +61,26 @@ describe("stripMarkdownArtifacts", () => {
   it("no rompe texto que ya viene en texto plano", () => {
     const plain = "Hola! Atiendo los martes en CIMEL Lanús. Pedí tu turno por WhatsApp 💙"
     expect(stripMarkdownArtifacts(plain)).toBe(plain)
+  })
+})
+
+// 2026-07-19: una categoria libre ("Investigacion medica", no una de las predefinidas) sin tema
+// generó contenido sobre "diferencia entre electro y eco" -- un tema real de cardiologia, pero sin
+// ninguna relacion con investigacion clinica/evidencia cientifica. La categoria llega tal cual la
+// escribe el usuario; el prompt tiene que instruir explicitamente al modelo a no reinterpretarla
+// hacia un tema cardiologico generico que le resulte mas comodo/conocido.
+describe("buildContentPlanPrompt incluye la categoria pedida y la regla de coherencia (bug real 2026-07-19)", () => {
+  const baseInput = { topic: "", category: "Investigación medica", format: "post", cta: "" }
+
+  it("incluye la categoria pedida tal cual, sin reemplazarla por otra", () => {
+    const prompt = buildContentPlanPrompt(baseInput)
+    expect(prompt).toContain("Categoría: Investigación medica")
+  })
+
+  it("instruye a interpretar la categoria de forma literal y no reemplazarla por una mas conocida", () => {
+    const prompt = buildContentPlanPrompt(baseInput)
+    expect(prompt).toContain("COHERENCIA CON LA CATEGORIA")
+    expect(prompt).toMatch(/interpretacion directa y reconocible de la categoria/i)
   })
 })
 
