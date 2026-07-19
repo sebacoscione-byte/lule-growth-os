@@ -1,6 +1,32 @@
 # Lule Growth OS — Contexto para Claude
 
 ## Estado actual
+- 2026-07-19 (ajuste de calidad, no bug: las placas de temas de consultorio no parecían de consultorio):
+  Seba notó, mirando la Biblioteca, que la placa de "Un estudio simple para tu tranquilidad" (tema:
+  ecocardiograma) mostraba el transductor del eco apoyado sobre una mesa ratona en lo que parece un
+  living, sin ningún contexto médico alrededor — no comunica que se trata de un estudio en consultorio.
+  Causa: `IMAGE_PROMPT_RULES` (`src/lib/ai.ts`) tenía una regla general "la imagen debe sentirse cercana
+  y confiable, no fria, hospitalaria..." con ejemplos de escena siempre domésticos (cocinar, tomarse la
+  presión en casa, salir a caminar) — correcto para temas de hábitos/prevención, pero sin ninguna
+  distinción para categorías que SÍ son un procedimiento real de consultorio (Ecocardiograma, Consulta
+  cardiológica, Estudios cardiológicos, Chequeo cardiovascular, atención en sedes). El modelo terminaba
+  aplicando el mismo criterio "hogareño" a un tema que necesitaba mostrar el consultorio. Fix: se separó
+  la regla en dos ramas explícitas dentro de `IMAGE_PROMPT_RULES` — temas de procedimiento/consulta en
+  consultorio ahora piden explícitamente un consultorio o sala de estudios reconocible (camilla, el
+  equipo correspondiente al estudio mencionado, ambiente clínico profesional pero cálido — luz natural,
+  madera, plantas, nunca frío/institucional tipo guardia); temas de hábitos/prevención sin procedimiento
+  en consultorio siguen usando la escena doméstica cotidiana de antes. Un único const (usado por
+  `buildContentPlanPrompt`, `generateContentPlan` y `regenerateImageDirection`), así que el fix aplica a
+  los tres generadores con un solo cambio. **Verificado en vivo** con dos llamadas reales a Gemini
+  (mismo pedido — categoría Ecocardiograma, mismo tema — comparando las reglas viejas contra las nuevas,
+  vía script temporal descartado después): con las reglas viejas, el `image_prompt` describía el
+  transductor "resting gently on a light wooden table" con la clínica "softly blurred" de fondo (el bug
+  reportado); con las reglas nuevas, describe "a warm, modern cardiology examination room... a
+  professional medical stretcher... next to a modern ultrasound machine" manteniendo la estética cálida
+  (luz natural, madera, una planta) en vez de un hospital frío. No se regeneraron las placas ya
+  aprobadas/publicadas existentes — el fix aplica hacia adelante, a la próxima vez que se genere o
+  regenere la dirección visual de una pieza. `npm test` (884/884), lint y build OK. Archivo:
+  `src/lib/ai.ts`.
 - 2026-07-19 (aviso de tema repetido: solo aprobadas/publicadas + ventana de 15 días): Seba reportó
   que el aviso amarillo "Ya generaste algo sobre esta categoría..." (Estudio de contenido, al elegir
   categoría antes de generar) saltaba apenas generaba un post nuevo — `findRecentDuplicateTopic`
