@@ -6,15 +6,18 @@
   "Se repite · próxima: [fecha]" y, si tiene límite, "deja de publicarse ~[fecha] ([N] repeticiones)"
   (o "no deja de publicarse hasta que la desactives" sin límite). La fecha de fin la estima
   `estimateRepeatEndDate` (nueva, pura, con tests: proyecta `1 + repeat_limit` apariciones menos las ya
-  hechas sobre los días del cronograma). (2) La Biblioteca se ordena **cronológicamente por
-  `created_at`, más nueva primero, en todas las vistas** — antes las Aprobadas iban por posición en la
-  cola de cada formato, lo que se leía como "agrupado por tipo". Las flechas de reordenar siguen
-  cambiando el orden de publicación (`queue_rank`), ya distinto del orden de la lista (por fecha).
-  Verificado en vivo (Playwright + E2E): la card muestra "Se repite · próxima: 20 jul / deja de
-  publicarse ~7 ago (8 repeticiones)". `npm test` (877/877), build y lint OK. Archivos:
-  `src/lib/content-pipeline.ts` (+tests), `src/app/(app)/contenido/instagram/page.tsx`,
-  `docs/CONTENT_STUDIO.md`. **Decisión abierta**: el orden se puso más-nueva-primero; si Seba lo
-  quiere al revés (cronológico ascendente) es cambiar el signo del sort.
+  hechas sobre los días del cronograma). (2) La Biblioteca se ordena **cronológicamente por la fecha
+  estimada de PUBLICACIÓN** (la que muestra cada card, "próxima/estimado X"), de la más próxima a la
+  más lejana, intercalando formatos — antes las Aprobadas iban por posición en la cola de cada formato
+  (se leía como "agrupado por tipo") y un primer intento por `created_at` tampoco servía porque las
+  fechas de publicación quedaban desordenadas (20, 22, 23 y abajo 21 — lo reportó Seba). Ahora el sort
+  usa `queueInfo.date` / `repeatInfo.nextDate` (la misma fecha que se muestra); las piezas sin fecha
+  estimada (borradores, archivadas, ya publicadas sin repetir) van al final por `created_at` desc.
+  Las flechas de reordenar cambian `queue_rank` → cambian la fecha estimada → cambian el lugar en la
+  lista. Verificado en vivo (Playwright + E2E): orden 20 jul → 21 jul → 22 jul → 23 jul, y la card
+  muestra "Se repite · próxima: 20 jul / deja de publicarse ~[fecha] ([N] repeticiones)". `npm test`
+  (877/877), build y lint OK. Archivos: `src/lib/content-pipeline.ts` (+tests),
+  `src/app/(app)/contenido/instagram/page.tsx`, `docs/CONTENT_STUDIO.md`.
 - 2026-07-19 (repetición aditiva: no compite con el cupo "Publicar de a N"): a pedido de Seba, las
   piezas marcadas para repetirse ya **no comparten el cupo `items_per_run`** con las nuevas — antes
   competían (la nueva ganaba y la repetida rellenaba lo que sobraba). Ahora `items_per_run` limita

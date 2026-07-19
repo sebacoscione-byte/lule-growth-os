@@ -960,7 +960,7 @@ export default function ContentStudioPage() {
   // formato, y una fecha estimada de cuando saldria segun el cronograma configurado. Se usa tanto para
   // el badge en cada card como para ordenar la lista cuando se filtra por "Aprobados".
   const queueInfo = useMemo(() => {
-    const info = new Map<string, { position: number; etaLabel: string }>()
+    const info = new Map<string, { position: number; etaLabel: string; date: Date | null }>()
     const now = new Date();
     (["post", "historia", "carrusel"] as const).forEach(format => {
       const track = autoPublishSettings[format]
@@ -974,7 +974,7 @@ export default function ContentStudioPage() {
             ? "estimado hoy"
             : `estimado ${date.toLocaleDateString("es-AR", { day: "numeric", month: "short" })}`
           : "elegí días en \"Publicación automática\" para poder estimar cuándo"
-        info.set(queuedItem.id, { position, etaLabel })
+        info.set(queuedItem.id, { position, etaLabel, date })
       })
     })
     return info
@@ -983,7 +983,7 @@ export default function ContentStudioPage() {
   // Para las piezas marcadas para repetirse: cuándo sale la próxima y cuándo dejaría de publicarse
   // (si tiene límite de repeticiones). Se muestra en la card en vez de la línea de cola normal.
   const repeatInfo = useMemo(() => {
-    const info = new Map<string, { nextLabel: string; endLabel: string }>()
+    const info = new Map<string, { nextLabel: string; endLabel: string; nextDate: Date | null }>()
     const now = new Date()
     const fmt = (date: Date) => date.toLocaleDateString("es-AR", { day: "numeric", month: "short" })
     items.forEach(item => {
@@ -993,13 +993,14 @@ export default function ContentStudioPage() {
       const todayAvailable = isTodayAvailableForQueueEstimate(track, now)
       const days = track.days_of_week
       let nextLabel: string
+      let nextDate: Date | null = null
       if (days.length === 0) {
         nextLabel = "elegí días en \"Publicación automática\""
       } else {
         const queued = queueInfo.get(item.id)
         // Aprobada sin publicar: su primera salida sigue la posición en la cola. Ya publicada
         // (repitiéndose): sale en el próximo día del cronograma (posición 1, una por día).
-        const nextDate = item.status === "approved" && queued
+        nextDate = item.status === "approved" && queued
           ? estimateAutoPublishDateForPosition(queued.position, days, track.items_per_run, now, todayAvailable)
           : estimateAutoPublishDateForPosition(1, days, 1, now, todayAvailable)
         nextLabel = nextDate ? (nextDate.toDateString() === now.toDateString() ? "hoy" : fmt(nextDate)) : "—"
@@ -1012,7 +1013,7 @@ export default function ContentStudioPage() {
         const reps = `${item.repeat_limit} ${item.repeat_limit === 1 ? "repetición" : "repeticiones"}`
         endLabel = endDate ? `deja de publicarse ~${fmt(endDate)} (${reps})` : `ya completó sus ${reps}`
       }
-      info.set(item.id, { nextLabel, endLabel })
+      info.set(item.id, { nextLabel, endLabel, nextDate })
     })
     return info
   }, [items, autoPublishSettings, queueInfo])
@@ -1028,12 +1029,21 @@ export default function ContentStudioPage() {
         .some(value => value.toLocaleLowerCase("es").includes(query))
       return matchesStatus && matchesFormat && matchesQuery
     })
-    // Orden cronológico, de la más nueva a la más antigua, en todas las vistas de la biblioteca. Antes
-    // las Aprobadas se ordenaban por la posición en la cola de auto-publicación DE CADA FORMATO, lo que
-    // se leía como "agrupado por tipo": ahora es un único orden por fecha, sin agrupar por formato. Las
-    // flechas de reordenar siguen cambiando el orden de PUBLICACIÓN (no el de esta lista, que va por fecha).
-    return [...matches].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-  }, [items, libraryFormat, libraryQuery, libraryStatus])
+    // Orden cronológico por la FECHA ESTIMADA DE PUBLICACIÓN (la que muestra cada card: "próxima /
+    // estimado X"), de la más próxima a la más lejana, intercalando formatos — no agrupado por tipo.
+    // Las piezas sin fecha de publicación estimada (borradores, archivadas, ya publicadas sin repetir)
+    // van al final, ordenadas de la más nueva a la más antigua por fecha de creación.
+    const nextPublishAt = (item: ContentItem): number => {
+      const date = item.repeat_interval_days ? repeatInfo.get(item.id)?.nextDate : queueInfo.get(item.id)?.date
+      return date ? date.getTime() : Number.POSITIVE_INFINITY
+    }
+    return [...matches].sort((a, b) => {
+      const da = nextPublishAt(a)
+      const db = nextPublishAt(b)
+      if (da !== db) return da - db
+      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    })
+  }, [items, libraryFormat, libraryQuery, libraryStatus, queueInfo, repeatInfo])
 
   const filteredCategories = useMemo(() => {
     const query = category.trim().toLocaleLowerCase("es")
