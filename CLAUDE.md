@@ -1,6 +1,18 @@
 # Lule Growth OS — Contexto para Claude
 
 ## Estado actual
+- 2026-07-19 (repetición aditiva: no compite con el cupo "Publicar de a N"): a pedido de Seba, las
+  piezas marcadas para repetirse ya **no comparten el cupo `items_per_run`** con las nuevas — antes
+  competían (la nueva ganaba y la repetida rellenaba lo que sobraba). Ahora `items_per_run` limita
+  **solo las piezas nuevas aprobadas** y las evergreen vencidas se publican **además**, en la misma
+  corrida: `pickNextPublishableItems` pasó de `[...aprobadas, ...evergreen].slice(0, count)` a
+  `[...aprobadas.slice(0, count), ...evergreen]`. Ej: "Publicar de a 1" + una fija marcada = 2
+  publicaciones por día programado (la nueva del cupo + la fija aparte). Se aclaró en la UI (control de
+  repetición del editor y nota bajo "Publicar de a N") que la repetida sale además y que una historia
+  sale como historia, no en el feed (`asStory = format === "historia"`, ya existente). Tests de
+  `pickNextPublishableItems` actualizados a la semántica aditiva. `npm test`, build y lint OK. Archivos:
+  `src/lib/content-pipeline.ts` (+tests), `src/app/(app)/contenido/instagram/page.tsx`,
+  `docs/CONTENT_STUDIO.md`.
 - 2026-07-19 (repetir historia fija: bug de guardado + rediseño del control): el campo "Repetir esta
   pieza sola cada X días" del editor de contenido **no se podía guardar** — `repeat_interval_days` no
   estaba en `EDITABLE_FIELDS`, así que "Guardar cambios" nunca se habilitaba y `saveChanges()` lo
@@ -11,8 +23,9 @@
   `repeat_limit` (nuevo, opcional, tope de reposteos; vacío = sin límite) y `repeat_count` (nuevo,
   system-managed: lo incrementa el cron al republicar con éxito, se resetea a 0 al re-activar). El
   guardado ahora va por el mismo camino probado (`onSave`→PATCH) que Aprobar/Volver a borrador. Sin
-  migración (las piezas viven como JSON en `app_config`). `isRepeatDue` respeta el límite; las piezas
-  que se repiten siguen llenando solo los huecos del cronograma (nunca desplazan una aprobada fresca).
+  migración (las piezas viven como JSON en `app_config`). `isRepeatDue` respeta el límite. (La relación
+  con el cupo `items_per_run` cambió el mismo día — ver la entrada de "repetición aditiva" arriba: las
+  repetidas se publican además de las nuevas, no compiten por el cupo.)
   **Verificado en vivo** con Playwright + la cuenta E2E contra la pieza real "TU CONTROL
   CARDIOVASCULAR": se prendió, se puso límite 8, se recargó la página y al reabrir seguía "Activada"
   con límite 8 (persiste de verdad), y se restauró el estado original. `npm test` (871/871), build y

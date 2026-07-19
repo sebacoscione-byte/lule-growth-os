@@ -259,15 +259,27 @@ describe("pickNextPublishableItems", () => {
     expect(pickNextPublishableItems([a], "historia", 0)).toEqual([])
   })
 
-  it("prioriza aprobadas frescas sobre evergreens vencidas, y llena lo que sobra con evergreens", () => {
+  it("las evergreens vencidas se publican ADEMAS de las frescas, sin competir por el cupo", () => {
     const fresh = item({ id: "fresh", format: "historia", status: "approved", approved_at: "2026-07-01T00:00:00.000Z" })
     const evergreen = item({
       id: "evergreen", format: "historia", status: "published",
       repeat_interval_days: 7, updated_at: "2026-07-01T00:00:00.000Z",
     })
     const now = new Date("2026-07-10T00:00:00.000Z") // 9 dias despues, ya vencio el intervalo de 7
-    expect(pickNextPublishableItems([evergreen, fresh], "historia", 1, now).map(i => i.id)).toEqual(["fresh"])
-    expect(pickNextPublishableItems([evergreen, fresh], "historia", 2, now).map(i => i.id)).toEqual(["fresh", "evergreen"])
+    // Con cupo 1 salen las DOS: la fresca (dentro del cupo) y ademas la evergreen vencida (2 publicaciones).
+    expect(pickNextPublishableItems([evergreen, fresh], "historia", 1, now).map(i => i.id)).toEqual(["fresh", "evergreen"])
+  })
+
+  it("items_per_run limita solo las frescas; las evergreens se agregan aparte", () => {
+    const fresh1 = item({ id: "fresh1", format: "historia", status: "approved", approved_at: "2026-07-01T00:00:00.000Z" })
+    const fresh2 = item({ id: "fresh2", format: "historia", status: "approved", approved_at: "2026-07-02T00:00:00.000Z" })
+    const evergreen = item({
+      id: "evergreen", format: "historia", status: "published",
+      repeat_interval_days: 7, updated_at: "2026-07-01T00:00:00.000Z",
+    })
+    const now = new Date("2026-07-10T00:00:00.000Z")
+    // Cupo 1: solo la primera fresca (la mas antigua) + la evergreen. fresh2 espera a la proxima corrida.
+    expect(pickNextPublishableItems([evergreen, fresh1, fresh2], "historia", 1, now).map(i => i.id)).toEqual(["fresh1", "evergreen"])
   })
 
   it("no repite una evergreen si todavia no paso su intervalo", () => {
