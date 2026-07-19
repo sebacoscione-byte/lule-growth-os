@@ -426,16 +426,28 @@ describe("findRecentDuplicateTopic", () => {
     expect(findRecentDuplicateTopic([vieja, nueva], { category: "Colesterol" }, now)?.id).toBe("nueva")
   })
 
-  it("ignora piezas fuera de la ventana de dias", () => {
-    const vieja = item({ id: "vieja", category: "Colesterol", created_at: "2026-01-01T00:00:00.000Z" })
+  it("ignora piezas fuera de la ventana de dias (default 15)", () => {
+    const vieja = item({ id: "vieja", category: "Colesterol", created_at: "2026-06-01T00:00:00.000Z" })
     const now = new Date("2026-07-05T00:00:00.000Z")
-    expect(findRecentDuplicateTopic([vieja], { category: "Colesterol" }, now, 30)).toBeNull()
+    expect(findRecentDuplicateTopic([vieja], { category: "Colesterol" }, now)).toBeNull()
   })
 
   it("ignora piezas archivadas", () => {
     const archivada = item({ id: "archivada", category: "Colesterol", status: "archived", created_at: "2026-07-01T00:00:00.000Z" })
     const now = new Date("2026-07-05T00:00:00.000Z")
     expect(findRecentDuplicateTopic([archivada], { category: "Colesterol" }, now)).toBeNull()
+  })
+
+  it("ignora borradores: todavia pueden descartarse o cambiar de tema", () => {
+    const borrador = item({ id: "borrador", category: "Colesterol", status: "draft", created_at: "2026-07-01T00:00:00.000Z" })
+    const now = new Date("2026-07-05T00:00:00.000Z")
+    expect(findRecentDuplicateTopic([borrador], { category: "Colesterol" }, now)).toBeNull()
+  })
+
+  it("detecta piezas publicadas dentro de la ventana, no solo aprobadas", () => {
+    const publicada = item({ id: "publicada", category: "Colesterol", status: "published", created_at: "2026-07-01T00:00:00.000Z" })
+    const now = new Date("2026-07-05T00:00:00.000Z")
+    expect(findRecentDuplicateTopic([publicada], { category: "Colesterol" }, now)?.id).toBe("publicada")
   })
 
   it("ignora la propia pieza cuando se pasa su id (editando una pieza existente)", () => {
