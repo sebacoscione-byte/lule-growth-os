@@ -1,6 +1,20 @@
 # Lule Growth OS — Contexto para Claude
 
 ## Estado actual
+- 2026-07-19 (card de repetición + orden cronológico de la Biblioteca): a pedido de Seba, (1) la card
+  de una pieza marcada para repetirse ahora muestra **cuándo se publica y cuándo deja de publicarse**:
+  "Se repite · próxima: [fecha]" y, si tiene límite, "deja de publicarse ~[fecha] ([N] repeticiones)"
+  (o "no deja de publicarse hasta que la desactives" sin límite). La fecha de fin la estima
+  `estimateRepeatEndDate` (nueva, pura, con tests: proyecta `1 + repeat_limit` apariciones menos las ya
+  hechas sobre los días del cronograma). (2) La Biblioteca se ordena **cronológicamente por
+  `created_at`, más nueva primero, en todas las vistas** — antes las Aprobadas iban por posición en la
+  cola de cada formato, lo que se leía como "agrupado por tipo". Las flechas de reordenar siguen
+  cambiando el orden de publicación (`queue_rank`), ya distinto del orden de la lista (por fecha).
+  Verificado en vivo (Playwright + E2E): la card muestra "Se repite · próxima: 20 jul / deja de
+  publicarse ~7 ago (8 repeticiones)". `npm test` (877/877), build y lint OK. Archivos:
+  `src/lib/content-pipeline.ts` (+tests), `src/app/(app)/contenido/instagram/page.tsx`,
+  `docs/CONTENT_STUDIO.md`. **Decisión abierta**: el orden se puso más-nueva-primero; si Seba lo
+  quiere al revés (cronológico ascendente) es cambiar el signo del sort.
 - 2026-07-19 (repetición aditiva: no compite con el cupo "Publicar de a N"): a pedido de Seba, las
   piezas marcadas para repetirse ya **no comparten el cupo `items_per_run`** con las nuevas — antes
   competían (la nueva ganaba y la repetida rellenaba lo que sobraba). Ahora `items_per_run` limita

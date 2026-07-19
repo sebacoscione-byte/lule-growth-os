@@ -2,7 +2,7 @@ import {
   shouldRunAutoPublish, isScheduledForFuture, isTodayScheduledDay, alreadyPublishedToday,
   estimateAutoPublishDrainDays, estimateAutoPublishDateForPosition, pickNextPublishableItem,
   pickNextPublishableItems, moveItemInQueue, resolveChannelsToPublish, DEFAULT_AUTO_PUBLISH_SETTINGS,
-  isRepeatDue, findRecentDuplicateTopic,
+  isRepeatDue, findRecentDuplicateTopic, estimateRepeatEndDate,
 } from "@/lib/content-pipeline"
 import type { AutoPublishTrackSettings, ContentItem } from "@/types"
 
@@ -340,6 +340,36 @@ describe("isRepeatDue", () => {
       updated_at: "2026-07-01T00:00:00.000Z",
     })
     expect(isRepeatDue(a, new Date("2026-07-10T00:00:00.000Z"))).toBe(true)
+  })
+})
+
+describe("estimateRepeatEndDate", () => {
+  const now = new Date("2026-07-10T12:00:00.000Z") // viernes
+  const daysBetween = (end: Date | null) => (end == null ? null : Math.round((end.getTime() - now.getTime()) / 86400000))
+
+  it("null si la pieza no se repite", () => {
+    expect(estimateRepeatEndDate(item({ repeat_limit: 5 }), [2, 4], now)).toBeNull()
+  })
+
+  it("null si no tiene limite (se repite hasta apagarla)", () => {
+    expect(estimateRepeatEndDate(item({ repeat_interval_days: 1 }), [2, 4], now)).toBeNull()
+  })
+
+  it("aprobada sin publicar: cuenta la publicacion original + las repeticiones", () => {
+    // total = 1 + 1 = 2 apariciones; la 2da en el cronograma martes/jueves desde el viernes cae +6 dias
+    const a = item({ status: "approved", repeat_interval_days: 1, repeat_limit: 1, repeat_count: 0 })
+    expect(daysBetween(estimateRepeatEndDate(a, [2, 4], now))).toBe(6)
+  })
+
+  it("ya publicada y repitiendo: descuenta la original + las repeticiones ya hechas", () => {
+    // total 1+3=4; ya aparecio 1 (original) + 2 (repeat_count) = 3; queda 1 -> proxima ocurrencia (martes, +4)
+    const a = item({ status: "published", repeat_interval_days: 1, repeat_limit: 3, repeat_count: 2 })
+    expect(daysBetween(estimateRepeatEndDate(a, [2, 4], now))).toBe(4)
+  })
+
+  it("null si ya alcanzo el limite (no quedan repeticiones)", () => {
+    const a = item({ status: "published", repeat_interval_days: 1, repeat_limit: 3, repeat_count: 3 })
+    expect(estimateRepeatEndDate(a, [2, 4], now)).toBeNull()
   })
 })
 
