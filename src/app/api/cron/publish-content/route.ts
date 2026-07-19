@@ -113,7 +113,12 @@ async function runTrack(
     const { item: nextItem, allPublished } = await publishApprovedItem(
       supabase, current, channelsToPublish, { instagramImageDataUrl: imageDataUrl }
     )
-    await writeContentItems(supabase, freshItems.map(existing => existing.id === current.id ? nextItem : existing))
+    // Solo cuando esta salida fue una repeticion real y efectiva, sumar al contador contra repeat_limit.
+    // Si no llego a publicarse (allPublished false), no cuenta -- asi un fallo transitorio no gasta cupo.
+    const persistItem = dueRepeat && allPublished
+      ? { ...nextItem, repeat_count: (current.repeat_count ?? 0) + 1 }
+      : nextItem
+    await writeContentItems(supabase, freshItems.map(existing => existing.id === current.id ? persistItem : existing))
     if (allPublished) publishedCount++
   }
 

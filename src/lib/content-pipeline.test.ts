@@ -300,6 +300,35 @@ describe("isRepeatDue", () => {
     const a = item({ status: "published", repeat_interval_days: 7, updated_at: "2026-07-01T00:00:00.000Z" })
     expect(isRepeatDue(a, new Date("2026-07-10T00:00:00.000Z"))).toBe(true)
   })
+
+  it("con repeat_interval_days=1 (interruptor on/off) es elegible en cuanto pasa un dia", () => {
+    const a = item({ status: "published", repeat_interval_days: 1, updated_at: "2026-07-01T00:00:00.000Z" })
+    expect(isRepeatDue(a, new Date("2026-07-03T00:00:00.000Z"))).toBe(true)
+  })
+
+  it("false si ya alcanzo el limite de repeticiones aunque haya vencido el intervalo", () => {
+    const a = item({
+      status: "published", repeat_interval_days: 1, repeat_limit: 8, repeat_count: 8,
+      updated_at: "2026-07-01T00:00:00.000Z",
+    })
+    expect(isRepeatDue(a, new Date("2026-07-10T00:00:00.000Z"))).toBe(false)
+  })
+
+  it("true si todavia no alcanzo el limite de repeticiones", () => {
+    const a = item({
+      status: "published", repeat_interval_days: 1, repeat_limit: 8, repeat_count: 3,
+      updated_at: "2026-07-01T00:00:00.000Z",
+    })
+    expect(isRepeatDue(a, new Date("2026-07-10T00:00:00.000Z"))).toBe(true)
+  })
+
+  it("sin repeat_limit no hay tope: se repite aunque repeat_count sea alto", () => {
+    const a = item({
+      status: "published", repeat_interval_days: 1, repeat_count: 50,
+      updated_at: "2026-07-01T00:00:00.000Z",
+    })
+    expect(isRepeatDue(a, new Date("2026-07-10T00:00:00.000Z"))).toBe(true)
+  })
 })
 
 describe("moveItemInQueue", () => {

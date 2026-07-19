@@ -2851,29 +2851,58 @@ function Editor({
             </div>
           )}
           {item.status !== "draft" && (
-            <div className="flex flex-wrap items-center gap-2 rounded-md border border-dashed border-gray-300 p-3 text-sm text-gray-700">
-              <span>Repetir esta pieza sola cada</span>
-              <Input
-                type="number"
-                min={1}
-                max={365}
-                value={item.repeat_interval_days ?? ""}
-                onChange={e => {
-                  const raw = e.target.value
-                  onChange({
-                    ...item,
-                    repeat_interval_days: raw === "" ? null : Math.min(365, Math.max(1, Number(raw) || 1)),
-                  })
-                }}
-                placeholder="—"
-                className="w-16 text-gray-900"
-              />
-              <span>días (vacío = publicar una sola vez, comportamiento de siempre)</span>
-              {Boolean(item.repeat_interval_days) && (
-                <p className="w-full text-xs text-amber-700">
-                  Los reposteos automáticos van por la API de Instagram: nunca pueden llevar sticker de link.
-                  Si el link tiene que estar, escribilo o poné un QR directo en la imagen antes de aprobarla.
-                </p>
+            <div className="flex flex-col gap-2 rounded-md border border-dashed border-gray-300 p-3 text-sm text-gray-700">
+              <div className="flex flex-wrap items-center gap-3">
+                <span className="font-medium text-gray-900">Repetir esta pieza automáticamente</span>
+                <Button
+                  type="button"
+                  variant={item.repeat_interval_days ? "default" : "outline"}
+                  size="sm"
+                  disabled={busy}
+                  onClick={() => onSave({ repeat_interval_days: item.repeat_interval_days ? null : 1 })}
+                >
+                  {item.repeat_interval_days ? "Activada" : "Desactivada"}
+                </Button>
+              </div>
+              {item.repeat_interval_days ? (
+                <>
+                  <p className="text-xs text-gray-500">
+                    Los días y cuántas veces por semana sale ya los decide el cronograma de auto-publicación
+                    de este formato — no hace falta configurarlos acá.
+                  </p>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span>Parar después de</span>
+                    <Input
+                      type="number"
+                      min={1}
+                      max={365}
+                      value={item.repeat_limit ?? ""}
+                      onChange={e => {
+                        const raw = e.target.value
+                        onChange({
+                          ...item,
+                          repeat_limit: raw === "" ? null : Math.min(365, Math.max(1, Number(raw) || 1)),
+                        })
+                      }}
+                      onBlur={() => onSave({ repeat_limit: item.repeat_limit ?? null })}
+                      placeholder="∞"
+                      className="w-16 text-gray-900"
+                    />
+                    <span>repeticiones (vacío = sin límite, se repite hasta que la desactives)</span>
+                    {(item.repeat_count ?? 0) > 0 && (
+                      <span className="text-xs text-gray-500">
+                        · Ya se repitió {item.repeat_count} {item.repeat_count === 1 ? "vez" : "veces"}
+                        {item.repeat_limit ? ` de ${item.repeat_limit}` : ""}
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-amber-700">
+                    Los reposteos automáticos van por la API de Instagram: nunca pueden llevar sticker de link.
+                    Si el link tiene que estar, escribilo o poné un QR directo en la imagen antes de aprobarla.
+                  </p>
+                </>
+              ) : (
+                <p className="text-xs text-gray-500">Desactivada = se publica una sola vez (comportamiento de siempre).</p>
               )}
             </div>
           )}

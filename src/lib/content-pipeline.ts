@@ -161,6 +161,9 @@ function effectiveQueueRank(item: ContentItem): number {
 export function isRepeatDue(item: ContentItem, now: Date): boolean {
   if (item.status !== "published") return false
   if (!item.repeat_interval_days || item.repeat_interval_days <= 0) return false
+  // Limite opcional de repeticiones: al alcanzarlo, la pieza deja de repetirse sola (queda publicada
+  // en su ultima salida). null/undefined = sin limite.
+  if (item.repeat_limit != null && (item.repeat_count ?? 0) >= item.repeat_limit) return false
   const daysSinceLastPublish = (now.getTime() - new Date(item.updated_at).getTime()) / (1000 * 60 * 60 * 24)
   return daysSinceLastPublish >= item.repeat_interval_days
 }

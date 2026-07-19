@@ -117,6 +117,9 @@ export async function PATCH(request: NextRequest) {
     if (body.repeat_interval_days != null && (typeof body.repeat_interval_days !== "number" || body.repeat_interval_days < 1 || body.repeat_interval_days > 365)) {
       return NextResponse.json({ error: "Intervalo de repeticion invalido" }, { status: 400 })
     }
+    if (body.repeat_limit != null && (typeof body.repeat_limit !== "number" || body.repeat_limit < 1 || body.repeat_limit > 365)) {
+      return NextResponse.json({ error: "Limite de repeticiones invalido" }, { status: 400 })
+    }
     if ((body.google_text?.length ?? 0) > 1500 || (body.visual_headline?.length ?? 0) > 90 ||
       (body.visual_subtitle?.length ?? 0) > 90 || (body.image_prompt?.length ?? 0) > 2400 ||
       (body.image_alt_text?.length ?? 0) > 180) {
@@ -167,6 +170,7 @@ export async function PATCH(request: NextRequest) {
       "auto_publish_result",
       "archived_from_status",
       "repeat_interval_days",
+      "repeat_limit",
     ]
     const changes = Object.fromEntries(
       editableFields
@@ -177,12 +181,17 @@ export async function PATCH(request: NextRequest) {
     // adjuntar la placa generada, limpiar el resultado de publicacion (deshacer) o registrar el
     // estado previo al archivar no debe resetear a borrador. repeat_interval_days es config de
     // cronograma, no contenido -- cambiarla tampoco debe tirar la pieza de vuelta a borrador.
-    const nonContentFields = new Set(["status", "visual_url", "auto_publish_result", "archived_from_status", "repeat_interval_days"])
+    const nonContentFields = new Set(["status", "visual_url", "auto_publish_result", "archived_from_status", "repeat_interval_days", "repeat_limit"])
     const hasContentChanges = editableFields.some(field => !nonContentFields.has(field) && body[field] !== undefined)
     const resetApproval = hasContentChanges && !body.status && ["approved", "published"].includes(current.status)
+    // Al re-activar la repeticion (off -> on), arrancar el contador de cero para que el limite cuente
+    // desde esta activacion y no arrastre reposteos de una tanda anterior. repeat_count lo maneja el
+    // sistema (cron), nunca el cliente directo.
+    const enablingRepeat = body.repeat_interval_days != null && body.repeat_interval_days > 0 && !current.repeat_interval_days
     const nextItem = {
       ...current,
       ...changes,
+      ...(enablingRepeat ? { repeat_count: 0 } : {}),
       ...(resetApproval ? { status: "draft" as const } : {}),
       updated_at: now,
       approved_at: body.status === "approved" ? now : resetApproval ? null : current.approved_at,
