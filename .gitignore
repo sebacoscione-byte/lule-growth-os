@@ -16,6 +16,9 @@
 # capturas temporales generadas por la skill local de verificación visual
 /.claude/skills/run-lule-growth-os/*.png
 
+# permisos personales del agente (no compartir en el repo)
+/.claude/settings.local.json
+
 # Playwright (QA-02) — /e2e/.auth guarda una sesión real (storageState), nunca commitear
 /test-results/
 /playwright-report/
