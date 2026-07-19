@@ -172,10 +172,12 @@ export function isRepeatDue(item: ContentItem, now: Date): boolean {
 export type AutoPublishFormat = "post" | "historia" | "carrusel"
 
 /**
- * Pura, sin I/O: elige hasta "count" items para auto-publicar de un formato puntual (post, historia o
- * carrusel, cada uno con su propio cronograma), en el orden de `effectiveQueueRank`. Las piezas aprobadas
- * (contenido fresco) siempre van primero; las piezas evergreen que ya cumplieron su intervalo de
- * repeticion (ver `isRepeatDue`) solo llenan los lugares que sobren, ordenadas por la mas atrasada.
+ * Pura, sin I/O: elige que items auto-publicar de un formato puntual (post, historia o carrusel, cada
+ * uno con su propio cronograma). `count` (items_per_run) limita SOLO las piezas nuevas aprobadas
+ * (contenido fresco, ordenadas por `effectiveQueueRank`). Las piezas evergreen que ya cumplieron su
+ * intervalo de repeticion (ver `isRepeatDue`) se publican ADEMAS, sin competir por ese cupo: una pieza
+ * fija que se repite no le quita el lugar a una nueva -- salen las dos en la misma corrida. Las evergreen
+ * van ordenadas por la mas atrasada.
  */
 export function pickNextPublishableItems(
   items: ContentItem[],
@@ -189,7 +191,7 @@ export function pickNextPublishableItems(
   const dueRepeats = items
     .filter(item => item.format === format && isRepeatDue(item, now))
     .sort((a, b) => new Date(a.updated_at).getTime() - new Date(b.updated_at).getTime())
-  return [...approved, ...dueRepeats].slice(0, Math.max(0, count))
+  return [...approved.slice(0, Math.max(0, count)), ...dueRepeats]
 }
 
 /** Pura, sin I/O: elige el proximo item para auto-publicar de un formato puntual. Ver `pickNextPublishableItems`. */

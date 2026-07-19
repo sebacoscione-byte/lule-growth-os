@@ -138,9 +138,11 @@ track — tener ambas cosas se pisaba). Los campos viven en el JSON de la pieza 
 - `repeat_count`: cuantas veces la republico el cron. Lo maneja **solo el sistema** (se incrementa en el cron
   al republicar con exito; no cuenta un fallo transitorio) y se resetea a 0 al re-activar el interruptor
   (off→on, server-side en `/api/content/items`). No es editable por el cliente.
-- Las piezas que se repiten **nunca desplazan a una pieza nueva aprobada**: `pickNextPublishableItems` toma
-  primero las aprobadas frescas y solo llena los lugares que sobren con las evergreen vencidas. Es decir, la
-  fija rellena huecos del cronograma, no compite con lo planificado.
+- Las piezas que se repiten **no compiten por el cupo `items_per_run`** ("Publicar de a N"): ese cupo limita
+  solo las piezas nuevas aprobadas, y las evergreen vencidas se publican **además** en la misma corrida
+  (`pickNextPublishableItems` = `[...aprobadas.slice(0, count), ...evergreenVencidas]`). Ej: con "Publicar de a
+  1" y una pieza fija marcada para repetirse, cada día programado salen 2 publicaciones — la nueva del cupo y
+  la fija aparte. Una pieza fija nunca le quita el lugar a una nueva ni al revés.
 - **Limitacion de plataforma**: los reposteos van por la API de Instagram, que nunca permite sticker de link
   en historias. Si el link tiene que estar (ir a la web, etc.), va escrito o como QR dentro de la imagen. Para
   mandar a Historias Destacadas no hace falta link: la placa indica "toca mi perfil" y la persona entra sola.

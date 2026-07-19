@@ -747,6 +747,12 @@ function AutoPublishTrackCard({
           Ej: poné 3 para publicar las historias de las 3 sedes de una, cada vez que le toque a este cronograma.
         </p>
       )}
+      {onChangeItemsPerRun && (
+        <p className="text-xs text-gray-500">
+          Cuenta solo las piezas <strong>nuevas</strong>. Las marcadas para repetirse salen <strong>además</strong> de
+          estas, no ocupan uno de estos lugares.
+        </p>
+      )}
       <div className="space-y-1">
         <p className="text-xs text-gray-500">Elegí en qué días (hasta {track.times_per_week}):</p>
         <WeekdayPicker
@@ -2867,8 +2873,14 @@ function Editor({
               {item.repeat_interval_days ? (
                 <>
                   <p className="text-xs text-gray-500">
-                    Los días y cuántas veces por semana sale ya los decide el cronograma de auto-publicación
-                    de este formato — no hace falta configurarlos acá.
+                    {item.format === "historia"
+                      ? "Sale como historia de Instagram, no en el feed. "
+                      : item.format === "carrusel"
+                      ? "Sale como carrusel en el feed. "
+                      : "Sale como post en el feed. "}
+                    Los días y cuántas veces por semana sale los decide el cronograma de auto-publicación
+                    de este formato — no hace falta configurarlos acá. Sale <strong>además</strong> de
+                    las piezas nuevas: no ocupa un lugar del &ldquo;Publicar de a N&rdquo;, se publica aparte.
                   </p>
                   <div className="flex flex-wrap items-center gap-2">
                     <span>Parar después de</span>
