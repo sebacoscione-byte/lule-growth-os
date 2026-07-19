@@ -6,7 +6,7 @@ import Image from "next/image"
 import Link from "next/link"
 import {
   Archive, ArchiveRestore, BookOpen, Check, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Copy, Download, ExternalLink, Link2, Loader2,
-  ImageIcon, Plus, Save, Search, Send, ShieldCheck, Sparkles, Pin, Undo2, Unlink, WandSparkles, X,
+  ImageIcon, Plus, Save, Search, Send, ShieldCheck, Sparkles, Pin, Trash2, Undo2, Unlink, WandSparkles, X,
 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { TrackedProfileLink } from "@/components/tracked-profile-link"
@@ -817,6 +817,7 @@ export default function ContentStudioPage() {
   const [researching, setResearching] = useState(false)
   const [generating, setGenerating] = useState(false)
   const [working, setWorking] = useState<string | null>(null)
+  const [deletingArchived, setDeletingArchived] = useState(false)
   const [insights, setInsights] = useState<Record<string, InstagramMediaInsights | "loading" | "error">>({})
   const [error, setError] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
@@ -1358,6 +1359,49 @@ export default function ContentStudioPage() {
     }
   }
 
+  async function deleteItem(item: ContentItem) {
+    const label = item.topic || item.visual_headline || "esta pieza"
+    if (!window.confirm(`¿Eliminar definitivamente "${label}"? Esta acción no se puede deshacer.`)) return
+    setWorking(item.id)
+    setError(null)
+    try {
+      const response = await fetch(`/api/content/items?id=${item.id}`, { method: "DELETE" })
+      const data = await response.json().catch(() => null) as { error?: string } | null
+      if (!response.ok || data?.error) {
+        setError(data?.error ?? "No se pudo eliminar la pieza")
+        return
+      }
+      setItems(previous => previous.filter(existing => existing.id !== item.id))
+      setActive(previous => previous?.id === item.id ? null : previous)
+    } catch {
+      setError("No se pudo eliminar la pieza. Revisá tu conexión e intentá nuevamente.")
+    } finally {
+      setWorking(null)
+    }
+  }
+
+  async function deleteAllArchived() {
+    const archivedCount = items.filter(item => item.status === "archived").length
+    if (archivedCount === 0) return
+    if (!window.confirm(`¿Eliminar definitivamente las ${archivedCount} piezas archivadas? Esta acción no se puede deshacer.`)) return
+    setDeletingArchived(true)
+    setError(null)
+    try {
+      const response = await fetch("/api/content/items?status=archived", { method: "DELETE" })
+      const data = await response.json().catch(() => null) as { error?: string } | null
+      if (!response.ok || data?.error) {
+        setError(data?.error ?? "No se pudieron eliminar las piezas archivadas")
+        return
+      }
+      setItems(previous => previous.filter(existing => existing.status !== "archived"))
+      setActive(previous => previous?.status === "archived" ? null : previous)
+    } catch {
+      setError("No se pudieron eliminar las piezas archivadas. Revisá tu conexión e intentá nuevamente.")
+    } finally {
+      setDeletingArchived(false)
+    }
+  }
+
   // Insights nativos (reach/likes/comments) se piden en vivo, a pedido — no hay un historial
   // guardado, ver docs/BACKLOG.md. Solo disponible para piezas publicadas con este sistema desde
   // que se agregó instagram_media_id (content-publish.ts).
@@ -1895,6 +1939,18 @@ export default function ContentStudioPage() {
                     {FORMATS.map(item => <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>)}
                   </SelectContent>
                 </Select>
+                {libraryStatus === "archived" && filteredItems.length > 0 && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="text-red-600 hover:bg-red-50 hover:text-red-700"
+                    disabled={deletingArchived}
+                    onClick={deleteAllArchived}
+                  >
+                    {deletingArchived ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
+                    Eliminar archivados
+                  </Button>
+                )}
               </div>
               {filteredItems.length === 0 ? (
                 <Card>
@@ -2039,12 +2095,26 @@ export default function ContentStudioPage() {
                         variant="ghost"
                         size="icon"
                         aria-label={item.status === "archived" ? "Restaurar pieza" : "Archivar pieza"}
+                        disabled={working === item.id}
                         onClick={() => item.status === "archived"
                           ? updateItem(item, { status: item.archived_from_status ?? "draft" })
                           : updateItem(item, { status: "archived", archived_from_status: item.status })}
                       >
                         {item.status === "archived" ? <ArchiveRestore className="h-4 w-4" /> : <Archive className="h-4 w-4" />}
                       </Button>
+                      {item.status === "archived" && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          aria-label="Eliminar pieza"
+                          title="Eliminar definitivamente esta pieza archivada"
+                          className="text-red-600 hover:bg-red-50 hover:text-red-700"
+                          disabled={working === item.id}
+                          onClick={() => deleteItem(item)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      )}
                     </div>
                   </CardContent>
                 </Card>
