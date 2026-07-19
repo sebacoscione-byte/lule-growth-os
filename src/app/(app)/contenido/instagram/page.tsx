@@ -2867,8 +2867,14 @@ function Editor({
               {item.repeat_interval_days ? (
                 <>
                   <p className="text-xs text-gray-500">
-                    Los días y cuántas veces por semana sale ya los decide el cronograma de auto-publicación
-                    de este formato — no hace falta configurarlos acá.
+                    {item.format === "historia"
+                      ? "Sale como historia de Instagram, no en el feed. "
+                      : item.format === "carrusel"
+                      ? "Sale como carrusel en el feed. "
+                      : "Sale como post en el feed. "}
+                    Los días y cuántas veces por semana sale los decide el cronograma de auto-publicación
+                    de este formato — no hace falta configurarlos acá. No le quita el lugar a las piezas
+                    nuevas: primero salen las aprobadas nuevas y esta solo rellena los lugares que sobren.
                   </p>
                   <div className="flex flex-wrap items-center gap-2">
                     <span>Parar después de</span>
