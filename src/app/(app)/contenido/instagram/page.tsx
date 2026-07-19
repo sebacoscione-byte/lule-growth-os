@@ -19,7 +19,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
 import { parseAiJson } from "@/lib/parse-ai-json"
 import { truncateForImagePlate } from "@/lib/content-text"
-import { DEFAULT_AUTO_PUBLISH_SETTINGS, alreadyPublishedToday, estimateAutoPublishDrainDays, estimateAutoPublishDateForPosition, findRecentDuplicateTopic, pickNextPublishableItems } from "@/lib/content-pipeline"
+import { DEFAULT_AUTO_PUBLISH_SETTINGS, alreadyPublishedToday, estimateAutoPublishDrainDays, estimateAutoPublishDateForPosition, estimateRepeatEndDate, findRecentDuplicateTopic, pickNextPublishableItems } from "@/lib/content-pipeline"
 import type { AutoPublishSettings, AutoPublishTrackSettings, ContentItem, ContentObjective, ContentScene, ContentSlide, ContentSource, ContentStatus } from "@/types"
 import type { InstagramMediaInsights } from "@/lib/instagram-business"
 import { CONTENT_OBJECTIVE_GOALS, CONTENT_OBJECTIVE_LABELS, WEEKDAY_OPTIONS } from "@/types"
@@ -980,6 +980,43 @@ export default function ContentStudioPage() {
     return info
   }, [items, autoPublishSettings])
 
+  // Para las piezas marcadas para repetirse: cuándo sale la próxima y cuándo dejaría de publicarse
+  // (si tiene límite de repeticiones). Se muestra en la card en vez de la línea de cola normal.
+  const repeatInfo = useMemo(() => {
+    const info = new Map<string, { nextLabel: string; endLabel: string }>()
+    const now = new Date()
+    const fmt = (date: Date) => date.toLocaleDateString("es-AR", { day: "numeric", month: "short" })
+    items.forEach(item => {
+      if (!item.repeat_interval_days) return
+      if (item.format !== "post" && item.format !== "historia" && item.format !== "carrusel") return
+      const track = autoPublishSettings[item.format]
+      const todayAvailable = isTodayAvailableForQueueEstimate(track, now)
+      const days = track.days_of_week
+      let nextLabel: string
+      if (days.length === 0) {
+        nextLabel = "elegí días en \"Publicación automática\""
+      } else {
+        const queued = queueInfo.get(item.id)
+        // Aprobada sin publicar: su primera salida sigue la posición en la cola. Ya publicada
+        // (repitiéndose): sale en el próximo día del cronograma (posición 1, una por día).
+        const nextDate = item.status === "approved" && queued
+          ? estimateAutoPublishDateForPosition(queued.position, days, track.items_per_run, now, todayAvailable)
+          : estimateAutoPublishDateForPosition(1, days, 1, now, todayAvailable)
+        nextLabel = nextDate ? (nextDate.toDateString() === now.toDateString() ? "hoy" : fmt(nextDate)) : "—"
+      }
+      let endLabel: string
+      if (item.repeat_limit == null) {
+        endLabel = "no deja de publicarse hasta que la desactives"
+      } else {
+        const endDate = estimateRepeatEndDate(item, days, now, todayAvailable)
+        const reps = `${item.repeat_limit} ${item.repeat_limit === 1 ? "repetición" : "repeticiones"}`
+        endLabel = endDate ? `deja de publicarse ~${fmt(endDate)} (${reps})` : `ya completó sus ${reps}`
+      }
+      info.set(item.id, { nextLabel, endLabel })
+    })
+    return info
+  }, [items, autoPublishSettings, queueInfo])
+
   const filteredItems = useMemo(() => {
     const query = libraryQuery.trim().toLocaleLowerCase("es")
     const matches = items.filter(item => {
@@ -991,11 +1028,12 @@ export default function ContentStudioPage() {
         .some(value => value.toLocaleLowerCase("es").includes(query))
       return matchesStatus && matchesFormat && matchesQuery
     })
-    // Al filtrar por Aprobados, mostrar en el mismo orden en que van a salir publicadas (no por fecha
-    // de creacion), para que las flechas de reordenar muevan la card visualmente donde uno espera.
-    if (libraryStatus !== "approved") return matches
-    return [...matches].sort((a, b) => (queueInfo.get(a.id)?.position ?? 0) - (queueInfo.get(b.id)?.position ?? 0))
-  }, [items, libraryFormat, libraryQuery, libraryStatus, queueInfo])
+    // Orden cronológico, de la más nueva a la más antigua, en todas las vistas de la biblioteca. Antes
+    // las Aprobadas se ordenaban por la posición en la cola de auto-publicación DE CADA FORMATO, lo que
+    // se leía como "agrupado por tipo": ahora es un único orden por fecha, sin agrupar por formato. Las
+    // flechas de reordenar siguen cambiando el orden de PUBLICACIÓN (no el de esta lista, que va por fecha).
+    return [...matches].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+  }, [items, libraryFormat, libraryQuery, libraryStatus])
 
   const filteredCategories = useMemo(() => {
     const query = category.trim().toLocaleLowerCase("es")
@@ -1905,11 +1943,17 @@ export default function ContentStudioPage() {
                         </Button>
                       )
                     )}
-                    {item.status === "approved" && queueInfo.get(item.id) && (
+                    {item.status === "approved" && !item.repeat_interval_days && queueInfo.get(item.id) && (
                       <p className="text-xs text-gray-500">
                         {queueInfo.get(item.id)!.position === 1 ? "Próxima en publicarse" : `#${queueInfo.get(item.id)!.position} en la cola`}
                         {" "}· {queueInfo.get(item.id)!.etaLabel}
                       </p>
+                    )}
+                    {(item.status === "approved" || item.status === "published") && item.repeat_interval_days && repeatInfo.get(item.id) && (
+                      <div className="rounded-md bg-gray-50 px-2.5 py-1.5 text-xs text-gray-600">
+                        <p><span className="font-medium text-gray-800">Se repite</span> · próxima: {repeatInfo.get(item.id)!.nextLabel}</p>
+                        <p>{repeatInfo.get(item.id)!.endLabel}</p>
+                      </div>
                     )}
                     <div className="flex gap-2">
                       <Button variant="outline" size="sm" className="flex-1" onClick={() => { setActive(item); setManualPrompt(null); setTab("crear") }}>

@@ -146,6 +146,18 @@ track — tener ambas cosas se pisaba). Los campos viven en el JSON de la pieza 
 - **Limitacion de plataforma**: los reposteos van por la API de Instagram, que nunca permite sticker de link
   en historias. Si el link tiene que estar (ir a la web, etc.), va escrito o como QR dentro de la imagen. Para
   mandar a Historias Destacadas no hace falta link: la placa indica "toca mi perfil" y la persona entra sola.
+- **En la card**: una pieza marcada para repetirse muestra en su tarjeta "Se repite · próxima: [fecha]" y, si
+  tiene limite, "deja de publicarse ~[fecha] ([N] repeticiones)" (o "no deja de publicarse hasta que la
+  desactives" si no hay limite). La fecha de fin la estima `estimateRepeatEndDate` (pura, con tests) proyectando
+  las apariciones que faltan sobre los dias del cronograma.
+
+### Orden de la Biblioteca
+
+La lista de la Biblioteca se ordena **cronologicamente por fecha de creacion, de la mas nueva a la mas antigua**,
+en todas las vistas (antes las Aprobadas se ordenaban por la posicion en la cola de auto-publicacion de cada
+formato, lo que se leia como "agrupado por tipo"). Las flechas de reordenar de cada card aprobada siguen
+cambiando el orden de **publicacion** de su formato (`queue_rank`), que ya no es el mismo que el orden de esta
+lista (que va por fecha).
 
 ## Guardrails
 

@@ -144,6 +144,26 @@ export function estimateAutoPublishDateForPosition(
 }
 
 /**
+ * Pura, sin I/O: fecha estimada de la ULTIMA publicacion de una pieza evergreen con limite de
+ * repeticiones (`repeat_limit`), segun los dias del cronograma. null si no tiene limite (no deja de
+ * publicarse hasta apagarla) o si ya no le quedan repeticiones. Modelo: la pieza aparece
+ * `1 + repeat_limit` veces en total (la publicacion original + N repeticiones); ya aparecio
+ * `(publicada ? 1 : 0) + repeat_count` veces. La ultima cae en el n-esimo dia programado que falta
+ * (una aparicion por dia programado, por eso itemsPerRun = 1). Es una estimacion para la UI.
+ */
+export function estimateRepeatEndDate(
+  item: ContentItem, daysOfWeek: number[], now: Date, todayAvailable: boolean = true
+): Date | null {
+  if (!item.repeat_interval_days || item.repeat_interval_days <= 0) return null
+  if (item.repeat_limit == null) return null
+  const totalAppearances = 1 + item.repeat_limit
+  const appearancesSoFar = (item.status === "published" ? 1 : 0) + (item.repeat_count ?? 0)
+  const remaining = Math.max(0, totalAppearances - appearancesSoFar)
+  if (remaining <= 0) return null
+  return estimateAutoPublishDateForPosition(remaining, daysOfWeek, 1, now, todayAvailable)
+}
+
+/**
  * Orden efectivo dentro de la cola de un formato: `queue_rank` explicito (asignado al reordenar a
  * mano) tiene prioridad; si nunca se reordeno, se ordena por approved_at (FIFO, el de siempre). Los
  * ranks manuales son enteros chicos (1, 2, 3...) y los timestamps son numeros mucho mas grandes, asi
