@@ -1,55 +1,56 @@
-# EN CURSO (2026-07-18) — atención particular como capacidad de sede
+# CERRADO (2026-07-18) — atención particular como capacidad de sede
 
 - [x] Reconstruir el último intercambio de Sebastián Coscione con consentimiento vigente.
 - [x] Separar `accepts_particular` de `obras_sociales` en configuración y UI.
 - [x] Mantener la cobertura del paciente y permitir una sede que acepte atención particular.
 - [x] Aplicar migración: CIMEL/Británico habilitados; Swiss Lomas deshabilitado.
 - [x] Ejecutar lint, 92 suites/867 tests y build de producción.
-- [ ] Verificar preview y publicar por PR.
+- [x] Publicado y mergeado como PR #129 (2026-07-18) — reconciliado en la revisión general
+      posterior, la entrada había quedado sin tildar.
 
 ---
 
-# EN CURSO (2026-07-18) — consulta informativa de obras sociales
+# CERRADO (2026-07-18) — consulta informativa de obras sociales
 
 - [x] Separar la cobertura guardada del paciente de una consulta sobre otra cobertura.
 - [x] Buscar la cobertura consultada en todas las sedes verificadas sin modificar el lead.
 - [x] Mantener IA sólo para reconocer intención libre; responder desde configuración verificada.
 - [x] Cubrir consultas Particular, Medife y cobertura no disponible con tests.
 - [x] Ejecutar lint, 91 suites/863 tests y build de producción.
-- [ ] Verificar preview y publicar por PR.
+- [x] Publicado y mergeado como PR #128 (2026-07-18) — reconciliado después, había quedado sin tildar.
 
 ---
 
-# EN CURSO (2026-07-18) — respuesta esperada en conversación de Seba Coscione
+# CERRADO (2026-07-18) — respuesta esperada en conversación de Seba Coscione
 
 - [x] Leer conversación, sesión, handoffs, consentimiento y cola durable de producción.
 - [x] Confirmar sesión histórica sin consentimiento vigente y mensajes procesados pero no visibles.
 - [x] Exigir consentimiento vigente antes de continuar y retomar el lead sin repetir el intake.
 - [x] Evitar derivar a una sede incompatible y ofrecer una alternativa compatible.
 - [x] Ejecutar lint, 91 suites/859 tests y build de producción.
-- [ ] Verificar preview y publicar por PR.
+- [x] Publicado y mergeado como PR #127 (2026-07-18) — reconciliado después, había quedado sin tildar.
 
 ---
 
-# EN CURSO (2026-07-18) — Inbox y coberturas del caso Sebastián Coscione
+# CERRADO (2026-07-18) — Inbox y coberturas del caso Sebastián Coscione
 
 - [x] Reconstruir la conversación real sin guardar PII en el repositorio.
 - [x] Confirmar que el filtro del receptor de alertas descartaba sus respuestas antes de la cola.
 - [x] Volver a persistir esos mensajes y cubrir el webhook con una regresión.
 - [x] Validar obra social contra la sede elegida y evitar listas globales incompatibles.
 - [x] Ejecutar lint, 91 suites/856 tests y build de producción.
-- [ ] Verificar preview y publicar por PR.
+- [x] Publicado y mergeado como PR #126 (2026-07-18) — reconciliado después, había quedado sin tildar.
 
 ---
 
-# HOTFIX EN CURSO (2026-07-18) — bot apagado para el receptor de alertas
+# HOTFIX CERRADO (2026-07-18) — bot apagado para el receptor de alertas
 
 - [x] Confirmar que no existía una exclusión entrante para `ALERT_WHATSAPP_TO`.
 - [x] Excluir sólo mensajes inbound del teléfono interno antes de la cola durable y del bot.
 - [x] Mantener los eventos de estado de Meta para no perder seguimiento de entrega.
 - [x] Ejecutar lint, 90 suites/853 tests y build.
 - [x] Publicar por PR #124; CI y Vercel Preview quedaron verdes.
-- [ ] Mergear a producción y comprobar el despliegue final.
+- [x] Mergeado a producción (PR #124, 2026-07-18) — reconciliado después, había quedado sin tildar.
 
 ---
 
@@ -124,7 +125,10 @@
 - [x] Validar la migración con rollback, aplicarla atómicamente en producción y comprobar el mismo
       `upsert` por REST con un evento técnico sintético eliminado inmediatamente.
 - [x] Confirmar 10/10 migraciones, preflight Meta 200, scheduler sano y suite completa verde.
-- [ ] Reenviar un mensaje real para confirmar el POST 200 y la respuesta desde el teléfono.
+- [x] Confirmado con tráfico real posterior: las conversaciones reales del 2026-07-18 (caso
+      Sebastián Coscione, PRs #126–#129) entraron por el webhook productivo y fueron procesadas
+      de punta a punta — la recepción quedó verificada con mensajes reales, no hizo falta un
+      reenvío manual.
 
 ---
 
@@ -509,9 +513,10 @@ pedir confirmación, salvo que toque lógica médica — ver CLAUDE.md).
   end-to-end). Extendido después a `webhooks/whatsapp` (la ruta más crítica: firma WA-01,
   idempotencia WA-02, clasificación de error WA-03) — 4 rutas cubiertas en total. Falta extender
   a más rutas — el patrón ya funciona, es mecánico.
-- [ ] **QA-02** — Smoke E2E (evaluar si vale la pena sumar Playwright dado el alcance del proyecto).
-- [ ] **GROWTH-01** — Evaluar si hay un camino real y acotado (ej. propagar un id de tracking vía
-  el link de WhatsApp) antes de construir nada; si no, documentar por qué sigue bloqueado.
+- [x] **QA-02** — Resuelto después: Playwright sumado (2026-07-12), suite autenticada corriendo
+  22/22 (2026-07-17) y CI configurado (2026-07-18) — ver `docs/BACKLOG.md`.
+- [x] **GROWTH-01** — Resuelto después (2026-07-12): referencia `Ref: XXX-YYY-01` en el mensaje
+  prellenado de WhatsApp + panel de embudo en `/dashboard` — ver "Cuarta continuación" más abajo.
 
 ## Continuación (2026-07-12, misma sesión)
 
