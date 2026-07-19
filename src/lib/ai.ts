@@ -159,8 +159,29 @@ const IMAGE_PROMPT_RULES = `DIRECCION VISUAL PARA GEMINI:
 - Define un unico punto focal claro y una escena que se entienda en menos de un segundo.
 - La escena debe activar curiosidad o identificacion en un paciente potencial: mostrar un momento cotidiano reconocible, una decision preventiva o el beneficio emocional de ocuparse de la salud.
 - Debe existir una tension visual suave entre "seguir postergando" y "ocuparse a tiempo", sin representar peligro, dolor, miedo ni urgencia.
-- La imagen debe sentirse cercana y confiable, no fria, hospitalaria ni publicitaria de stock.
-- Elegi una sola direccion creativa concreta. Preferi un momento humano cotidiano vinculado directamente al tema (ej: preparar una comida saludable para un tema de colesterol, tomarse la presion en casa para hipertension, salir a caminar para sedentarismo). Si en cambio elegis un objeto como metafora o una naturaleza muerta editorial, el objeto tiene que evocar el tema de forma inmediata sin necesitar el texto para entenderse (ej: un plato con alimentos altos en grasas para colesterol, una alarma de reloj para chequeos postergados) — evita metaforas abstractas o poeticas que solo se entienden leyendo el titular (ej: piedras acumulandose, arena cayendo, un nudo desatandose: no comunican "salud" ni "cardiologia" por si solas). No mezcles conceptos.
+- La imagen debe sentirse cercana y confiable: evita el pasillo de guardia, la luz fria fluorescente,
+  el ambiente esteril-asustador o la publicidad de stock generica. Pero un consultorio medico calido y
+  profesional (luz natural, materiales nobles, plantas, tonos calidos) es una ubicacion valida y en
+  muchos casos la correcta -- no es lo mismo que "hospitalario" en el sentido frio/institucional que hay
+  que evitar.
+- Elegi una sola direccion creativa concreta segun de que habla el tema:
+  - Si el tema es un estudio, procedimiento o consulta que sucede en el consultorio (ecocardiograma,
+    consulta cardiologica, estudios cardiologicos, chequeo cardiovascular, atencion en una sede, como
+    pedir turno), la escena TIENE que transcurrir en un consultorio o sala de estudios reconocible como
+    tal (camilla, equipo correspondiente al estudio mencionado en uso o listo para usarse, ambiente
+    clinico profesional pero calido) -- nunca en un living, dormitorio u otro espacio domestico generico.
+    Un instrumento medico (ej. el transductor de un ecografo) apoyado sobre una mesa ratona sin ningun
+    contexto clinico alrededor no comunica de que se trata el estudio y le resta credibilidad a la pieza.
+  - Si el tema es sobre habitos, prevencion o factores de riesgo sin un procedimiento en consultorio
+    (alimentacion, actividad fisica, presion tomada en casa, adherencia a un tratamiento), preferi un
+    momento humano cotidiano vinculado directamente al tema (ej: preparar una comida saludable para un
+    tema de colesterol, tomarse la presion en casa para hipertension, salir a caminar para sedentarismo).
+  - Si en cambio elegis un objeto como metafora o una naturaleza muerta editorial, el objeto tiene que
+    evocar el tema de forma inmediata sin necesitar el texto para entenderse (ej: un plato con alimentos
+    altos en grasas para colesterol, una alarma de reloj para chequeos postergados) — evita metaforas
+    abstractas o poeticas que solo se entienden leyendo el titular (ej: piedras acumulandose, arena
+    cayendo, un nudo desatandose: no comunican "salud" ni "cardiologia" por si solas). No mezcles
+    conceptos.
 - Describi sujeto, accion, encuadre, lente o perspectiva, iluminacion, profundidad, paleta, textura, estado de animo y ubicacion del espacio negativo.
 - Usa este orden dentro del prompt: objetivo y tema; escena principal; composicion; luz y color; acabado editorial; espacio negativo; restricciones.
 - Indica proporcion vertical 4:5 para feed; usa 9:16 solo si el formato es historia.
