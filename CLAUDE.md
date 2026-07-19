@@ -1,6 +1,25 @@
 # Lule Growth OS — Contexto para Claude
 
 ## Estado actual
+- 2026-07-19 (repetir historia fija: bug de guardado + rediseño del control): el campo "Repetir esta
+  pieza sola cada X días" del editor de contenido **no se podía guardar** — `repeat_interval_days` no
+  estaba en `EDITABLE_FIELDS`, así que "Guardar cambios" nunca se habilitaba y `saveChanges()` lo
+  descartaba (el backend siempre lo aceptó; el bug era 100% del front). A pedido de Seba se cambió el
+  control de "cada X días" (que se pisaba con los días del cronograma del track) a un **interruptor
+  on/off + límite opcional de repeticiones**: al prender guarda `repeat_interval_days = 1` (= elegible
+  en cada corrida programada; los días/veces por semana los sigue decidiendo el cronograma del track),
+  `repeat_limit` (nuevo, opcional, tope de reposteos; vacío = sin límite) y `repeat_count` (nuevo,
+  system-managed: lo incrementa el cron al republicar con éxito, se resetea a 0 al re-activar). El
+  guardado ahora va por el mismo camino probado (`onSave`→PATCH) que Aprobar/Volver a borrador. Sin
+  migración (las piezas viven como JSON en `app_config`). `isRepeatDue` respeta el límite; las piezas
+  que se repiten siguen llenando solo los huecos del cronograma (nunca desplazan una aprobada fresca).
+  **Verificado en vivo** con Playwright + la cuenta E2E contra la pieza real "TU CONTROL
+  CARDIOVASCULAR": se prendió, se puso límite 8, se recargó la página y al reabrir seguía "Activada"
+  con límite 8 (persiste de verdad), y se restauró el estado original. `npm test` (871/871), build y
+  lint sin errores. Archivos: `src/types/index.ts`, `src/lib/content-pipeline.ts` (+tests),
+  `src/app/api/content/items/route.ts`, `src/app/api/cron/publish-content/route.ts`,
+  `src/app/(app)/contenido/instagram/page.tsx`, `docs/CONTENT_STUDIO.md`. Contexto de la limitación de
+  links en historias por API sigue vigente (sin sticker de link; usar QR/texto o mandar a Destacados).
 - 2026-07-18 (Content-Security-Policy, cierra el trabajo futuro de TECH-01): `next.config.mjs`
   ahora manda un header CSP completo, armado desde el inventario real de lo que el navegador carga
   (gtag de GA4 con consentimiento, Supabase para login/MFA e imágenes de Storage, `data:` para el

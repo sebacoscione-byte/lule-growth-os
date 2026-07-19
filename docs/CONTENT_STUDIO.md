@@ -123,6 +123,28 @@ protegido por la env var `CRON_SECRET`, ver `CLAUDE.md`).
   en `src/lib/content-pipeline.ts` como funciones puras testeadas (`content-pipeline.test.ts`); la
   publicacion por canal compartida entre el cron y "Publicar ahora" vive en `src/lib/content-publish.ts`.
 
+### Repetir una pieza fija (evergreen) — on/off + limite (2026-07-19)
+
+Cada pieza `approved`/`published` tiene en su editor un interruptor **"Repetir esta pieza automaticamente"**
+(antes era un campo "repetir cada X dias", cambiado a on/off porque los dias ya los decide el cronograma del
+track — tener ambas cosas se pisaba). Los campos viven en el JSON de la pieza (`app_config`, sin migracion):
+
+- `repeat_interval_days`: al prender el interruptor se guarda `1` = "elegible en cada corrida programada".
+  Que dias y cuantas veces por semana sale lo controla enteramente el cronograma del track (post/historia/
+  carrusel), no la pieza. Apagado = `null` (se publica una sola vez, comportamiento de siempre). Valores `>1`
+  son legado (cadencia propia en dias desde `updated_at`); `isRepeatDue` los sigue respetando.
+- `repeat_limit` (opcional): tope de repeticiones automaticas. Vacio/`null` = sin limite (se repite hasta
+  apagarlo). Al alcanzarlo, `isRepeatDue` deja de darla por vencida y la pieza no vuelve a salir sola.
+- `repeat_count`: cuantas veces la republico el cron. Lo maneja **solo el sistema** (se incrementa en el cron
+  al republicar con exito; no cuenta un fallo transitorio) y se resetea a 0 al re-activar el interruptor
+  (off→on, server-side en `/api/content/items`). No es editable por el cliente.
+- Las piezas que se repiten **nunca desplazan a una pieza nueva aprobada**: `pickNextPublishableItems` toma
+  primero las aprobadas frescas y solo llena los lugares que sobren con las evergreen vencidas. Es decir, la
+  fija rellena huecos del cronograma, no compite con lo planificado.
+- **Limitacion de plataforma**: los reposteos van por la API de Instagram, que nunca permite sticker de link
+  en historias. Si el link tiene que estar (ir a la web, etc.), va escrito o como QR dentro de la imagen. Para
+  mandar a Historias Destacadas no hace falta link: la placa indica "toca mi perfil" y la persona entra sola.
+
 ## Guardrails
 
 Todo contenido debe evitar diagnosticos, tratamientos, interpretacion de estudios, promesas y mensajes que asuman una condicion medica del lector. Los sintomas de alarma deben derivarse a guardia o atencion medica inmediata.
