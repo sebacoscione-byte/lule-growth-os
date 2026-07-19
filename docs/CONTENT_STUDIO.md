@@ -153,11 +153,13 @@ track — tener ambas cosas se pisaba). Los campos viven en el JSON de la pieza 
 
 ### Orden de la Biblioteca
 
-La lista de la Biblioteca se ordena **cronologicamente por fecha de creacion, de la mas nueva a la mas antigua**,
-en todas las vistas (antes las Aprobadas se ordenaban por la posicion en la cola de auto-publicacion de cada
-formato, lo que se leia como "agrupado por tipo"). Las flechas de reordenar de cada card aprobada siguen
-cambiando el orden de **publicacion** de su formato (`queue_rank`), que ya no es el mismo que el orden de esta
-lista (que va por fecha).
+La lista de la Biblioteca se ordena **cronologicamente por la fecha estimada de PUBLICACION** (la que muestra
+cada card: "proxima / estimado X"), de la mas proxima a la mas lejana, intercalando formatos — no agrupado por
+tipo. Es la fecha real en que cada pieza va a salir segun el cronograma de su formato (repetidas incluidas, por
+su proxima salida). Las piezas sin fecha de publicacion estimada (borradores, archivadas, ya publicadas sin
+repetir) van al final, de la mas nueva a la mas antigua por `created_at`. Las flechas de reordenar cambian el
+`queue_rank` de un formato, que a su vez cambia la fecha estimada de esa pieza y por lo tanto su lugar en esta
+lista.
 
 ## Guardrails
 
