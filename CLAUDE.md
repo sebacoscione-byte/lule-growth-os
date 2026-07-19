@@ -1,6 +1,16 @@
 # Lule Growth OS — Contexto para Claude
 
 ## Estado actual
+- 2026-07-19 (aviso de tema repetido: solo aprobadas/publicadas + ventana de 15 días): Seba reportó
+  que el aviso amarillo "Ya generaste algo sobre esta categoría..." (Estudio de contenido, al elegir
+  categoría antes de generar) saltaba apenas generaba un post nuevo — `findRecentDuplicateTopic`
+  (`src/lib/content-pipeline.ts`) solo excluía piezas `archived`, así que un borrador recién creado
+  (la pieza que se acaba de generar) ya contaba como "duplicado" contra sí mismo/lo anterior. Ahora
+  solo considera piezas `approved`/`published` (un borrador todavía puede descartarse o cambiar de
+  tema, no es una repetición real) y la ventana bajó de 30 a 15 días (`DEFAULT_DUPLICATE_TOPIC_WINDOW_DAYS`).
+  Tests nuevos/actualizados en `content-pipeline.test.ts` (ignora borradores; detecta publicadas;
+  ventana default 15 días). `npm test` (882/882), lint y build OK. Archivos:
+  `src/lib/content-pipeline.ts` (+tests), `src/app/(app)/contenido/instagram/page.tsx` (comentario).
 - 2026-07-19 (bug real: "Generar propuesta completa" fallaba con "No se pudo generar la respuesta con
   IA", Seba reportó "rompiste algo" tras la sesión anterior): **investigado y confirmado que NO fue
   causado por ningún cambio de esta sesión** — `/api/content/route.ts` (el que genera) solo importa

@@ -1052,8 +1052,9 @@ export default function ContentStudioPage() {
       : CATEGORIES
   }, [category])
 
-  // Aviso no bloqueante: si ya se genero o publico algo con la misma categoria (o el mismo hook) en
-  // los ultimos 30 dias, mostrarlo antes de generar para evitar repetir el mismo angulo sin querer.
+  // Aviso no bloqueante: si ya se aprobo o publico algo con la misma categoria (o el mismo hook) en
+  // los ultimos 15 dias, mostrarlo antes de generar para evitar repetir el mismo angulo sin querer.
+  // Los borradores no cuentan: todavia pueden descartarse o cambiar de tema.
   const recentDuplicate = useMemo(() => {
     if (!category.trim()) return null
     return findRecentDuplicateTopic(items, { category: category.trim() }, new Date())
