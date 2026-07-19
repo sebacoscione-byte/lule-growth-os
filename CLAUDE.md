@@ -1,6 +1,19 @@
 # Lule Growth OS — Contexto para Claude
 
 ## Estado actual
+- 2026-07-18 (Content-Security-Policy, cierra el trabajo futuro de TECH-01): `next.config.mjs`
+  ahora manda un header CSP completo, armado desde el inventario real de lo que el navegador carga
+  (gtag de GA4 con consentimiento, Supabase para login/MFA e imágenes de Storage, `data:` para el
+  QR de MFA y previews — nada más; las reseñas de Places no traen fotos y el OAuth es redirect
+  top-level que CSP no restringe). `script-src` mantiene `'unsafe-inline'` (Next inyecta scripts
+  inline; nonce vía proxy queda como mejora futura) — el valor está en `connect-src`/`img-src`/
+  `frame-src 'none'`/`form-action 'self'`. Dev suma `'unsafe-eval'`+ws (HMR); previews de Vercel
+  permiten `vercel.live`. Verificado contra build de producción real: 19 tests públicos + los 3
+  autenticados (login+TOTP, dashboard, inbox, leads) pasan con el CSP activo; landing sin errores
+  de consola. GA no probado en vivo (sin measurement ID local) — allowlist oficial de GA4, revisar
+  la consola del sitio real tras el deploy. El mismo día se registró la primera revisión del modo
+  sombra (n=2, 100% match — sin señal para fase 2/canary hasta que Meta destrabe volumen real) y
+  se reconcilió `docs/IN_PROGRESS.md` con los PRs #124/#126–#129 ya mergeados.
 - 2026-07-17 (clasificador v2 conectado en modo sombra, PR #116): `whatsapp-policy-shadow-runner.ts`
   llama a `evaluateWhatsAppPolicy()` (`whatsapp-policy.ts`, construido el 16/07 pero nunca conectado)
   en paralelo a cada mensaje real, sin ningún efecto sobre la respuesta al paciente — corre desde un

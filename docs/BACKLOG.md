@@ -868,6 +868,22 @@ deliberado: primero integridad de WhatsApp y datos de pacientes; luego medición
   - **Aceptación cumplida para el alcance decidido**: lint/tests/build limpios, headers de
     seguridad básicos presentes sin romper nada verificable en este entorno. Un CSP completo queda
     como trabajo futuro explícito, a hacerse con acceso para probar OAuth de punta a punta.
+  - [x] **Content-Security-Policy agregado (2026-07-18)** — la condición que lo bloqueaba (no poder
+    probar login de punta a punta) ya no existía: este entorno local corre la suite E2E autenticada
+    real. Header en `next.config.mjs` con inventario verificado archivo por archivo de lo que el
+    navegador realmente carga: `script-src` self + gtag (con `'unsafe-inline'` — Next App Router
+    inyecta scripts inline; el patrón de nonce vía proxy queda como mejora futura), `connect-src`
+    self + Supabase (login/MFA del browser) + endpoints GA4, `img-src` self/data:/blob: + Supabase
+    Storage + pixel GA, `frame-src 'none'`, `object-src 'none'`, `base-uri`/`form-action 'self'`.
+    En dev suma `'unsafe-eval'`+ws (Turbopack/HMR); en previews de Vercel permite `vercel.live`
+    (toolbar). El OAuth de Google/Instagram no necesita permisos: son redirects top-level, que CSP
+    no restringe. **Verificado contra un build de producción real**: header presente, landing sin
+    errores de consola, y `npm run test:e2e` completo — los 3 tests autenticados (login+TOTP,
+    dashboard, inbox, alta/edición/borrado de lead) y los 19 públicos pasan con el CSP activo.
+    **Pendiente de chequeo post-deploy**: GA no se pudo probar en vivo (sin
+    `NEXT_PUBLIC_GA_MEASUREMENT_ID` local) — la allowlist es la documentada oficial de GA4; si GA
+    está activo en producción, mirar la consola del sitio real tras el deploy por si aparece una
+    violación de CSP.
 
 ### Ola 4 — Derivación a humano sin alerta en tiempo real ✅ Resuelto (2026-07-15, incidente real 2026-07-14)
 
