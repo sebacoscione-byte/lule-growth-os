@@ -169,6 +169,13 @@ por qué tipo de acción es, para que sepas qué esperar de cada uno. El detalle
   `whatsapp_policy_evaluations` unos días, revisar las coincidencias/discrepancias, y recién
   entonces decidir si conviene una fase 2 (ampliar cobertura) o un canary mínimo. La IA seguirá
   devolviendo enums validados, nunca texto para el paciente.
+  - **Primera revisión de señal (2026-07-18, consulta read-only de agregados sin PII)**: la tabla
+    tiene apenas **2 evaluaciones** (ambas del 18/07, estado `routed`, categoría `human_handoff`),
+    con **100% de coincidencia** legacy↔v2 en action/intent/response/handoff. Buen sanity check
+    inicial, pero n=2 no es señal para decidir nada. La acumulación va a seguir lenta mientras el
+    bot solo hable con testers — **la decisión fase 2/canary queda en la práctica atada a resolver
+    la verificación de negocio de Meta** (el bloqueante 🚨 de arriba), que es lo que traería el
+    volumen real. Re-revisar cuando haya al menos algunas decenas de evaluaciones.
 - [x] ~~Agregar a Lucía al Business Manager de Meta~~ **Resuelto (2026-07-18)**: invitada con
   "Acceso parcial → Básico" (no "Administrar"), asignada solo a la cuenta de WhatsApp Business
   ("Dra Lucia Chahin") — sin acceso a la App técnica (API keys/webhook) ni a "WhatsApp Marketing
