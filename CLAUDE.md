@@ -1,6 +1,26 @@
 # Lule Growth OS — Contexto para Claude
 
 ## Estado actual
+- 2026-07-19 (bug real: la placa de "Un estudio simple para tu tranquilidad" mostró un ecógrafo con el
+  transductor sobre el abdomen, no un ecocardiograma): Seba volvió a regenerar la placa de esta misma
+  pieza (después del fix de género de más arriba) y esta vez el transductor apareció apoyado sobre el
+  abdomen de la paciente, en una pose reconocible como ecografía obstétrica/abdominal — no un
+  ecocardiograma, que se hace con el transductor sobre el pecho/tórax, cerca del corazón. Causa:
+  `IMAGE_PROMPT_RULES` pedía "equipo correspondiente al estudio mencionado en uso" pero nunca
+  especificaba DÓNDE del cuerpo va el transductor ni QUÉ tiene que mostrar el monitor — dejaba esos dos
+  detalles librados a la interpretación genérica del modelo, y "ecografía"/"ultrasound" tiene un prior
+  cultural mucho más fuerte hacia la pose obstétrica (abdomen) que hacia la cardíaca. **Verificado en
+  vivo**: pidiendo la misma escena varias veces sin esta regla, algunas corridas ya decían "chest"
+  correctamente pero otras no mencionaban ninguna ubicación anatómica en absoluto (dejando la puerta
+  abierta al bug real). Fix: se suma una instrucción explícita en `IMAGE_PROMPT_RULES` — para un
+  ecocardiograma, el transductor tiene que ir sobre el pecho/tórax cerca del corazón (nunca el abdomen,
+  aclarando explícitamente que esa es la confusión más común de la palabra genérica "ecografía"), y si
+  el monitor es visible tiene que mostrar una vista cardíaca (cámaras del corazón), no una imagen
+  fetal/abdominal — mismo criterio generalizado a cualquier otro estudio nombrado (el posicionamiento y
+  lo que se ve en pantalla tienen que corresponder exactamente a ESE estudio, no a uno similar o más
+  genérico). Verificado en vivo repitiendo el pedido con la regla nueva: todas las corridas especifican
+  "chest, near the heart" y una vista de "heart chambers", nunca abdomen. `npm test` (884/884), lint y
+  build OK. Archivo: `src/lib/ai.ts`.
 - 2026-07-19 (bug real: al regenerar la dirección visual de "Un estudio simple para tu tranquilidad"
   con las reglas de consultorio del fix anterior, la placa mostró la mano/brazo de un médico HOMBRE
   apoyada en el hombro de la paciente): Seba lo marcó de inmediato — la Dra. Lucía Chahin es mujer,
