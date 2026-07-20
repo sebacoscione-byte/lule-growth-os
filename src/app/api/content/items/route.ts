@@ -232,9 +232,20 @@ export async function DELETE(request: NextRequest) {
   try {
     const supabase = await authenticatedClient()
     const id = request.nextUrl.searchParams.get("id")
-    if (!id) return NextResponse.json({ error: "id required" }, { status: 400 })
-    await writeContentItems(supabase, (await readContentItems(supabase)).filter(item => item.id !== id))
-    return NextResponse.json({ ok: true })
+    const status = request.nextUrl.searchParams.get("status")
+    if (!id && !status) return NextResponse.json({ error: "id o status requerido" }, { status: 400 })
+    // Borrado en lote solo se permite para archivadas -- borrar en lote borradores/aprobadas/publicadas
+    // a ciegas es mucho mas riesgoso y no tiene un caso de uso real hoy.
+    if (status && status !== "archived") {
+      return NextResponse.json({ error: "Solo se puede eliminar en lote el estado archivado" }, { status: 400 })
+    }
+    const items = await readContentItems(supabase)
+    const remaining = status
+      ? items.filter(item => item.status !== "archived")
+      : items.filter(item => item.id !== id)
+    const deletedCount = items.length - remaining.length
+    await writeContentItems(supabase, remaining)
+    return NextResponse.json({ ok: true, deletedCount })
   } catch (error) {
     return errorResponse(error)
   }
