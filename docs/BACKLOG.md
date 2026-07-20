@@ -1641,3 +1641,30 @@ de un solo elemento (`["gemini"]`), así que nunca había un segundo proveedor a
 independientemente del `break`. Se agregó un comentario en el código (`getRequestedProvider()`)
 documentando este gotcha para que una sesión futura no vuelva a sospechar un bug de lógica antes de
 reiniciar el dev server. Ver memoria `reference_gemini_config_gotchas` caso 6.
+
+### [BACKLOG] IA respondiendo DMs/fotos de Instagram — investigado, a backlog (2026-07-20)
+Seba preguntó si la IA podría responder mensajes directos (incluyendo fotos) de Instagram, en la
+misma línea que el bot de WhatsApp. Investigado (búsqueda de la documentación oficial vigente, sin
+tocar código): **es técnicamente viable sin el cambio de arquitectura que bloquea Business Discovery**
+(ver el ítem de arriba) — la mensajería de Instagram sí está soportada dentro de "Instagram API with
+Instagram Login" (`graph.instagram.com`, la misma que ya usa este proyecto para publicar, sin
+necesitar vincular una Facebook Page), vía el permiso `instagram_business_manage_messages` y webhooks
+de mensajería. Incluye envío/recepción de imágenes (PNG/JPEG/GIF hasta 8MB). La API solo permite
+responder a usuarios que ya escribieron primero (mismo patrón de ventana que WhatsApp).
+
+**Por qué queda en backlog y no se implementó ahora**: no es un toggle, es un proyecto del tamaño de
+"Ola 0" de WhatsApp (ver más arriba en este documento) aplicado a un segundo canal:
+1. Requiere activar el permiso `instagram_business_manage_messages` — reconexión de OAuth + un App
+   Review de Meta aparte (semanas de espera, mismo trámite ya conocido de Instagram).
+2. Necesita su propio webhook con verificación de firma e idempotencia (mismo patrón que
+   `api/webhooks/whatsapp`, no algo que se pueda reusar tal cual).
+3. El riesgo más alto es médico, no técnico: cualquier respuesta de IA sobre una foto que mande un
+   paciente (ej. una foto de un electro, un estudio, una zona del cuerpo) cae de lleno en "no
+   interpretar estudios" — un modelo de visión tiende a describir/opinar sobre lo que ve en la imagen
+   si no se lo restringe explícitamente, más todavía que con texto. Habría que extender el mismo
+   framework de guardrails médicos del bot de WhatsApp (enums cerrados, catálogo fijo de respuestas,
+   nunca texto médico libre) a este canal nuevo, no inventar uno aparte.
+
+Si se retoma: dimensionarlo como un proyecto propio (no una tarea suelta), reusando el diseño ya
+probado del bot de WhatsApp (idempotencia, outbox, guardrails) en vez de construir algo nuevo desde
+cero para Instagram.
