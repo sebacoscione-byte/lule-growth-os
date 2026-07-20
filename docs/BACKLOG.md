@@ -1668,3 +1668,14 @@ responder a usuarios que ya escribieron primero (mismo patrón de ventana que Wh
 Si se retoma: dimensionarlo como un proyecto propio (no una tarea suelta), reusando el diseño ya
 probado del bot de WhatsApp (idempotencia, outbox, guardrails) en vez de construir algo nuevo desde
 cero para Instagram.
+
+### [TECH] Texto de ayuda desactualizado en Configuración → Ubicaciones (campo WhatsApp propio)
+`src/app/(app)/configuracion/page.tsx` (~línea 999) dice: *"Si lo dejás vacío, el botón 'Consultar
+por WhatsApp' de la landing usa el WhatsApp del consultorio."* Eso ya no es cierto: desde el fix de
+2026-07-06/07 (ver `feedback_ui_completeness_lule` en memoria, caso 2 — pedido explícito de Seba
+para CIMEL, "sacale el boton de whatsapp porque no tiene whatsapp"), `landing-interactions.tsx`
+oculta el botón por completo (`{sede.whatsapp && (...)}`) cuando el campo queda vacío, en vez de
+mostrar un fallback al WhatsApp del consultorio. Es solo el copy el que quedó desactualizado — el
+comportamiento actual (ocultar) es el correcto/deseado, reconfirmado el 2026-07-20 cuando Seba
+decidió no sumarle el bot a CIMEL. Fix sugerido: actualizar el texto de ayuda para que describa el
+comportamiento real ("si lo dejás vacío, no se muestra ningún botón de WhatsApp para esta sede").
