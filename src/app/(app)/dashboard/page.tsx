@@ -138,6 +138,23 @@ async function getClicksByLocation(
   }
 }
 
+// click_instagram se graba desde el PR #104 (2026-07-16, link de confianza a Instagram en las 7
+// landings) pero a propósito nunca se sumó a ACTION_META/contact_actions (no es un paso hacia pedir
+// turno, mezclarlo ahí infla la tasa de conversión de forma engañosa) -- por eso no se veía en
+// ningún lado de /dashboard hasta ahora. Conteo simple y separado, mismo patrón que getClicksByLocation.
+async function getInstagramWebClicks(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  period: DashboardPeriod
+): Promise<{ count: number; available: boolean }> {
+  try {
+    const { data, error } = await supabase.rpc("landing_instagram_clicks", { p_days: period })
+    if (error) throw error
+    return { count: Number(data ?? 0), available: true }
+  } catch {
+    return { count: 0, available: false }
+  }
+}
+
 type HeroVariantRow = {
   variant: "a" | "b"
   visits: number
@@ -405,6 +422,7 @@ async function getDashboardData(period: DashboardPeriod) {
     heroVariantResults,
     referralFunnel,
     clicksByLocation,
+    instagramWebClicks,
     whatsappCostSummary,
     weeklyReports,
     growth,
@@ -414,6 +432,7 @@ async function getDashboardData(period: DashboardPeriod) {
     getHeroVariantResults(supabase, period),
     getReferralFunnel(supabase, period),
     getClicksByLocation(supabase, period),
+    getInstagramWebClicks(supabase, period),
     getWhatsAppCostSummary(supabase),
     getWeeklyReports(supabase),
     getDashboardGrowthData(supabase, period),
@@ -423,7 +442,7 @@ async function getDashboardData(period: DashboardPeriod) {
 
   return {
     metrics, recentLeads: (recentLeads ?? []) as Lead[],
-    landingRanking, heroVariantResults, referralFunnel, clicksByLocation,
+    landingRanking, heroVariantResults, referralFunnel, clicksByLocation, instagramWebClicks,
     whatsappCostSummary, growthRecommendations, weeklyReports, growth, contentPerformance,
   }
 }
@@ -572,7 +591,7 @@ export default async function DashboardPage({
   const period = parseDashboardPeriod((await searchParams).period)
   const {
     metrics, recentLeads, landingRanking,
-    heroVariantResults, referralFunnel, clicksByLocation,
+    heroVariantResults, referralFunnel, clicksByLocation, instagramWebClicks,
     whatsappCostSummary, growthRecommendations, weeklyReports, growth, contentPerformance,
   } = await getDashboardData(period)
 
@@ -951,6 +970,22 @@ export default async function DashboardPage({
                 </table>
               </div>
             )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Clicks al link de confianza de Instagram desde la web (PR #104, sin card hasta ahora) */}
+      {instagramWebClicks.available && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Clicks a Instagram desde la web</CardTitle>
+            <p className="text-xs text-gray-500">
+              Últimos {period}{" "}días. Cuenta clicks en el link de confianza a Instagram de las 7 landings
+              públicas — no cuenta como paso hacia pedir turno, es un dato aparte de la tasa de conversión.
+            </p>
+          </CardHeader>
+          <CardContent>
+            <p className="text-2xl font-bold text-gray-900">{instagramWebClicks.count}</p>
           </CardContent>
         </Card>
       )}
