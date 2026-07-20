@@ -2568,6 +2568,10 @@ function Editor({
       item.status === "published" &&
       !window.confirm("Esta pieza ya está publicada en Instagram. Guardar estos cambios la va a devolver a \"Borrador\" acá en el sistema (no borra ni modifica la publicación real). ¿Continuar?")
     ) return
+    if (
+      item.status === "approved" &&
+      !window.confirm("Esta pieza ya está aprobada. Guardar estos cambios la va a devolver a \"Borrador\" y va a salir de la cola de publicación automática hasta que se vuelva a aprobar. ¿Continuar?")
+    ) return
     onSave(editableContent(item))
   }
 
