@@ -1,5 +1,5 @@
 # Backlog — Lule Growth OS
-**Actualizado:** 2026-07-17 | **Basado en:** PRD Estrategia de Captación v2.1
+**Actualizado:** 2026-07-20 | **Basado en:** PRD Estrategia de Captación v2.1
 
 ---
 
@@ -852,12 +852,13 @@ deliberado: primero integridad de WhatsApp y datos de pacientes; luego medición
   - [x] Warnings de lint: `npm run lint` quedó en 0 problemas (antes había un warning de
     `ContentChannel` sin usar en `contenido/instagram/page.tsx`, import residual de cuando se sacó
     Google Business del frente — ver 2026-07-07 en `CLAUDE.md`).
-  - [x] Vulnerabilidad de PostCSS: re-chequeada con `npm audit` — **sigue sin solución real**. Es una
-    dependencia interna de `next` (`node_modules/next/node_modules/postcss`), no algo declarado en
-    este proyecto. El rango vulnerable de Next según el propio advisory llega hasta
-    `16.3.0-canary.5`, y hoy (`npm view next versions`) todavía no existe ningún `16.3.0` estable
-    (solo canaries/previews) — no se debe adoptar una versión no estable en una app médica en
-    producción. Sigue esperando a que Next libere un patch estable.
+  - [x] Vulnerabilidad de PostCSS: re-chequeada con `npm audit` en esta fecha — dependencia interna
+    de `next` (`node_modules/next/node_modules/postcss`), no algo declarado en este proyecto. El
+    rango vulnerable de Next según el propio advisory llega hasta `16.3.0-canary.5`, y en ese
+    momento todavía no existía ningún `16.3.0` estable — no se debía adoptar una versión no estable
+    en una app médica en producción. **Actualización 2026-07-20**: resuelto sin esperar un patch de
+    Next — ver "[TECH] ✅ Resuelto (2026-07-20): vuln moderada transitiva en `postcss`" más abajo
+    (forzado con `overrides` en `package.json`, `npm audit` en 0 vulnerabilidades).
   - [x] **Headers de seguridad (2026-07-12, segundo incremento) — decisión deliberada de alcance**:
     se agregaron en `next.config.mjs` (`headers()`, aplicado a todas las rutas) `X-Content-Type-
     Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`, `X-Frame-Options:
@@ -1098,7 +1099,7 @@ orgánico de búsqueda y convierten con instrucciones claras para pedir turno.
 - [x] FAQ específica por landing (preguntas frecuentes distintas por servicio/sede)
 - [x] Links internos entre landings (ej. Lanús → Lomas y viceversa, para SEO)
 - [x] Datos estructurados JSON-LD (Physician, FAQPage, BreadcrumbList) *(MedicalClinic por sede pendiente)*
-- [ ] ~~Formulario "No pude pedir turno" en cada landing SEO~~ — revertido, ver nota en Etapa 2
+- [x] ~~Formulario "No pude pedir turno" en cada landing SEO~~ — revertido, ver nota en Etapa 2
 
 ### Acciones externas (las hace el equipo)
 - [x] ~~Configurar Google Search Console con el sitemap~~ ver "✍️ Contenido para cargar/publicar"
@@ -1135,7 +1136,8 @@ intención de turno: quien busca "cardióloga en Lanús" tiene alta probabilidad
       `utm_content = MAPS-GRAL-01` y `landing_page = google-maps` (2026-07-18).
 - [x] ~~Evaluar si crear ficha separada para Swiss Medical Lomas~~ **Decidido (2026-07-17):** no,
   se mantiene una sola ficha ("Dra. Lucía Chahin") para las 3 sedes.
-- [ ] Definir estrategia de reseñas: cómo y cuándo pedirlas a pacientes actuales
+- [ ] Definir estrategia de reseñas: cómo y cuándo pedirlas a pacientes actuales — ver
+  "🤔 Decisiones tuyas" en 📌 Pendientes tuyos, arriba (mismo pendiente, evitar duplicar el estado acá)
 
 ### Pendiente: cuota 0 en la GBP API (bloquea Perfil/Publicaciones/Reseñas dentro de la app)
 Las pestañas **Perfil**, **Publicaciones** y **Reseñas** de Google Local muestran "cuota API = 0" /
@@ -1267,7 +1269,7 @@ público para pedir turno.
       **aprobados en Meta** desde el 2026-07-07 — este flujo ya puede mandar mensajes reales, no
       sigue bloqueado. Los demás templates (`recordatorio_turno`, `seguimiento_post_consulta`, etc.)
       siguen sin automatizar porque necesitan una fecha de turno real que la app no gestiona.
-- [ ] *(Descartado por ahora, 2026-07-17)* Configurar `WHATSAPP_VERIFY_TOKEN` en `.env.local` + webhook de prueba separado (vía ngrok) para testear localmente cambios en la lógica de recepción de mensajes (`src/lib/whatsapp-bot.ts`) sin tocar el webhook de producción. Seba confirmó que no hace falta armarlo por adelantado — se retoma el día que haya un cambio real de esa lógica en curso.
+- [x] ~~Configurar `WHATSAPP_VERIFY_TOKEN` en `.env.local` + webhook de prueba separado (vía ngrok) para testear localmente cambios en la lógica de recepción de mensajes~~ **Descartado por ahora (2026-07-17)** — Seba confirmó que no hace falta armarlo por adelantado; se retoma el día que haya un cambio real de esa lógica en curso.
 - [x] Instagram Graph API: publicación directa desde la app del contenido aprobado (2026-07-06/07) —
       manual ("Publicar ahora" y botones por canal en el editor) y automática (Vercel Cron diario,
       dos cronogramas independientes: posts de feed y historias, cada uno con su propia frecuencia
@@ -1300,9 +1302,14 @@ público para pedir turno.
 
 ## Etapa 8 — Escalamiento
 
-- [ ] Google Search Console: monitorear keywords, indexación y clics
-- [ ] Google Analytics: visitas, sesiones, tasa de rebote y conversión por página
-- [ ] Google Ads: campañas de búsqueda pagada para Lanús y Lomas de Zamora
+- [ ] Google Search Console: monitorear keywords, indexación y clics — la propiedad ya está
+  configurada y verificada (2026-07-17, ver 📌 Pendientes tuyos); esto es el hábito de revisión
+  periódica, no trabajo de build pendiente.
+- [ ] Google Analytics: visitas, sesiones, tasa de rebote y conversión por página — GA4 ya está
+  implementado con consentimiento opt-in (DATA-03, Ola 1); esto es revisar el panel con regularidad
+  una vez que `NEXT_PUBLIC_GA_MEASUREMENT_ID` esté cargado, no trabajo de build pendiente.
+- [ ] Google Ads: campañas de búsqueda pagada para Lanús y Lomas de Zamora — sin empezar, es una
+  decisión de presupuesto/marketing, no depende de código.
 - [x] A/B testing de landings (2026-07-07) — primer test real en producción: la landing principal
       (`/dra-lucia-chahin`) asigna automáticamente, por cookie (`lule_hero_variant`, 90 días), cuál de
       los dos botones del hero es primario — "Pedir turno" (variante A, control) o "Ver sedes y
@@ -1577,15 +1584,6 @@ cuando el visitante entra por el link de "Consultar por WhatsApp").
   (mismo bloqueo que Business Discovery, ver standby arriba 2026-07-11) — cambio estructural que el
   proyecto evita a propósito. La alternativa manual (carga CSV/JSON) es técnicamente viable pero de bajo
   ROI para una consulta unipersonal; no construir salvo pedido explícito.
-
-### [TECH] Falta página de Política de Privacidad + instrucciones de borrado de datos
-Ninguna existe hoy (`grep -i "privacidad|privacy|terms"` sobre `src/app` no encontró nada). Son
-requisito de Meta para cualquier App Review de "Instagram Login" (permisos `instagram_business_basic`,
-`instagram_business_content_publish`). No es urgente mientras la única cuenta de Instagram conectada
-(la de Lucía) siga agregada como tester en el Meta App — el modo desarrollo no expira para
-testers/admins. Si en algún momento se decide sacar la app del modo desarrollo, hace falta: página
-pública `/privacidad` con qué datos de leads se recolectan y cómo se usan, y una URL o texto de
-instrucciones de borrado de datos. Ver memoria `project_meta_business_checklist`.
 
 ### [TECH] ✅ Resuelto (2026-07-20): los previews de Vercel seguían grabando visitas reales en `landing_events`
 El PR #75 (ver CLAUDE.md → 2026-07-14) cortó el caso más común de contaminación de analytics
