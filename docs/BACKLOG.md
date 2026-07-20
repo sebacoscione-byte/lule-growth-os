@@ -1503,8 +1503,11 @@ típico caiga cerca de las 8:30 reales), pero **no hay garantía real** — si s
 de rango, las dos alternativas reales son: (1) mover el disparo a un cron externo gratuito (ej.
 cron-job.org o un GitHub Action programado) que pegue a `/api/cron/publish-content` con el
 `CRON_SECRET` existente, sin depender del scheduler de Vercel; o (2) upgradear a Vercel Pro
-(decisión de billing, no tomarla sin confirmación explícita del usuario). Ver memoria
-`project_vercel_cron_limit`.
+(decisión de billing, no tomarla sin confirmación explícita del usuario). **Consultado de nuevo
+2026-07-20** (misma pregunta, mismas 3 opciones) durante una limpieza de deuda técnica — Seba eligió
+otra vez no invertir en esto ("dejarlo como está por ahora"). Es la segunda vez que elige la opción
+de menor esfuerzo: no volver a levantarlo como pendiente activo salvo que él lo pida o que el
+horario real empiece a causar un problema concreto. Ver memoria `project_vercel_cron_limit`.
 
 ### [ANÁLISIS] Plan de mejoras de Instagram (benchmark ChatGPT, 2026-07-11) — qué suma y qué no
 Seba compartió un documento externo (benchmark de perfiles médicos + propuesta de arquitectura para el
