@@ -123,6 +123,26 @@ export const LANDING_DATA: Record<string, PublicLandingData> = {
       { ...BRITANICO, instruction: "Llamá al 4309-6400 (atención telefónica 24hs) o a la Central de Turnos 0810-222-2748 / 11-3015-9749, o pedí turno desde la app del Hospital Británico, y solicitá turno con la Dra. Lucía Chahin en cardiología." },
     ],
   },
+  "ecocardiograma-caba": {
+    title: "Ecocardiograma en CABA — Dra. Lucía Chahin | Hospital Británico",
+    description: "¿Necesitás un ecocardiograma en CABA? La Dra. Lucía Chahin realiza ecocardiogramas los miércoles en el Hospital Británico (Central), Perdriel 74.",
+    h1: "Ecocardiograma en CABA — Dra. Lucía Chahin",
+    intro: "Si necesitás un ecocardiograma en CABA, la Dra. Lucía Chahin lo realiza los miércoles en el Hospital Británico (Central).",
+    services: ["Ecocardiograma", "Consulta cardiológica"],
+    locations: [
+      { ...BRITANICO, instruction: "Llamá al 4309-6400 (atención telefónica 24hs) o a la Central de Turnos 0810-222-2748 / 11-3015-9749, o pedí turno desde la app del Hospital Británico, y solicitá turno con la Dra. Lucía Chahin y mencioná que es para ecocardiograma." },
+    ],
+  },
+  "consulta-cardiologica-caba": {
+    title: "Consulta Cardiológica en CABA — Dra. Lucía Chahin | Hospital Británico",
+    description: "Consulta cardiológica en CABA con la Dra. Lucía Chahin. Atiende los miércoles en el Hospital Británico (Central), Perdriel 74.",
+    h1: "Consulta Cardiológica en CABA — Dra. Lucía Chahin",
+    intro: "Para una consulta cardiológica en CABA, la Dra. Lucía Chahin atiende los miércoles en el Hospital Británico (Central).",
+    services: ["Consulta cardiológica", "Ecocardiograma", "Control cardiovascular"],
+    locations: [
+      { ...BRITANICO, instruction: "Llamá al 4309-6400 (atención telefónica 24hs) o a la Central de Turnos 0810-222-2748 / 11-3015-9749, o pedí turno desde la app del Hospital Británico, y solicitá turno con la Dra. Lucía Chahin y mencioná que es para consulta de cardiología." },
+    ],
+  },
 }
 
 export const PUBLIC_LANDING_SLUGS = Object.keys(LANDING_DATA)
@@ -182,8 +202,10 @@ export const RELATED_LANDING_SLUGS: Record<string, string[]> = {
   "cardiologa-lanus": ["cardiologa-lomas", "cardiologa-caba"],
   "cardiologa-lomas": ["cardiologa-lanus", "cardiologa-caba"],
   "cardiologa-caba": ["cardiologa-lanus", "cardiologa-lomas"],
-  "ecocardiograma-lanus": ["ecocardiograma-lomas"],
-  "ecocardiograma-lomas": ["ecocardiograma-lanus"],
-  "consulta-cardiologica-lanus": ["consulta-cardiologica-lomas"],
-  "consulta-cardiologica-lomas": ["consulta-cardiologica-lanus"],
+  "ecocardiograma-lanus": ["ecocardiograma-lomas", "ecocardiograma-caba"],
+  "ecocardiograma-lomas": ["ecocardiograma-lanus", "ecocardiograma-caba"],
+  "ecocardiograma-caba": ["ecocardiograma-lanus", "ecocardiograma-lomas"],
+  "consulta-cardiologica-lanus": ["consulta-cardiologica-lomas", "consulta-cardiologica-caba"],
+  "consulta-cardiologica-lomas": ["consulta-cardiologica-lanus", "consulta-cardiologica-caba"],
+  "consulta-cardiologica-caba": ["consulta-cardiologica-lanus", "consulta-cardiologica-lomas"],
 }

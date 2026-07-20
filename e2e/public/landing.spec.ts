@@ -9,8 +9,10 @@ const SEO_LANDING_SLUGS = [
   "cardiologa-caba",
   "ecocardiograma-lanus",
   "ecocardiograma-lomas",
+  "ecocardiograma-caba",
   "consulta-cardiologica-lanus",
   "consulta-cardiologica-lomas",
+  "consulta-cardiologica-caba",
 ]
 
 test.describe("Landing principal (/dra-lucia-chahin)", () => {

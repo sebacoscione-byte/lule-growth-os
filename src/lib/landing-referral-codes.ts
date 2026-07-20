@@ -25,8 +25,10 @@ const REFERRAL_CODES: ReferralCodeInfo[] = [
   { code: "CABA-CARD-01", landingSlug: "cardiologa-caba", locationKey: "britanico", specialty: "cardiologia", description: "Landing 'Cardióloga en CABA'" },
   { code: "LAN-ECO-01", landingSlug: "ecocardiograma-lanus", locationKey: "cimel", specialty: "ecocardiograma", description: "Landing 'Ecocardiograma en Lanús'" },
   { code: "LOM-ECO-01", landingSlug: "ecocardiograma-lomas", locationKey: "swiss", specialty: "ecocardiograma", description: "Landing 'Ecocardiograma en Lomas de Zamora'" },
+  { code: "CABA-ECO-01", landingSlug: "ecocardiograma-caba", locationKey: "britanico", specialty: "ecocardiograma", description: "Landing 'Ecocardiograma en CABA'" },
   { code: "LAN-CONS-01", landingSlug: "consulta-cardiologica-lanus", locationKey: "cimel", specialty: "consulta_cardiologica", description: "Landing 'Consulta Cardiológica en Lanús'" },
   { code: "LOM-CONS-01", landingSlug: "consulta-cardiologica-lomas", locationKey: "swiss", specialty: "consulta_cardiologica", description: "Landing 'Consulta Cardiológica en Lomas de Zamora'" },
+  { code: "CABA-CONS-01", landingSlug: "consulta-cardiologica-caba", locationKey: "britanico", specialty: "consulta_cardiologica", description: "Landing 'Consulta Cardiológica en CABA'" },
   // CTA de respaldo "consultanos por WhatsApp" (solo aparece si una landing no tiene obras
   // sociales cargadas) — un único código compartido entre todas las landings a propósito: es un
   // link de bajísimo uso, no justifica un código por slug.
