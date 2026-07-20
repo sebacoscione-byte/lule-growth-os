@@ -15,6 +15,9 @@
     "migrate": "npm install --no-save pg && node scripts/migrate.mjs",
     "push-e2e-ci-secrets": "node scripts/push-e2e-ci-secrets.mjs"
   },
+  "overrides": {
+    "postcss": "^8.5.15"
+  },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.104.1",
     "@radix-ui/react-avatar": "^1.1.12",
@@ -33,7 +36,7 @@
     "clsx": "^2.1.1",
     "date-fns": "^4.4.0",
     "lucide-react": "^1.17.0",
-    "next": "16.2.9",
+    "next": "16.2.10",
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "tailwind-merge": "^3.6.0",
