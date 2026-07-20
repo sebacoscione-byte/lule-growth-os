@@ -1619,15 +1619,24 @@ motivo de arriba) y una card chica "Clicks a Instagram desde la web" en `/dashbo
 por sede", que solo muestra el total del período — sin mezclarlo con la tasa de conversión ni el
 embudo de atribución existente. Migración aplicada en producción vía `npm run migrate`.
 
-### [BUG] Fallback Gemini→Anthropic no se activó en la práctica (2026-07-19)
+### [BUG] ✅ Investigado y cerrado (2026-07-20): fallback Gemini→Anthropic no se activó en la práctica
 `generateText` (`src/lib/ai.ts`) tiene la lógica para reintentar con Anthropic cuando Gemini falla
-(agregada el mismo día para el bug de JSON truncado). Verificado por logs (`ai_requests`, lectura
-sola) que cuando Gemini falló hoy con `purpose=content_plan`, **no hubo ningún intento posterior a
-Anthropic** — cero filas con `provider=anthropic` en todo el día, pese a `AI_PROVIDER=""` (modo auto)
-y ambas API keys cargadas en `.env.local`. No se pudo confirmar la causa raíz con certeza en esta
-sesión; la hipótesis más probable es que el proceso local de `npm run dev` ya estaba corriendo desde
-antes de que `AI_PROVIDER` se editara a `""`, y una env var de servidor (no `NEXT_PUBLIC_`) no se
-recargó en caliente — pero no se verificó reiniciando el servidor para confirmarlo. Si vuelve a pasar
-después de reiniciar `npm run dev`, hay que revisar `getRequestedProvider()`/`getProviderOrder()` en
-`src/lib/ai.ts` con logging temporal para ver qué valor real toma `AI_PROVIDER` en el momento del
-fallo. Ver memoria `reference_gemini_config_gotchas` caso 6.
+(agregada el 2026-07-19 para el bug de JSON truncado). Se había verificado por logs (`ai_requests`,
+lectura sola) que cuando Gemini falló ese día con `purpose=content_plan`, no hubo ningún intento
+posterior a Anthropic — cero filas con `provider=anthropic` en todo el día, pese a `AI_PROVIDER=""`
+(modo auto) y ambas API keys cargadas en `.env.local`.
+
+**Causa raíz confirmada (no es un bug de código)**: se replicó exactamente la lógica de
+`getRequestedProvider()`/`getProviderOrder()`/el `break` condicional de `generateText` (líneas
+468-508 de `src/lib/ai.ts`) contra el `.env.local` real vigente hoy, sin depender de un proceso de
+Next ya corriendo — con `AI_PROVIDER=""`, la lógica calcula `requested = "auto"`,
+`providerOrder = ["gemini", "anthropic"]` y el `break` condicional (`getRequestedProvider() !==
+"auto"`) evalúa `false`, o sea que el loop **sí** sigue al siguiente proveedor tras una falla. El
+código es correcto tal como está escrito. La hipótesis original era la correcta: `npm run dev` no
+recarga `.env.local` en caliente para env vars de servidor, así que el proceso que generó el bug
+real casi seguro tenía un valor viejo de `AI_PROVIDER` (ej. `"gemini"` explícito) en memoria desde
+antes de editar el archivo a `""` — con un valor explícito, `getProviderOrder()` devuelve un array
+de un solo elemento (`["gemini"]`), así que nunca había un segundo proveedor al que caerle,
+independientemente del `break`. Se agregó un comentario en el código (`getRequestedProvider()`)
+documentando este gotcha para que una sesión futura no vuelva a sospechar un bug de lógica antes de
+reiniciar el dev server. Ver memoria `reference_gemini_config_gotchas` caso 6.

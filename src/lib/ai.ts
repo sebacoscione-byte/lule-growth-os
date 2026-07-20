@@ -46,6 +46,12 @@ export function getAiMode(): AiMode {
   return process.env.NEXT_PUBLIC_AI_MODE === "gemini_api" ? "gemini_api" : "manual"
 }
 
+// Lee process.env en cada llamada (no memoiza) a proposito: un `npm run dev` ya corriendo NO
+// recarga `.env.local` en caliente para env vars de servidor, asi que editar AI_PROVIDER sin
+// reiniciar el proceso deja este valor viejo en memoria -- confirmado como causa raiz de un caso real
+// donde el fallback a Anthropic no se disparo (ver docs/BACKLOG.md, caso cerrado 2026-07-20). Si el
+// fallback no dispara pese a AI_PROVIDER="" en .env.local, reiniciar el dev server antes de sospechar
+// un bug de logica en generateText().
 function getRequestedProvider(): AiProvider | "auto" {
   const provider = process.env.AI_PROVIDER?.toLowerCase()
   return provider === "anthropic" || provider === "gemini" ? provider : "auto"
