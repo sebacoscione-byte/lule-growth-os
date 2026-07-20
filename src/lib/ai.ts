@@ -192,7 +192,12 @@ const IMAGE_PROMPT_RULES = `DIRECCION VISUAL PARA GEMINI:
 - Pedi iluminacion natural o cinematografica suave, profundidad, textura y una paleta sobria con acentos bordo, azul profundo o verde azulado.
 - Prioriza escenas humanas cotidianas, objetos o metaforas visuales inteligentes. Evita la placa de texto generica.
 - Si aparecen personas: adultas, aspecto argentino o latino diverso, expresion serena, nunca con dolor ni en una urgencia.
-- No representar a una medica real ni inventar el rostro de la Dra. Lucia Chahin.
+- No representar a una medica real ni inventar el rostro de la Dra. Lucia Chahin. Si la escena incluye
+  una figura de medica/o (aunque sea parcial: una mano, un brazo, un guardapolvo, sin mostrar el
+  rostro), esa figura TIENE que leerse inequivocamente como FEMENINA -- la Dra. Lucia Chahin es mujer y
+  es la unica profesional de esta cuenta. Nunca describas ni dejes ambigua una mano, brazo, guardapolvo
+  o silueta de aspecto masculino en ese rol: especifica en el prompt que es una mano/muñeca femenina
+  (sin inventar el rostro real).
 - PROHIBIDO dentro de la imagen: texto adicional al titular y subtitulo solicitados, logos, marcas de agua, interfaces, diagnosticos, estudios legibles, anatomia gore, personas angustiadas, corazon rojo de stock, estetoscopio flotante o ECG decorativo.
 - No pedir collages, infografias, posters, flyers, marcos, placas, fondos con gradiente ni composiciones divididas.
 - El prompt debe terminar reforzando, en ingles y de forma 100% GENERICA (nunca citando el titular o
