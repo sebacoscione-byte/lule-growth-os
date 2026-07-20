@@ -1563,19 +1563,23 @@ testers/admins. Si en algún momento se decide sacar la app del modo desarrollo,
 pública `/privacidad` con qué datos de leads se recolectan y cómo se usan, y una URL o texto de
 instrucciones de borrado de datos. Ver memoria `project_meta_business_checklist`.
 
-### [TECH] Los previews de Vercel siguen grabando visitas reales en `landing_events` (2026-07-14)
+### [TECH] ✅ Resuelto (2026-07-20): los previews de Vercel seguían grabando visitas reales en `landing_events`
 El PR #75 (ver CLAUDE.md → 2026-07-14) cortó el caso más común de contaminación de analytics
 (`npm run dev` local, incluidos `npm run test:e2e:public` y sesiones de agentes verificando
 visualmente) chequeando que `window.location.hostname` no sea `localhost`/`127.0.0.1`. Un preview
-deploy de Vercel (dominio `*.vercel.app`, no localhost) **no queda cubierto por ese guard** — si
-alguien navega un preview a mano para revisar un PR antes de mergear, esas visitas también se graban
-como reales en la misma base de producción (no hay proyecto de staging separado, ver memoria
-`project_dashboard_data_integrity_2026-07-14`). No se resolvió en el mismo PR porque requiere decidir
-entre: (a) chequear `process.env.VERCEL_ENV !== "production"` server-side antes de insertar el
-evento (más robusto, cubre cualquier dominio no-producción, pero agrega una env var más a la
-superficie del endpoint público), o (b) mantener un allowlist de dominio (`draluciachahin.ar`) en el
-cliente. Bajo impacto real hoy (los previews se navegan poco, casi todo el volumen sospechoso venía
-de local), no urgente.
+deploy de Vercel (dominio `*.vercel.app`, no localhost) no quedaba cubierto por ese guard — si
+alguien navegaba un preview a mano para revisar un PR antes de mergear, esas visitas también se
+grababan como reales en la misma base de producción (no hay proyecto de staging separado, ver
+memoria `project_dashboard_data_integrity_2026-07-14`). Resuelto con la opción (a) que se había
+dejado planteada: `POST /api/public/click` ahora corta temprano (devuelve `{ok: true}` sin insertar
+ni consultar el rate limit) si `process.env.VERCEL_ENV` está definido y no es `"production"` —
+`VERCEL_ENV` la inyecta Vercel automáticamente en cualquier deployment (`production`/`preview`/
+`development`), no hace falta cargarla a mano ni es un secreto. Queda `undefined` fuera de Vercel
+(`npm run dev`/`build`/`start` locales, runners de CI), así que no cambia nada del comportamiento
+existente ahí — solo bloquea específicamente los previews reales de Vercel, que es el caso que
+faltaba cubrir. Tests nuevos en `src/app/api/public/click/route.test.ts` (inserta en producción real
+y cuando `VERCEL_ENV` no está definida; no inserta ni consulta rate limit en `preview`/
+`development`).
 
 ### [TECH] `click_instagram` no tiene ninguna card en el dashboard todavía (2026-07-16)
 El PR #104 agregó un link de confianza a Instagram cerca del inicio de las 7 landings públicas

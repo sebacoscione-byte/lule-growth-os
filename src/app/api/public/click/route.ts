@@ -24,6 +24,16 @@ const clickEventSchema = z.object({
 })
 
 export async function POST(request: Request) {
+  // Local/preview no deben ensuciar landing_events de producción (no hay proyecto de staging
+  // separado, ver docs/BACKLOG.md). El cliente (trackLandingEvent) ya filtra localhost, pero un
+  // preview deploy de Vercel (dominio *.vercel.app, navegado a mano para revisar un PR) no pasa por
+  // ese filtro de hostname -- VERCEL_ENV lo cubre server-side sin agregar un dominio hardcodeado.
+  // Solo actúa si Vercel la define (queda undefined fuera de Vercel, ej. corridas locales), para no
+  // tocar el comportamiento de npm run build/start ni de los tests E2E.
+  if (process.env.VERCEL_ENV && process.env.VERCEL_ENV !== "production") {
+    return NextResponse.json({ ok: true })
+  }
+
   const ip = getClientIp(request)
   const { allowed } = await checkRateLimit(`click:${ip}`, 30, 60_000)
   if (!allowed) {
