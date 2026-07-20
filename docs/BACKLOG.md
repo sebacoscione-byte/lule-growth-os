@@ -1581,20 +1581,19 @@ faltaba cubrir. Tests nuevos en `src/app/api/public/click/route.test.ts` (insert
 y cuando `VERCEL_ENV` no está definida; no inserta ni consulta rate limit en `preview`/
 `development`).
 
-### [TECH] `click_instagram` no tiene ninguna card en el dashboard todavía (2026-07-16)
+### [TECH] ✅ Resuelto (2026-07-20): `click_instagram` no tenía ninguna card en el dashboard
 El PR #104 agregó un link de confianza a Instagram cerca del inicio de las 7 landings públicas
 (`src/app/landings/[slug]/instagram-trust-link.tsx`) y trackea el click como `click_instagram` en
 `landing_events` (migración `20260716_landing_events_instagram_click.sql`, ya aplicada en
 producción) — pero a propósito **no** se sumó al `IN`-list de "acciones de contacto/engaged" que usan
 las funciones SQL de `dashboard_growth_metrics` (no es un paso hacia pedir turno, mezclarlo ahí
-infla la tasa de conversión de forma engañosa). Resultado: el dato ya se está guardando desde que se
-aplicó la migración, pero hoy no se ve en ningún lado de `/dashboard` — no hay ninguna card ni número
-que lo muestre. Si en algún momento se quiere ver "cuánta gente clickeó Instagram desde la web",
-hace falta un query/RPC nuevo y chico (conteo simple de `landing_events` filtrado por
-`event_type = 'click_instagram'` y fecha, mismo patrón que `getClicksByLocation` en
-`src/app/(app)/dashboard/page.tsx`) — deliberadamente separado de `ACTION_META`/`contact_actions`
-por el motivo de arriba. No se hizo en el mismo PR porque no fue parte de lo pedido (Seba solo pidió
-el link en la web); se dejó como mejora futura opcional.
+infla la tasa de conversión de forma engañosa). El dato ya se guardaba desde que se aplicó esa
+migración, pero no se veía en ningún lado de `/dashboard`. Resuelto con el mismo patrón sugerido:
+nueva función `landing_instagram_clicks(p_days)` (migración `20260720_landing_instagram_clicks.sql`,
+conteo simple agregado en SQL, deliberadamente separada de `ACTION_META`/`contact_actions` por el
+motivo de arriba) y una card chica "Clicks a Instagram desde la web" en `/dashboard`, junto a "Clicks
+por sede", que solo muestra el total del período — sin mezclarlo con la tasa de conversión ni el
+embudo de atribución existente. Migración aplicada en producción vía `npm run migrate`.
 
 ### [BUG] Fallback Gemini→Anthropic no se activó en la práctica (2026-07-19)
 `generateText` (`src/lib/ai.ts`) tiene la lógica para reintentar con Anthropic cuando Gemini falla
