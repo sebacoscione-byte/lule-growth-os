@@ -1371,6 +1371,19 @@ standby):**
    específico de WhatsApp — ver [[project_whatsapp_setup]]) ni App Review completo, mientras la cuenta de
    Facebook de Lucía quede como tester/admin de la app.
 
+### [BACKLOG] Auditar `IMAGE_PROMPT_RULES` para otros estudios nombrados, no solo ecocardiograma (2026-07-19)
+El 2026-07-19 se corrigieron tres ambigüedades seguidas en `IMAGE_PROMPT_RULES` (`src/lib/ai.ts`),
+encontradas una por regeneración real en la UI: (1) escenas de procedimiento sin ambientación de
+consultorio, (2) figura médica que podía leerse como hombre en vez de la Dra. Chahin (mujer), (3) el
+transductor de un ecocardiograma apoyado sobre el abdomen (pose de ecografía obstétrica) en vez del
+pecho/tórax. La regla de posicionamiento anatómico (3) solo se especificó en detalle para
+"ecocardiograma" — el texto generaliza "la misma lógica aplica a cualquier otro estudio nombrado",
+pero eso depende de que el modelo infiera bien por analogía. Si en el futuro se usan categorías/temas
+sobre otros estudios con una forma de realizarse igual de específica (ej. Holter, ergometría, monitoreo
+ambulatorio de presión), vale la pena regenerar una placa de prueba para cada uno y confirmar que no
+aparece la misma clase de ambigüedad antes de que un paciente vea una placa incorrecta. Ver
+[[feedback_ui_completeness_lule]] en memoria para el patrón completo de los tres bugs.
+
 ### [DECISIÓN] Google Business: descartado del front de Estudio de contenido (2026-07-07)
 La API de Google (`accounts.list`) nunca devolvió `account_id` para la sede conectada, así que
 publicar posts ahí siempre iba a requerir el paso manual de copiar/pegar (la cuenta probablemente es
@@ -1408,11 +1421,20 @@ sign up" estaba **prendido** (cualquiera podía registrarse y quedar con acceso 
 guardó. Solo quedan los 3 usuarios ya existentes (dra. Lucía, lchahin2015, Seba); para sumar gente
 nueva al equipo hay que crearla a mano desde Authentication → Users → Add user.
 
-### [TECH] `npm audit`: vuln moderada transitiva en `postcss` (vía `next`)
+### [TECH] ✅ Resuelto (2026-07-20): vuln moderada transitiva en `postcss` (vía `next`)
 XSS en el stringify de CSS de `postcss` (`GHSA-qx2v-qp2m-jg93`), dependencia interna de `next`. El fix
-automático (`npm audit fix --force`) bajaría Next a una versión canary vieja — no conviene. Bajo riesgo
-real (no hay contenido de usuario que fluya a valores CSS en esta app). Esperar a que Next libere un
-patch que actualice su propia dependencia de `postcss`.
+automático (`npm audit fix --force`) seguía bajando Next a una versión canary vieja — no conviene, y
+la última versión estable de Next (16.2.10, verificado contra el registry) todavía bundlea
+`postcss@8.4.31` (vulnerable, la reparación real está en `>=8.5.10`) — no era cuestión de esperar un
+patch más, ese patch no estaba en el roadmap visible de Next. En vez de eso se agregó
+`"overrides": { "postcss": "^8.5.15" }` en `package.json`: fuerza la resolución de **cualquier**
+`postcss` anidado (incluido `node_modules/next/node_modules/postcss`) a una versión ya parcheada, sin
+tocar la versión de Next ni arriesgar una regresión de canary. postcss 8.x mantiene compatibilidad de
+API entre parches menores, así que este forzado no debería romper el pipeline de CSS de Next/
+Tailwind — confirmado con `npm run build` real (todas las rutas, estáticas y dinámicas, compilaron
+igual que antes) más `npm audit` en 0 vulnerabilidades (antes: 2 moderadas). De paso se actualizó
+`next` de `16.2.9` a `16.2.10` (último patch estable, sin relación con esta vuln puntual). `npm test`
+(884/884) y lint sin errores.
 
 ### [TECH] ✅ Resuelto (2026-07-08): ciclo de vida de piezas en Estudio de contenido (archivar/restaurar, edición de publicadas, UX de placa/alt text)
 Auditoría de "borradores" encontró y corrigió 3 problemas reales (PR #12, #13, #14):
@@ -1567,3 +1589,16 @@ hace falta un query/RPC nuevo y chico (conteo simple de `landing_events` filtrad
 `src/app/(app)/dashboard/page.tsx`) — deliberadamente separado de `ACTION_META`/`contact_actions`
 por el motivo de arriba. No se hizo en el mismo PR porque no fue parte de lo pedido (Seba solo pidió
 el link en la web); se dejó como mejora futura opcional.
+
+### [BUG] Fallback Gemini→Anthropic no se activó en la práctica (2026-07-19)
+`generateText` (`src/lib/ai.ts`) tiene la lógica para reintentar con Anthropic cuando Gemini falla
+(agregada el mismo día para el bug de JSON truncado). Verificado por logs (`ai_requests`, lectura
+sola) que cuando Gemini falló hoy con `purpose=content_plan`, **no hubo ningún intento posterior a
+Anthropic** — cero filas con `provider=anthropic` en todo el día, pese a `AI_PROVIDER=""` (modo auto)
+y ambas API keys cargadas en `.env.local`. No se pudo confirmar la causa raíz con certeza en esta
+sesión; la hipótesis más probable es que el proceso local de `npm run dev` ya estaba corriendo desde
+antes de que `AI_PROVIDER` se editara a `""`, y una env var de servidor (no `NEXT_PUBLIC_`) no se
+recargó en caliente — pero no se verificó reiniciando el servidor para confirmarlo. Si vuelve a pasar
+después de reiniciar `npm run dev`, hay que revisar `getRequestedProvider()`/`getProviderOrder()` en
+`src/lib/ai.ts` con logging temporal para ver qué valor real toma `AI_PROVIDER` en el momento del
+fallo. Ver memoria `reference_gemini_config_gotchas` caso 6.
