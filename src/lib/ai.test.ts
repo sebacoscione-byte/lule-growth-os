@@ -25,6 +25,16 @@ jest.mock("@supabase/supabase-js", () => ({
   }),
 }))
 
+// Usado solo por el describe de fallback Gemini->Anthropic mas abajo -- el resto de los tests de
+// este archivo fuerza AI_PROVIDER a un unico proveedor y nunca llega a instanciar el SDK real.
+const anthropicCreateMock = jest.fn()
+jest.mock("@anthropic-ai/sdk", () => ({
+  __esModule: true,
+  default: jest.fn().mockImplementation(() => ({
+    messages: { create: (...args: unknown[]) => anthropicCreateMock(...args) },
+  })),
+}))
+
 describe("stripMarkdownArtifacts", () => {
   it("saca titulos de Markdown (# con espacio) sin tocar hashtags reales", () => {
     expect(stripMarkdownArtifacts("### ¿Cuándo consultar a una cardióloga?")).toBe("¿Cuándo consultar a una cardióloga?")
@@ -205,5 +215,28 @@ describe("generateText valida JSON antes de dar por exitosa la respuesta (bug re
     const result = await generateContentPlan(planInput)
     expect(result.hook).toBe("hook")
     expect(result.image_alt_text).toBe("alt")
+  })
+
+  // Caso cerrado 2026-07-20 (ver docs/BACKLOG.md): se habia reportado que el fallback a Anthropic no
+  // se disparaba en un caso real -- confirmado que la causa era un AI_PROVIDER viejo en memoria de un
+  // npm run dev ya corriendo (no recarga .env.local en caliente), no un bug de logica. Este test fija
+  // el comportamiento correcto en modo "auto" (AI_PROVIDER=""): si Gemini falla, el loop sigue a
+  // Anthropic en la misma llamada.
+  it("en modo auto (AI_PROVIDER vacio), una falla de Gemini SI dispara el fallback a Anthropic", async () => {
+    process.env.AI_PROVIDER = ""
+    const previousAnthropicKey = process.env.ANTHROPIC_API_KEY
+    process.env.ANTHROPIC_API_KEY = "test-key" // el SDK va mockeado, el valor real no importa
+    anthropicCreateMock.mockResolvedValue({ content: [{ type: "text", text: JSON.stringify(validPlan) }] })
+    fetchSpy = jest.spyOn(global, "fetch").mockResolvedValue(geminiHttpResponse(truncatedJson))
+
+    try {
+      const result = await generateContentPlan(planInput)
+      expect(result.hook).toBe("hook")
+      expect(anthropicCreateMock).toHaveBeenCalledTimes(1)
+    } finally {
+      if (previousAnthropicKey === undefined) delete process.env.ANTHROPIC_API_KEY
+      else process.env.ANTHROPIC_API_KEY = previousAnthropicKey
+      anthropicCreateMock.mockReset()
+    }
   })
 })
