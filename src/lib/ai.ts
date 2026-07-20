@@ -177,9 +177,21 @@ const IMAGE_PROMPT_RULES = `DIRECCION VISUAL PARA GEMINI:
     apoyado sobre el pecho/torax, cerca del corazon (NUNCA sobre el abdomen -- esa es la pose clasica de
     una ecografia obstetrica/abdominal, la confusion mas comun de la palabra generica "ecografia"), y si
     el monitor del equipo es visible tiene que mostrar una vista cardiaca (camaras del corazon), nunca
-    una imagen fetal o abdominal. La misma logica aplica a cualquier otro estudio nombrado en la
-    categoria o el tema: el posicionamiento del transductor/equipo y lo que se ve en pantalla tienen que
-    corresponder exactamente a ESE estudio puntual, no a un estudio similar o mas generico.
+    una imagen fetal o abdominal. Un HOLTER TIENE que mostrarse puesto sobre el cuerpo del paciente:
+    electrodos adhesivos chicos pegados sobre su pecho, conectados por cables finos a un grabador
+    compacto que cuelga de una correa al hombro o se sujeta al cinturon (NUNCA el dispositivo solo,
+    apoyado en un escritorio o sostenido en la mano sin estar conectado a un paciente -- esa toma de
+    "producto en exhibicion" no comunica que es un monitoreo ambulatorio continuo de 24-48hs sobre el
+    cuerpo, que es el punto central de que es un Holter). Un MAPA (monitoreo ambulatorio de presion
+    arterial) TIENE que mostrarse con el manguito de presion puesto sobre el brazo del paciente (por
+    encima o por debajo de la manga), conectado a un grabador portatil chico en el cinturon o en
+    bandolera (NUNCA el manguito solo, exhibido o sostenido aparte sin un brazo puesto adentro -- mismo
+    motivo que el Holter: sin el brazo no se entiende que es un monitoreo continuo puesto sobre el
+    cuerpo). La misma logica aplica a cualquier otro estudio nombrado en la
+    categoria o el tema: el posicionamiento del transductor/equipo sobre el cuerpo del paciente (cuando
+    corresponda) y lo que se ve en pantalla tienen que corresponder exactamente a ESE estudio puntual,
+    no a un estudio similar o mas generico, y no alcanza con un "product shot" del equipo solo si el
+    estudio real requiere que este puesto sobre una persona para tener sentido.
   - Si el tema es sobre habitos, prevencion o factores de riesgo sin un procedimiento en consultorio
     (alimentacion, actividad fisica, presion tomada en casa, adherencia a un tratamiento), preferi un
     momento humano cotidiano vinculado directamente al tema (ej: preparar una comida saludable para un

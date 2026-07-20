@@ -1371,18 +1371,42 @@ standby):**
    específico de WhatsApp — ver [[project_whatsapp_setup]]) ni App Review completo, mientras la cuenta de
    Facebook de Lucía quede como tester/admin de la app.
 
-### [BACKLOG] Auditar `IMAGE_PROMPT_RULES` para otros estudios nombrados, no solo ecocardiograma (2026-07-19)
+### [BACKLOG] ✅ Auditado y reforzado (2026-07-20): `IMAGE_PROMPT_RULES` para otros estudios nombrados
 El 2026-07-19 se corrigieron tres ambigüedades seguidas en `IMAGE_PROMPT_RULES` (`src/lib/ai.ts`),
 encontradas una por regeneración real en la UI: (1) escenas de procedimiento sin ambientación de
 consultorio, (2) figura médica que podía leerse como hombre en vez de la Dra. Chahin (mujer), (3) el
 transductor de un ecocardiograma apoyado sobre el abdomen (pose de ecografía obstétrica) en vez del
 pecho/tórax. La regla de posicionamiento anatómico (3) solo se especificó en detalle para
-"ecocardiograma" — el texto generaliza "la misma lógica aplica a cualquier otro estudio nombrado",
-pero eso depende de que el modelo infiera bien por analogía. Si en el futuro se usan categorías/temas
-sobre otros estudios con una forma de realizarse igual de específica (ej. Holter, ergometría, monitoreo
-ambulatorio de presión), vale la pena regenerar una placa de prueba para cada uno y confirmar que no
-aparece la misma clase de ambigüedad antes de que un paciente vea una placa incorrecta. Ver
-[[feedback_ui_completeness_lule]] en memoria para el patrón completo de los tres bugs.
+"ecocardiograma" — el texto generalizaba "la misma lógica aplica a cualquier otro estudio nombrado",
+pero eso dependía de que el modelo infiera bien por analogía.
+
+**Auditoría en vivo (script temporal contra la API real de Gemini, descartado después, sin tocar
+Supabase)** probando 3 llamadas reales por estudio para "Estudios cardiologicos" con la regla vieja:
+- **Ergometría/prueba de esfuerzo**: sin ambigüedad — el modelo ya devuelve consistentemente una
+  cinta y un monitor de ECG en uso (prior cultural fuerte, como con "guardia" antes del fix de
+  consultorio). No necesitaba regla nueva.
+- **Electrocardiograma**: sin error anatómico — el modelo elige mostrar la tira impresa del ECG
+  siendo analizada en vez del procedimiento en sí (variación de estilo válida, no una confusión de
+  cuerpo/pantalla como la del eco). Tampoco necesitaba regla nueva.
+- **Holter**: ambigüedad real encontrada — el modelo mostraba el dispositivo solo, apoyado en un
+  escritorio o sostenido en la mano ("product shot"), sin transmitir que es un monitor que el
+  paciente lleva puesto 24-48hs. 1/1 corridas con la regla vieja.
+- **MAPA (monitoreo ambulatorio de presión)**: intermitente — a veces mostraba el manguito puesto en
+  el brazo del paciente (correcto), otras veces solo el dispositivo exhibido aparte, mismo patrón de
+  la intermitencia original del eco antes de su fix.
+
+**Fix**: se agregaron instrucciones anatómicas explícitas para HOLTER (electrodos adhesivos en el
+pecho, cables a un grabador en correa/cinturón — nunca el dispositivo solo) y MAPA (manguito puesto
+sobre el brazo, conectado a un grabador portátil — nunca el manguito solo), mismo patrón "TIENE
+que... NUNCA..." que ya usaba la regla de ecocardiograma. **Verificado en vivo de nuevo** con la
+regla reforzada: Holter pasó de 1/1 mal a 5/6 corridas correctas (electrodos en el pecho del
+paciente, grabador en cinturón/correa) en dos tandas de prueba; MAPA se mantuvo alto, 5/6 correcto
+(manguito puesto en el brazo). No se llegó a 6/6 determinístico — coherente con la naturaleza
+estocástica del modelo, mismo nivel de rigor que la verificación original del fix de eco. Se
+mantiene la generalización para cualquier otro estudio no cubierto explícitamente, ahora con una
+frase adicional aclarando que un "product shot" del equipo solo no alcanza si el estudio real
+requiere mostrarlo puesto sobre una persona. `npm test`/lint/build verificados sin regresión. Ver
+[[feedback_ui_completeness_lule]] en memoria para el patrón completo de los bugs de este bloque.
 
 ### [DECISIÓN] Google Business: descartado del front de Estudio de contenido (2026-07-07)
 La API de Google (`accounts.list`) nunca devolvió `account_id` para la sede conectada, así que
