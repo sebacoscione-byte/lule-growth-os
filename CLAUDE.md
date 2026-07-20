@@ -1,6 +1,23 @@
 # Lule Growth OS — Contexto para Claude
 
 ## Estado actual
+- 2026-07-19 (bug real: al regenerar la dirección visual de "Un estudio simple para tu tranquilidad"
+  con las reglas de consultorio del fix anterior, la placa mostró la mano/brazo de un médico HOMBRE
+  apoyada en el hombro de la paciente): Seba lo marcó de inmediato — la Dra. Lucía Chahin es mujer,
+  cualquier figura médica en las placas tiene que leerse como femenina. Causa: `IMAGE_PROMPT_RULES`
+  solo decía "no representar a una médica real ni inventar el rostro de la Dra. Lucía Chahin" —
+  suficiente para no inventarle la cara, pero sin ninguna instrucción sobre el género cuando la escena
+  incluye una figura médica parcial (mano, brazo, guardapolvo, sin rostro) — el fix anterior (placas
+  ambientadas en consultorio) hizo más probable que esas figuras parciales aparecieran, y sin una regla
+  explícita el resultado quedaba librado al azar. **Verificado en vivo**: pidiendo la misma escena varias
+  veces sin esta regla, unas veces el modelo ya decía "female cardiologist" y otras dejaba la descripción
+  ambigua (la que generó el bug real, con un guardapolvo sobre un sweater azul marino sin ninguna señal
+  de género) — intermitente, no determinístico. Fix: se suma una instrucción explícita en
+  `IMAGE_PROMPT_RULES` — si aparece una figura médica aunque sea parcial, tiene que leerse
+  inequívocamente como femenina (mano/muñeca femenina, nunca ambigua ni masculina), sin inventar el
+  rostro real. Verificado en vivo repitiendo el mismo pedido con la regla nueva: siempre especifica
+  "female cardiologist" / "clearly feminine" en el prompt resultante. `npm test` (884/884), lint y
+  build OK. Archivo: `src/lib/ai.ts`.
 - 2026-07-19 (ajuste de calidad, no bug: las placas de temas de consultorio no parecían de consultorio):
   Seba notó, mirando la Biblioteca, que la placa de "Un estudio simple para tu tranquilidad" (tema:
   ecocardiograma) mostraba el transductor del eco apoyado sobre una mesa ratona en lo que parece un
