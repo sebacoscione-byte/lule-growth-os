@@ -172,6 +172,14 @@ const IMAGE_PROMPT_RULES = `DIRECCION VISUAL PARA GEMINI:
     clinico profesional pero calido) -- nunca en un living, dormitorio u otro espacio domestico generico.
     Un instrumento medico (ej. el transductor de un ecografo) apoyado sobre una mesa ratona sin ningun
     contexto clinico alrededor no comunica de que se trata el estudio y le resta credibilidad a la pieza.
+    Si el estudio tiene una forma anatomica reconocible de realizarse, especificala en el prompt sin
+    dejarla a la interpretacion generica del modelo: un ECOCARDIOGRAMA se hace con el transductor
+    apoyado sobre el pecho/torax, cerca del corazon (NUNCA sobre el abdomen -- esa es la pose clasica de
+    una ecografia obstetrica/abdominal, la confusion mas comun de la palabra generica "ecografia"), y si
+    el monitor del equipo es visible tiene que mostrar una vista cardiaca (camaras del corazon), nunca
+    una imagen fetal o abdominal. La misma logica aplica a cualquier otro estudio nombrado en la
+    categoria o el tema: el posicionamiento del transductor/equipo y lo que se ve en pantalla tienen que
+    corresponder exactamente a ESE estudio puntual, no a un estudio similar o mas generico.
   - Si el tema es sobre habitos, prevencion o factores de riesgo sin un procedimiento en consultorio
     (alimentacion, actividad fisica, presion tomada en casa, adherencia a un tratamiento), preferi un
     momento humano cotidiano vinculado directamente al tema (ej: preparar una comida saludable para un
