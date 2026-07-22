@@ -1,6 +1,30 @@
 # Lule Growth OS — Contexto para Claude
 
 ## Estado actual
+- 2026-07-22 (mejora, no bug: estrategia de hashtags para llegar a gente fuera de los seguidores):
+  Seba pidió revisar si había que cambiar los hashtags de Instagram para captar personas por fuera
+  del seguimiento de la cuenta. Se revisaron en vivo (consulta de solo lectura a `app_config` /
+  `content_pipeline`, sin PII, contenido de marketing) los hashtags reales de las 12 piezas
+  aprobadas/publicadas: todas caían en un único nivel (nicho cardiológico + marca, ej.
+  `#Cardiologia #SaludCardiovascular #ChequeoPreventivo #DraLuciaChahin` repetidos en casi todas),
+  solo 2/12 incluían geolocalización y ninguna usaba un hashtag amplio/alto volumen. La guía vigente
+  de Instagram para 2026 (Later, Sprout Social) confirma que mezclar niveles de volumen (alto +
+  medio + nicho) aumenta 35-60% el alcance entre no seguidores vía "hashtags superpuestos" con
+  contenido de nichos similares — repetir siempre el mismo combo de nicho deja la cuenta encerrada
+  en la misma audiencia chica. Fix: nueva regla compartida `HASHTAG_RULES` en `src/lib/ai.ts` —
+  pide explícitamente una mezcla de 3 niveles (1 amplio tipo `#Salud`/`#CorazonSano`, 1-2 de nicho
+  específicos del tema, 1-2 de geolocalización según la sede más relevante: Lanús/CIMEL, Hospital
+  Británico/CABA, Lomas de Zamora/Swiss Medical) y baja `#DraLuciaChahin` de fijo-en-cada-post a
+  opcional (un hashtag de marca ayuda a que te encuentren los que ya te conocen, no a sumar gente
+  nueva). Un único const, cableado en los tres generadores que producen hashtags
+  (`buildContentPlanPrompt`, `generateContentPlan`, `generateInstagramContent`), mismo patrón que
+  otras reglas compartidas de este archivo. **Verificado en vivo** con llamadas reales a Gemini
+  (script temporal descartado después, sin tocar Supabase) comparando la regla vieja contra la
+  nueva para las mismas categorías: con la regla vieja, siempre el mismo combo de nicho/marca
+  (`#Colesterol #SaludCardiovascular #Cardiologia #ChequeoMedico #PrevenirEsCurar`); con la regla
+  nueva, mezcla real de niveles (`#CorazonSano #Colesterol #Lanus`, `#CorazonSano #Cardiologo
+  #Lanus #CABA`). No se regeneraron los hashtags de piezas ya aprobadas/publicadas — el fix aplica
+  hacia adelante. `npm test` (889/889), lint y build OK. Archivo: `src/lib/ai.ts`.
 - 2026-07-19 (bug real: la placa de "Un estudio simple para tu tranquilidad" mostró un ecógrafo con el
   transductor sobre el abdomen, no un ecocardiograma): Seba volvió a regenerar la placa de esta misma
   pieza (después del fix de género de más arriba) y esta vez el transductor apareció apoyado sobre el
