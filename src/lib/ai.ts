@@ -267,6 +267,19 @@ const CATEGORY_COHERENCE_RULES = `COHERENCIA CON LA CATEGORIA:
 - Si la categoria no es una de las habituales de cardiologia clinica, no la conviertas en la categoria conocida mas parecida: desarrolla el tema tal como fue pedido.
 - Alguien que lea solo el hook o el titular tiene que poder reconocer sin dudar que la pieza pertenece a la categoria pedida.`
 
+// 2026-07-22: revisando los hashtags reales de las piezas publicadas, todas caian en el mismo nivel
+// (nicho cardiologico + marca: #Cardiologia, #SaludCardiovascular, #DraLuciaChahin repetidos siempre)
+// y casi ninguna incluia geolocalizacion -- una mezcla de un solo nivel no ayuda a llegar a gente
+// que todavia no sigue la cuenta (la guia vigente de Instagram para descubrimiento fuera de
+// seguidores pide mezclar niveles de volumen, no repetir siempre el mismo combo de nicho).
+const HASHTAG_RULES = `HASHTAGS (para llegar a gente que todavia no te sigue, no solo a tu audiencia actual):
+- Nunca repitas siempre el mismo combo de 3-5 tags de nicho. Cada pieza necesita una mezcla de 3 niveles distintos:
+  1) UNO amplio/alto volumen de salud o cardiologia en espanol (ej: #Salud, #Medicina, #CorazonSano, #VidaSaludable) -- pone la pieza al lado de contenido con mucho mas alcance que el de esta cuenta.
+  2) UNO o dos de nicho, especificos del tema puntual de la pieza (ej: #Hipertension, #Colesterol, #EcocardiogramaDoppler) -- conectan con quien busca activamente ese tema.
+  3) UNO o dos de geolocalizacion, eligiendo la sede mas relevante para el tema/pieza (Lanus/CIMEL, Hospital Britanico/CABA, Lomas de Zamora/Swiss Medical) -- clave para que te encuentre gente cerca buscando un cardiologo, no solo quien ya te sigue.
+- No uses "#DraLuciaChahin" en cada pieza: un hashtag de marca ayuda a que te encuentren los que ya te conocen, no a sumar gente nueva. Usalo como maximo en una de cada varias piezas, nunca como tag fijo.
+- Minimo 3, maximo 5 hashtags en total (tope de la plataforma).`
+
 const OBJECTIVE_GUIDANCE: Record<ContentObjective, string> = {
   alcance: "Objetivo ALCANCE: priorizá un hook que genere curiosidad, sorpresa o identificación inmediata para maximizar alcance y comentarios. El CTA puede ser una pregunta abierta o invitar a comentar/guardar, no hace falta que invite a pedir turno.",
   educacion: "Objetivo EDUCACION: priorizá dejar un aprendizaje concreto y accionable, algo que valga la pena guardar. El CTA invita a guardar la pieza para el próximo control, no hace falta que invite a pedir turno ahora.",
@@ -327,6 +340,8 @@ ${PATIENT_ACQUISITION_RULES}
 
 ${CATEGORY_COHERENCE_RULES}
 
+${HASHTAG_RULES}
+
 ENFOQUE DEL CONTENIDO:
 El contenido debe captar pacientes potenciales educándolos. Usá datos relevantes,
 desmitificá creencias comunes, explicá conceptos de forma accesible, o destacá la
@@ -361,7 +376,7 @@ Usá exactamente estas claves:
   "hook": "frase gancho para la portada del carrusel",
   "caption": "caption completo (150-300 palabras). Estructurá con introducción + puntos clave de cada slide.",
   "google_text": "texto para Google Business, máximo 1500 caracteres",
-  "hashtags": "#hashtag1 #hashtag2 (3-5 hashtags)",
+  "hashtags": "#hashtag1 #hashtag2 (3-5, mezclando niveles según HASHTAG_RULES de arriba)",
   "visual_headline": "título de la portada, máximo 40 caracteres",
   "visual_subtitle": "subtítulo de la portada, máximo 60 caracteres",
   "visual_style": "rose",
@@ -380,7 +395,7 @@ Usá exactamente estas claves:
   "hook": "frase gancho para la primera escena",
   "caption": "caption completo para Instagram con emojis y párrafos (150-300 palabras)",
   "google_text": "texto para publicación en Google Business, máximo 1500 caracteres",
-  "hashtags": "#hashtag1 #hashtag2 (3-5 hashtags relevantes al tema y cardiología)",
+  "hashtags": "#hashtag1 #hashtag2 (3-5, mezclando niveles según HASHTAG_RULES de arriba)",
   "visual_headline": "titular para la placa de portada, máximo 60 caracteres",
   "visual_subtitle": "subtítulo para la placa de portada, máximo 80 caracteres",
   "visual_style": "rose",
@@ -398,7 +413,7 @@ Usá exactamente estas claves:
   "hook": "frase gancho de 1-2 líneas para captar atención en Instagram",
   "caption": "caption completo para Instagram con emojis y párrafos (150-300 palabras)",
   "google_text": "texto para publicación en Google Business, máximo 1500 caracteres",
-  "hashtags": "#hashtag1 #hashtag2 (3-5 hashtags relevantes al tema y cardiología)",
+  "hashtags": "#hashtag1 #hashtag2 (3-5, mezclando niveles según HASHTAG_RULES de arriba)",
   "visual_headline": "titular para la placa visual, máximo 60 caracteres",
   "visual_subtitle": "subtítulo para la placa visual, máximo 80 caracteres",
   "visual_style": "rose",
@@ -774,6 +789,7 @@ Tono profesional, calido y argentino.
 NUNCA prometes resultados medicos, nunca das diagnosticos, nunca asumis condiciones del lector.
 El objetivo es informar y captar personas que quieran pedir turno.
 ${PLAIN_TEXT_RULES}
+${HASHTAG_RULES}
 Devolve SOLO un JSON con: { "caption": "...", "hook": "...", "hashtags": "..." }`,
     messages: [{ role: "user", content: `Genera un ${type} sobre: ${category}. CTA sugerido: ${cta}` }],
   })
@@ -875,7 +891,7 @@ ${input.format === "carrusel" ? "Es un CARRUSEL: generá 4-5 slides con headline
   "hook": "...",
   "caption": "...",
   "google_text": "...",
-  "hashtags": "3 a 5 hashtags relevantes, separados por espacio (ej: #hashtag1 #hashtag2 #hashtag3)",
+  "hashtags": "3 a 5, mezclando niveles segun HASHTAG_RULES (amplio + nicho + geo), separados por espacio",
   "visual_headline": "...",
   "visual_subtitle": "...",
   "image_prompt": "...",
@@ -906,8 +922,8 @@ ${IMAGE_PROMPT_RULES}
 ${PATIENT_ACQUISITION_RULES}
 ${CATEGORY_COHERENCE_RULES}
 ${REEL_SCENE_RULES}
+${HASHTAG_RULES}
 - El texto de Google debe tener maximo 1500 caracteres.
-- Los hashtags deben ser entre 3 y 5, los mas relevantes al tema y a cardiologia. Nunca mas de 5.
 - Si un texto necesita comillas, escapalas como \\\" o usa comillas simples para no romper el JSON.
 - Devolve SOLO JSON valido.`,
     messages: [{ role: "user", content: userContent }],
