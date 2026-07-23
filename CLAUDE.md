@@ -1,6 +1,26 @@
 # Lule Growth OS — Contexto para Claude
 
 ## Estado actual
+- 2026-07-23 (cierre real del pendiente de la microinfografía animada, PR #166): quedaba explícitamente
+  sin verificar un video de Veo real con el prompt nuevo (fondo/animación, sin consultorio). Con el cupo
+  diario ya subido a mano por Seba (`DAILY_VIDEO_GENERATION_LIMIT=5` en `.env.local`), se generó un video
+  real (categoría "Presión arterial") y se compuso con `burnVideoBrief()` de punta a punta contra la UI
+  real. Primera corrida: un frame mostró una tarjeta de texto casi invisible ("Si se repite, es momento de
+  consultar."), diagnosticado en el momento como falta de bitrate (ffmpeg sin `-crf` explícito
+  recodificaba a ~380kb/s) — se agregó `-crf 18 -preset medium` a los dos comandos de ffmpeg de
+  `video-caption.ts`. **Al re-verificar con una segunda generación real de Veo y una grilla de frames cada
+  0,5s (no solo 4 puntos sueltos), se confirmó que esa "falta de legibilidad" nunca fue un bug de
+  encoding**: con 3 mensajes repartidos en la ventana de 1,2-6,2s, cada tarjeta dura ~1,67s con 0,25s de
+  fundido de entrada/salida (`fadeAlphaExpr` en `video-caption.ts`) — el frame de la primera verificación
+  cayó, por casualidad, a 33ms del final del fundido de salida de esa tarjeta puntual, mostrándola casi
+  transparente. Es el comportamiento esperado de un fundido, no un defecto. La grilla completa (16 frames)
+  mostró las 5 tarjetas (gancho, 3 mensajes, CTA) perfectamente legibles durante toda su ventana real de
+  exhibición. El fix de `-crf 18 -preset medium` se mantiene igual (mejora real de calidad del archivo
+  maestro, sin costo relevante en un clip de 8s) pero **no era la causa** del problema reportado — no
+  había ningún bug de legibilidad que corregir. Lección para no repetir: al verificar un video con
+  fundidos, extraer frames cada 0,3-0,5s en vez de puntos sueltos elegidos a mano, para no confundir un
+  instante de transición intencional con un defecto real. `npm test` (889/889), lint y build sin errores.
+  Archivo: `src/lib/video-caption.ts`.
 - 2026-07-22 (mejora, no bug: estrategia de hashtags para llegar a gente fuera de los seguidores):
   Seba pidió revisar si había que cambiar los hashtags de Instagram para captar personas por fuera
   del seguimiento de la cuenta. Se revisaron en vivo (consulta de solo lectura a `app_config` /

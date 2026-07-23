@@ -105,6 +105,13 @@ export async function burnCaptionsOntoVideo(input: {
     await execFileAsync(ffmpegInstaller.path, [
       "-y", "-i", inputPath,
       "-vf", drawtextFilters.join(","),
+      // Sin esto, ffmpeg re-codifica el video con un bitrate default bajo (~380kb/s en un clip de
+      // prueba real) -- suficiente para que el fondo se vea bien, pero el texto compuesto encima
+      // pierde contraste/legibilidad en frames con mas movimiento (bug real encontrado en vivo,
+      // 2026-07-23). CRF 18 es practicamente sin perdida visible para x264; preset "medium" no suma
+      // tiempo relevante en un clip de unos pocos segundos.
+      "-crf", "18",
+      "-preset", "medium",
       "-codec:a", "copy",
       outputPath,
     ])
@@ -217,6 +224,13 @@ export async function burnVideoBrief(input: {
     await execFileAsync(ffmpegInstaller.path, [
       "-y", "-i", inputPath,
       "-vf", filters.join(","),
+      // Sin esto, ffmpeg re-codifica el video con un bitrate default bajo (~380kb/s en un clip de
+      // prueba real) -- suficiente para que el fondo se vea bien, pero el texto compuesto encima
+      // pierde contraste/legibilidad en frames con mas movimiento (bug real encontrado en vivo,
+      // 2026-07-23). CRF 18 es practicamente sin perdida visible para x264; preset "medium" no suma
+      // tiempo relevante en un clip de unos pocos segundos.
+      "-crf", "18",
+      "-preset", "medium",
       "-codec:a", "copy",
       outputPath,
     ])
