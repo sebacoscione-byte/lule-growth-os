@@ -20,6 +20,7 @@ export const DEFAULT_AUTO_PUBLISH_SETTINGS: AutoPublishSettings = {
   post: { ...DEFAULT_TRACK, times_per_week: 2 },
   historia: { ...DEFAULT_TRACK, times_per_week: 3 },
   carrusel: { ...DEFAULT_TRACK, times_per_week: 1 },
+  reel: { ...DEFAULT_TRACK, times_per_week: 1 },
 }
 
 export async function readContentItems(supabase: SupabaseClient): Promise<ContentItem[]> {
@@ -51,13 +52,15 @@ export async function readAutoPublishSettings(supabase: SupabaseClient): Promise
   // (enabled seguia en false), asi que reseteamos directo a los defaults nuevos en vez de migrar.
   if (!stored?.post || !stored?.historia) return DEFAULT_AUTO_PUBLISH_SETTINGS
 
-  // .carrusel es nuevo (2026-07-11): las configuraciones ya guardadas en produccion no lo tienen.
-  // Nunca resetear post/historia por esto -- solo completar carrusel con el default (deshabilitado).
+  // .carrusel (2026-07-11) y .reel (2026-07-23) son mas nuevos que post/historia: las configuraciones
+  // ya guardadas en produccion antes de cada uno no los tienen. Nunca resetear post/historia por esto
+  // -- solo completar el track nuevo con el default (deshabilitado).
   return {
     channels: stored.channels ?? DEFAULT_AUTO_PUBLISH_SETTINGS.channels,
     post: { ...DEFAULT_AUTO_PUBLISH_SETTINGS.post, ...stored.post },
     historia: { ...DEFAULT_AUTO_PUBLISH_SETTINGS.historia, ...stored.historia },
     carrusel: { ...DEFAULT_AUTO_PUBLISH_SETTINGS.carrusel, ...(stored.carrusel ?? {}) },
+    reel: { ...DEFAULT_AUTO_PUBLISH_SETTINGS.reel, ...(stored.reel ?? {}) },
   }
 }
 
@@ -188,8 +191,9 @@ export function isRepeatDue(item: ContentItem, now: Date): boolean {
   return daysSinceLastPublish >= item.repeat_interval_days
 }
 
-/** Formatos con cronograma propio de auto-publicacion. Reel queda afuera: requiere video real, no soportado. */
-export type AutoPublishFormat = "post" | "historia" | "carrusel"
+/** Formatos con cronograma propio de auto-publicacion. Reel (2026-07-23) requiere que el video ya este
+ * subido a mano en el item (video_url) -- la app no genera video, ver publishReelToInstagram. */
+export type AutoPublishFormat = "post" | "historia" | "carrusel" | "reel"
 
 /**
  * Pura, sin I/O: elige que items auto-publicar de un formato puntual (post, historia o carrusel, cada

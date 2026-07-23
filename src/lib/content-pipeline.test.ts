@@ -214,8 +214,9 @@ describe("pickNextPublishableItem", () => {
     expect(pickNextPublishableItem([carrusel], "carrusel")?.id).toBe("carrusel")
   })
 
-  it("un reel nunca se elige, no tiene track propio (requiere video, sin soporte)", () => {
-    const reel = item({ id: "reel", format: "reel" })
+  it("un reel aprobado se elige al pedir el formato reel (tiene su propio track, 2026-07-23), pero no en los otros", () => {
+    const reel = item({ id: "reel", format: "reel", video_url: "https://example.com/reel.mp4" })
+    expect(pickNextPublishableItem([reel], "reel")?.id).toBe("reel")
     expect(pickNextPublishableItem([reel], "post")).toBeNull()
     expect(pickNextPublishableItem([reel], "historia")).toBeNull()
     expect(pickNextPublishableItem([reel], "carrusel")).toBeNull()

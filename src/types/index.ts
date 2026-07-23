@@ -192,6 +192,8 @@ export interface ContentItem {
   scenes?: ContentScene[]
   reel_duration_seconds?: number
   visual_url?: string
+  /** Video del reel, subido a mano (la app no genera video) y persistido en Storage antes de aprobar. Solo aplica a format === "reel". */
+  video_url?: string
   source: ContentSource | null
   created_at: string
   updated_at: string
@@ -244,6 +246,7 @@ export interface AutoPublishSettings {
   post: AutoPublishTrackSettings
   historia: AutoPublishTrackSettings
   carrusel: AutoPublishTrackSettings
+  reel: AutoPublishTrackSettings
 }
 
 export interface ClassifyResult {

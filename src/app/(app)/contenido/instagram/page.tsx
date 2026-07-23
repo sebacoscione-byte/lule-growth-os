@@ -6,7 +6,7 @@ import Image from "next/image"
 import Link from "next/link"
 import {
   Archive, ArchiveRestore, BookOpen, Check, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Copy, Download, ExternalLink, Link2, Loader2,
-  ImageIcon, Plus, Save, Search, Send, ShieldCheck, Sparkles, Pin, Trash2, Undo2, Unlink, WandSparkles, X,
+  ImageIcon, Plus, Save, Search, Send, ShieldCheck, Sparkles, Pin, Trash2, Undo2, Unlink, Video, WandSparkles, X,
 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { TrackedProfileLink } from "@/components/tracked-profile-link"
@@ -17,6 +17,7 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
+import { createClient as createBrowserSupabaseClient } from "@/lib/supabase/client"
 import { parseAiJson } from "@/lib/parse-ai-json"
 import { truncateForImagePlate } from "@/lib/content-text"
 import { DEFAULT_AUTO_PUBLISH_SETTINGS, alreadyPublishedToday, estimateAutoPublishDrainDays, estimateAutoPublishDateForPosition, estimateRepeatEndDate, findRecentDuplicateTopic, pickNextPublishableItems } from "@/lib/content-pipeline"
@@ -50,7 +51,7 @@ const CTA_OPTIONS = [
 ]
 
 const FORMATS = [
-  { value: "reel", label: "Reel / portada" },
+  { value: "reel", label: "Reel" },
   { value: "historia", label: "Historia" },
   { value: "carrusel", label: "Carrusel" },
   { value: "post", label: "Post estatico" },
@@ -74,6 +75,9 @@ const EDITABLE_FIELDS: Array<keyof ContentItem> = [
   "visual_subtitle", "visual_style", "image_prompt", "image_alt_text", "slides",
   "scenes", "reel_duration_seconds",
 ]
+
+// video_url no entra en EDITABLE_FIELDS (igual que visual_url) a proposito: subir el video no cuenta
+// como "edicion de contenido" para el chequeo de cambios sin guardar / reset a borrador, ver items/route.ts.
 
 function editableContent(item: ContentItem) {
   return Object.fromEntries(EDITABLE_FIELDS.map(field => [field, item[field]])) as Partial<ContentItem>
@@ -592,13 +596,15 @@ function fromLocalInputValue(value: string): string {
   return new Date(value).toISOString()
 }
 
-function describeAutoPublishQueue(kind: "post" | "historia" | "carrusel", count: number, track: AutoPublishTrackSettings): string {
+function describeAutoPublishQueue(kind: "post" | "historia" | "carrusel" | "reel", count: number, track: AutoPublishTrackSettings): string {
   const { days_of_week: daysOfWeek, items_per_run: itemsPerRun } = track
   const label = kind === "post"
     ? `${count} post${count === 1 ? "" : "s"} aprobado${count === 1 ? "" : "s"} en cola`
     : kind === "historia"
     ? `${count} historia${count === 1 ? "" : "s"} aprobada${count === 1 ? "" : "s"} en cola`
-    : `${count} carrusel${count === 1 ? "" : "es"} aprobado${count === 1 ? "" : "s"} en cola`
+    : kind === "carrusel"
+    ? `${count} carrusel${count === 1 ? "" : "es"} aprobado${count === 1 ? "" : "s"} en cola`
+    : `${count} reel${count === 1 ? "" : "s"} aprobado${count === 1 ? "" : "s"} en cola`
   if (count === 0) return `${label}.`
   if (daysOfWeek.length === 0) return `${label} — elegí al menos un día de la semana para que empiece a publicar.`
   const now = new Date()
@@ -901,6 +907,7 @@ export default function ContentStudioPage() {
             post: { ...DEFAULT_AUTO_PUBLISH_SETTINGS.post, ...stored.post },
             historia: { ...DEFAULT_AUTO_PUBLISH_SETTINGS.historia, ...stored.historia },
             carrusel: { ...DEFAULT_AUTO_PUBLISH_SETTINGS.carrusel, ...(stored.carrusel ?? {}) },
+            reel: { ...DEFAULT_AUTO_PUBLISH_SETTINGS.reel, ...(stored.reel ?? {}) },
           }
           setAutoPublishSettings(loaded)
           setSavedAutoPublishSettings(loaded)
@@ -920,11 +927,11 @@ export default function ContentStudioPage() {
     setAutoPublishSaved(false)
   }
 
-  function updateTrackSettings(track: "post" | "historia" | "carrusel", patch: Partial<AutoPublishTrackSettings>) {
+  function updateTrackSettings(track: "post" | "historia" | "carrusel" | "reel", patch: Partial<AutoPublishTrackSettings>) {
     updateAutoPublishSettings({ ...autoPublishSettings, [track]: { ...autoPublishSettings[track], ...patch } })
   }
 
-  function changeTimesPerWeek(track: "post" | "historia" | "carrusel", value: number) {
+  function changeTimesPerWeek(track: "post" | "historia" | "carrusel" | "reel", value: number) {
     const current = autoPublishSettings[track]
     updateTrackSettings(track, { times_per_week: value, days_of_week: current.days_of_week.slice(0, value) })
   }
@@ -955,6 +962,7 @@ export default function ContentStudioPage() {
     approvedPost: items.filter(item => item.status === "approved" && item.format === "post").length,
     approvedHistoria: items.filter(item => item.status === "approved" && item.format === "historia").length,
     approvedCarrusel: items.filter(item => item.status === "approved" && item.format === "carrusel").length,
+    approvedReel: items.filter(item => item.status === "approved" && item.format === "reel").length,
   }), [items])
 
   // Posicion (1-indexado) de cada pieza aprobada dentro de la cola de auto-publicacion de su propio
@@ -963,7 +971,7 @@ export default function ContentStudioPage() {
   const queueInfo = useMemo(() => {
     const info = new Map<string, { position: number; etaLabel: string; date: Date | null }>()
     const now = new Date();
-    (["post", "historia", "carrusel"] as const).forEach(format => {
+    (["post", "historia", "carrusel", "reel"] as const).forEach(format => {
       const track = autoPublishSettings[format]
       const todayAvailable = isTodayAvailableForQueueEstimate(track, now)
       const queue = pickNextPublishableItems(items, format, items.length)
@@ -989,7 +997,7 @@ export default function ContentStudioPage() {
     const fmt = (date: Date) => date.toLocaleDateString("es-AR", { day: "numeric", month: "short" })
     items.forEach(item => {
       if (!item.repeat_interval_days) return
-      if (item.format !== "post" && item.format !== "historia" && item.format !== "carrusel") return
+      if (item.format !== "post" && item.format !== "historia" && item.format !== "carrusel" && item.format !== "reel") return
       const track = autoPublishSettings[item.format]
       const todayAvailable = isTodayAvailableForQueueEstimate(track, now)
       const days = track.days_of_week
@@ -1467,6 +1475,7 @@ export default function ContentStudioPage() {
 
   async function publishInstagram(item: ContentItem) {
     const isCarrusel = item.format === "carrusel"
+    const isReel = item.format === "reel"
     const carruselImageUrls = [item.visual_url, ...(item.slides ?? []).map(slide => slide.visual_url)]
       .filter((url): url is string => Boolean(url))
     const freshVisualUrl = generatedVisual?.itemId === item.id ? generatedVisual.url : null
@@ -1474,7 +1483,11 @@ export default function ContentStudioPage() {
       setError("Generá la imagen de la portada y de cada slide antes de publicar el carrusel.")
       return
     }
-    if (!isCarrusel && !freshVisualUrl && !item.visual_url) {
+    if (isReel && !item.video_url) {
+      setError("Subí el video antes de publicar el reel.")
+      return
+    }
+    if (!isCarrusel && !isReel && !freshVisualUrl && !item.visual_url) {
       setError("Generá la placa final antes de publicar en Instagram.")
       return
     }
@@ -1488,6 +1501,8 @@ export default function ContentStudioPage() {
           itemId: item.id,
           ...(isCarrusel
             ? { imageUrls: carruselImageUrls }
+            : isReel
+            ? { videoUrl: item.video_url }
             : freshVisualUrl ? { imageDataUrl: freshVisualUrl } : { imageUrl: item.visual_url }),
           caption: `${item.hook}\n\n${item.caption}\n\n${item.hashtags}`,
           format: item.format,
@@ -1687,7 +1702,7 @@ export default function ContentStudioPage() {
                       <SelectContent>{FORMATS.map(item => <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>)}</SelectContent>
                     </Select>
                     {format === "reel" && (
-                      <p className="text-xs text-amber-700">Este formato no se puede publicar directo a Instagram desde acá (requiere video real). Vas a poder copiarlo para publicarlo manualmente.</p>
+                      <p className="text-xs text-amber-700">Vas a poder subir el video ya grabado una vez creada la pieza, y publicarlo con un clic (o dejarlo en la publicación automática) igual que el resto de los formatos.</p>
                     )}
                     {format === "carrusel" && (
                       <p className="text-xs text-blue-700">Vas a poder generar una imagen por cada slide y publicar el carrusel completo con un clic, una vez que tengas todas las placas listas.</p>
@@ -1909,6 +1924,16 @@ export default function ContentStudioPage() {
                     onChangeTimesPerWeek={value => changeTimesPerWeek("carrusel", value)}
                     onChangeDaysOfWeek={days => updateTrackSettings("carrusel", { days_of_week: days })}
                     onChangeStartsAt={iso => updateTrackSettings("carrusel", { starts_at: iso })}
+                  />
+                  <AutoPublishTrackCard
+                    title="Reels"
+                    track={autoPublishSettings.reel}
+                    queueText={describeAutoPublishQueue("reel", counts.approvedReel, autoPublishSettings.reel)}
+                    saving={savingAutoPublish}
+                    onToggleEnabled={() => updateTrackSettings("reel", { enabled: !autoPublishSettings.reel.enabled })}
+                    onChangeTimesPerWeek={value => changeTimesPerWeek("reel", value)}
+                    onChangeDaysOfWeek={days => updateTrackSettings("reel", { days_of_week: days })}
+                    onChangeStartsAt={iso => updateTrackSettings("reel", { starts_at: iso })}
                   />
                 </CardContent>
               </Card>
@@ -2195,6 +2220,8 @@ function Editor({
   const [directionError, setDirectionError] = useState<string | null>(null)
   const [imageUploading, setImageUploading] = useState(false)
   const [imageUploadError, setImageUploadError] = useState<string | null>(null)
+  const [videoUploading, setVideoUploading] = useState(false)
+  const [videoUploadError, setVideoUploadError] = useState<string | null>(null)
   const [showHistoriaText, setShowHistoriaText] = useState(false)
   const [slideGeneratingIndex, setSlideGeneratingIndex] = useState<number | null>(null)
   const [slideErrors, setSlideErrors] = useState<Record<number, string>>({})
@@ -2205,17 +2232,21 @@ function Editor({
   const [slideSceneErrors, setSlideSceneErrors] = useState<Record<number, string>>({})
   const [slideSceneFallbackWarning, setSlideSceneFallbackWarning] = useState<Record<number, string>>({})
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const videoInputRef = useRef<HTMLInputElement>(null)
   const imagePrompt = item.image_prompt?.trim() || fallbackImagePrompt(item)
   const displayedVisualUrl = generatedVisual?.itemId === item.id ? generatedVisual.url : item.visual_url
   const isHistoria = item.format === "historia"
   const isCarrusel = item.format === "carrusel"
+  const isReel = item.format === "reel"
   const carruselImagesReady = !isCarrusel || Boolean(
     item.visual_url && (item.slides ?? []).length > 0 && (item.slides ?? []).every(slide => Boolean(slide.visual_url))
   )
+  const reelVideoReady = !isReel || Boolean(item.video_url)
   const approvalReady = Boolean(
     (isHistoria || (item.hook.trim() && item.caption.trim())) &&
     (item.visual_headline.trim() || item.visual_url) &&
-    carruselImagesReady
+    carruselImagesReady &&
+    reelVideoReady
   )
   // Cualquier generacion de imagen (una slide puntual o la tanda completa) o guardado en curso bloquea
   // el resto de las acciones que tocan "slides": todas leen/escriben el array completo del item en un
@@ -2496,6 +2527,46 @@ function Editor({
       setImageUploadError(error instanceof Error ? error.message : "No se pudo subir la imagen.")
     } finally {
       setImageUploading(false)
+    }
+  }
+
+  const MAX_VIDEO_BYTES = 100 * 1024 * 1024
+
+  /**
+   * A diferencia de handleImageUpload (manda el archivo entero como data URL a nuestra propia ruta),
+   * un video no cabe cómodo en el body de una función serverless -- primero se pide una URL de subida
+   * firmada (server, service_role) y despues se sube el archivo DIRECTO a Supabase Storage desde el
+   * navegador con el cliente anon (uploadToSignedUrl no necesita permisos de RLS propios, el token ya
+   * autoriza esa subida puntual). Ver /api/content/upload-video.
+   */
+  async function handleVideoUpload(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0]
+    event.target.value = ""
+    if (!file) return
+    if (file.size > MAX_VIDEO_BYTES) {
+      setVideoUploadError("El video no puede superar los 100 MB.")
+      return
+    }
+    setVideoUploading(true)
+    setVideoUploadError(null)
+    try {
+      const signResponse = await fetch("/api/content/upload-video", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ itemId: item.id, contentType: file.type }),
+      })
+      const signData = await signResponse.json()
+      if (!signResponse.ok || signData.error) throw new Error(signData.error ?? "No se pudo preparar la subida del video.")
+      const browserSupabase = createBrowserSupabaseClient()
+      const { error: uploadError } = await browserSupabase.storage
+        .from("content-media")
+        .uploadToSignedUrl(signData.path, signData.token, file)
+      if (uploadError) throw new Error(uploadError.message)
+      onSave({ video_url: signData.publicUrl })
+    } catch (error) {
+      setVideoUploadError(error instanceof Error ? error.message : "No se pudo subir el video.")
+    } finally {
+      setVideoUploading(false)
     }
   }
 
@@ -2845,7 +2916,7 @@ function Editor({
             </Select>
           </div>
           {item.format === "reel" && (
-            <p className="text-xs text-amber-700">Este formato no se puede publicar directo a Instagram desde acá (requiere video real) ni entra en la publicación automática. Elegí &ldquo;Post estático&rdquo;, &ldquo;Historia&rdquo; o &ldquo;Carrusel&rdquo; si querés publicar con un clic.</p>
+            <p className="text-xs text-amber-700">Subí el video (más abajo) antes de aprobar — un reel necesita el archivo real para poder publicarse, la app no lo genera.</p>
           )}
           {item.format === "carrusel" && (
             <p className="text-xs text-blue-700">Generá la placa de la portada y de cada slide (más abajo) antes de aprobar — un carrusel necesita todas sus imágenes listas para poder publicarse.</p>
@@ -2945,8 +3016,40 @@ function Editor({
                 </div>
               </div>
               <p className="text-xs text-gray-500">
-                Se entiende sin audio: texto breve en pantalla por escena + qué se filma. Sirve como guía para grabar (Lucía sin hablar a cámara, o B-roll) — la app no genera video.
+                Se entiende sin audio: texto breve en pantalla por escena + qué se filma. Sirve como guía para grabar (Lucía sin hablar a cámara, o B-roll) — subí el video ya grabado más abajo.
               </p>
+              <div className="space-y-2 rounded-md bg-gray-50 p-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Video del reel</p>
+                {item.video_url ? (
+                  <video
+                    key={item.video_url}
+                    src={item.video_url}
+                    controls
+                    className="max-h-80 w-full rounded-md border border-gray-200 bg-black"
+                  />
+                ) : (
+                  <p className="text-xs text-gray-500">Todavía no subiste el video — hace falta para poder aprobar y publicar este reel.</p>
+                )}
+                <input
+                  ref={videoInputRef}
+                  type="file"
+                  accept="video/mp4,video/quicktime"
+                  className="hidden"
+                  onChange={handleVideoUpload}
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => videoInputRef.current?.click()}
+                  disabled={videoUploading}
+                  className="w-full gap-2"
+                >
+                  {videoUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Video className="h-4 w-4" />}
+                  {item.video_url ? "Reemplazar video" : "Subir video"}
+                </Button>
+                <p className="text-[11px] text-gray-400">MP4 o MOV, hasta 100 MB.</p>
+                {videoUploadError && <p className="text-xs text-red-600 bg-red-50 rounded p-2">{videoUploadError}</p>}
+              </div>
               {(item.scenes ?? []).map((scene, index) => (
                 <div key={index} className="space-y-2 rounded-md bg-gray-50 p-3">
                   <div className="flex items-center justify-between">
@@ -3006,6 +3109,8 @@ function Editor({
                       ? "Sale como historia de Instagram, no en el feed. "
                       : item.format === "carrusel"
                       ? "Sale como carrusel en el feed. "
+                      : item.format === "reel"
+                      ? "Sale como reel en el feed. "
                       : "Sale como post en el feed. "}
                     Los días y cuántas veces por semana sale los decide el cronograma de auto-publicación
                     de este formato — no hace falta configurarlos acá. Sale <strong>además</strong> de
@@ -3092,12 +3197,12 @@ function Editor({
               </Button>
             )}
             {item.status === "approved" && igConnected && (() => {
-              const formatSupported = item.format === "post" || item.format === "historia" || item.format === "carrusel"
-              const imagesReady = isCarrusel ? carruselImagesReady : Boolean(displayedVisualUrl)
+              const formatSupported = item.format === "post" || item.format === "historia" || item.format === "carrusel" || item.format === "reel"
+              const imagesReady = isCarrusel ? carruselImagesReady : isReel ? reelVideoReady : Boolean(displayedVisualUrl)
               const disabledReason = !formatSupported
-                ? "Este formato no publica directo (requiere video real). Copiá el contenido y publicalo manualmente."
+                ? "Este formato no publica directo desde acá."
                 : !imagesReady
-                  ? isCarrusel ? "Generá la imagen de la portada y de cada slide primero" : "Generá la placa final primero"
+                  ? isCarrusel ? "Generá la imagen de la portada y de cada slide primero" : isReel ? "Subí el video primero" : "Generá la placa final primero"
                   : undefined
               return (
                 <Button
@@ -3130,6 +3235,8 @@ function Editor({
             <p className="text-xs text-amber-700">
               {isCarrusel
                 ? "Para aprobar, generá la placa de la portada y de cada slide (arriba)."
+                : isReel
+                ? "Para aprobar, completá hook y caption, agregá un titular visual (o subí una imagen propia) y subí el video."
                 : isHistoria
                 ? "Para aprobar, agregá un titular visual o subí una imagen propia."
                 : "Para aprobar, completá hook y caption, y agregá un titular visual o subí una imagen propia."}
@@ -3137,8 +3244,8 @@ function Editor({
           )}
           <p className="text-xs text-gray-500">
             {igConnected
-              ? "Instagram publica posts, historias y carruseles con las placas generadas (conectá y generá las placas antes). Los reels todavia requieren video real, publicalos manualmente."
-              : "Conectá Instagram arriba para publicar posts, historias y carruseles directamente."}
+              ? "Instagram publica posts, historias, carruseles y reels (conectá, generá las placas y para reels subí el video antes)."
+              : "Conectá Instagram arriba para publicar posts, historias, carruseles y reels directamente."}
           </p>
         </CardContent>
       </Card>

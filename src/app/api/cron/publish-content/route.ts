@@ -83,6 +83,15 @@ async function runTrack(
         lastIssue = `error: item ${current.id} sin todas las placas del carrusel generadas`
         continue
       }
+    } else if (format === "reel") {
+      // El reel se publica con el video real (item.video_url, subido a mano) -- nunca generar una
+      // placa de portada "de apuro" acá, la aprobacion ya la exigio si hacia falta y publishApprovedItem
+      // no la usa para publicar. Sin video, saltar: la aprobacion ya lo exige, pero re-chequear evita
+      // publicar un reel roto si algo lo borro despues de aprobado.
+      if (!current.video_url) {
+        lastIssue = `error: item ${current.id} sin video subido`
+        continue
+      }
     } else if (!current.visual_url) {
       if (!current.image_prompt) {
         lastIssue = `error: item ${current.id} sin image_prompt`
@@ -166,8 +175,11 @@ export async function GET(request: Request) {
     // Tercer track (2026-07-11), corre dentro de este mismo cron -- no suma un cron job nuevo de
     // Vercel, el plan Hobby sigue en 2 (este + weekly-report).
     const carrusel = await runTrack(supabase, "carrusel", settings.carrusel, settings.channels, now)
+    // Cuarto track (2026-07-23): el video ya tiene que estar subido a mano (ver runTrack, rama
+    // format === "reel") -- mismo motivo de arriba, corre acá adentro, no en un cron propio.
+    const reel = await runTrack(supabase, "reel", settings.reel, settings.channels, now)
 
-    await writeAutoPublishSettings(supabase, { ...settings, post, historia, carrusel })
+    await writeAutoPublishSettings(supabase, { ...settings, post, historia, carrusel, reel })
 
     // El seguimiento de WhatsApp corre acá adentro (en vez de tener su propio Vercel Cron) para no
     // sumar un tercer cron job -- el plan Hobby de Vercel limita a 2. Ver src/lib/whatsapp-followup.ts.
@@ -194,6 +206,7 @@ export async function GET(request: Request) {
     if (post.last_run_result?.includes("(error:")) failures.push(`Posts: ${post.last_run_result}`)
     if (historia.last_run_result?.includes("(error:")) failures.push(`Historias: ${historia.last_run_result}`)
     if (carrusel.last_run_result?.includes("(error:")) failures.push(`Carruseles: ${carrusel.last_run_result}`)
+    if (reel.last_run_result?.includes("(error:")) failures.push(`Reels: ${reel.last_run_result}`)
     const realWhatsappErrors = whatsappFollowup.errors.filter(e => !e.includes("todavía no está aprobado"))
     if (realWhatsappErrors.length > 0) failures.push(`Seguimiento WhatsApp: ${realWhatsappErrors.join("; ")}`)
     if (instagramFollowers.error) failures.push(`Seguidores de Instagram: ${instagramFollowers.error}`)
@@ -216,6 +229,7 @@ export async function GET(request: Request) {
 
     return NextResponse.json({
       post: post.last_run_result, historia: historia.last_run_result, carrusel: carrusel.last_run_result,
+      reel: reel.last_run_result,
       whatsappFollowup, instagramFollowers,
       googleBusinessMetrics, handoffReminder, whatsappQueue, whatsappQueueHealth,
       whatsappMetaPreflight,
