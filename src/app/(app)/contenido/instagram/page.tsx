@@ -2211,7 +2211,7 @@ function Editor({
   generatedVisual: { itemId: string; url: string } | null
   onGeneratedVisual: (visual: { itemId: string; url: string } | null) => void
   onChange: (item: ContentItem) => void
-  onSave: (changes: Partial<ContentItem>) => void
+  onSave: (changes: Partial<ContentItem>) => Promise<void>
   onCopy: () => void
   onPublishInstagram: () => void
   onPublishNow: () => void
@@ -2638,7 +2638,7 @@ function Editor({
         setAiVideoHelpUrl(typeof data.help_url === "string" ? data.help_url : null)
         return
       }
-      onSave({ video_url: data.video_url, video_prompt: videoPrompt })
+      await onSave({ video_url: data.video_url, video_prompt: videoPrompt })
     } catch {
       setAiVideoError("No se pudo conectar con Veo para generar el video.")
     } finally {
@@ -2667,7 +2667,7 @@ function Editor({
         setCaptionError(data.error ?? "No se pudo agregar el texto al video.")
         return
       }
-      onSave({ video_url: data.video_url })
+      await onSave({ video_url: data.video_url })
     } catch {
       setCaptionError("No se pudo conectar con el servidor para agregar el texto.")
     } finally {
