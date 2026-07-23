@@ -1,14 +1,15 @@
 import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { getServiceDb } from "@/lib/supabase/service"
-import { publishImageToInstagram, publishCarouselToInstagram } from "@/lib/instagram-business"
+import { publishImageToInstagram, publishCarouselToInstagram, publishReelToInstagram } from "@/lib/instagram-business"
 import { authorizeStaff } from "@/lib/staff-authz"
 
 const INSTAGRAM_BUSINESS_ROLES = ["owner", "doctor"] as const
 
 // Un carrusel espera hasta 10 contenedores de imagen (aunque en paralelo, ver publishCarouselToInstagram)
-// mas el contenedor padre -- el default de la plataforma podria no alcanzar en un caso lento.
-export const maxDuration = 120
+// mas el contenedor padre, y un reel puede tardar hasta REEL_CONTAINER_TIMEOUT_MS (90s) procesando el
+// video -- el default de la plataforma podria no alcanzar en un caso lento.
+export const maxDuration = 150
 
 export async function POST(request: Request) {
   try {
@@ -17,7 +18,8 @@ export async function POST(request: Request) {
     if (!auth.ok) return NextResponse.json({ error: auth.error, code: auth.code }, { status: auth.status })
 
     const body = await request.json() as {
-      itemId?: string; imageDataUrl?: string; imageUrl?: string; imageUrls?: string[]; caption?: string; format?: string
+      itemId?: string; imageDataUrl?: string; imageUrl?: string; imageUrls?: string[]; videoUrl?: string
+      caption?: string; format?: string
     }
     if (!body.itemId || !body.format) {
       return NextResponse.json({ error: "Falta el identificador del contenido o el formato." }, { status: 400 })
@@ -33,6 +35,14 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: "Faltan las placas generadas de cada slide del carrusel." }, { status: 400 })
       }
       const { mediaId } = await publishCarouselToInstagram(service, { imageUrls: body.imageUrls, caption: body.caption })
+      return NextResponse.json({ ok: true, mediaId })
+    }
+
+    if (body.format === "reel") {
+      if (!body.videoUrl) {
+        return NextResponse.json({ error: "Falta el video subido de esta pieza." }, { status: 400 })
+      }
+      const { mediaId } = await publishReelToInstagram(service, { videoUrl: body.videoUrl, caption: body.caption })
       return NextResponse.json({ ok: true, mediaId })
     }
 

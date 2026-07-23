@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
-import { publishImageToInstagram, publishCarouselToInstagram } from "@/lib/instagram-business"
+import { publishImageToInstagram, publishCarouselToInstagram, publishReelToInstagram } from "@/lib/instagram-business"
 import { createGoogleBusinessPost } from "@/lib/google-business"
 import type { ContentChannel, ContentItem } from "@/types"
 
@@ -28,6 +28,13 @@ export async function publishApprovedItem(
       if (item.format === "carrusel") {
         const published = await publishCarouselToInstagram(supabase, {
           imageUrls: carouselImageUrls(item),
+          caption: `${item.hook}\n\n${item.caption}\n\n${item.hashtags}`,
+        })
+        instagramMediaId = published.mediaId
+      } else if (item.format === "reel") {
+        if (!item.video_url) throw new Error("Subí el video antes de publicar el reel.")
+        const published = await publishReelToInstagram(supabase, {
+          videoUrl: item.video_url,
           caption: `${item.hook}\n\n${item.caption}\n\n${item.hashtags}`,
         })
         instagramMediaId = published.mediaId

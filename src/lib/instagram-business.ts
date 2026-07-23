@@ -318,7 +318,9 @@ export async function publishContainer(token: string, containerId: string): Prom
   return data.id
 }
 
-export async function waitForContainerReady(token: string, containerId: string, timeoutMs = 40_000): Promise<void> {
+export async function waitForContainerReady(
+  token: string, containerId: string, timeoutMs = 40_000, label = "la imagen"
+): Promise<void> {
   const start = Date.now()
   while (Date.now() - start < timeoutMs) {
     const status = await getContainerStatus(token, containerId)
@@ -326,7 +328,7 @@ export async function waitForContainerReady(token: string, containerId: string, 
     if (status === "ERROR" || status === "EXPIRED") throw new Error(`IG container status: ${status}`)
     await new Promise(resolve => setTimeout(resolve, 2000))
   }
-  throw new Error("Tiempo de espera agotado procesando la imagen en Instagram")
+  throw new Error(`Tiempo de espera agotado procesando ${label} en Instagram`)
 }
 
 const PUBLISHABLE_FORMATS = ["post", "historia"] as const
@@ -431,5 +433,47 @@ export async function publishCarouselToInstagram(
   const carouselContainerId = await createCarouselContainer(token, childIds, (input.caption ?? "").slice(0, 2200))
   await waitForContainerReady(token, carouselContainerId)
   const mediaId = await publishContainer(token, carouselContainerId)
+  return { mediaId }
+}
+
+// ─── Publicacion (reel / video) ──────────────────────────────────────────
+
+// El contenedor de un video tarda mas en procesarse que uno de imagen (Meta lo descarga y lo
+// transcodifica) -- 40s (el default para imagenes) no alcanza. Los reels de esta cuenta estan
+// acotados a 60s de duracion (ver reel_duration_seconds), asi que el archivo es chico; 90s de margen
+// deberia alcanzar en la practica. Si no alcanza, publishReelToInstagram falla y el item queda
+// "approved" para reintentar en la proxima corrida -- mismo criterio que el resto de los formatos.
+const REEL_CONTAINER_TIMEOUT_MS = 90_000
+
+export async function createVideoContainer(
+  token: string,
+  videoUrl: string,
+  options: { caption?: string } = {}
+): Promise<string> {
+  const params = new URLSearchParams({ media_type: "REELS", video_url: videoUrl, access_token: token })
+  if (options.caption) params.set("caption", options.caption)
+
+  const res = await fetch(`${GRAPH_BASE}/me/media?${params}`, { method: "POST" })
+  const data = await res.json() as ContainerResponse
+  if (!res.ok || data.error) throw new Error(data.error?.message || `IG reel container error ${res.status}`)
+  return data.id
+}
+
+/**
+ * Publica un reel: requiere que el video ya este subido y persistido en Storage de antes
+ * (item.video_url, subido a mano por la doctora via /api/content/upload-video -- la app no genera
+ * video, ver el guion de escenas en el editor). A diferencia de publishImageToInstagram, nunca recibe
+ * un archivo nuevo para subir, solo trabaja con una URL publica ya existente.
+ */
+export async function publishReelToInstagram(
+  supabase: SupabaseClient,
+  input: { videoUrl: string; caption?: string }
+): Promise<{ mediaId: string }> {
+  const token = await getValidToken(supabase)
+  if (!token) throw new Error("Instagram no esta conectado. Conectá la cuenta primero.")
+
+  const containerId = await createVideoContainer(token, input.videoUrl, { caption: (input.caption ?? "").slice(0, 2200) })
+  await waitForContainerReady(token, containerId, REEL_CONTAINER_TIMEOUT_MS, "el video")
+  const mediaId = await publishContainer(token, containerId)
   return { mediaId }
 }

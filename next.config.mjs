@@ -40,6 +40,9 @@ const csp = [
   `script-src 'self' 'unsafe-inline' https://www.googletagmanager.com${isDev ? " 'unsafe-eval'" : ""}${isVercelPreview ? " https://vercel.live" : ""}`,
   `style-src 'self' 'unsafe-inline'${isVercelPreview ? " https://vercel.live" : ""}`,
   `img-src 'self' data: blob: ${supabaseOrigin} https://www.google-analytics.com https://www.googletagmanager.com`.trim(),
+  // Video del reel (content-media en Supabase Storage) para el preview en el editor -- sin esto, el
+  // <video> del editor queda bloqueado por CSP (media-src cae a default-src 'self' si no se declara).
+  `media-src 'self' ${supabaseOrigin}`.trim(),
   `font-src 'self' data:${isVercelPreview ? " https://vercel.live https://assets.vercel.com" : ""}`,
   `connect-src 'self' ${supabaseOrigin} https://*.google-analytics.com https://*.analytics.google.com https://www.googletagmanager.com https://stats.g.doubleclick.net${isDev ? " ws: wss:" : ""}${isVercelPreview ? " https://vercel.live wss://ws-us3.pusher.com" : ""}`.trim(),
   `frame-src ${isVercelPreview ? "https://vercel.live" : "'none'"}`,
