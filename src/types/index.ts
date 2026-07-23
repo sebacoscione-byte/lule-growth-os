@@ -192,8 +192,10 @@ export interface ContentItem {
   scenes?: ContentScene[]
   reel_duration_seconds?: number
   visual_url?: string
-  /** Video del reel, subido a mano (la app no genera video) y persistido en Storage antes de aprobar. Solo aplica a format === "reel". */
+  /** Video del reel: subido a mano, o generado con IA (Veo) y persistido en Storage antes de aprobar. Solo aplica a format === "reel". */
   video_url?: string
+  /** Direccion de video (en ingles) para generar el video con IA -- solo se usa para el camino "Generar con IA", no para subir un video propio. */
+  video_prompt?: string
   source: ContentSource | null
   created_at: string
   updated_at: string

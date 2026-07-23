@@ -73,7 +73,7 @@ const STYLE_CLASSES = {
 const EDITABLE_FIELDS: Array<keyof ContentItem> = [
   "format", "hook", "caption", "google_text", "hashtags", "visual_headline",
   "visual_subtitle", "visual_style", "image_prompt", "image_alt_text", "slides",
-  "scenes", "reel_duration_seconds",
+  "scenes", "reel_duration_seconds", "video_prompt",
 ]
 
 // video_url no entra en EDITABLE_FIELDS (igual que visual_url) a proposito: subir el video no cuenta
@@ -107,6 +107,10 @@ function CharacterCount({ value, limit }: { value: string; limit?: number }) {
 function fallbackImagePrompt(item: ContentItem) {
   const ratio = item.format === "historia" ? "9:16 vertical Instagram Story" : "4:5 vertical Instagram feed"
   return `Create a scroll-stopping premium editorial plate for a cardiology social media post about "${item.topic}". ${ratio}. Use one instantly understandable focal point and a relatable everyday moment that makes a potential patient feel recognized or motivated to take a preventive step. Create gentle visual tension between postponing care and choosing to take care of oneself, without fear, pain or urgency. Sophisticated deep blue, burgundy and warm neutral palette, natural cinematic lighting, realistic texture and depth. Reserve a clean, high-contrast area for the exact requested Spanish headline and subtitle. Avoid cold hospital imagery, generic medical stock photography, recognizable real physicians and advertising clichés. No extra text, no logos, no watermark.`
+}
+
+function fallbackVideoPrompt(item: ContentItem) {
+  return `A single continuous 6-second cinematic B-roll shot for a cardiology practice reel about "${item.topic}". Slow gentle camera dolly-in or soft pan, warm natural lighting, sophisticated deep blue, burgundy and warm neutral palette, realistic organic texture. No people speaking, gesturing to explain, or looking directly at camera -- if a partial medical figure appears (hand, arm, coat), it must read as clearly feminine, never inventing a real face. No on-screen text, logos or watermark. Ambient sound only, no dialogue, no voiceover. Vertical 9:16 composition.`
 }
 
 function VisualCard({ item, compact = false, trueAspect = false }: { item: ContentItem; compact?: boolean; trueAspect?: boolean }) {
@@ -2222,6 +2226,12 @@ function Editor({
   const [imageUploadError, setImageUploadError] = useState<string | null>(null)
   const [videoUploading, setVideoUploading] = useState(false)
   const [videoUploadError, setVideoUploadError] = useState<string | null>(null)
+  const [videoDirectionGenerating, setVideoDirectionGenerating] = useState(false)
+  const [videoDirectionError, setVideoDirectionError] = useState<string | null>(null)
+  const [aiVideoGenerating, setAiVideoGenerating] = useState(false)
+  const [aiVideoError, setAiVideoError] = useState<string | null>(null)
+  const [aiVideoHelpUrl, setAiVideoHelpUrl] = useState<string | null>(null)
+  const [showVideoPrompt, setShowVideoPrompt] = useState(false)
   const [showHistoriaText, setShowHistoriaText] = useState(false)
   const [slideGeneratingIndex, setSlideGeneratingIndex] = useState<number | null>(null)
   const [slideErrors, setSlideErrors] = useState<Record<number, string>>({})
@@ -2234,6 +2244,7 @@ function Editor({
   const fileInputRef = useRef<HTMLInputElement>(null)
   const videoInputRef = useRef<HTMLInputElement>(null)
   const imagePrompt = item.image_prompt?.trim() || fallbackImagePrompt(item)
+  const videoPrompt = item.video_prompt?.trim() || fallbackVideoPrompt(item)
   const displayedVisualUrl = generatedVisual?.itemId === item.id ? generatedVisual.url : item.visual_url
   const isHistoria = item.format === "historia"
   const isCarrusel = item.format === "carrusel"
@@ -2567,6 +2578,69 @@ function Editor({
       setVideoUploadError(error instanceof Error ? error.message : "No se pudo subir el video.")
     } finally {
       setVideoUploading(false)
+    }
+  }
+
+  async function regenerateVideoDirection() {
+    setVideoDirectionGenerating(true)
+    setVideoDirectionError(null)
+    try {
+      const response = await fetch("/api/content/video-direction", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          category: item.category,
+          topic: item.topic,
+          visual_headline: item.visual_headline,
+          caption: item.caption,
+          previous_video_prompt: videoPrompt,
+        }),
+      })
+      const data = await response.json()
+      if (!response.ok || data.error) {
+        setVideoDirectionError(data.error ?? "No se pudo proponer la dirección de video.")
+        return
+      }
+      onChange({ ...item, video_prompt: data.video_prompt })
+      setShowVideoPrompt(true)
+    } catch {
+      setVideoDirectionError("No se pudo conectar con la IA para proponer la dirección de video.")
+    } finally {
+      setVideoDirectionGenerating(false)
+    }
+  }
+
+  /**
+   * A diferencia de generateVisual (responde en segundos), Veo tarda 1-3 minutos -- esta llamada queda
+   * esperando esa respuesta sincrónica larga (ver maxDuration en /api/content/video). Tiene costo real
+   * por generación (a diferencia de las placas, sin tier gratuito) y un límite diario propio, mucho más
+   * estricto, del lado del servidor.
+   */
+  async function generateAiVideo() {
+    if (
+      item.video_url &&
+      !window.confirm("Ya hay un video cargado en esta pieza. Generar uno nuevo con IA lo va a reemplazar (tiene costo real). ¿Continuar?")
+    ) return
+    setAiVideoGenerating(true)
+    setAiVideoError(null)
+    setAiVideoHelpUrl(null)
+    try {
+      const response = await fetch("/api/content/video", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ itemId: item.id, video_prompt: videoPrompt }),
+      })
+      const data = await response.json()
+      if (!response.ok || data.error) {
+        setAiVideoError(data.error ?? "No se pudo generar el video.")
+        setAiVideoHelpUrl(typeof data.help_url === "string" ? data.help_url : null)
+        return
+      }
+      onSave({ video_url: data.video_url, video_prompt: videoPrompt })
+    } catch {
+      setAiVideoError("No se pudo conectar con Veo para generar el video.")
+    } finally {
+      setAiVideoGenerating(false)
     }
   }
 
@@ -3028,8 +3102,73 @@ function Editor({
                     className="max-h-80 w-full rounded-md border border-gray-200 bg-black"
                   />
                 ) : (
-                  <p className="text-xs text-gray-500">Todavía no subiste el video — hace falta para poder aprobar y publicar este reel.</p>
+                  <p className="text-xs text-gray-500">Todavía no subiste ni generaste el video — hace falta para poder aprobar y publicar este reel.</p>
                 )}
+
+                <div className="space-y-1.5 rounded-md border border-violet-200 bg-violet-50/60 p-2.5">
+                  <div className="flex items-center justify-between">
+                    <p className="text-[11px] font-semibold uppercase tracking-wide text-violet-700">Generar con IA (Veo)</p>
+                    <button
+                      type="button"
+                      onClick={() => setShowVideoPrompt(v => !v)}
+                      className="text-[11px] text-violet-700 hover:text-violet-800 underline"
+                    >
+                      {showVideoPrompt ? "Ocultar dirección" : "Ver/editar dirección"}
+                    </button>
+                  </div>
+                  {showVideoPrompt && (
+                    <>
+                      <Textarea
+                        rows={4}
+                        value={videoPrompt}
+                        onChange={e => onChange({ ...item, video_prompt: e.target.value })}
+                        className="bg-white text-gray-900 text-[11px]"
+                      />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={regenerateVideoDirection}
+                        disabled={videoDirectionGenerating}
+                        className="h-auto gap-1.5 px-2 py-1 text-[11px] text-violet-700 hover:text-violet-800"
+                      >
+                        {videoDirectionGenerating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <WandSparkles className="h-3.5 w-3.5" />}
+                        Proponer dirección con IA
+                      </Button>
+                      {videoDirectionError && <p className="text-[11px] text-red-600">{videoDirectionError}</p>}
+                    </>
+                  )}
+                  <Button
+                    type="button"
+                    onClick={generateAiVideo}
+                    disabled={aiVideoGenerating}
+                    className="w-full gap-2"
+                  >
+                    {aiVideoGenerating ? <Loader2 className="h-4 w-4 animate-spin" /> : <WandSparkles className="h-4 w-4" />}
+                    {aiVideoGenerating ? "Generando... puede tardar unos minutos" : item.video_url ? "Regenerar video con IA" : "Generar video con IA"}
+                  </Button>
+                  <p className="text-[11px] text-violet-700/80">
+                    Un solo plano corto (hasta 8s), sin personas hablando — B-roll silencioso. Tiene costo real por intento (aprox. USD 1), sin límite gratuito.
+                  </p>
+                  {aiVideoError && (
+                    <div className="space-y-1.5 rounded bg-red-50 p-2">
+                      <p className="text-[11px] text-red-600">{aiVideoError}</p>
+                      {aiVideoHelpUrl && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => window.open(aiVideoHelpUrl, "_blank")}
+                          className="h-auto gap-1.5 border-red-200 bg-white py-1 text-[11px] text-red-700 hover:bg-red-100"
+                        >
+                          <ExternalLink className="h-3 w-3" /> Revisar cuota de Gemini
+                        </Button>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                <p className="text-center text-[11px] text-gray-400">— o —</p>
+
                 <input
                   ref={videoInputRef}
                   type="file"
