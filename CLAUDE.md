@@ -1064,8 +1064,12 @@ powershell.exe -NoProfile -Command "[System.Environment]::SetEnvironmentVariable
   preguntar, y esperar un “dale” antes de desplegar cambios de lógica médica.
 - **Nunca pushear directo a `main`.** Trabajar siempre en rama + Pull Request (la rama+PR es
   para tener preview de Vercel como red de seguridad, no para pedir aprobación humana).
-- Para cambios no médicos, seguir `AGENTS.md`. Para cambios médicos, el build/tests/preview son
-  necesarios pero no reemplazan la aprobación humana previa al merge/deploy.
+- **Para cambios no médicos: mergear el PR vos mismo (`gh pr merge --squash --delete-branch`) en
+  cuanto CI/build/tests/preview den verde — es el último paso de la tarea, no algo que quede
+  pendiente para Seba.** No terminar un resumen de cierre con "revisalo y mergealo cuando
+  quieras" ni variantes — eso ya se probó como fricción real más de una vez (ver memoria
+  `feedback_merge_autonomy`). Para cambios médicos, el build/tests/preview son necesarios pero no
+  reemplazan la aprobación humana previa al merge/deploy.
 - **Solo preguntar cuando hay una decisión real entre múltiples opciones** con consecuencias
   distintas que no se pueden inferir del contexto — no para pedir permiso de ejecutar algo que
   ya se decidió hacer.
