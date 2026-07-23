@@ -649,6 +649,61 @@
   probarlo en vivo una vez deployado. Archivos: `src/lib/video-caption.ts`, `src/lib/fonts/
   DejaVuSans-Bold.ttf`, `src/app/api/content/video-caption/`, `next.config.mjs`, `package.json`,
   `src/app/(app)/contenido/instagram/page.tsx`.
+- 2026-07-23 (mismo día, cambio COMPLETO de criterio para el video de reels con IA): Seba pidió
+  reemplazar por completo el criterio anterior (B-roll cinematográfico de consultorio -- se veía
+  "como publicidad genérica de IA") por una **microinfografía médica animada**: estructura fija de
+  8 segundos (gancho 0,0-1,2s / 1 a 3 mensajes 1,2-6,2s / CTA 6,2-8,0s), con una regla explícita
+  clave: **Veo genera SOLO el fondo/animación (nunca texto, títulos ni interfaces) -- el texto se
+  agrega después por edición real** para garantizar ortografía y legibilidad. Trajo un brief
+  larguísimo y muy específico (ejemplos exactos de ganchos buenos, frases prohibidas, criterios de
+  rechazo, y un formato de entrega con autoevaluación 1-5 en 6 dimensiones, bloqueando la generación
+  si alguna da menos de 4).
+  - `VIDEO_PROMPT_RULES` (`src/lib/ai.ts`) reescrito de cero: prohíbe explícitamente consultorios
+    vacíos, estetoscopios sobre una mesa, médicos caminando por pasillos, dolly-in cinematográfico
+    como único recurso, interfaces médicas inventadas, estética de clínica de lujo y rosa como color
+    dominante -- pide en cambio una ilustración/motion graphic médico limpio y moderno (ej. un
+    corazón animado con una línea de ECG) sobre fondo claro.
+  - `VIDEO_BRIEF_RULES` (nuevo): estructura, ejemplos de ganchos buenos vs. frases vacías prohibidas
+    (transcriptas casi literal, son muy específicas), contenidos a priorizar, precisión médica,
+    criterios de rechazo y la rúbrica de puntaje.
+  - `generateVideoBrief()` reemplaza a `generateVideoDirection()` (eliminada, junto con la ruta
+    `/api/content/video-direction` y el botón "Proponer dirección con IA"): devuelve gancho,
+    video_prompt, objetivo, mensajes, CTA, notas de postproducción/validación y los 6 puntajes en
+    una sola llamada. Nueva ruta `/api/content/video-brief`. Nuevos tipos `ContentVideoBrief`/
+    `ContentVideoScores`, campo `video_brief?` en `ContentItem` (el gancho reusa `item.hook`, el
+    prompt de Veo reusa `item.video_prompt` -- ya existían).
+  - `burnVideoBrief()` (nuevo, en `video-caption.ts`, distinto de `burnCaptionsOntoVideo` que sigue
+    vigente para el guion filmado a mano -- caso de uso separado): quema gancho/mensajes/CTA con
+    tarjetas de texto (fondo claro para gancho/mensajes, tarjeta de acento azul profundo para el
+    CTA) y un fundido de entrada/salida suave (expresión `alpha` de ffmpeg en función de `t`,
+    construida a mano). `/api/content/video` ahora compone el brief automáticamente sobre el fondo
+    que genera Veo en la misma llamada (un solo click, un solo video final) si se le manda
+    hook/messages/cta; sin eso, sigue subiendo el fondo solo (compatible con un `video_prompt`
+    suelto sin pasar por "Generar propuesta").
+  - UI: la tarjeta "Generar con IA (Veo)" se reemplazó por "Microinfografía animada (Veo + texto
+    real)" -- botón "Generar propuesta" muestra el brief completo (objetivo, gancho, mensajes, CTA,
+    prompt en inglés colapsable, notas) con los 6 puntajes en verde/rojo; el botón "Generar video
+    con IA" queda **deshabilitado** si cualquier puntaje da menos de 4/5, con el detalle de qué
+    dimensión falló -- gate real, no solo informativo, tal como se pidió explícitamente
+    ("No generes el video definitivo si alguna categoría obtiene menos de 4 puntos").
+  - **Verificado en vivo (sin gastar cupo de Veo, agotado ese día -- 3/3 generaciones reales ya
+    usadas)**: composición de tarjetas con `burnVideoBrief` probada primero con un video sintético
+    gratis (mismo patrón que la sesión anterior), y la generación real del brief (solo texto, sin
+    Veo) probada de punta a punta con Playwright sobre la UI real -- resultado real: gancho "¿Sentís
+    que el corazón se te sale del pecho?", mensajes específicos y no genéricos, CTA "Pedí tu turno
+    desde el link de la bio", prompt para Veo "Clean medical motion graphic of a stylized, anatomical
+    human heart beating" (alineado con las reglas nuevas). **Pendiente**: verificación end-to-end con
+    una generación real de Veo en el estilo nuevo -- requiere esperar al reseteo diario del cupo o
+    que Seba autorice subir `DAILY_VIDEO_GENERATION_LIMIT` por un día.
+  - `npm test` (889/889), lint y build sin errores (2 errores reales de tipos de TypeScript
+    encontrados y corregidos por el build: un `Buffer<ArrayBufferLike>` vs `Buffer<ArrayBuffer>` al
+    reasignar la variable tras componer el brief, y un cast directo a `ContentVideoScores` que
+    TypeScript no aceptaba por no solapar lo suficiente con `Record<string, number>` -- se construyó
+    el objeto de puntajes explícitamente en vez de `Object.fromEntries` + cast).
+  - Archivos: `src/lib/ai.ts`, `src/types/index.ts`, `src/lib/video-caption.ts`,
+    `src/app/api/content/video/route.ts`, `src/app/api/content/video-brief/` (nueva),
+    `src/app/api/content/video-direction/` (eliminada), `src/app/api/content/items/route.ts`,
+    `src/app/(app)/contenido/instagram/page.tsx`.
 
 ## Qué es esta app
 Sistema de adquisición de pacientes para la Dra. Lucía Chahin, cardióloga.

@@ -21,7 +21,7 @@ import { createClient as createBrowserSupabaseClient } from "@/lib/supabase/clie
 import { parseAiJson } from "@/lib/parse-ai-json"
 import { truncateForImagePlate } from "@/lib/content-text"
 import { DEFAULT_AUTO_PUBLISH_SETTINGS, alreadyPublishedToday, estimateAutoPublishDrainDays, estimateAutoPublishDateForPosition, estimateRepeatEndDate, findRecentDuplicateTopic, pickNextPublishableItems } from "@/lib/content-pipeline"
-import type { AutoPublishSettings, AutoPublishTrackSettings, ContentItem, ContentObjective, ContentScene, ContentSlide, ContentSource, ContentStatus } from "@/types"
+import type { AutoPublishSettings, AutoPublishTrackSettings, ContentItem, ContentObjective, ContentScene, ContentSlide, ContentSource, ContentStatus, ContentVideoScores } from "@/types"
 import type { InstagramMediaInsights } from "@/lib/instagram-business"
 import { CONTENT_OBJECTIVE_GOALS, CONTENT_OBJECTIVE_LABELS, WEEKDAY_OPTIONS } from "@/types"
 
@@ -56,6 +56,16 @@ const FORMATS = [
   { value: "carrusel", label: "Carrusel" },
   { value: "post", label: "Post estatico" },
 ]
+
+const VIDEO_SCORE_LABELS: Array<[keyof ContentVideoScores, string]> = [
+  ["scroll_stop", "Detiene el scroll"],
+  ["clarity", "Claridad"],
+  ["utility", "Utilidad"],
+  ["credibility", "Credibilidad"],
+  ["legibility", "Legibilidad"],
+  ["brand_consistency", "Consistencia de marca"],
+]
+const VIDEO_SCORE_MIN = 4
 
 const STATUS_LABELS: Record<ContentStatus, string> = {
   draft: "Borrador",
@@ -2583,30 +2593,28 @@ function Editor({
     }
   }
 
-  async function regenerateVideoDirection() {
+  /**
+   * Genera la propuesta completa de la microinfografía (gancho, video_prompt para Veo, mensajes, CTA,
+   * notas de postproducción/validación y la autoevaluación 1-5) -- /api/content/video-brief, ver
+   * generateVideoBrief() en ai.ts. No genera ningún video todavía, solo texto (rápido, sin costo real).
+   */
+  async function generateVideoBriefProposal() {
     setVideoDirectionGenerating(true)
     setVideoDirectionError(null)
     try {
-      const response = await fetch("/api/content/video-direction", {
+      const response = await fetch("/api/content/video-brief", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          category: item.category,
-          topic: item.topic,
-          visual_headline: item.visual_headline,
-          caption: item.caption,
-          previous_video_prompt: videoPrompt,
-        }),
+        body: JSON.stringify({ category: item.category, topic: item.topic, objective: item.objective ?? "conversion" }),
       })
       const data = await response.json()
       if (!response.ok || data.error) {
-        setVideoDirectionError(data.error ?? "No se pudo proponer la dirección de video.")
+        setVideoDirectionError(data.error ?? "No se pudo generar la propuesta de video.")
         return
       }
-      onChange({ ...item, video_prompt: data.video_prompt })
-      setShowVideoPrompt(true)
+      await onSave({ hook: data.hook, video_prompt: data.video_prompt, video_brief: data.brief })
     } catch {
-      setVideoDirectionError("No se pudo conectar con la IA para proponer la dirección de video.")
+      setVideoDirectionError("No se pudo conectar con la IA para generar la propuesta.")
     } finally {
       setVideoDirectionGenerating(false)
     }
@@ -2616,7 +2624,9 @@ function Editor({
    * A diferencia de generateVisual (responde en segundos), Veo tarda 1-3 minutos -- esta llamada queda
    * esperando esa respuesta sincrónica larga (ver maxDuration en /api/content/video). Tiene costo real
    * por generación (a diferencia de las placas, sin tier gratuito) y un límite diario propio, mucho más
-   * estricto, del lado del servidor.
+   * estricto, del lado del servidor. Si hay una propuesta (video_brief) cargada, la misma llamada
+   * también compone el gancho/mensajes/CTA sobre el video que genera Veo -- un solo click, un solo
+   * video final (ver /api/content/video).
    */
   async function generateAiVideo() {
     if (
@@ -2630,7 +2640,11 @@ function Editor({
       const response = await fetch("/api/content/video", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ itemId: item.id, video_prompt: videoPrompt }),
+        body: JSON.stringify({
+          itemId: item.id,
+          video_prompt: videoPrompt,
+          ...(item.video_brief ? { hook: item.hook, messages: item.video_brief.messages, cta: item.video_brief.cta } : {}),
+        }),
       })
       const data = await response.json()
       if (!response.ok || data.error) {
@@ -3136,50 +3150,99 @@ function Editor({
                   <p className="text-xs text-gray-500">Todavía no subiste ni generaste el video — hace falta para poder aprobar y publicar este reel.</p>
                 )}
 
-                <div className="space-y-1.5 rounded-md border border-violet-200 bg-violet-50/60 p-2.5">
-                  <div className="flex items-center justify-between">
-                    <p className="text-[11px] font-semibold uppercase tracking-wide text-violet-700">Generar con IA (Veo)</p>
-                    <button
-                      type="button"
-                      onClick={() => setShowVideoPrompt(v => !v)}
-                      className="text-[11px] text-violet-700 hover:text-violet-800 underline"
-                    >
-                      {showVideoPrompt ? "Ocultar dirección" : "Ver/editar dirección"}
-                    </button>
-                  </div>
-                  {showVideoPrompt && (
-                    <>
-                      <Textarea
-                        rows={4}
-                        value={videoPrompt}
-                        onChange={e => onChange({ ...item, video_prompt: e.target.value })}
-                        className="bg-white text-gray-900 text-[11px]"
-                      />
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={regenerateVideoDirection}
-                        disabled={videoDirectionGenerating}
-                        className="h-auto gap-1.5 px-2 py-1 text-[11px] text-violet-700 hover:text-violet-800"
-                      >
-                        {videoDirectionGenerating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <WandSparkles className="h-3.5 w-3.5" />}
-                        Proponer dirección con IA
-                      </Button>
-                      {videoDirectionError && <p className="text-[11px] text-red-600">{videoDirectionError}</p>}
-                    </>
-                  )}
+                <div className="space-y-2 rounded-md border border-violet-200 bg-violet-50/60 p-2.5">
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-violet-700">Microinfografía animada (Veo + texto real)</p>
+                  <p className="text-[11px] text-violet-700/80">
+                    Veo genera solo el fondo/animación (sin texto); el gancho, los mensajes y el CTA se
+                    escriben aparte y se queman encima por edición real, para que salgan siempre bien
+                    escritos.
+                  </p>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={generateVideoBriefProposal}
+                    disabled={videoDirectionGenerating}
+                    className="w-full gap-1.5"
+                  >
+                    {videoDirectionGenerating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <WandSparkles className="h-3.5 w-3.5" />}
+                    {item.video_brief ? "Regenerar propuesta" : "Generar propuesta"}
+                  </Button>
+                  {videoDirectionError && <p className="text-[11px] text-red-600">{videoDirectionError}</p>}
+
+                  {item.video_brief && (() => {
+                    const scores = item.video_brief.scores
+                    const lowScores = VIDEO_SCORE_LABELS.filter(([key]) => scores[key] < VIDEO_SCORE_MIN)
+                    return (
+                      <div className="space-y-2 rounded-md bg-white p-2.5 text-[11px] text-gray-800">
+                        <p><span className="font-semibold text-gray-900">Objetivo:</span> {item.video_brief.objective}</p>
+                        <p><span className="font-semibold text-gray-900">Gancho (0,0-1,2s):</span> {item.hook || "—"}</p>
+                        <div>
+                          <span className="font-semibold text-gray-900">Mensajes (1,2-6,2s):</span>
+                          <ul className="list-disc space-y-0.5 pl-4">
+                            {item.video_brief.messages.map((message, index) => <li key={index}>{message}</li>)}
+                          </ul>
+                        </div>
+                        <p><span className="font-semibold text-gray-900">CTA (6,2-8,0s):</span> {item.video_brief.cta}</p>
+
+                        <button
+                          type="button"
+                          onClick={() => setShowVideoPrompt(v => !v)}
+                          className="text-violet-700 hover:text-violet-800 underline"
+                        >
+                          {showVideoPrompt ? "Ocultar detalle técnico" : "Ver detalle técnico (prompt, notas)"}
+                        </button>
+                        {showVideoPrompt && (
+                          <div className="space-y-2 border-t border-gray-100 pt-2">
+                            <div className="space-y-1">
+                              <Label className="text-[11px] text-gray-600">Prompt en inglés para Veo</Label>
+                              <Textarea
+                                rows={3}
+                                value={videoPrompt}
+                                onChange={e => onChange({ ...item, video_prompt: e.target.value })}
+                                className="bg-gray-50 text-gray-900 text-[11px]"
+                              />
+                            </div>
+                            <p><span className="font-semibold text-gray-900">Postproducción:</span> {item.video_brief.postproduction_notes || "—"}</p>
+                            <p><span className="font-semibold text-gray-900">Validar (Dra. Lucía):</span> {item.video_brief.validation_notes || "—"}</p>
+                          </div>
+                        )}
+
+                        <div className="grid grid-cols-2 gap-1.5 pt-1">
+                          {VIDEO_SCORE_LABELS.map(([key, label]) => {
+                            const value = scores[key]
+                            const ok = value >= VIDEO_SCORE_MIN
+                            return (
+                              <div
+                                key={key}
+                                className={`rounded px-2 py-1 text-[10px] font-medium ${ok ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700"}`}
+                              >
+                                {label}: {value}/5
+                              </div>
+                            )
+                          })}
+                        </div>
+                        {lowScores.length > 0 && (
+                          <p className="font-medium text-red-700">
+                            No llega al mínimo ({VIDEO_SCORE_MIN}/5) en {lowScores.map(([, label]) => label).join(", ")}.
+                            Generá una propuesta nueva antes de crear el video.
+                          </p>
+                        )}
+                      </div>
+                    )
+                  })()}
+
                   <Button
                     type="button"
                     onClick={generateAiVideo}
-                    disabled={aiVideoGenerating}
+                    disabled={aiVideoGenerating || Boolean(item.video_brief && Object.values(item.video_brief.scores).some(v => v < VIDEO_SCORE_MIN))}
                     className="w-full gap-2"
                   >
                     {aiVideoGenerating ? <Loader2 className="h-4 w-4 animate-spin" /> : <WandSparkles className="h-4 w-4" />}
                     {aiVideoGenerating ? "Generando... puede tardar unos minutos" : item.video_url ? "Regenerar video con IA" : "Generar video con IA"}
                   </Button>
                   <p className="text-[11px] text-violet-700/80">
-                    Un solo plano corto (hasta 8s), sin personas hablando — B-roll silencioso. Tiene costo real por intento (aprox. USD 1), sin límite gratuito.
+                    Tiene costo real por intento (aprox. USD 1), sin límite gratuito.
                   </p>
                   {aiVideoError && (
                     <div className="space-y-1.5 rounded bg-red-50 p-2">

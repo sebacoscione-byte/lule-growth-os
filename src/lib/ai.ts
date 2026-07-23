@@ -4,7 +4,7 @@ import { createClient as createSupabaseClient } from "@supabase/supabase-js"
 import { parseAiJson } from "@/lib/parse-ai-json"
 import { EMERGENCY_REPLY, MEDICAL_BOUNDARY_REPLY, isEmergencyMessage, isMedicalBoundaryMessage } from "@/lib/medical-safety"
 import { z } from "zod"
-import type { ClassifyResult, ContentObjective, ContentScene, ContentSource, WhatsAppIntent } from "@/types"
+import type { ClassifyResult, ContentObjective, ContentScene, ContentSource, ContentVideoBrief, ContentVideoScores, WhatsAppIntent } from "@/types"
 
 export type AiMode = "manual" | "gemini_api"
 
@@ -299,27 +299,88 @@ const REEL_SCENE_RULES = `GUION DEL REEL SILENCIOSO:
 - La primera escena es el hook visual. La última cierra con una acción concreta o una pregunta, coherente con el CTA.
 - No pidas que la doctora hable, mueva los labios o mire directo a cámara explicando algo — son tomas mudas o B-roll.`
 
-// 2026-07-23: video generado con IA (Veo) para reels -- a pedido explicito de Seba, nunca personas
-// hablando a camara (se nota demasiado que es IA generativa, rompe la confianza que la pieza necesita
-// generar). Reusa el mismo criterio de B-roll silencioso que REEL_SCENE_RULES (guion para filmar a
-// mano) pero adaptado a un UNICO plano continuo generado por IA, con instrucciones de audio nativo
-// explicitas (Veo genera audio -- sin aclarar "sin dialogo" puede inventar voces, todavia mas notorio
-// que en una imagen fija) y el mismo criterio de posicionamiento anatomico correcto de IMAGE_PROMPT_RULES.
-const VIDEO_PROMPT_RULES = `DIRECCION DE VIDEO PARA VEO (reel generado con IA):
+// 2026-07-23, reescrito el mismo dia a pedido explicito de Seba: el criterio anterior (B-roll
+// cinematografico de consultorio -- estetoscopio en una mesa, plantas, dolly lento) generaba clips
+// que "parecen publicidad generica de IA", no contenido educativo. Nuevo criterio: Veo genera
+// UNICAMENTE el fondo/elemento animado (una ilustracion o motion graphic medico simple, tipo
+// microinfografia -- nunca una escena de consultorio ni personas), y el texto (gancho, mensajes,
+// CTA) se agrega despues por edicion real (ver burnCaptionsOntoVideo en video-caption.ts), nunca
+// generado por Veo. Ver VIDEO_BRIEF_RULES para la estructura de contenido (gancho/mensajes/CTA) que
+// se compone encima de este video.
+const VIDEO_PROMPT_RULES = `DIRECCION DE VIDEO PARA VEO (fondo animado de una microinfografia medica, reel generado con IA):
 - Inclui "video_prompt": el prompt final que se manda directo al modelo de video, en ingles para maximizar precision, sin instrucciones conversacionales ni explicaciones.
-- Describe UN SOLO plano continuo de 4 a 8 segundos (Veo genera un clip corto por pedido, no una secuencia editada de varias escenas) -- elegi el momento mas fuerte y representativo del tema, no intentes contar toda la idea en un solo plano.
-- PROHIBIDO TERMINANTE: ninguna persona hablando a camara, moviendo los labios, gesticulando como si explicara algo, mirando fijo al lente dirigiendose al espectador, ni una entrevista o testimonial. Un modelo de video generativo se nota MUCHISIMO como IA falsa apenas una persona "habla" -- eso rompe justo la confianza que la pieza necesita generar en un paciente potencial. Es contenido B-roll silencioso: manos, objetos, ambientes, equipamiento medico, gestos cotidianos, nunca dialogo.
-- Sonido: termina siempre pidiendo explicitamente "ambient sound only, no dialogue, no voiceover, no spoken words, no lip movement, no one addressing the camera" -- Veo genera audio nativo, y sin esta instruccion puede inventar voces o dialogo falso, mucho mas notorio que en una imagen fija.
-- Describe un movimiento de camara concreto y sutil: dolly-in lento, paneo suave, primer plano estatico con micro-movimiento organico, empuje lento hacia un detalle. Nunca una camara completamente estatica tipo foto ni multiples cortes -- Veo genera un plano continuo, no una edicion con cortes.
-- Misma logica que la direccion visual de placas (ver IMAGE_PROMPT_RULES) para elegir el tema de la escena segun la categoria:
-  - Procedimiento o consulta que sucede en el consultorio (ecocardiograma, consulta cardiologica, estudios cardiologicos, chequeo cardiovascular, atencion en una sede): consultorio o sala de estudios reconocible, con el equipo correspondiente al estudio en la posicion anatomica correcta si se ve sobre un cuerpo -- mismo criterio exacto que las placas (ecocardiograma con el transductor en el pecho cerca del corazon, nunca el abdomen; Holter/MAPA puestos sobre el cuerpo del paciente, nunca el aparato solo en un escritorio).
-  - Habitos, prevencion o factores de riesgo sin procedimiento en consultorio: un momento domestico cotidiano vinculado directo al tema, con movimiento de camara que lo acompañe con naturalidad.
-  - Metafora de objeto: un objeto que evoque el tema de inmediato en primer plano, revelado con una intencion clara de movimiento de camara (nunca una metafora abstracta que solo se entienda leyendo texto).
-- Si aparece una figura humana parcial (una mano, un brazo, un guardapolvo, nunca el rostro real de la Dra. Lucia Chahin ni de nadie identificable), tiene que leerse inequivocamente FEMENINA si se sugiere que es la medica -- mismo criterio que las placas, nunca ambigua ni masculina.
-- Paleta y clima: luz natural o cinematografica calida, tonos bordo, azul profundo o verde azulado, textura realista y organica -- nunca luz fria fluorescente ni un ambiente esteril-asustador tipo guardia.
-- PROHIBIDO en el plano: texto en pantalla, subtitulos, logos, marcas de agua, interfaces, anatomia gore, personas angustiadas o en una situacion de urgencia.
+- Describe UN SOLO plano continuo de 4 a 8 segundos (Veo genera un clip corto por pedido) -- este video es solo el FONDO/elemento animado de una pieza educativa; el texto (titulo, mensajes, CTA) se agrega despues por edicion, nunca lo genera Veo.
+- OBJETIVO DE LA ESCENA: una ilustracion o motion graphic medico simple y moderno que refuerce visualmente el tema puntual (ej: un corazon estilizado latiendo con una linea de ECG dibujandose, un icono de tensiometro con el manguito inflandose, una comparacion visual simple) -- no una escena fotorealista de consultorio. Tiene que poder servir de fondo detras de texto sin competir con el.
+- PROHIBIDO TERMINANTE (esto generaba el problema real reportado -- se ve como publicidad generica de IA, no como contenido educativo):
+  - Consultorios vacios, estetoscopios apoyados sobre una mesa, plantas de decoracion, medicos caminando por pasillos.
+  - Primeros planos de "maquinas medicas" genericas o ficticias sin proposito educativo claro.
+  - Camara haciendo un dolly-in/acercamiento lento y cinematografico durante los 8 segundos como unico recurso visual -- el movimiento tiene que ser sutil y funcional (un pulso, un brillo, una linea de ECG dibujandose, un leve cambio de escala), no una toma de "publicidad de clinica premium".
+  - Personas hablando a camara, moviendo los labios, gesticulando como si explicaran algo, mirando fijo al lente, entrevistas o testimoniales -- se nota muchisimo como IA falsa y rompe la confianza que la pieza necesita generar.
+  - Interfaces o pantallas medicas inventadas (monitores con UI ficticia, ECG decorativo sin sentido).
+  - Estetica futurista, hologramas, luces neon.
+  - Apariencia de publicidad de clinica privada de lujo (marmol, iluminacion dramatica, glamour).
+  - Anatomia deformada o gore.
+- ESTILO VISUAL: fondo claro o institucional (nunca oscuro/cinematografico), paleta sobria de azul profundo, verde azulado o neutros calidos -- NUNCA rosa como color dominante. Ilustracion limpia, moderna, plana o semi-plana (no fotorealista tipo stock), anatomicamente razonable si se muestra un organo. Maximo 2-3 planos (Veo genera uno solo por pedido, esto aplica si en el futuro se encadenan varias generaciones).
+- Sonido: termina siempre pidiendo explicitamente "ambient sound only, no dialogue, no voiceover, no spoken words, no lip movement, no one addressing the camera" -- Veo genera audio nativo, y sin esta instruccion puede inventar voces o dialogo falso.
+- Consistencia de marca: manten el mismo lenguaje visual (paleta, estilo de ilustracion) entre piezas distintas para que se sientan parte de la misma cuenta, no generaciones sueltas sin relacion.
+- Si por algun motivo aparece una figura humana parcial (una mano, nunca el rostro real de la Dra. Lucia Chahin ni de nadie identificable), tiene que leerse inequivocamente FEMENINA si se sugiere que es la medica.
+- PROHIBIDO en el plano: texto en pantalla, subtitulos, logos, marcas de agua, numeros o cifras renderizadas por el modelo (esos van en la superposicion de texto real, no acá).
 - Aspecto vertical 9:16 siempre (es para un reel).
-- Termina "video_prompt" reforzando en ingles: "No people speaking, gesturing to explain, or looking directly at camera. No on-screen text, logos or watermark. Ambient sound only, no dialogue, no voiceover."`
+- Termina "video_prompt" reforzando en ingles: "Clean modern medical motion graphic / illustration style, light background, no people speaking or looking at camera, no on-screen text, logos or watermark, ambient sound only, no dialogue, no voiceover."`
+
+// 2026-07-23: estructura y criterio de contenido para la "microinfografia medica animada" -- reglas
+// de Seba, transcriptas casi literal porque son muy especificas (ejemplos exactos de ganchos buenos y
+// frases vacias a evitar). Alimenta generateVideoBrief(), que genera TODO el contenido de texto de la
+// pieza (gancho, mensajes, CTA) en espanol -- Veo nunca ve ni genera este texto, ver VIDEO_PROMPT_RULES.
+const VIDEO_BRIEF_RULES = `MICROINFOGRAFIA MEDICA ANIMADA -- estructura obligatoria de un reel de 8 segundos:
+El objetivo NO es una escena cinematografica. Es una pieza que detiene el scroll, ensena algo util y
+termina con una llamada a la accion -- como una infografia que se mueve, no un video publicitario.
+
+ESTRUCTURA (los tiempos son fijos, no los cambies):
+- 0,0 a 1,2 segundos -- "hook": un gancho inmediato que se entiende sin sonido. Tiene que verse grande
+  y reconocible en el primer segundo. Ejemplos de gancho que SI funcionan: "¿Sentís palpitaciones?",
+  "Así cambia el ritmo de tu corazón", "¿La presión alta siempre da síntomas?", "3 señales para
+  consultar al cardiólogo".
+- 1,2 a 6,2 segundos -- "messages": 1 a 3 mensajes secundarios como maximo, con informacion util y
+  concreta (no mas de eso -- si hay mas de 3 ideas, elegi las mas fuertes y descarta el resto).
+- 6,2 a 8,0 segundos -- "cta": cierre breve. Ejemplos: "Consultá con cardiología", "Pedí turno desde
+  el link de la bio", "Guardalo para recordarlo". El CTA nunca puede ser mas largo ni mas protagonico
+  que la informacion -- primero se aporta valor, despues se invita a la accion.
+
+REDACCION DEL GANCHO Y LOS MENSAJES:
+- Maximo 6 a 9 palabras importantes visibles en pantalla al mismo tiempo (pensa en tarjetas de texto
+  grandes y legibles, no parrafos).
+- PROHIBIDAS las frases vacias/genericas -- estas frases especificas estan explicitamente prohibidas,
+  nunca las generes ni una variacion cercana: "Tu corazón merece lo mejor", "Un chequeo puede
+  cambiarlo todo", "Cuidarte es amarte", "La prevención es la clave". Reemplaza siempre por
+  informacion especifica y verificable. Ejemplo: en vez de "Cuidá tu corazón", usa "¿Tu presión supera
+  repetidamente 140/90?" o "¿Las palpitaciones vienen acompañadas de mareo?" o "¿Sabías que la
+  hipertensión puede no dar síntomas?".
+- Contenido a priorizar (elegi UNO como eje de la pieza, no mezcles varios): sintomas con los que una
+  persona pueda identificarse: mitos y verdades; comparaciones visuales; senales para hacer una
+  consulta; explicaciones simples de estudios cardiologicos; prevencion cardiovascular; situaciones
+  cotidianas (subir escaleras, hacer ejercicio, sentir palpitaciones, controlar la presion).
+
+PRECISION MEDICA (igual de estricto que el resto del contenido de esta cuenta):
+- No inventes sintomas, diagnosticos, cifras ni recomendaciones -- toda cifra o dato tiene que ser
+  informacion medica general validada, nunca inventada para que suene mas concreta.
+- Nunca un diagnostico individual, nunca una promesa tipo "un chequeo te salvara", nunca generar miedo
+  innecesario (ver tambien PATIENT_ACQUISITION_RULES: nunca escasez, culpa, miedo ni urgencia comercial).
+- Nunca presentar como normal un sintoma que en realidad podria requerir atencion urgente.
+
+CRITERIOS QUE HACEN QUE UNA PROPUESTA NO SIRVA (tenelos en cuenta al puntuarte a vos mismo mas abajo):
+No entenderse en el primer segundo sin sonido; poder ser usada por cualquier medico de cualquier
+especialidad (no especifica de cardiologia); mostrar solo objetos o un consultorio sin ensenar nada;
+depender del audio para entenderse; un CTA que ocupa mas tiempo o espacio que la informacion; no dejar
+ganas de guardarla o compartirla; sentirse como un banco de imagenes o una publicidad generica.
+
+PUNTAJE (autoevaluate del 1 al 5 en cada dimension, honesto -- no pongas todo en 5 por default):
+- scroll_stop: ¿el gancho detiene el scroll en el primer segundo?
+- clarity: ¿se entiende el tema sin sonido, de un vistazo?
+- utility: ¿ensena algo concreto y especifico, no una frase vacia?
+- credibility: ¿es médicamente preciso, sin inventar datos ni prometer resultados?
+- legibility: ¿el texto propuesto entra comodo en pantalla (maximo 6-9 palabras visibles a la vez)?
+- brand_consistency: ¿coherente con el tono cercano-profesional de la cuenta, sin ser frio ni dramatico?`
 
 export function buildContentPlanPrompt(input: {
   topic: string
@@ -1090,44 +1151,88 @@ FINAL ART DIRECTION:
 }
 
 /**
- * Pide una direccion de video nueva (video_prompt) para el UNICO plano de un reel generado con IA, a
- * partir de una pieza ya escrita (categoria, tema, titular, caption). Mismo patron que
- * regenerateImageDirection, pero para VIDEO_PROMPT_RULES en vez de IMAGE_PROMPT_RULES.
+ * Genera la propuesta completa de un reel tipo "microinfografia medica animada" (2026-07-23,
+ * reemplaza generateVideoDirection): el gancho (para item.hook), el video_prompt (fondo/animacion
+ * para Veo, sin texto -- ver VIDEO_PROMPT_RULES), y el resto del brief estructurado (mensajes, CTA,
+ * notas de postproduccion/validacion, autoevaluacion 1-5) segun VIDEO_BRIEF_RULES. La UI bloquea
+ * generar el video real si alguna dimension del puntaje da menos de 4.
  */
-export async function generateVideoDirection(input: {
+export async function generateVideoBrief(input: {
   category: string
   topic: string
-  visual_headline: string
-  caption: string
-  previous_video_prompt?: string
-}): Promise<{ video_prompt: string }> {
+  objective: ContentObjective
+}): Promise<{ hook: string; video_prompt: string; brief: ContentVideoBrief }> {
   if (getAiMode() === "manual") {
     throw new Error("Modo manual activo: la generación automática está deshabilitada.")
   }
-  const avoidPrevious = input.previous_video_prompt
-    ? `\nLa direccion anterior fue esta, DESCARTALA y proponé un plano distinto (otro momento, sujeto o encuadre -- no una variacion menor): """${input.previous_video_prompt}"""`
-    : ""
   const text = await generateText({
-    maxTokens: 500,
+    maxTokens: 1200,
     json: true,
-    purpose: "video_direction",
+    purpose: "video_brief",
     cacheSystem: true,
-    system: `${VIDEO_PROMPT_RULES}
+    system: `${VIDEO_BRIEF_RULES}
 
-Te paso una pieza de contenido tipo reel ya escrita (categoria, tema, titular y el caption completo).
-Tu tarea es proponer la direccion de ese UNICO plano de video generado con IA, siguiendo las reglas de
-arriba.
-Devolve SOLO un JSON PLANO con esta forma exacta, sin ningun otro campo: { "video_prompt": "..." }`,
+${VIDEO_PROMPT_RULES}
+
+${PATIENT_ACQUISITION_RULES}
+
+Con todas las reglas de arriba, generá la propuesta completa de un reel tipo microinfografía médica
+animada de 8 segundos para la cuenta de Instagram de la Dra. Lucía Chahin (cardióloga), sobre la
+categoría, el tema y el objetivo editorial que te paso.
+Devolvé SOLO un JSON PLANO con esta forma exacta, sin ningún otro campo ni anidamiento distinto:
+{
+  "hook": "texto del gancho en español, tal como debe verse en pantalla en el primer segundo (0,0-1,2s)",
+  "video_prompt": "el prompt en inglés para Veo, siguiendo las reglas de dirección de video de arriba",
+  "objective": "una sola oración en español: el objetivo educativo específico de esta pieza puntual",
+  "messages": ["mensaje secundario 1", "mensaje secundario 2 (opcional)", "mensaje secundario 3 (opcional)"],
+  "cta": "texto del cierre/CTA en español (6,2-8,0s)",
+  "postproduction_notes": "en español: elementos que deberían agregarse o ajustarse en postproducción",
+  "validation_notes": "en español: qué debería validar puntualmente la Dra. Lucía antes de aprobar",
+  "scores": { "scroll_stop": 1-5, "clarity": 1-5, "utility": 1-5, "credibility": 1-5, "legibility": 1-5, "brand_consistency": 1-5 }
+}`,
     messages: [{
       role: "user",
-      content: `Categoria: ${input.category}\nTema: ${input.topic}\nTitular: "${input.visual_headline}"\nCaption completo:\n${input.caption}${avoidPrevious}`,
+      content: `Categoría: ${input.category}\nTema: ${input.topic}\n${OBJECTIVE_GUIDANCE[input.objective]}`,
     }],
   })
-  const parsed = parseJson<{ video_prompt?: unknown }>(text)
-  if (typeof parsed.video_prompt !== "string" || !parsed.video_prompt.trim()) {
-    throw new Error("La IA devolvió una respuesta incompleta para la dirección de video.")
+  const parsed = parseJson<{
+    hook?: unknown; video_prompt?: unknown; objective?: unknown; messages?: unknown; cta?: unknown
+    postproduction_notes?: unknown; validation_notes?: unknown; scores?: unknown
+  }>(text)
+
+  const messages = Array.isArray(parsed.messages)
+    ? parsed.messages.filter((m): m is string => typeof m === "string" && Boolean(m.trim())).slice(0, 3)
+    : []
+  if (typeof parsed.hook !== "string" || !parsed.hook.trim() ||
+    typeof parsed.video_prompt !== "string" || !parsed.video_prompt.trim() ||
+    messages.length === 0) {
+    throw new Error("La IA devolvió una propuesta de video incompleta.")
   }
-  return { video_prompt: parsed.video_prompt }
+
+  const rawScores = (parsed.scores ?? {}) as Record<string, unknown>
+  const clampScore = (key: keyof ContentVideoScores) =>
+    typeof rawScores[key] === "number" ? Math.min(5, Math.max(1, Math.round(rawScores[key] as number))) : 1
+  const scores: ContentVideoScores = {
+    scroll_stop: clampScore("scroll_stop"),
+    clarity: clampScore("clarity"),
+    utility: clampScore("utility"),
+    credibility: clampScore("credibility"),
+    legibility: clampScore("legibility"),
+    brand_consistency: clampScore("brand_consistency"),
+  }
+
+  return {
+    hook: parsed.hook,
+    video_prompt: parsed.video_prompt,
+    brief: {
+      objective: typeof parsed.objective === "string" ? parsed.objective : "",
+      messages,
+      cta: typeof parsed.cta === "string" ? parsed.cta : "",
+      postproduction_notes: typeof parsed.postproduction_notes === "string" ? parsed.postproduction_notes : "",
+      validation_notes: typeof parsed.validation_notes === "string" ? parsed.validation_notes : "",
+      scores,
+    },
+  }
 }
 
 const VEO_POLL_INTERVAL_MS = 10_000

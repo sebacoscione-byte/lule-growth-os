@@ -168,6 +168,32 @@ export interface ContentScene {
   shot: string
 }
 
+/** Autoevaluacion 1-5 de la propuesta de reel (microinfografia animada), ver VIDEO_BRIEF_RULES en
+ * ai.ts. Si alguna dimension da menos de 4, la UI bloquea "Generar video con IA" hasta regenerar la
+ * propuesta o corregirla a mano. */
+export interface ContentVideoScores {
+  scroll_stop: number
+  clarity: number
+  utility: number
+  credibility: number
+  legibility: number
+  brand_consistency: number
+}
+
+/** Propuesta estructurada de un reel tipo "microinfografia medica animada" (2026-07-23, reemplaza el
+ * criterio anterior de B-roll cinematografico). item.hook es el gancho (0,0-1,2s, reusa el mismo
+ * campo que el hook de Instagram) e item.video_prompt es el prompt de Veo (fondo/animacion, sin
+ * texto) -- este objeto cubre el resto de la propuesta: mensajes secundarios (1,2-6,2s), CTA
+ * (6,2-8,0s) y las notas/puntajes para revision humana antes de aprobar. */
+export interface ContentVideoBrief {
+  objective: string
+  messages: string[]
+  cta: string
+  postproduction_notes: string
+  validation_notes: string
+  scores: ContentVideoScores
+}
+
 export interface ContentItem {
   id: string
   topic: string
@@ -196,6 +222,8 @@ export interface ContentItem {
   video_url?: string
   /** Direccion de video (en ingles) para generar el video con IA -- solo se usa para el camino "Generar con IA", no para subir un video propio. */
   video_prompt?: string
+  /** Propuesta estructurada (microinfografia animada) generada junto con video_prompt -- ver ContentVideoBrief. */
+  video_brief?: ContentVideoBrief
   source: ContentSource | null
   created_at: string
   updated_at: string
