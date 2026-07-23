@@ -320,13 +320,14 @@ const VIDEO_PROMPT_RULES = `DIRECCION DE VIDEO PARA VEO (fondo animado de una mi
   - Estetica futurista, hologramas, luces neon.
   - Apariencia de publicidad de clinica privada de lujo (marmol, iluminacion dramatica, glamour).
   - Anatomia deformada o gore.
+  - MOCKUP DE TELEFONO O APP: nunca encuadrar la escena como si fuera la captura de pantalla de un telefono o una app (por ejemplo, un icono de tensiometro/gauge NO tiene que dibujarse dentro de un marco de telefono). Esto esta PROHIBIDO: el plano no puede simular ser la pantalla de un dispositivo -- es una ilustracion a pantalla completa (full-bleed), nunca un telefono/tablet dentro del cuadro, nunca un marco de dispositivo, nunca una barra de estado, reloj, hora, iconos de notificacion/senal/bateria, ni ningun texto que parezca un nombre de app o marca.
 - ESTILO VISUAL: fondo claro o institucional (nunca oscuro/cinematografico), paleta sobria de azul profundo, verde azulado o neutros calidos -- NUNCA rosa como color dominante. Ilustracion limpia, moderna, plana o semi-plana (no fotorealista tipo stock), anatomicamente razonable si se muestra un organo. Maximo 2-3 planos (Veo genera uno solo por pedido, esto aplica si en el futuro se encadenan varias generaciones).
 - Sonido: termina siempre pidiendo explicitamente "ambient sound only, no dialogue, no voiceover, no spoken words, no lip movement, no one addressing the camera" -- Veo genera audio nativo, y sin esta instruccion puede inventar voces o dialogo falso.
 - Consistencia de marca: manten el mismo lenguaje visual (paleta, estilo de ilustracion) entre piezas distintas para que se sientan parte de la misma cuenta, no generaciones sueltas sin relacion.
 - Si por algun motivo aparece una figura humana parcial (una mano, nunca el rostro real de la Dra. Lucia Chahin ni de nadie identificable), tiene que leerse inequivocamente FEMENINA si se sugiere que es la medica.
 - PROHIBIDO en el plano: texto en pantalla, subtitulos, logos, marcas de agua, numeros o cifras renderizadas por el modelo (esos van en la superposicion de texto real, no acá).
 - Aspecto vertical 9:16 siempre (es para un reel).
-- Termina "video_prompt" reforzando en ingles: "Clean modern medical motion graphic / illustration style, light background, no people speaking or looking at camera, no on-screen text, logos or watermark, ambient sound only, no dialogue, no voiceover."`
+- Termina "video_prompt" reforzando en ingles: "Clean modern medical motion graphic / illustration style, full-bleed illustration filling the entire frame, not a phone or app screenshot, no phone mockup or device frame, no status bar, no clock or time display, no notification/signal/battery icons, no fake app name or logo, light background, no people speaking or looking at camera, no on-screen text, logos or watermark, ambient sound only, no dialogue, no voiceover."`
 
 // 2026-07-23: estructura y criterio de contenido para la "microinfografia medica animada" -- reglas
 // de Seba, transcriptas casi literal porque son muy especificas (ejemplos exactos de ganchos buenos y
