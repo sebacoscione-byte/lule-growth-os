@@ -2794,332 +2794,19 @@ function Editor({
             </CardContent>
           </Card>
         )}
-        <Card className="border-violet-200 bg-violet-50/40">
-          <CardHeader className="pb-3">
-            <CardTitle className="flex items-center gap-2 text-base text-gray-900">
-              <WandSparkles className="h-4 w-4 text-violet-600" />
-              Placa final con Gemini
-            </CardTitle>
-            <p className="text-xs text-gray-600">
-              Gemini resuelve la escena, composición, tipografía, contraste y zonas seguras según el formato.
-            </p>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {displayedVisualUrl ? (
-              <Image
-                src={displayedVisualUrl}
-                alt={item.image_alt_text || `Placa visual sobre ${item.topic}`}
-                width={1024}
-                height={item.format === "historia" ? 1820 : 1280}
-                unoptimized
-                className="h-auto w-full rounded-xl border border-violet-100"
-              />
-            ) : (
-              <div className="flex min-h-56 items-center justify-center rounded-xl border border-dashed border-violet-200 bg-white p-6 text-center text-sm text-gray-500">
-                La dirección visual ya está definida por la IA. Generá la placa final cuando quieras revisarla o publicarla.
-              </div>
-            )}
-            {visualError && (
-              <div className="space-y-2 rounded-md bg-red-50 p-3 text-xs text-red-700">
-                <p>{visualError}</p>
-                {visualHelpUrl && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => window.open(visualHelpUrl, "_blank")}
-                    className="gap-2 border-red-200 bg-white text-red-700 hover:bg-red-100"
-                  >
-                    <ExternalLink className="h-3.5 w-3.5" />
-                    Revisar cuota de Gemini
-                  </Button>
-                )}
-              </div>
-            )}
-            <div className="grid gap-2 sm:flex">
-              <Button onClick={generateVisual} disabled={visualGenerating} className="w-full flex-1 gap-2">
-                {visualGenerating ? <Loader2 className="h-4 w-4 animate-spin" /> : <WandSparkles className="h-4 w-4" />}
-                {displayedVisualUrl ? "Regenerar placa" : "Generar placa final"}
-              </Button>
-              {generatedVisual?.itemId === item.id && (
-                <Button variant="outline" onClick={downloadGeneratedVisual} className="w-full flex-1 gap-2">
-                  <Download className="h-4 w-4" />
-                  Descargar placa
-                </Button>
-              )}
-            </div>
-            <div className="space-y-2">
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/png,image/jpeg,image/webp"
-                className="hidden"
-                onChange={handleImageUpload}
-              />
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => fileInputRef.current?.click()}
-                disabled={imageUploading}
-                className="w-full gap-2"
-              >
-                {imageUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImageIcon className="h-4 w-4" />}
-                Subir imagen propia (sin generar con IA)
-              </Button>
-              {imageUploadError && <p className="text-xs text-red-600 bg-red-50 rounded p-2">{imageUploadError}</p>}
-            </div>
-            <div className="space-y-1.5">
-              <div className="flex items-center justify-between"><Label className="text-gray-900">Titular de la placa</Label><CharacterCount value={item.visual_headline} limit={90} /></div>
-              <Input
-                value={item.visual_headline}
-                maxLength={90}
-                onChange={event => onChange({ ...item, visual_headline: event.target.value })}
-                placeholder="Texto grande que va a aparecer en la imagen"
-                className="bg-white text-gray-900"
-              />
-            </div>
-            <div className="space-y-1.5">
-              <div className="flex items-center justify-between"><Label className="text-gray-900">Subtítulo de la placa</Label><CharacterCount value={item.visual_subtitle} limit={90} /></div>
-              <Input
-                value={item.visual_subtitle}
-                maxLength={90}
-                onChange={event => onChange({ ...item, visual_subtitle: event.target.value })}
-                placeholder="Texto secundario que va a aparecer en la imagen"
-                className="bg-white text-gray-900"
-              />
-              <p className="text-xs text-gray-400">
-                Esto es el texto exacto que Gemini dibuja arriba de la escena — si no coincide con el
-                hook o el caption, corregilo acá y volvé a generar la placa.
-              </p>
-            </div>
-            <div className="space-y-1.5">
-              <div className="flex items-center justify-between">
-                <Label className="text-gray-900">Descripción de la imagen (para generar la placa)</Label>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={regenerateImageDirection}
-                  disabled={directionGenerating}
-                  className="h-auto gap-1.5 px-2 py-1 text-xs text-violet-700 hover:text-violet-800"
-                >
-                  {directionGenerating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <WandSparkles className="h-3.5 w-3.5" />}
-                  Regenerar
-                </Button>
-              </div>
-              <Textarea
-                rows={4}
-                value={imagePrompt}
-                onChange={event => onChange({ ...item, image_prompt: event.target.value })}
-                placeholder="Describí la escena que querés para la placa"
-                className="bg-white text-gray-900 text-xs"
-              />
-              <p className="text-xs text-gray-400">
-                Esto es lo que usa &ldquo;{displayedVisualUrl ? "Regenerar placa" : "Generar placa final"}&rdquo; arriba para
-                crear la imagen — escribila a mano o tocá &ldquo;Regenerar&rdquo; para que la IA proponga una escena nueva
-                basada en el Caption de Instagram de abajo.
-              </p>
-              {directionError && <p className="text-xs text-red-600">{directionError}</p>}
-            </div>
-          </CardContent>
-        </Card>
-        {isCarrusel && (
+        {isReel && (
           <Card className="border-violet-200 bg-violet-50/40">
             <CardHeader className="pb-3">
               <CardTitle className="flex items-center gap-2 text-base text-gray-900">
-                <WandSparkles className="h-4 w-4 text-violet-600" />
-                Placas de cada slide
+                <Video className="h-4 w-4 text-violet-600" />
+                Video del reel
               </CardTitle>
               <p className="text-xs text-gray-600">
-                Cada slide necesita su propia imagen para poder aprobar y publicar el carrusel completo.
-                Cada una tiene su propia escena (mismo estilo y paleta que la portada, pero un sujeto
-                distinto) para que no se repita la misma foto de fondo con solo el texto cambiado — si
-                no le cargás una descripción propia, se genera una automáticamente al crear la imagen.
+                Un reel necesita el video real para poder aprobar y publicar — generalo con IA
+                (microinfografía animada) o subí uno propio ya grabado. La placa/imagen no se usa acá.
               </p>
             </CardHeader>
             <CardContent className="space-y-3">
-              <Button
-                onClick={generateAllCarouselVisuals}
-                disabled={carruselBusy || (item.slides ?? []).length === 0}
-                className="w-full gap-2"
-              >
-                {bulkGenerating ? <Loader2 className="h-4 w-4 animate-spin" /> : <WandSparkles className="h-4 w-4" />}
-                Generar todas las placas ({1 + (item.slides ?? []).length} imágenes)
-              </Button>
-              {(item.slides ?? []).length === 0 && (
-                <p className="text-xs text-gray-500">Agregá al menos una slide (más abajo, en la sección de texto) antes de generar imágenes.</p>
-              )}
-              {bulkError && <p className="text-xs text-red-600 bg-red-50 rounded p-2">{bulkError}</p>}
-              <p className="text-xs text-gray-400">
-                Usa 1 llamada a Gemini por imagen, más 1 llamada de texto adicional por cada slide que
-                todavía no tenga su propia escena (para proponerle una distinta a la portada). Mientras
-                se generan, no se puede editar el texto ni agregar/quitar slides.
-              </p>
-              {(item.slides ?? []).length > 0 && (
-                <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-                  {(item.slides ?? []).map((slide, index) => (
-                    <div key={index} className="space-y-1.5">
-                      <SlideCard slide={slide} index={index} style={item.visual_style} />
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => generateSlideVisual(index)}
-                        disabled={carruselBusy}
-                        className="w-full gap-1.5 text-xs"
-                      >
-                        {slideGeneratingIndex === index ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <WandSparkles className="h-3.5 w-3.5" />}
-                        {slide.visual_url ? "Regenerar" : "Generar"}
-                      </Button>
-                      {slideErrors[index] && <p className="text-xs text-red-600">{slideErrors[index]}</p>}
-                      {slideSceneFallbackWarning[index] && <p className="text-[11px] text-amber-700">{slideSceneFallbackWarning[index]}</p>}
-                      <button
-                        type="button"
-                        onClick={() => toggleSlideScene(index)}
-                        className="w-full text-center text-[11px] text-violet-700 hover:text-violet-800 underline"
-                      >
-                        {expandedSlideScene.has(index) ? "Ocultar descripción (texto)" : slide.image_prompt ? "Ver descripción (texto)" : "Sin descripción propia todavía"}
-                      </button>
-                      {expandedSlideScene.has(index) && (
-                        <div className="space-y-1">
-                          <Textarea
-                            rows={3}
-                            value={slide.image_prompt ?? ""}
-                            onChange={event => updateSlide(index, { image_prompt: event.target.value })}
-                            placeholder="Se completa sola al generar la imagen — o escribila a mano acá."
-                            className="bg-white text-gray-900 text-[11px]"
-                            disabled={carruselBusy}
-                          />
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => regenerateSlideScene(index)}
-                            disabled={carruselBusy || slideSceneGeneratingIndex === index}
-                            className="h-auto w-full gap-1.5 px-2 py-1 text-[11px] text-violet-700 hover:text-violet-800"
-                          >
-                            {slideSceneGeneratingIndex === index ? <Loader2 className="h-3 w-3 animate-spin" /> : <WandSparkles className="h-3 w-3" />}
-                            Nueva escena
-                          </Button>
-                          {slideSceneErrors[index] && <p className="text-[11px] text-red-600">{slideSceneErrors[index]}</p>}
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        )}
-        <Button variant="outline" onClick={onCopy} className="w-full gap-2">{copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />} Copiar Instagram</Button>
-        <TrackedLinkField itemId={item.id} visits={item.tracked_visits ?? 0} interactions={item.tracked_interactions ?? 0} />
-        {item.source && (
-          <a href={item.source.url} target="_blank" rel="noreferrer" className="block rounded-lg border border-blue-100 bg-blue-50 p-3 text-xs text-blue-800">
-            <span className="font-medium">Fuente revisada:</span> {item.source.title} <ExternalLink className="inline h-3 w-3" />
-          </a>
-        )}
-      </div>
-      <Card>
-        <CardHeader className="space-y-3">
-          <div className="flex items-center justify-between gap-3">
-            <CardTitle className="text-base">Revisión humana</CardTitle>
-            <div className="flex items-center gap-2">
-              {hasUnsavedChanges && <Badge variant="warning">Cambios sin guardar</Badge>}
-              <Badge variant="outline">{STATUS_LABELS[item.status]}</Badge>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <Label className="shrink-0 text-gray-900">Formato</Label>
-            <Select value={item.format} onValueChange={value => onChange({ ...item, format: value as ContentItem["format"] })}>
-              <SelectTrigger className="w-48 text-gray-900"><SelectValue /></SelectTrigger>
-              <SelectContent>{FORMATS.map(option => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}</SelectContent>
-            </Select>
-          </div>
-          {item.format === "reel" && (
-            <p className="text-xs text-amber-700">Subí el video (más abajo) antes de aprobar — un reel necesita el archivo real para poder publicarse, la app no lo genera.</p>
-          )}
-          {item.format === "carrusel" && (
-            <p className="text-xs text-blue-700">Generá la placa de la portada y de cada slide (más abajo) antes de aprobar — un carrusel necesita todas sus imágenes listas para poder publicarse.</p>
-          )}
-          <div className="flex gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
-            <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0" />
-            <span>Verificá que no haya diagnósticos, tratamientos, interpretación de estudios ni promesas. Ante síntomas de alarma, derivá a guardia.</span>
-          </div>
-          <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 text-xs text-blue-900">
-            <p className="font-semibold">Checklist de captación</p>
-            <ul className="mt-2 space-y-1">
-              <li>• ¿El hook se entiende y despierta curiosidad en menos de 3 segundos?</li>
-              <li>• ¿La imagen conecta con una situación o aspiración reconocible?</li>
-              <li>• ¿La pieza entrega valor antes de invitar a pedir turno?</li>
-              <li>• ¿El CTA explica un próximo paso simple, sin miedo ni presión?</li>
-            </ul>
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {isHistoria && !showHistoriaText && (
-            <div className="text-xs text-gray-500 rounded-md bg-gray-50 border border-gray-200 p-2 space-y-1.5">
-              <p>Instagram no muestra caption ni hashtags en historias (solo la imagen) — no hace falta escribir nada acá, subí la imagen y aprobá.</p>
-              <button type="button" onClick={() => setShowHistoriaText(true)} className="font-medium text-gray-700 hover:text-gray-900 underline">
-                Agregar texto de referencia interna (opcional)
-              </button>
-            </div>
-          )}
-          {(!isHistoria || showHistoriaText) && (
-            <>
-              {isHistoria && (
-                <p className="text-xs text-gray-500 rounded-md bg-gray-50 border border-gray-200 p-2">
-                  Instagram no muestra caption ni hashtags en historias (solo la imagen) — completar estos campos es opcional, quedan como referencia interna.
-                </p>
-              )}
-              <div className="space-y-1.5">
-                <div className="flex items-center justify-between"><Label className="text-gray-900">Hook{isHistoria ? " (referencia interna)" : " de Instagram"}</Label><CharacterCount value={item.hook} /></div>
-                <Textarea rows={2} value={item.hook} onChange={event => onChange({ ...item, hook: event.target.value })} className="text-gray-900" />
-              </div>
-              <div className="space-y-1.5">
-                <div className="flex items-center justify-between"><Label className="text-gray-900">Caption{isHistoria ? " (referencia interna)" : " de Instagram"}</Label><CharacterCount value={item.caption} /></div>
-                <Textarea rows={9} value={item.caption} onChange={event => onChange({ ...item, caption: event.target.value })} className="text-gray-900" />
-              </div>
-              <div className="space-y-1.5">
-                <div className="flex items-center justify-between"><Label className="text-gray-900">Hashtags{isHistoria ? " (referencia interna)" : ""}</Label><CharacterCount value={item.hashtags} /></div>
-                <Textarea rows={3} value={item.hashtags} onChange={event => onChange({ ...item, hashtags: event.target.value })} className="text-gray-900" />
-              </div>
-            </>
-          )}
-          {item.format === "carrusel" && (
-            <div className="space-y-3 rounded-lg border border-gray-200 p-3">
-              <div className="flex items-center justify-between">
-                <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Slides del carrusel</p>
-                <Button
-                  type="button" variant="outline" size="sm" onClick={addSlide}
-                  disabled={carruselBusy || (item.slides ?? []).length >= 9} className="gap-1.5"
-                >
-                  <Plus className="h-3.5 w-3.5" /> Agregar slide
-                </Button>
-              </div>
-              {(item.slides ?? []).length === 0 && (
-                <p className="text-xs text-gray-500">Todavía no hay slides. Agregá al menos una para poder armar el carrusel.</p>
-              )}
-              {carruselBusy && (
-                <p className="text-xs text-gray-500">Generando placas — esperá a que termine para editar el texto o agregar/quitar slides.</p>
-              )}
-              {(item.slides ?? []).map((slide, index) => (
-                <div key={index} className="space-y-2 rounded-md bg-gray-50 p-3">
-                  <div className="flex items-center justify-between">
-                    <Label className="text-gray-900">Slide {index + 1}</Label>
-                    <button
-                      type="button" onClick={() => removeSlide(index)} disabled={carruselBusy}
-                      aria-label="Quitar slide" className="text-gray-400 hover:text-red-600 disabled:opacity-40 disabled:hover:text-gray-400"
-                    >
-                      <X className="h-3.5 w-3.5" />
-                    </button>
-                  </div>
-                  <Input value={slide.headline} maxLength={60} disabled={carruselBusy} onChange={event => updateSlide(index, { headline: event.target.value })} className="bg-white text-gray-900" />
-                  <Textarea rows={3} value={slide.text} maxLength={300} disabled={carruselBusy} onChange={event => updateSlide(index, { text: event.target.value })} className="bg-white text-gray-900" />
-                </div>
-              ))}
-            </div>
-          )}
-          {item.format === "reel" && (
-            <div className="space-y-3 rounded-lg border border-gray-200 p-3">
               <div className="flex items-center justify-between">
                 <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Guion del reel silencioso</p>
                 <div className="flex items-center gap-1.5">
@@ -3138,7 +2825,7 @@ function Editor({
                 Se entiende sin audio: texto breve en pantalla por escena + qué se filma. Sirve como guía para grabar (Lucía sin hablar a cámara, o B-roll) — subí el video ya grabado más abajo.
               </p>
               <div className="space-y-2 rounded-md bg-gray-50 p-3">
-                <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Video del reel</p>
+                <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Video actual</p>
                 {item.video_url ? (
                   <video
                     key={item.video_url}
@@ -3338,6 +3025,333 @@ function Editor({
                   {captionError && <p className="text-[11px] text-red-600 bg-red-50 rounded p-2">{captionError}</p>}
                 </div>
               )}
+            </CardContent>
+          </Card>
+        )}
+        {!isReel && (
+        <Card className="border-violet-200 bg-violet-50/40">
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-base text-gray-900">
+              <WandSparkles className="h-4 w-4 text-violet-600" />
+              Placa final con Gemini
+            </CardTitle>
+            <p className="text-xs text-gray-600">
+              Gemini resuelve la escena, composición, tipografía, contraste y zonas seguras según el formato.
+            </p>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {displayedVisualUrl ? (
+              <Image
+                src={displayedVisualUrl}
+                alt={item.image_alt_text || `Placa visual sobre ${item.topic}`}
+                width={1024}
+                height={item.format === "historia" ? 1820 : 1280}
+                unoptimized
+                className="h-auto w-full rounded-xl border border-violet-100"
+              />
+            ) : (
+              <div className="flex min-h-56 items-center justify-center rounded-xl border border-dashed border-violet-200 bg-white p-6 text-center text-sm text-gray-500">
+                La dirección visual ya está definida por la IA. Generá la placa final cuando quieras revisarla o publicarla.
+              </div>
+            )}
+            {visualError && (
+              <div className="space-y-2 rounded-md bg-red-50 p-3 text-xs text-red-700">
+                <p>{visualError}</p>
+                {visualHelpUrl && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => window.open(visualHelpUrl, "_blank")}
+                    className="gap-2 border-red-200 bg-white text-red-700 hover:bg-red-100"
+                  >
+                    <ExternalLink className="h-3.5 w-3.5" />
+                    Revisar cuota de Gemini
+                  </Button>
+                )}
+              </div>
+            )}
+            <div className="grid gap-2 sm:flex">
+              <Button onClick={generateVisual} disabled={visualGenerating} className="w-full flex-1 gap-2">
+                {visualGenerating ? <Loader2 className="h-4 w-4 animate-spin" /> : <WandSparkles className="h-4 w-4" />}
+                {displayedVisualUrl ? "Regenerar placa" : "Generar placa final"}
+              </Button>
+              {generatedVisual?.itemId === item.id && (
+                <Button variant="outline" onClick={downloadGeneratedVisual} className="w-full flex-1 gap-2">
+                  <Download className="h-4 w-4" />
+                  Descargar placa
+                </Button>
+              )}
+            </div>
+            <div className="space-y-2">
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/png,image/jpeg,image/webp"
+                className="hidden"
+                onChange={handleImageUpload}
+              />
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={imageUploading}
+                className="w-full gap-2"
+              >
+                {imageUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImageIcon className="h-4 w-4" />}
+                Subir imagen propia (sin generar con IA)
+              </Button>
+              {imageUploadError && <p className="text-xs text-red-600 bg-red-50 rounded p-2">{imageUploadError}</p>}
+            </div>
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between"><Label className="text-gray-900">Titular de la placa</Label><CharacterCount value={item.visual_headline} limit={90} /></div>
+              <Input
+                value={item.visual_headline}
+                maxLength={90}
+                onChange={event => onChange({ ...item, visual_headline: event.target.value })}
+                placeholder="Texto grande que va a aparecer en la imagen"
+                className="bg-white text-gray-900"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between"><Label className="text-gray-900">Subtítulo de la placa</Label><CharacterCount value={item.visual_subtitle} limit={90} /></div>
+              <Input
+                value={item.visual_subtitle}
+                maxLength={90}
+                onChange={event => onChange({ ...item, visual_subtitle: event.target.value })}
+                placeholder="Texto secundario que va a aparecer en la imagen"
+                className="bg-white text-gray-900"
+              />
+              <p className="text-xs text-gray-400">
+                Esto es el texto exacto que Gemini dibuja arriba de la escena — si no coincide con el
+                hook o el caption, corregilo acá y volvé a generar la placa.
+              </p>
+            </div>
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <Label className="text-gray-900">Descripción de la imagen (para generar la placa)</Label>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={regenerateImageDirection}
+                  disabled={directionGenerating}
+                  className="h-auto gap-1.5 px-2 py-1 text-xs text-violet-700 hover:text-violet-800"
+                >
+                  {directionGenerating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <WandSparkles className="h-3.5 w-3.5" />}
+                  Regenerar
+                </Button>
+              </div>
+              <Textarea
+                rows={4}
+                value={imagePrompt}
+                onChange={event => onChange({ ...item, image_prompt: event.target.value })}
+                placeholder="Describí la escena que querés para la placa"
+                className="bg-white text-gray-900 text-xs"
+              />
+              <p className="text-xs text-gray-400">
+                Esto es lo que usa &ldquo;{displayedVisualUrl ? "Regenerar placa" : "Generar placa final"}&rdquo; arriba para
+                crear la imagen — escribila a mano o tocá &ldquo;Regenerar&rdquo; para que la IA proponga una escena nueva
+                basada en el Caption de Instagram de abajo.
+              </p>
+              {directionError && <p className="text-xs text-red-600">{directionError}</p>}
+            </div>
+          </CardContent>
+        </Card>
+        )}
+        {isCarrusel && (
+          <Card className="border-violet-200 bg-violet-50/40">
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2 text-base text-gray-900">
+                <WandSparkles className="h-4 w-4 text-violet-600" />
+                Placas de cada slide
+              </CardTitle>
+              <p className="text-xs text-gray-600">
+                Cada slide necesita su propia imagen para poder aprobar y publicar el carrusel completo.
+                Cada una tiene su propia escena (mismo estilo y paleta que la portada, pero un sujeto
+                distinto) para que no se repita la misma foto de fondo con solo el texto cambiado — si
+                no le cargás una descripción propia, se genera una automáticamente al crear la imagen.
+              </p>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <Button
+                onClick={generateAllCarouselVisuals}
+                disabled={carruselBusy || (item.slides ?? []).length === 0}
+                className="w-full gap-2"
+              >
+                {bulkGenerating ? <Loader2 className="h-4 w-4 animate-spin" /> : <WandSparkles className="h-4 w-4" />}
+                Generar todas las placas ({1 + (item.slides ?? []).length} imágenes)
+              </Button>
+              {(item.slides ?? []).length === 0 && (
+                <p className="text-xs text-gray-500">Agregá al menos una slide (más abajo, en la sección de texto) antes de generar imágenes.</p>
+              )}
+              {bulkError && <p className="text-xs text-red-600 bg-red-50 rounded p-2">{bulkError}</p>}
+              <p className="text-xs text-gray-400">
+                Usa 1 llamada a Gemini por imagen, más 1 llamada de texto adicional por cada slide que
+                todavía no tenga su propia escena (para proponerle una distinta a la portada). Mientras
+                se generan, no se puede editar el texto ni agregar/quitar slides.
+              </p>
+              {(item.slides ?? []).length > 0 && (
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                  {(item.slides ?? []).map((slide, index) => (
+                    <div key={index} className="space-y-1.5">
+                      <SlideCard slide={slide} index={index} style={item.visual_style} />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => generateSlideVisual(index)}
+                        disabled={carruselBusy}
+                        className="w-full gap-1.5 text-xs"
+                      >
+                        {slideGeneratingIndex === index ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <WandSparkles className="h-3.5 w-3.5" />}
+                        {slide.visual_url ? "Regenerar" : "Generar"}
+                      </Button>
+                      {slideErrors[index] && <p className="text-xs text-red-600">{slideErrors[index]}</p>}
+                      {slideSceneFallbackWarning[index] && <p className="text-[11px] text-amber-700">{slideSceneFallbackWarning[index]}</p>}
+                      <button
+                        type="button"
+                        onClick={() => toggleSlideScene(index)}
+                        className="w-full text-center text-[11px] text-violet-700 hover:text-violet-800 underline"
+                      >
+                        {expandedSlideScene.has(index) ? "Ocultar descripción (texto)" : slide.image_prompt ? "Ver descripción (texto)" : "Sin descripción propia todavía"}
+                      </button>
+                      {expandedSlideScene.has(index) && (
+                        <div className="space-y-1">
+                          <Textarea
+                            rows={3}
+                            value={slide.image_prompt ?? ""}
+                            onChange={event => updateSlide(index, { image_prompt: event.target.value })}
+                            placeholder="Se completa sola al generar la imagen — o escribila a mano acá."
+                            className="bg-white text-gray-900 text-[11px]"
+                            disabled={carruselBusy}
+                          />
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => regenerateSlideScene(index)}
+                            disabled={carruselBusy || slideSceneGeneratingIndex === index}
+                            className="h-auto w-full gap-1.5 px-2 py-1 text-[11px] text-violet-700 hover:text-violet-800"
+                          >
+                            {slideSceneGeneratingIndex === index ? <Loader2 className="h-3 w-3 animate-spin" /> : <WandSparkles className="h-3 w-3" />}
+                            Nueva escena
+                          </Button>
+                          {slideSceneErrors[index] && <p className="text-[11px] text-red-600">{slideSceneErrors[index]}</p>}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
+        <Button variant="outline" onClick={onCopy} className="w-full gap-2">{copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />} Copiar Instagram</Button>
+        <TrackedLinkField itemId={item.id} visits={item.tracked_visits ?? 0} interactions={item.tracked_interactions ?? 0} />
+        {item.source && (
+          <a href={item.source.url} target="_blank" rel="noreferrer" className="block rounded-lg border border-blue-100 bg-blue-50 p-3 text-xs text-blue-800">
+            <span className="font-medium">Fuente revisada:</span> {item.source.title} <ExternalLink className="inline h-3 w-3" />
+          </a>
+        )}
+      </div>
+      <Card>
+        <CardHeader className="space-y-3">
+          <div className="flex items-center justify-between gap-3">
+            <CardTitle className="text-base">Revisión humana</CardTitle>
+            <div className="flex items-center gap-2">
+              {hasUnsavedChanges && <Badge variant="warning">Cambios sin guardar</Badge>}
+              <Badge variant="outline">{STATUS_LABELS[item.status]}</Badge>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <Label className="shrink-0 text-gray-900">Formato</Label>
+            <Select value={item.format} onValueChange={value => onChange({ ...item, format: value as ContentItem["format"] })}>
+              <SelectTrigger className="w-48 text-gray-900"><SelectValue /></SelectTrigger>
+              <SelectContent>{FORMATS.map(option => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}</SelectContent>
+            </Select>
+          </div>
+          {item.format === "reel" && (
+            <p className="text-xs text-amber-700">Subí el video (más abajo) antes de aprobar — un reel necesita el archivo real para poder publicarse, la app no lo genera.</p>
+          )}
+          {item.format === "carrusel" && (
+            <p className="text-xs text-blue-700">Generá la placa de la portada y de cada slide (más abajo) antes de aprobar — un carrusel necesita todas sus imágenes listas para poder publicarse.</p>
+          )}
+          <div className="flex gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
+            <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0" />
+            <span>Verificá que no haya diagnósticos, tratamientos, interpretación de estudios ni promesas. Ante síntomas de alarma, derivá a guardia.</span>
+          </div>
+          <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 text-xs text-blue-900">
+            <p className="font-semibold">Checklist de captación</p>
+            <ul className="mt-2 space-y-1">
+              <li>• ¿El hook se entiende y despierta curiosidad en menos de 3 segundos?</li>
+              <li>• ¿La imagen conecta con una situación o aspiración reconocible?</li>
+              <li>• ¿La pieza entrega valor antes de invitar a pedir turno?</li>
+              <li>• ¿El CTA explica un próximo paso simple, sin miedo ni presión?</li>
+            </ul>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {isHistoria && !showHistoriaText && (
+            <div className="text-xs text-gray-500 rounded-md bg-gray-50 border border-gray-200 p-2 space-y-1.5">
+              <p>Instagram no muestra caption ni hashtags en historias (solo la imagen) — no hace falta escribir nada acá, subí la imagen y aprobá.</p>
+              <button type="button" onClick={() => setShowHistoriaText(true)} className="font-medium text-gray-700 hover:text-gray-900 underline">
+                Agregar texto de referencia interna (opcional)
+              </button>
+            </div>
+          )}
+          {(!isHistoria || showHistoriaText) && (
+            <>
+              {isHistoria && (
+                <p className="text-xs text-gray-500 rounded-md bg-gray-50 border border-gray-200 p-2">
+                  Instagram no muestra caption ni hashtags en historias (solo la imagen) — completar estos campos es opcional, quedan como referencia interna.
+                </p>
+              )}
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between"><Label className="text-gray-900">Hook{isHistoria ? " (referencia interna)" : " de Instagram"}</Label><CharacterCount value={item.hook} /></div>
+                <Textarea rows={2} value={item.hook} onChange={event => onChange({ ...item, hook: event.target.value })} className="text-gray-900" />
+              </div>
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between"><Label className="text-gray-900">Caption{isHistoria ? " (referencia interna)" : " de Instagram"}</Label><CharacterCount value={item.caption} /></div>
+                <Textarea rows={9} value={item.caption} onChange={event => onChange({ ...item, caption: event.target.value })} className="text-gray-900" />
+              </div>
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between"><Label className="text-gray-900">Hashtags{isHistoria ? " (referencia interna)" : ""}</Label><CharacterCount value={item.hashtags} /></div>
+                <Textarea rows={3} value={item.hashtags} onChange={event => onChange({ ...item, hashtags: event.target.value })} className="text-gray-900" />
+              </div>
+            </>
+          )}
+          {item.format === "carrusel" && (
+            <div className="space-y-3 rounded-lg border border-gray-200 p-3">
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Slides del carrusel</p>
+                <Button
+                  type="button" variant="outline" size="sm" onClick={addSlide}
+                  disabled={carruselBusy || (item.slides ?? []).length >= 9} className="gap-1.5"
+                >
+                  <Plus className="h-3.5 w-3.5" /> Agregar slide
+                </Button>
+              </div>
+              {(item.slides ?? []).length === 0 && (
+                <p className="text-xs text-gray-500">Todavía no hay slides. Agregá al menos una para poder armar el carrusel.</p>
+              )}
+              {carruselBusy && (
+                <p className="text-xs text-gray-500">Generando placas — esperá a que termine para editar el texto o agregar/quitar slides.</p>
+              )}
+              {(item.slides ?? []).map((slide, index) => (
+                <div key={index} className="space-y-2 rounded-md bg-gray-50 p-3">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-gray-900">Slide {index + 1}</Label>
+                    <button
+                      type="button" onClick={() => removeSlide(index)} disabled={carruselBusy}
+                      aria-label="Quitar slide" className="text-gray-400 hover:text-red-600 disabled:opacity-40 disabled:hover:text-gray-400"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                  <Input value={slide.headline} maxLength={60} disabled={carruselBusy} onChange={event => updateSlide(index, { headline: event.target.value })} className="bg-white text-gray-900" />
+                  <Textarea rows={3} value={slide.text} maxLength={300} disabled={carruselBusy} onChange={event => updateSlide(index, { text: event.target.value })} className="bg-white text-gray-900" />
+                </div>
+              ))}
             </div>
           )}
           {item.status !== "draft" && (

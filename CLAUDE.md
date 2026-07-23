@@ -1,6 +1,26 @@
 # Lule Growth OS — Contexto para Claude
 
 ## Estado actual
+- 2026-07-23 (mismo día, feedback de Seba mirando el editor de una pieza reel): marcó que el layout
+  del editor no tenía sentido para un reel — la columna central seguía mostrando "Placa final con
+  Gemini" (generación de imagen) como panel principal, mientras que la generación/subida real del
+  video (lo único que un reel necesita para publicarse) quedaba escondida al final de la columna
+  derecha, debajo de hook/caption/hashtags/checklist — y las escenas del guion aparecían todavía más
+  abajo, después de eso. Investigado antes de tocar código: confirmado que la placa/`visual_url` no se
+  usa para NADA en un reel — ni `publishReelToInstagram` (`instagram-business.ts`, solo usa
+  `video_url`+`caption`) ni el gate de aprobación (`reelVideoReady`, no `displayedVisualUrl`) la
+  referencian — mostrarla como panel principal para este formato era directamente contenido muerto que
+  confundía sobre qué hace falta para publicar. Fix: la card "Placa final con Gemini" ahora se oculta
+  cuando `isReel` (`!isReel &&`); en su lugar aparece una card nueva "Video del reel" en la misma
+  posición (columna central) con TODO lo que antes vivía disperso en la columna derecha — guion +
+  duración, video actual, Microinfografía animada (Veo + texto real), subir video, y la lista de
+  escenas con "Agregar texto del guion al video" — movido tal cual, sin reescribir lógica ni handlers,
+  solo reubicado. El formato Post/Historia sigue mostrando "Placa final con Gemini" exactamente igual
+  que antes (sin cambios ahí). Verificado en vivo con Playwright (usuario E2E real): se creó una pieza
+  reel en blanco y se confirmó que "Video del reel" es visible y "Placa final con Gemini" NO lo es; se
+  creó una pieza post en blanco de control y se confirmó lo inverso — 0 errores de consola en ambos
+  casos. `npm test` (889/889), lint y build sin errores. Archivo:
+  `src/app/(app)/contenido/instagram/page.tsx`.
 - 2026-07-23 (mismo día, feedback de Seba mirando un frame real): al revisar un frame del video
   generado con Veo, Seba marcó dos cosas — arriba del todo aparecía un "9:16" tipo reloj de celular y
   la palabra "caustion" (sin sentido) junto a íconos, y en ningún lado del video decía "Dra. Lucía
