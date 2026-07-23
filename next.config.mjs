@@ -62,14 +62,14 @@ const nextConfig = {
   // module type" sobre el .exe/README del paquete de plataforma). serverExternalPackages le dice a
   // Next que los deje como require() reales de node_modules en tiempo de ejecucion, sin bundlearlos.
   serverExternalPackages: ["@ffmpeg-installer/ffmpeg", "@ffprobe-installer/ffprobe"],
-  // /api/content/video-caption (2026-07-23) usa ffmpeg/ffprobe (binarios de @ffmpeg-installer /
-  // @ffprobe-installer, resueltos dinámicamente según plataforma -- el tracer automático de Next
-  // suele seguirlos bien) y una fuente propia para quemar texto (DejaVuSans-Bold.ttf, referenciada
-  // solo por ruta de archivo dentro de video-caption.ts, nunca importada -- el tracer automático NO
-  // tiene forma de detectarla sola). Sin esto, el deploy de Vercel puede arrancar sin el archivo y
-  // fallar recién al primer uso real, no en build.
+  // /api/content/video (burnVideoBrief en video-caption.ts) usa ffmpeg/ffprobe (binarios de
+  // @ffmpeg-installer / @ffprobe-installer, resueltos dinámicamente según plataforma -- el tracer
+  // automático de Next suele seguirlos bien) y una fuente propia para quemar texto
+  // (DejaVuSans-Bold.ttf, referenciada solo por ruta de archivo dentro de video-caption.ts, nunca
+  // importada -- el tracer automático NO tiene forma de detectarla sola). Sin esto, el deploy de
+  // Vercel puede arrancar sin el archivo y fallar recién al primer uso real, no en build.
   outputFileTracingIncludes: {
-    "/api/content/video-caption": [
+    "/api/content/video": [
       "src/lib/fonts/DejaVuSans-Bold.ttf",
       "node_modules/@ffmpeg-installer/**",
       "node_modules/@ffprobe-installer/**",

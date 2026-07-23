@@ -1,6 +1,35 @@
 # Lule Growth OS — Contexto para Claude
 
 ## Estado actual
+- 2026-07-23 (mismo día, feedback de Seba tras seguir sin entender el panel del reel): a pesar del
+  reordenamiento del punto anterior, Seba seguía sin entender la diferencia entre "Generar propuesta"
+  y "Generar video con IA", y marcó que el "Guion del reel silencioso" (Escena 1/2/3, con texto en
+  pantalla + dirección de toma) no le hacía sentido — "no necesito un guionista, si subo el video es
+  porque ya lo armé". Se eliminó el sistema de escenas/guion por completo (era un segundo sistema de
+  contenido, paralelo y no coordinado con la microinfografía de Veo — nada impedía generar el video
+  con IA y después quemarle encima el texto de las escenas también, duplicando texto sobre texto).
+  Alcance del borrado: `ContentScene`/`scenes`/`reel_duration_seconds` (tipos, generación en
+  `generateContentPlan`/`buildContentPlanPrompt`, `REEL_SCENE_RULES`), la función
+  `burnCaptionsOntoVideo()` y la ruta `/api/content/video-caption` completa (existían solo para
+  quemar el texto de las escenas — `burnVideoBrief()`, la del camino de Veo, sigue intacta), la UI de
+  Escena 1/2/3 + "Agregar escena" + "Agregar texto del guion al video", y la validación/allowlist de
+  esos campos en `/api/content/items`. **Bug real encontrado en el camino**: `next.config.mjs` tenía
+  `outputFileTracingIncludes` apuntando a la ruta `/api/content/video-caption` (para bundlear
+  ffmpeg/ffprobe/la fuente DejaVuSans-Bold.ttf en el deploy de Vercel) — al borrar esa ruta, ese
+  tracing quedó apuntando a nada, así que `/api/content/video` (la ruta que sigue usando esos mismos
+  binarios/fuente vía `burnVideoBrief`) se hubiera quedado sin ellos en producción. Corregido
+  apuntando el tracing a `/api/content/video`. Segundo pedido de Seba en el mismo mensaje: "quiero
+  entender o leer que va de prompt para armar el video" — el prompt en inglés para Veo ya se mostraba,
+  pero escondido detrás de un toggle "Ver detalle técnico" que aparentemente no se notó; se sacó el
+  toggle y ahora se muestra siempre, apenas se genera una propuesta, con la etiqueta más explícita
+  "Prompt en inglés que se le manda a Veo (fondo/animación del video)". Verificado en vivo con
+  Playwright (usuario E2E real): pieza reel nueva no muestra "Guion del reel silencioso" ni "Escena"
+  ni "Agregar escena" en ningún lado; al generar una propuesta, el prompt de Veo es visible sin tener
+  que expandir nada — 0 errores de consola. `npm test` (889/889), lint y build sin errores. Archivos:
+  `src/types/index.ts`, `src/lib/ai.ts`, `src/lib/video-caption.ts`,
+  `src/app/api/content/video-caption/` (eliminada), `src/app/api/content/items/route.ts`,
+  `src/app/(app)/contenido/instagram/page.tsx`, `next.config.mjs`, `src/lib/instagram-business.ts`
+  (comentario obsoleto).
 - 2026-07-23 (mismo día, feedback de Seba mirando el editor de una pieza reel): marcó que el layout
   del editor no tenía sentido para un reel — la columna central seguía mostrando "Placa final con
   Gemini" (generación de imagen) como panel principal, mientras que la generación/subida real del

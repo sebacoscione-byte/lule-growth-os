@@ -21,7 +21,7 @@ import { createClient as createBrowserSupabaseClient } from "@/lib/supabase/clie
 import { parseAiJson } from "@/lib/parse-ai-json"
 import { truncateForImagePlate } from "@/lib/content-text"
 import { DEFAULT_AUTO_PUBLISH_SETTINGS, alreadyPublishedToday, estimateAutoPublishDrainDays, estimateAutoPublishDateForPosition, estimateRepeatEndDate, findRecentDuplicateTopic, pickNextPublishableItems } from "@/lib/content-pipeline"
-import type { AutoPublishSettings, AutoPublishTrackSettings, ContentItem, ContentObjective, ContentScene, ContentSlide, ContentSource, ContentStatus, ContentVideoScores } from "@/types"
+import type { AutoPublishSettings, AutoPublishTrackSettings, ContentItem, ContentObjective, ContentSlide, ContentSource, ContentStatus, ContentVideoScores } from "@/types"
 import type { InstagramMediaInsights } from "@/lib/instagram-business"
 import { CONTENT_OBJECTIVE_GOALS, CONTENT_OBJECTIVE_LABELS, WEEKDAY_OPTIONS } from "@/types"
 
@@ -83,7 +83,7 @@ const STYLE_CLASSES = {
 const EDITABLE_FIELDS: Array<keyof ContentItem> = [
   "format", "hook", "caption", "google_text", "hashtags", "visual_headline",
   "visual_subtitle", "visual_style", "image_prompt", "image_alt_text", "slides",
-  "scenes", "reel_duration_seconds", "video_prompt",
+  "video_prompt",
 ]
 
 // video_url no entra en EDITABLE_FIELDS (igual que visual_url) a proposito: subir el video no cuenta
@@ -1214,22 +1214,6 @@ export default function ContentStudioPage() {
             image_prompt: typeof s.image_prompt === "string" ? s.image_prompt.slice(0, 2400) : undefined,
           }))
       : undefined
-    const rawScenes = generated.scenes
-    const scenes = Array.isArray(rawScenes)
-      ? (rawScenes as Array<Record<string, unknown>>)
-          .filter(s => typeof s.onScreenText === "string" && typeof s.shot === "string")
-          .slice(0, 6)
-          .map(s => ({
-            from: typeof s.from === "number" ? s.from : 0,
-            to: typeof s.to === "number" ? s.to : 0,
-            onScreenText: (s.onScreenText as string).slice(0, 140),
-            shot: (s.shot as string).slice(0, 300),
-          }))
-      : undefined
-    const reelDurationSeconds = typeof generated.reel_duration_seconds === "number"
-      ? Math.min(60, Math.max(1, Math.round(generated.reel_duration_seconds)))
-      : undefined
-
     const item: ContentItem = {
       id: crypto.randomUUID(),
       topic: inferredTopic.slice(0, 200),
@@ -1255,8 +1239,6 @@ export default function ContentStudioPage() {
       image_prompt: (generated.image_prompt as string | undefined)?.slice(0, 2400),
       image_alt_text: (generated.image_alt_text as string | undefined)?.slice(0, 180),
       slides: slides && slides.length > 0 ? slides : undefined,
-      scenes: scenes && scenes.length > 0 ? scenes : undefined,
-      reel_duration_seconds: reelDurationSeconds,
     }
 
     const saved = await fetch("/api/content/items", {
@@ -2241,9 +2223,6 @@ function Editor({
   const [aiVideoGenerating, setAiVideoGenerating] = useState(false)
   const [aiVideoError, setAiVideoError] = useState<string | null>(null)
   const [aiVideoHelpUrl, setAiVideoHelpUrl] = useState<string | null>(null)
-  const [showVideoPrompt, setShowVideoPrompt] = useState(false)
-  const [captionBurning, setCaptionBurning] = useState(false)
-  const [captionError, setCaptionError] = useState<string | null>(null)
   const [showHistoriaText, setShowHistoriaText] = useState(false)
   const [slideGeneratingIndex, setSlideGeneratingIndex] = useState<number | null>(null)
   const [slideErrors, setSlideErrors] = useState<Record<number, string>>({})
@@ -2301,26 +2280,6 @@ function Editor({
     setSlideSceneErrors({})
     setSlideSceneFallbackWarning({})
     setExpandedSlideScene(new Set())
-  }
-
-  function updateScene(index: number, changes: Partial<ContentScene>) {
-    if (!item.scenes) return
-    onChange({
-      ...item,
-      scenes: item.scenes.map((scene, sceneIndex) => sceneIndex === index ? { ...scene, ...changes } : scene),
-    })
-  }
-
-  function addScene() {
-    const scenes = item.scenes ?? []
-    const lastTo = scenes[scenes.length - 1]?.to ?? 0
-    if (scenes.length >= 6) return
-    onChange({ ...item, scenes: [...scenes, { from: lastTo, to: lastTo + 4, onScreenText: "", shot: "" }] })
-  }
-
-  function removeScene(index: number) {
-    if (!item.scenes) return
-    onChange({ ...item, scenes: item.scenes.filter((_, sceneIndex) => sceneIndex !== index) })
   }
 
   async function generateVisual() {
@@ -2660,35 +2619,6 @@ function Editor({
     }
   }
 
-  /**
-   * Quema el texto de item.scenes (el guion) sobre el video ya generado/subido, con ffmpeg
-   * (/api/content/video-caption) -- solo se ven las escenas cuyo inicio cae dentro de la duración
-   * real del video, ver burnCaptionsOntoVideo en src/lib/video-caption.ts.
-   */
-  async function burnSceneCaptions() {
-    if (!item.video_url || !item.scenes || item.scenes.length === 0) return
-    if (!window.confirm("Esto reemplaza el video actual por una versión con el texto del guion quemado encima. ¿Continuar?")) return
-    setCaptionBurning(true)
-    setCaptionError(null)
-    try {
-      const response = await fetch("/api/content/video-caption", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ itemId: item.id, videoUrl: item.video_url, scenes: item.scenes }),
-      })
-      const data = await response.json()
-      if (!response.ok || data.error) {
-        setCaptionError(data.error ?? "No se pudo agregar el texto al video.")
-        return
-      }
-      await onSave({ video_url: data.video_url })
-    } catch {
-      setCaptionError("No se pudo conectar con el servidor para agregar el texto.")
-    } finally {
-      setCaptionBurning(false)
-    }
-  }
-
   async function regenerateImageDirection() {
     if (
       item.image_prompt?.trim() &&
@@ -2807,23 +2737,6 @@ function Editor({
               </p>
             </CardHeader>
             <CardContent className="space-y-3">
-              <div className="flex items-center justify-between">
-                <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Guion del reel silencioso</p>
-                <div className="flex items-center gap-1.5">
-                  <Label className="text-xs text-gray-500">Duración (seg)</Label>
-                  <Input
-                    type="number"
-                    min={1}
-                    max={60}
-                    value={item.reel_duration_seconds ?? ""}
-                    onChange={e => onChange({ ...item, reel_duration_seconds: e.target.value === "" ? undefined : Number(e.target.value) })}
-                    className="w-16 bg-white text-gray-900"
-                  />
-                </div>
-              </div>
-              <p className="text-xs text-gray-500">
-                Se entiende sin audio: texto breve en pantalla por escena + qué se filma. Sirve como guía para grabar (Lucía sin hablar a cámara, o B-roll) — subí el video ya grabado más abajo.
-              </p>
               <div className="space-y-2 rounded-md bg-gray-50 p-3">
                 <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Video actual</p>
                 {item.video_url ? (
@@ -2872,28 +2785,19 @@ function Editor({
                         </div>
                         <p><span className="font-semibold text-gray-900">CTA (6,2-8,0s):</span> {item.video_brief.cta}</p>
 
-                        <button
-                          type="button"
-                          onClick={() => setShowVideoPrompt(v => !v)}
-                          className="text-violet-700 hover:text-violet-800 underline"
-                        >
-                          {showVideoPrompt ? "Ocultar detalle técnico" : "Ver detalle técnico (prompt, notas)"}
-                        </button>
-                        {showVideoPrompt && (
-                          <div className="space-y-2 border-t border-gray-100 pt-2">
-                            <div className="space-y-1">
-                              <Label className="text-[11px] text-gray-600">Prompt en inglés para Veo</Label>
-                              <Textarea
-                                rows={3}
-                                value={videoPrompt}
-                                onChange={e => onChange({ ...item, video_prompt: e.target.value })}
-                                className="bg-gray-50 text-gray-900 text-[11px]"
-                              />
-                            </div>
-                            <p><span className="font-semibold text-gray-900">Postproducción:</span> {item.video_brief.postproduction_notes || "—"}</p>
-                            <p><span className="font-semibold text-gray-900">Validar (Dra. Lucía):</span> {item.video_brief.validation_notes || "—"}</p>
+                        <div className="space-y-2 border-t border-gray-100 pt-2">
+                          <div className="space-y-1">
+                            <Label className="text-[11px] text-gray-600">Prompt en inglés que se le manda a Veo (fondo/animación del video)</Label>
+                            <Textarea
+                              rows={3}
+                              value={videoPrompt}
+                              onChange={e => onChange({ ...item, video_prompt: e.target.value })}
+                              className="bg-gray-50 text-gray-900 text-[11px]"
+                            />
                           </div>
-                        )}
+                          <p><span className="font-semibold text-gray-900">Postproducción:</span> {item.video_brief.postproduction_notes || "—"}</p>
+                          <p><span className="font-semibold text-gray-900">Validar (Dra. Lucía):</span> {item.video_brief.validation_notes || "—"}</p>
+                        </div>
 
                         <div className="grid grid-cols-2 gap-1.5 pt-1">
                           {VIDEO_SCORE_LABELS.map(([key, label]) => {
@@ -2970,61 +2874,6 @@ function Editor({
                 <p className="text-[11px] text-gray-400">MP4 o MOV, hasta 100 MB.</p>
                 {videoUploadError && <p className="text-xs text-red-600 bg-red-50 rounded p-2">{videoUploadError}</p>}
               </div>
-              {(item.scenes ?? []).map((scene, index) => (
-                <div key={index} className="space-y-2 rounded-md bg-gray-50 p-3">
-                  <div className="flex items-center justify-between">
-                    <Label className="text-gray-900">Escena {index + 1}</Label>
-                    <div className="flex items-center gap-2">
-                      <Input type="number" min={0} value={scene.from} onChange={e => updateScene(index, { from: Number(e.target.value) })} className="w-14 bg-white text-gray-900" />
-                      <span className="text-xs text-gray-400">a</span>
-                      <Input type="number" min={0} value={scene.to} onChange={e => updateScene(index, { to: Number(e.target.value) })} className="w-14 bg-white text-gray-900" />
-                      <span className="text-xs text-gray-400">seg</span>
-                      <button type="button" onClick={() => removeScene(index)} aria-label="Quitar escena" className="text-gray-400 hover:text-red-600">
-                        <X className="h-3.5 w-3.5" />
-                      </button>
-                    </div>
-                  </div>
-                  <Input
-                    placeholder="Texto en pantalla (4-10 palabras)"
-                    value={scene.onScreenText}
-                    maxLength={140}
-                    onChange={e => updateScene(index, { onScreenText: e.target.value })}
-                    className="bg-white text-gray-900"
-                  />
-                  <Textarea
-                    rows={2}
-                    placeholder="Dirección de la toma: qué se ve, sin hablar a cámara"
-                    value={scene.shot}
-                    maxLength={300}
-                    onChange={e => updateScene(index, { shot: e.target.value })}
-                    className="bg-white text-gray-900 text-xs"
-                  />
-                </div>
-              ))}
-              {(item.scenes?.length ?? 0) < 6 && (
-                <Button type="button" variant="outline" size="sm" onClick={addScene} className="gap-1.5">
-                  <Plus className="h-3.5 w-3.5" /> Agregar escena
-                </Button>
-              )}
-              {item.video_url && (item.scenes?.length ?? 0) > 0 && (
-                <div className="space-y-1.5 border-t border-gray-200 pt-3">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={burnSceneCaptions}
-                    disabled={captionBurning}
-                    className="w-full gap-1.5"
-                  >
-                    {captionBurning ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <WandSparkles className="h-3.5 w-3.5" />}
-                    {captionBurning ? "Agregando texto al video..." : "Agregar texto del guion al video"}
-                  </Button>
-                  <p className="text-[11px] text-gray-500">
-                    Quema el texto en pantalla de cada escena sobre el video actual (reemplaza el video de la pieza). Solo se ven las escenas que entran en la duración real del video.
-                  </p>
-                  {captionError && <p className="text-[11px] text-red-600 bg-red-50 rounded p-2">{captionError}</p>}
-                </div>
-              )}
             </CardContent>
           </Card>
         )}
