@@ -606,6 +606,49 @@
   Archivos: `src/lib/ai.ts`, `src/types/index.ts`, `src/app/api/content/video/`,
   `src/app/api/content/video-direction/`, `src/app/api/content/items/route.ts`,
   `src/app/(app)/contenido/instagram/page.tsx`.
+- 2026-07-23 (mismo día, texto quemado sobre el video del reel — ffmpeg): Seba preguntó si el texto
+  se iba a ver en español dentro del video (no — Veo tiene prohibido renderizar texto en el plano, a
+  propósito: los modelos de video generativo son mucho peor que los de imagen escribiendo texto
+  legible, riesgo real de letras deformes en una cuenta médica) y si se podían hacer "videos
+  interactivos" tipo "cómo pedir turno" con texto superpuesto — eso sí requería agregar edición de
+  video real, no solo prompting. A pedido explícito, se construyó: `src/lib/video-caption.ts`
+  (`burnCaptionsOntoVideo`) quema el `onScreenText` de `item.scenes` (el guion, ya existente) sobre
+  CUALQUIER video de la pieza (generado con IA o subido a mano) usando ffmpeg (`@ffmpeg-installer/
+  ffmpeg` + `@ffprobe-installer/ffprobe`, nuevas dependencias) — botón "Agregar texto del guion al
+  video" en el editor, ruta `/api/content/video-caption`. **Decisión tecnica clave**: el texto de
+  cada escena se pasa a `drawtext` via `textfile=` (un archivo aparte por escena), nunca inline
+  (`text=`) -- evita tener que escapar a mano tildes/eñes/comillas/dos puntos del texto en español
+  dentro del filtergraph de ffmpeg, delicado de hacer bien. El guion (`REEL_SCENE_RULES`) esta
+  pensado para un reel filmado a mano de hasta 25s; un clip de Veo dura como maximo 8s -- se detecta
+  la duracion real con ffprobe y solo se queman las escenas cuyo inicio entra en esa duracion, las
+  que no entran simplemente no se muestran (no rompe nada). Fuente propia bundleada
+  (`src/lib/fonts/DejaVuSans-Bold.ttf`, licencia libre Bitstream Vera/DejaVu, elegida por su buena
+  cobertura de acentos y por ser la eleccion estandar de la comunidad para drawtext en entornos
+  headless sin fontconfig del sistema) -- **dos bugs reales de bundling en Vercel encontrados y
+  corregidos en el camino, ninguno de los dos los detecta `next dev`**: (1) Turbopack intentaba
+  bundlear el `require()` dinamico de `@ffmpeg-installer/ffmpeg` como si fuera codigo de la app y
+  fallaba en build ("Unknown module type" sobre el .exe/README del paquete de plataforma) --
+  corregido con `serverExternalPackages` en `next.config.mjs` (le dice a Next que lo deje como
+  `require()` real de `node_modules` en runtime, sin bundlearlo); (2) el tracer automatico de
+  archivos de Next NO tiene forma de detectar la fuente `.ttf` sola porque se referencia solo por
+  ruta de archivo, nunca por un `import` -- se agrego `outputFileTracingIncludes` explicito para esa
+  ruta puntual, sin esto el deploy real de Vercel arrancaria sin el archivo y fallaria recien al
+  primer uso, no en build. Texto envuelto a mano en varias lineas (ffmpeg no hace word-wrap solo; un
+  `onScreenText` de 8-10 palabras al tamaño de fuente elegido se cortaba contra los bordes del video
+  vertical de 720px). **Verificado en vivo dos veces**: primero un smoke test local standalone
+  (video sintetico generado con ffmpeg, gratis, sin pasar por Veo) para validar el comando exacto de
+  ffmpeg y el escapado de rutas antes de integrarlo; despues de punta a punta con Playwright sobre
+  la UI/ruta real (subida manual de un video de prueba, escenas reales escritas en el editor,
+  click real en el boton real) -- se descargo el video resultante real de Storage y se inspeccionaron
+  frames: el texto en español con acentos se ve perfecto, dentro de los margenes, en los tiempos
+  correctos. `npm test` (889/889), lint y build sin errores (el build en si fue el que encontro el
+  bug de Turbopack de arriba). **Riesgo residual, no verificable desde este entorno**: el bundling
+  real en el runtime Linux de Vercel (distinto del `next build` local en Windows) recien queda
+  confirmado del todo con el primer uso real en produccion -- si el CI (que corre en Linux) pasa el
+  build, es una señal fuerte de que el fix de `serverExternalPackages` generaliza, pero no reemplaza
+  probarlo en vivo una vez deployado. Archivos: `src/lib/video-caption.ts`, `src/lib/fonts/
+  DejaVuSans-Bold.ttf`, `src/app/api/content/video-caption/`, `next.config.mjs`, `package.json`,
+  `src/app/(app)/contenido/instagram/page.tsx`.
 
 ## Qué es esta app
 Sistema de adquisición de pacientes para la Dra. Lucía Chahin, cardióloga.

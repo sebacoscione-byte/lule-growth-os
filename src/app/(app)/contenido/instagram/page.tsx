@@ -2232,6 +2232,8 @@ function Editor({
   const [aiVideoError, setAiVideoError] = useState<string | null>(null)
   const [aiVideoHelpUrl, setAiVideoHelpUrl] = useState<string | null>(null)
   const [showVideoPrompt, setShowVideoPrompt] = useState(false)
+  const [captionBurning, setCaptionBurning] = useState(false)
+  const [captionError, setCaptionError] = useState<string | null>(null)
   const [showHistoriaText, setShowHistoriaText] = useState(false)
   const [slideGeneratingIndex, setSlideGeneratingIndex] = useState<number | null>(null)
   const [slideErrors, setSlideErrors] = useState<Record<number, string>>({})
@@ -2641,6 +2643,35 @@ function Editor({
       setAiVideoError("No se pudo conectar con Veo para generar el video.")
     } finally {
       setAiVideoGenerating(false)
+    }
+  }
+
+  /**
+   * Quema el texto de item.scenes (el guion) sobre el video ya generado/subido, con ffmpeg
+   * (/api/content/video-caption) -- solo se ven las escenas cuyo inicio cae dentro de la duración
+   * real del video, ver burnCaptionsOntoVideo en src/lib/video-caption.ts.
+   */
+  async function burnSceneCaptions() {
+    if (!item.video_url || !item.scenes || item.scenes.length === 0) return
+    if (!window.confirm("Esto reemplaza el video actual por una versión con el texto del guion quemado encima. ¿Continuar?")) return
+    setCaptionBurning(true)
+    setCaptionError(null)
+    try {
+      const response = await fetch("/api/content/video-caption", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ itemId: item.id, videoUrl: item.video_url, scenes: item.scenes }),
+      })
+      const data = await response.json()
+      if (!response.ok || data.error) {
+        setCaptionError(data.error ?? "No se pudo agregar el texto al video.")
+        return
+      }
+      onSave({ video_url: data.video_url })
+    } catch {
+      setCaptionError("No se pudo conectar con el servidor para agregar el texto.")
+    } finally {
+      setCaptionBurning(false)
     }
   }
 
@@ -3224,6 +3255,25 @@ function Editor({
                 <Button type="button" variant="outline" size="sm" onClick={addScene} className="gap-1.5">
                   <Plus className="h-3.5 w-3.5" /> Agregar escena
                 </Button>
+              )}
+              {item.video_url && (item.scenes?.length ?? 0) > 0 && (
+                <div className="space-y-1.5 border-t border-gray-200 pt-3">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={burnSceneCaptions}
+                    disabled={captionBurning}
+                    className="w-full gap-1.5"
+                  >
+                    {captionBurning ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <WandSparkles className="h-3.5 w-3.5" />}
+                    {captionBurning ? "Agregando texto al video..." : "Agregar texto del guion al video"}
+                  </Button>
+                  <p className="text-[11px] text-gray-500">
+                    Quema el texto en pantalla de cada escena sobre el video actual (reemplaza el video de la pieza). Solo se ven las escenas que entran en la duración real del video.
+                  </p>
+                  {captionError && <p className="text-[11px] text-red-600 bg-red-50 rounded p-2">{captionError}</p>}
+                </div>
               )}
             </div>
           )}
