@@ -570,6 +570,42 @@
   tenido ningún efecto real. Corregido a `maxTokens: 60` (verificado en vivo: la respuesta real más
   larga usó 16 tokens), y confirmado que clasifica bien, incluyendo el intent `turno_ya_resuelto`
   agregado hoy mismo. `npm test` (354/354), lint y build sin errores.
+- 2026-07-23 (video de reels generado con IA, Veo — PR #161 fue la publicación con video propio
+  subido a mano; esta es la segunda mitad, generarlo con IA): Seba pidió explorar reels con IA.
+  Se comparó en vivo Veo (Google) contra Sora (OpenAI) con generaciones reales de las dos APIs antes
+  de elegir — Sora tenía mejor fama de calidad (coincidía con la experiencia de Seba probándolo el
+  día anterior), pero su Videos API se apaga el 24/9/2026 sin sucesor anunciado: se descartó por
+  ahora ("dejemos Sora para una 2da etapa"), Veo no tiene fecha de corte anunciada. A pedido
+  explícito de Seba, regla obligatoria en todo el contenido generado: nunca una persona hablando a
+  cámara (se nota demasiado como IA, rompe la confianza) — mismo criterio que ya regía el guion
+  manual de reels, ahora encodeado en `VIDEO_PROMPT_RULES` (`src/lib/ai.ts`) con instrucción
+  explícita de audio ("ambient sound only, no dialogue") porque Veo genera audio nativo y sin esa
+  aclaración puede inventar voces falsas. Implementado: `generateVideoDirection()` (propone
+  `video_prompt`) + `generateContentVideo()` (llama a Veo, sondea la operación asincrónica de larga
+  duración cada 10s hasta 1-3 min, descarga y devuelve el video — Google solo lo deja disponible
+  48hs en su propia URL); dos rutas nuevas (`/api/content/video-direction`,
+  `/api/content/video` con `maxDuration = 280`, la más alta del proyecto); botones "Proponer
+  dirección con IA" / "Generar video con IA" en el editor de una pieza reel, junto a la subida
+  manual ya existente. Límite diario propio y más estricto (`DAILY_VIDEO_GENERATION_LIMIT`, default
+  3) separado de `DAILY_AI_REQUEST_LIMIT` porque, a diferencia de las placas, Veo no tiene tier
+  gratuito — cada generación exitosa cuesta real (~USD 0.80-1 por clip de 8s en el tier Fast).
+  **Verificado en vivo de punta a punta** con Playwright (usuario E2E real): se creó una pieza reel,
+  se generó un video real con Veo a través de la UI/ruta real (no un script aparte), y se confirmó
+  que el `<video>` del editor lo reproduce sin errores de consola. En el camino se encontró que la
+  primera corrida SÍ mostraba un error real de CSP bloqueando el `<video>` — pero la causa no fue el
+  código nuevo: un servidor de desarrollo viejo, sobreviviente de antes en esta misma sesión, seguía
+  respondiendo en el puerto 3000 sin el fix de `media-src` que ya se había mergeado en el PR
+  anterior (#161) — el comando de reinicio no lo mató por un detalle del regex de coincidencia de
+  proceso. Al matar ese proceso viejo y limpiar el caché de `.next`, la generación repetida cargó
+  limpia — esto de paso fue la primera confirmación real de que el fix de CSP de PR #161 funciona
+  (nunca se había cargado antes un `<video src>` real en el navegador para probarlo). `npm test`
+  (889/889), lint y build sin errores. Pendiente explícito, no abordado: sumar `video_prompt` al
+  flujo principal de generación de contenido (`generateContentPlan`) para que un reel nuevo ya salga
+  con dirección de video propuesta sin un paso manual aparte — quedó fuera de alcance a propósito
+  para no tocar esa función central (900+ líneas, prompt médico-sensible) en la misma pasada.
+  Archivos: `src/lib/ai.ts`, `src/types/index.ts`, `src/app/api/content/video/`,
+  `src/app/api/content/video-direction/`, `src/app/api/content/items/route.ts`,
+  `src/app/(app)/contenido/instagram/page.tsx`.
 
 ## Qué es esta app
 Sistema de adquisición de pacientes para la Dra. Lucía Chahin, cardióloga.
@@ -666,6 +702,8 @@ SUPABASE_DB_PASSWORD=   # Para migraciones: npm run migrate. Ver: Supabase → P
 AI_PROVIDER=auto
 GEMINI_API_KEY=
 GEMINI_MODEL=gemini-3.5-flash
+GEMINI_VIDEO_MODEL=veo-3.1-fast-generate-preview  # Video de reels con IA — ver "Video de reels con IA (Veo)" abajo
+DAILY_VIDEO_GENERATION_LIMIT=3  # Tope diario, propio y mas estricto que DAILY_AI_REQUEST_LIMIT: tiene costo real por generación
 ANTHROPIC_API_KEY=
 ANTHROPIC_MODEL=claude-sonnet-4-6
 # Google Business Profile API (OAuth 2.0)
@@ -737,6 +775,41 @@ respuestas, solo elige cuál de las categorías fijas aplica). Análisis de cost
 - Si algún día el volumen superara igual el tier gratuito, el costo pagado de `gemini-3.5-flash` es
   del orden de centésimas de centavo por llamada (mensajes cortos, salida limitada a 20 tokens) —
   no es una preocupación real a la escala de un consultorio.
+
+### Video de reels con IA (Veo) — costo real, sin tier gratuito (2026-07-23)
+
+En el editor de una pieza formato reel, además de subir un video propio, se puede generar el video con
+IA (Veo 3.1, vía la misma `GEMINI_API_KEY`) — botones "Proponer dirección con IA" (propone
+`video_prompt`, un plano único en inglés) y "Generar video con IA" (`generateContentVideo()` en
+`src/lib/ai.ts` → `/api/content/video`). A pedido explícito de Seba, comparado en vivo contra Sora
+(OpenAI) antes de elegir: Sora tenía mejor fama de calidad pero **su API se apaga el 24/9/2026 sin
+sucesor anunciado** — se descartó por ahora, queda como una eventual "segunda etapa" si hace falta
+mejorar calidad más adelante. Veo quedó verificado en vivo con una generación real (clip de 8s
+vertical, tier Fast, ~$0.88, 67s de principio a fin) antes de integrarlo al código.
+
+- **Sin tier gratuito, a diferencia de las placas**: cada generación exitosa tiene costo real
+  (`GEMINI_VIDEO_MODEL=veo-3.1-fast-generate-preview` por default — Fast 720p, ~$0.10-0.12/seg, un
+  clip de hasta 8s sale ~$0.80-1). Necesita que el proyecto de Google Cloud detrás de `GEMINI_API_KEY`
+  tenga facturación paga activa (a diferencia del resto de la IA de este proyecto) — confirmalo en
+  aistudio.google.com → Proyectos → tu proyecto → columna "Nivel de facturación" (tiene que decir un
+  nivel pago, no "Nivel gratuito").
+- **Límite diario propio y más estricto**: `DAILY_VIDEO_GENERATION_LIMIT` (default 3/día,
+  independiente de `DAILY_AI_REQUEST_LIMIT`, ver `getDailyRequestCount(purpose)` con filtro por
+  `purpose = "content_video"`) — a diferencia del límite general, pensado para llamadas casi gratis,
+  este existe específicamente porque cada intento cuesta plata real.
+- **Regla creativa obligatoria, a pedido explícito de Seba**: nunca generar una persona hablando a
+  cámara — se nota demasiado que es IA generativa y rompe la confianza que la pieza necesita generar.
+  Todo el contenido es B-roll silencioso (manos, objetos, ambientes, equipamiento), mismo criterio que
+  ya regía el guion manual de reels (`REEL_SCENE_RULES`) — ver `VIDEO_PROMPT_RULES` en `src/lib/ai.ts`,
+  incluye instrucción explícita de audio ("ambient sound only, no dialogue") porque Veo genera audio
+  nativo y sin esa aclaración puede inventar voces.
+- Es un proceso asíncrono de 1-3 minutos (Veo devuelve una operación de larga duración, se consulta el
+  progreso hasta que termina) — la ruta `/api/content/video` queda esperando esa respuesta larga
+  (`maxDuration = 280`, la más alta de todo el proyecto) y el botón del editor muestra "Generando...
+  puede tardar unos minutos" en vez del spinner casi instantáneo de las placas.
+- El video que devuelve Google solo está disponible 48hs en su propia URL — la ruta lo descarga y
+  persiste en Storage (`content-media`, mismo bucket que las placas y la subida manual) de una, nunca
+  se linkea directo a la URL de Google.
 
 ## Instagram Business — cómo configurar OAuth (publicar posts/historias)
 La app usa "Instagram API with Instagram Login" (graph.instagram.com) — NO requiere una Facebook Page vinculada,

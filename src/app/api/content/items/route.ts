@@ -97,7 +97,7 @@ export async function PATCH(request: NextRequest) {
 
     const textFields: Array<keyof ContentItem> = [
       "hook", "caption", "google_text", "hashtags", "visual_headline", "visual_subtitle",
-      "image_prompt", "image_alt_text", "visual_url", "video_url",
+      "image_prompt", "image_alt_text", "visual_url", "video_url", "video_prompt",
     ]
     if (textFields.some(field => body[field] !== undefined && typeof body[field] !== "string")) {
       return NextResponse.json({ error: "Hay campos de texto invalidos" }, { status: 400 })
@@ -122,7 +122,8 @@ export async function PATCH(request: NextRequest) {
     }
     if ((body.google_text?.length ?? 0) > 1500 || (body.visual_headline?.length ?? 0) > 90 ||
       (body.visual_subtitle?.length ?? 0) > 90 || (body.image_prompt?.length ?? 0) > 2400 ||
-      (body.image_alt_text?.length ?? 0) > 180 || (body.video_url?.length ?? 0) > 500) {
+      (body.image_alt_text?.length ?? 0) > 180 || (body.video_url?.length ?? 0) > 500 ||
+      (body.video_prompt?.length ?? 0) > 2400) {
       return NextResponse.json({ error: "Uno o mas campos superan el limite permitido" }, { status: 400 })
     }
     if (body.slides && (!Array.isArray(body.slides) || body.slides.some(slide =>
@@ -168,6 +169,7 @@ export async function PATCH(request: NextRequest) {
       "reel_duration_seconds",
       "visual_url",
       "video_url",
+      "video_prompt",
       "auto_publish_result",
       "archived_from_status",
       "repeat_interval_days",

@@ -139,15 +139,20 @@ async function logRequest(
   } catch { /* non-critical */ }
 }
 
-export async function getDailyRequestCount(): Promise<number> {
+/** `purpose` filtra el conteo a un uso puntual (ej. "content_video") -- sin el parametro, cuenta todas
+ * las llamadas exitosas del dia, igual que antes. Usado para el limite general (DAILY_AI_REQUEST_LIMIT)
+ * y para limites propios y mas estrictos de usos con costo real por llamada (ver DAILY_VIDEO_GENERATION_LIMIT). */
+export async function getDailyRequestCount(purpose?: string): Promise<number> {
   try {
     const today = new Date()
     today.setHours(0, 0, 0, 0)
-    const { count } = await getDb()
+    let query = getDb()
       .from("ai_requests")
       .select("id", { count: "exact", head: true })
       .gte("created_at", today.toISOString())
       .eq("success", true)
+    if (purpose) query = query.eq("purpose", purpose)
+    const { count } = await query
     return count ?? 0
   } catch {
     return 0
@@ -293,6 +298,28 @@ const REEL_SCENE_RULES = `GUION DEL REEL SILENCIOSO:
 - Cada escena tiene "onScreenText" (4 a 10 palabras, máximo 14, una sola idea, se lee en menos de 3 segundos) y "shot" (dirección de la toma en español: qué se ve, sin mostrar el rostro real de la doctora ni datos personales — ej. "Primer plano de un tensiómetro inflándose", "Manos preparando el consultorio").
 - La primera escena es el hook visual. La última cierra con una acción concreta o una pregunta, coherente con el CTA.
 - No pidas que la doctora hable, mueva los labios o mire directo a cámara explicando algo — son tomas mudas o B-roll.`
+
+// 2026-07-23: video generado con IA (Veo) para reels -- a pedido explicito de Seba, nunca personas
+// hablando a camara (se nota demasiado que es IA generativa, rompe la confianza que la pieza necesita
+// generar). Reusa el mismo criterio de B-roll silencioso que REEL_SCENE_RULES (guion para filmar a
+// mano) pero adaptado a un UNICO plano continuo generado por IA, con instrucciones de audio nativo
+// explicitas (Veo genera audio -- sin aclarar "sin dialogo" puede inventar voces, todavia mas notorio
+// que en una imagen fija) y el mismo criterio de posicionamiento anatomico correcto de IMAGE_PROMPT_RULES.
+const VIDEO_PROMPT_RULES = `DIRECCION DE VIDEO PARA VEO (reel generado con IA):
+- Inclui "video_prompt": el prompt final que se manda directo al modelo de video, en ingles para maximizar precision, sin instrucciones conversacionales ni explicaciones.
+- Describe UN SOLO plano continuo de 4 a 8 segundos (Veo genera un clip corto por pedido, no una secuencia editada de varias escenas) -- elegi el momento mas fuerte y representativo del tema, no intentes contar toda la idea en un solo plano.
+- PROHIBIDO TERMINANTE: ninguna persona hablando a camara, moviendo los labios, gesticulando como si explicara algo, mirando fijo al lente dirigiendose al espectador, ni una entrevista o testimonial. Un modelo de video generativo se nota MUCHISIMO como IA falsa apenas una persona "habla" -- eso rompe justo la confianza que la pieza necesita generar en un paciente potencial. Es contenido B-roll silencioso: manos, objetos, ambientes, equipamiento medico, gestos cotidianos, nunca dialogo.
+- Sonido: termina siempre pidiendo explicitamente "ambient sound only, no dialogue, no voiceover, no spoken words, no lip movement, no one addressing the camera" -- Veo genera audio nativo, y sin esta instruccion puede inventar voces o dialogo falso, mucho mas notorio que en una imagen fija.
+- Describe un movimiento de camara concreto y sutil: dolly-in lento, paneo suave, primer plano estatico con micro-movimiento organico, empuje lento hacia un detalle. Nunca una camara completamente estatica tipo foto ni multiples cortes -- Veo genera un plano continuo, no una edicion con cortes.
+- Misma logica que la direccion visual de placas (ver IMAGE_PROMPT_RULES) para elegir el tema de la escena segun la categoria:
+  - Procedimiento o consulta que sucede en el consultorio (ecocardiograma, consulta cardiologica, estudios cardiologicos, chequeo cardiovascular, atencion en una sede): consultorio o sala de estudios reconocible, con el equipo correspondiente al estudio en la posicion anatomica correcta si se ve sobre un cuerpo -- mismo criterio exacto que las placas (ecocardiograma con el transductor en el pecho cerca del corazon, nunca el abdomen; Holter/MAPA puestos sobre el cuerpo del paciente, nunca el aparato solo en un escritorio).
+  - Habitos, prevencion o factores de riesgo sin procedimiento en consultorio: un momento domestico cotidiano vinculado directo al tema, con movimiento de camara que lo acompañe con naturalidad.
+  - Metafora de objeto: un objeto que evoque el tema de inmediato en primer plano, revelado con una intencion clara de movimiento de camara (nunca una metafora abstracta que solo se entienda leyendo texto).
+- Si aparece una figura humana parcial (una mano, un brazo, un guardapolvo, nunca el rostro real de la Dra. Lucia Chahin ni de nadie identificable), tiene que leerse inequivocamente FEMENINA si se sugiere que es la medica -- mismo criterio que las placas, nunca ambigua ni masculina.
+- Paleta y clima: luz natural o cinematografica calida, tonos bordo, azul profundo o verde azulado, textura realista y organica -- nunca luz fria fluorescente ni un ambiente esteril-asustador tipo guardia.
+- PROHIBIDO en el plano: texto en pantalla, subtitulos, logos, marcas de agua, interfaces, anatomia gore, personas angustiadas o en una situacion de urgencia.
+- Aspecto vertical 9:16 siempre (es para un reel).
+- Termina "video_prompt" reforzando en ingles: "No people speaking, gesturing to explain, or looking directly at camera. No on-screen text, logos or watermark. Ambient sound only, no dialogue, no voiceover."`
 
 export function buildContentPlanPrompt(input: {
   topic: string
@@ -555,6 +582,10 @@ export function getPublicAiError(error: unknown): string {
   if (normalized.startsWith("daily_limit_exceeded:")) {
     const limit = message.split(":")[1]
     return `Se alcanzó el límite diario de ${limit} llamadas a la IA. Usá el modo manual o esperá hasta mañana.`
+  }
+  if (normalized.startsWith("daily_video_limit_exceeded:")) {
+    const limit = message.split(":")[1]
+    return `Se alcanzó el límite diario de ${limit} videos generados con IA (tiene costo real por generación). Esperá hasta mañana o subí un video propio.`
   }
   if (normalized.includes("credit balance") || normalized.includes("billing") || normalized.includes("insufficient")) {
     return "El proveedor de IA no tiene saldo disponible. Activá billing en Google Cloud o usá el modo manual."
@@ -1053,6 +1084,126 @@ FINAL ART DIRECTION:
     return { mime_type: mimeType, image_data: imageData }
   } catch (error) {
     await logRequest("gemini", model, promptHash, "content_visual", false,
+      error instanceof Error ? error.message : String(error))
+    throw error
+  }
+}
+
+/**
+ * Pide una direccion de video nueva (video_prompt) para el UNICO plano de un reel generado con IA, a
+ * partir de una pieza ya escrita (categoria, tema, titular, caption). Mismo patron que
+ * regenerateImageDirection, pero para VIDEO_PROMPT_RULES en vez de IMAGE_PROMPT_RULES.
+ */
+export async function generateVideoDirection(input: {
+  category: string
+  topic: string
+  visual_headline: string
+  caption: string
+  previous_video_prompt?: string
+}): Promise<{ video_prompt: string }> {
+  if (getAiMode() === "manual") {
+    throw new Error("Modo manual activo: la generación automática está deshabilitada.")
+  }
+  const avoidPrevious = input.previous_video_prompt
+    ? `\nLa direccion anterior fue esta, DESCARTALA y proponé un plano distinto (otro momento, sujeto o encuadre -- no una variacion menor): """${input.previous_video_prompt}"""`
+    : ""
+  const text = await generateText({
+    maxTokens: 500,
+    json: true,
+    purpose: "video_direction",
+    cacheSystem: true,
+    system: `${VIDEO_PROMPT_RULES}
+
+Te paso una pieza de contenido tipo reel ya escrita (categoria, tema, titular y el caption completo).
+Tu tarea es proponer la direccion de ese UNICO plano de video generado con IA, siguiendo las reglas de
+arriba.
+Devolve SOLO un JSON PLANO con esta forma exacta, sin ningun otro campo: { "video_prompt": "..." }`,
+    messages: [{
+      role: "user",
+      content: `Categoria: ${input.category}\nTema: ${input.topic}\nTitular: "${input.visual_headline}"\nCaption completo:\n${input.caption}${avoidPrevious}`,
+    }],
+  })
+  const parsed = parseJson<{ video_prompt?: unknown }>(text)
+  if (typeof parsed.video_prompt !== "string" || !parsed.video_prompt.trim()) {
+    throw new Error("La IA devolvió una respuesta incompleta para la dirección de video.")
+  }
+  return { video_prompt: parsed.video_prompt }
+}
+
+const VEO_POLL_INTERVAL_MS = 10_000
+// Deja margen debajo del maxDuration (280s) de /api/content/video: el pedido inicial + la descarga
+// final tambien consumen tiempo dentro de esa misma funcion serverless.
+const VEO_POLL_TIMEOUT_MS = 260_000
+
+/**
+ * Genera el UNICO plano de video de un reel con Veo (Gemini API). A diferencia de generateContentVisual
+ * (respuesta sincronica en segundos), Veo es un proceso asincronico de "operacion de larga duracion":
+ * se pide, se consulta el progreso cada VEO_POLL_INTERVAL_MS hasta que termina (puede tardar 1-3 min),
+ * y recien ahi se descarga el archivo final (el video de Google solo esta disponible 48hs, por eso se
+ * descarga y persiste en Storage de una via la ruta que llama a esta funcion, nunca se linkea directo).
+ * No tiene tier gratuito (a diferencia de las placas) -- cada llamada exitosa tiene costo real, por eso
+ * usa su propio limite diario mas estricto (DAILY_VIDEO_GENERATION_LIMIT), separado de
+ * DAILY_AI_REQUEST_LIMIT.
+ */
+export async function generateContentVideo(input: {
+  video_prompt: string
+}): Promise<{ mime_type: string; video_data: string }> {
+  if (getAiMode() === "manual") {
+    throw new Error("Modo manual activo: la generación automática está deshabilitada.")
+  }
+  const apiKey = process.env.GEMINI_API_KEY
+  if (!apiKey) throw new Error("GEMINI_API_KEY no esta configurada.")
+
+  const dailyLimit = Number(process.env.DAILY_VIDEO_GENERATION_LIMIT ?? 3)
+  if (await getDailyRequestCount("content_video") >= dailyLimit) {
+    throw new Error(`DAILY_VIDEO_LIMIT_EXCEEDED:${dailyLimit}`)
+  }
+
+  const model = process.env.GEMINI_VIDEO_MODEL || "veo-3.1-fast-generate-preview"
+  const promptHash = hashPrompt(input.video_prompt)
+  const base = "https://generativelanguage.googleapis.com/v1beta"
+
+  try {
+    const startRes = await fetch(`${base}/models/${encodeURIComponent(model)}:predictLongRunning`, {
+      method: "POST",
+      headers: { "x-goog-api-key": apiKey, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        instances: [{ prompt: input.video_prompt }],
+        parameters: { aspectRatio: "9:16", resolution: "720p" },
+      }),
+    })
+    const startData = await startRes.json() as { name?: string; error?: { message?: string } }
+    if (!startRes.ok || !startData.name) {
+      throw new Error(startData.error?.message || `Veo respondio con estado ${startRes.status}.`)
+    }
+
+    const startedAt = Date.now()
+    let statusData: {
+      done?: boolean
+      error?: { message?: string }
+      response?: { generateVideoResponse?: { generatedSamples?: Array<{ video?: { uri?: string } }> } }
+    } = {}
+    while (Date.now() - startedAt < VEO_POLL_TIMEOUT_MS) {
+      await new Promise(resolve => setTimeout(resolve, VEO_POLL_INTERVAL_MS))
+      const statusRes = await fetch(`${base}/${startData.name}`, { headers: { "x-goog-api-key": apiKey } })
+      statusData = await statusRes.json()
+      if (!statusRes.ok) throw new Error(`Veo respondio con estado ${statusRes.status} al consultar el progreso.`)
+      if (statusData.done) break
+    }
+    if (!statusData.done) throw new Error("Veo no termino de procesar el video a tiempo. Probá de nuevo en unos minutos.")
+    if (statusData.error) throw new Error(statusData.error.message || "Veo no pudo generar el video.")
+
+    const videoUri = statusData.response?.generateVideoResponse?.generatedSamples?.[0]?.video?.uri
+    if (!videoUri) throw new Error("Veo no devolvió ningún video.")
+
+    const videoRes = await fetch(videoUri, { headers: { "x-goog-api-key": apiKey } })
+    if (!videoRes.ok) throw new Error(`No se pudo descargar el video generado (estado ${videoRes.status}).`)
+    const videoData = Buffer.from(await videoRes.arrayBuffer()).toString("base64")
+
+    await logRequest("gemini", model, promptHash, "content_video", true)
+    return { mime_type: "video/mp4", video_data: videoData }
+  } catch (error) {
+    await logRequest("gemini", model, promptHash, "content_video", false,
       error instanceof Error ? error.message : String(error))
     throw error
   }
