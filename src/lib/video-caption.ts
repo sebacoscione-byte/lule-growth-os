@@ -7,6 +7,13 @@ import ffmpegInstaller from "@ffmpeg-installer/ffmpeg"
 import ffprobeInstaller from "@ffprobe-installer/ffprobe"
 import type { ContentScene } from "@/types"
 
+// Paleta de las tarjetas de texto de la microinfografia (2026-07-23) -- mismo azul profundo que
+// VIDEO_PROMPT_RULES pide para el fondo animado, nunca rosa como color dominante (pedido explicito).
+const CARD_TEXT_COLOR = "0x0F2A4A" // azul profundo, para texto sobre tarjeta clara
+const CARD_BG_COLOR = "white@0.94" // tarjeta clara (gancho y mensajes)
+const CTA_BG_COLOR = "0x0F2A4A@0.94" // tarjeta con acento de marca (cierre)
+const CTA_TEXT_COLOR = "white"
+
 const execFileAsync = promisify(execFile)
 
 // DejaVu Sans Bold: fuente estatica (no variable) con buena cobertura de acentos/ñ en español,
@@ -98,6 +105,118 @@ export async function burnCaptionsOntoVideo(input: {
     await execFileAsync(ffmpegInstaller.path, [
       "-y", "-i", inputPath,
       "-vf", drawtextFilters.join(","),
+      "-codec:a", "copy",
+      outputPath,
+    ])
+
+    return await readFile(outputPath)
+  } finally {
+    await rm(workDir, { recursive: true, force: true })
+  }
+}
+
+const CARD_FADE_SECONDS = 0.25
+
+/** Expresion de alpha (0-1) para un fundido de entrada/salida suave dentro de [from, to] -- ffmpeg no
+ * anima drawtext solo, hay que darle la expresion de opacidad en funcion de "t" a mano. Las comas
+ * internas de cada if(...) se escapan porque el filtro completo se concatena con otros drawtext
+ * separados por comas (ver textCardFilter). */
+function fadeAlphaExpr(from: number, to: number): string {
+  const fadeIn = from + CARD_FADE_SECONDS
+  const fadeOut = Math.max(fadeIn, to - CARD_FADE_SECONDS)
+  return (
+    `if(lt(t\\,${from})\\,0\\,` +
+    `if(lt(t\\,${fadeIn})\\,(t-${from})/${CARD_FADE_SECONDS}\\,` +
+    `if(lt(t\\,${fadeOut})\\,1\\,` +
+    `if(lt(t\\,${to})\\,(${to}-t)/${CARD_FADE_SECONDS}\\,0))))`
+  )
+}
+
+function textCardFilter(opts: {
+  textPath: string
+  fontPath: string
+  from: number
+  to: number
+  fontSize: number
+  y: string
+  boxColor: string
+  fontColor: string
+}): string {
+  return `drawtext=fontfile='${opts.fontPath}':textfile='${opts.textPath}':fontsize=${opts.fontSize}:` +
+    `fontcolor=${opts.fontColor}:box=1:boxcolor=${opts.boxColor}:boxborderw=22:x=(w-text_w)/2:y=${opts.y}:` +
+    `line_spacing=10:alpha='${fadeAlphaExpr(opts.from, opts.to)}':enable='between(t\\,${opts.from}\\,${opts.to})'`
+}
+
+// Estructura obligatoria de la microinfografia (ver VIDEO_BRIEF_RULES en ai.ts): gancho 0,0-1,2s,
+// mensajes 1,2-6,2s repartidos en partes iguales, CTA 6,2-8,0s. Se clampea a la duracion real del
+// video (ffprobe) por si Veo entrega un clip un poco mas corto/largo que 8s.
+const HOOK_END = 1.2
+const MESSAGES_END = 6.2
+
+/**
+ * Compone la microinfografia completa: quema el gancho, los mensajes secundarios y el CTA de un
+ * ContentVideoBrief sobre el video (fondo/animacion) generado por Veo -- Veo nunca genera este texto
+ * (ver VIDEO_PROMPT_RULES), se agrega aca por edicion real para garantizar ortografia y legibilidad.
+ * Tarjetas claras (gancho y mensajes) + una tarjeta de acento de marca para el CTA, con un fundido de
+ * entrada/salida suave. Reemplaza, para el camino de generacion con IA, a burnCaptionsOntoVideo (que
+ * sigue vigente para el guion filmado a mano, un caso de uso distinto).
+ */
+export async function burnVideoBrief(input: {
+  videoBuffer: Buffer
+  hook: string
+  messages: string[]
+  cta: string
+}): Promise<Buffer> {
+  const workDir = await mkdtemp(join(tmpdir(), "lule-video-brief-"))
+  try {
+    const inputPath = join(workDir, "input.mp4")
+    const outputPath = join(workDir, "output.mp4")
+    await writeFile(inputPath, input.videoBuffer)
+
+    const durationSeconds = await getDurationSeconds(inputPath)
+    const fontPath = escapeFilterPath(FONT_PATH)
+    const filters: string[] = []
+
+    if (input.hook.trim()) {
+      const hookEnd = Math.min(HOOK_END, durationSeconds)
+      const textPath = join(workDir, "hook.txt")
+      await writeFile(textPath, wrapCaptionText(input.hook, 16), "utf-8")
+      filters.push(textCardFilter({
+        textPath: escapeFilterPath(textPath), fontPath, from: 0, to: hookEnd,
+        fontSize: 56, y: "h*0.14", boxColor: CARD_BG_COLOR, fontColor: CARD_TEXT_COLOR,
+      }))
+    }
+
+    const usableMessages = input.messages.filter(m => m.trim()).slice(0, 3)
+    const messagesEnd = Math.min(MESSAGES_END, durationSeconds)
+    const messageWindow = Math.max(0, messagesEnd - Math.min(HOOK_END, durationSeconds))
+    const perMessage = usableMessages.length > 0 ? messageWindow / usableMessages.length : 0
+    for (let index = 0; index < usableMessages.length; index++) {
+      const from = Math.min(HOOK_END, durationSeconds) + index * perMessage
+      const to = Math.min(from + perMessage, durationSeconds)
+      if (to <= from) continue
+      const textPath = join(workDir, `message-${index}.txt`)
+      await writeFile(textPath, wrapCaptionText(usableMessages[index], 19), "utf-8")
+      filters.push(textCardFilter({
+        textPath: escapeFilterPath(textPath), fontPath, from, to,
+        fontSize: 46, y: "(h-text_h)/2", boxColor: CARD_BG_COLOR, fontColor: CARD_TEXT_COLOR,
+      }))
+    }
+
+    if (input.cta.trim() && durationSeconds > messagesEnd) {
+      const textPath = join(workDir, "cta.txt")
+      await writeFile(textPath, wrapCaptionText(input.cta, 20), "utf-8")
+      filters.push(textCardFilter({
+        textPath: escapeFilterPath(textPath), fontPath, from: messagesEnd, to: durationSeconds,
+        fontSize: 46, y: "h-260", boxColor: CTA_BG_COLOR, fontColor: CTA_TEXT_COLOR,
+      }))
+    }
+
+    if (filters.length === 0) return input.videoBuffer
+
+    await execFileAsync(ffmpegInstaller.path, [
+      "-y", "-i", inputPath,
+      "-vf", filters.join(","),
       "-codec:a", "copy",
       outputPath,
     ])

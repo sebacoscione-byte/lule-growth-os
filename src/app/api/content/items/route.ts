@@ -143,6 +143,22 @@ export async function PATCH(request: NextRequest) {
     if (body.reel_duration_seconds != null && (typeof body.reel_duration_seconds !== "number" || body.reel_duration_seconds < 1 || body.reel_duration_seconds > 60)) {
       return NextResponse.json({ error: "Duracion de reel invalida" }, { status: 400 })
     }
+    if (body.video_brief !== undefined) {
+      const brief = body.video_brief
+      const scoreKeys = ["scroll_stop", "clarity", "utility", "credibility", "legibility", "brand_consistency"]
+      const validScores = typeof brief?.scores === "object" && brief.scores !== null &&
+        scoreKeys.every(key => typeof brief.scores[key as keyof typeof brief.scores] === "number" &&
+          brief.scores[key as keyof typeof brief.scores] >= 1 && brief.scores[key as keyof typeof brief.scores] <= 5)
+      const validBrief = brief !== null && typeof brief === "object" &&
+        typeof brief.objective === "string" && brief.objective.length <= 300 &&
+        Array.isArray(brief.messages) && brief.messages.length >= 1 && brief.messages.length <= 3 &&
+        brief.messages.every((m: unknown) => typeof m === "string" && m.length <= 200) &&
+        typeof brief.cta === "string" && brief.cta.length <= 120 &&
+        typeof brief.postproduction_notes === "string" && brief.postproduction_notes.length <= 1000 &&
+        typeof brief.validation_notes === "string" && brief.validation_notes.length <= 1000 &&
+        validScores
+      if (!validBrief) return NextResponse.json({ error: "Propuesta de video invalida" }, { status: 400 })
+    }
     if (body.auto_publish_result !== undefined) {
       const validKeys = ["instagram", "google_business"]
       const validValues = ["published", "error"]
@@ -170,6 +186,7 @@ export async function PATCH(request: NextRequest) {
       "visual_url",
       "video_url",
       "video_prompt",
+      "video_brief",
       "auto_publish_result",
       "archived_from_status",
       "repeat_interval_days",
