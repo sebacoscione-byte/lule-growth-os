@@ -134,15 +134,6 @@ export async function PATCH(request: NextRequest) {
     ))) {
       return NextResponse.json({ error: "Slides invalidos" }, { status: 400 })
     }
-    if (body.scenes && (!Array.isArray(body.scenes) || body.scenes.length > 6 || body.scenes.some(scene =>
-      typeof scene?.onScreenText !== "string" || typeof scene?.shot !== "string" ||
-      scene.onScreenText.length > 140 || scene.shot.length > 300
-    ))) {
-      return NextResponse.json({ error: "Escenas invalidas" }, { status: 400 })
-    }
-    if (body.reel_duration_seconds != null && (typeof body.reel_duration_seconds !== "number" || body.reel_duration_seconds < 1 || body.reel_duration_seconds > 60)) {
-      return NextResponse.json({ error: "Duracion de reel invalida" }, { status: 400 })
-    }
     if (body.video_brief !== undefined) {
       const brief = body.video_brief
       const scoreKeys = ["scroll_stop", "clarity", "utility", "credibility", "legibility", "brand_consistency"]
@@ -181,8 +172,6 @@ export async function PATCH(request: NextRequest) {
       "image_prompt",
       "image_alt_text",
       "slides",
-      "scenes",
-      "reel_duration_seconds",
       "visual_url",
       "video_url",
       "video_prompt",

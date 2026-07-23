@@ -160,14 +160,6 @@ export interface ContentSlide {
   image_prompt?: string
 }
 
-/** Un segmento del guion de un reel silencioso: se entiende sin audio, texto en pantalla + direccion de la toma. */
-export interface ContentScene {
-  from: number
-  to: number
-  onScreenText: string
-  shot: string
-}
-
 /** Autoevaluacion 1-5 de la propuesta de reel (microinfografia animada), ver VIDEO_BRIEF_RULES en
  * ai.ts. Si alguna dimension da menos de 4, la UI bloquea "Generar video con IA" hasta regenerar la
  * propuesta o corregirla a mano. */
@@ -214,9 +206,6 @@ export interface ContentItem {
   image_prompt?: string
   image_alt_text?: string
   slides?: ContentSlide[]
-  /** Guion del reel silencioso: solo se genera/edita cuando format === "reel". Duracion total sugerida + texto/toma por escena. */
-  scenes?: ContentScene[]
-  reel_duration_seconds?: number
   visual_url?: string
   /** Video del reel: subido a mano, o generado con IA (Veo) y persistido en Storage antes de aprobar. Solo aplica a format === "reel". */
   video_url?: string

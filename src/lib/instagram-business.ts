@@ -439,10 +439,11 @@ export async function publishCarouselToInstagram(
 // ─── Publicacion (reel / video) ──────────────────────────────────────────
 
 // El contenedor de un video tarda mas en procesarse que uno de imagen (Meta lo descarga y lo
-// transcodifica) -- 40s (el default para imagenes) no alcanza. Los reels de esta cuenta estan
-// acotados a 60s de duracion (ver reel_duration_seconds), asi que el archivo es chico; 90s de margen
-// deberia alcanzar en la practica. Si no alcanza, publishReelToInstagram falla y el item queda
-// "approved" para reintentar en la proxima corrida -- mismo criterio que el resto de los formatos.
+// transcodifica) -- 40s (el default para imagenes) no alcanza. Los reels de esta cuenta son clips
+// cortos (Veo genera hasta 8s; un video propio subido a mano suele ser corto tambien), asi que el
+// archivo es chico; 90s de margen deberia alcanzar en la practica. Si no alcanza, publishReelToInstagram
+// falla y el item queda "approved" para reintentar en la proxima corrida -- mismo criterio que el resto
+// de los formatos.
 const REEL_CONTAINER_TIMEOUT_MS = 90_000
 
 export async function createVideoContainer(
