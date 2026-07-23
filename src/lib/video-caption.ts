@@ -14,6 +14,14 @@ const CARD_BG_COLOR = "white@0.94" // tarjeta clara (gancho y mensajes)
 const CTA_BG_COLOR = "0x0F2A4A@0.94" // tarjeta con acento de marca (cierre)
 const CTA_TEXT_COLOR = "white"
 
+// Credito de marca persistente (2026-07-23): quemado por edicion real, nunca generado por Veo -- a
+// diferencia del texto del brief, no depende de lo que el modelo de video decida dibujar. Se agrega
+// porque Veo, sin esto, puede rellenar la parte superior del cuadro con contenido inventado (llego a
+// alucinar una barra de estado de telefono con un nombre de app falso) y porque una pieza medica
+// necesita identificar a la profesional de forma consistente en todas las piezas, no solo en el CTA.
+const BRAND_LABEL = "Dra. Lucía Chahin · Cardióloga"
+const BRAND_FONT_SIZE = 24
+
 const execFileAsync = promisify(execFile)
 
 // DejaVu Sans Bold: fuente estatica (no variable) con buena cobertura de acentos/ñ en español,
@@ -165,8 +173,9 @@ const MESSAGES_END = 6.2
  * ContentVideoBrief sobre el video (fondo/animacion) generado por Veo -- Veo nunca genera este texto
  * (ver VIDEO_PROMPT_RULES), se agrega aca por edicion real para garantizar ortografia y legibilidad.
  * Tarjetas claras (gancho y mensajes) + una tarjeta de acento de marca para el CTA, con un fundido de
- * entrada/salida suave. Reemplaza, para el camino de generacion con IA, a burnCaptionsOntoVideo (que
- * sigue vigente para el guion filmado a mano, un caso de uso distinto).
+ * entrada/salida suave, mas un credito de marca (BRAND_LABEL) persistente durante todo el video.
+ * Reemplaza, para el camino de generacion con IA, a burnCaptionsOntoVideo (que sigue vigente para el
+ * guion filmado a mano, un caso de uso distinto).
  */
 export async function burnVideoBrief(input: {
   videoBuffer: Buffer
@@ -183,6 +192,14 @@ export async function burnVideoBrief(input: {
     const durationSeconds = await getDurationSeconds(inputPath)
     const fontPath = escapeFilterPath(FONT_PATH)
     const filters: string[] = []
+
+    const brandTextPath = join(workDir, "brand.txt")
+    await writeFile(brandTextPath, BRAND_LABEL, "utf-8")
+    filters.push(
+      `drawtext=fontfile='${fontPath}':textfile='${escapeFilterPath(brandTextPath)}':fontsize=${BRAND_FONT_SIZE}:` +
+      `fontcolor=${CARD_TEXT_COLOR}:box=1:boxcolor=${CARD_BG_COLOR}:boxborderw=14:x=(w-text_w)/2:y=26:` +
+      `alpha='if(lt(t\\,0.3)\\,t/0.3\\,1)'`
+    )
 
     if (input.hook.trim()) {
       const hookEnd = Math.min(HOOK_END, durationSeconds)
@@ -218,8 +235,6 @@ export async function burnVideoBrief(input: {
         fontSize: 46, y: "h-260", boxColor: CTA_BG_COLOR, fontColor: CTA_TEXT_COLOR,
       }))
     }
-
-    if (filters.length === 0) return input.videoBuffer
 
     await execFileAsync(ffmpegInstaller.path, [
       "-y", "-i", inputPath,

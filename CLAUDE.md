@@ -1,6 +1,28 @@
 # Lule Growth OS — Contexto para Claude
 
 ## Estado actual
+- 2026-07-23 (mismo día, feedback de Seba mirando un frame real): al revisar un frame del video
+  generado con Veo, Seba marcó dos cosas — arriba del todo aparecía un "9:16" tipo reloj de celular y
+  la palabra "caustion" (sin sentido) junto a íconos, y en ningún lado del video decía "Dra. Lucía
+  Chahin". La primera es un bug real: Veo interpretó el ícono de tensiómetro/gauge que pedía el prompt
+  como si fuera la captura de pantalla de una app de salud, y agregó por su cuenta una barra de estado
+  de celular con un nombre de app inventado — la regla vigente ya prohibía "interfaces médicas
+  inventadas" pero nunca contempló específicamente un mockup de teléfono/app (una alucinación distinta:
+  no es una interfaz médica ficticia, es que Veo enmarcó todo el plano como si fuera la pantalla de un
+  dispositivo). Fix en `VIDEO_PROMPT_RULES` (`src/lib/ai.ts`): nueva prohibición explícita de mockup de
+  teléfono/app (nunca un dispositivo dentro del cuadro, nunca barra de estado/reloj/iconos de
+  notificación/señal/batería, nunca un nombre de app o logo inventado — el plano tiene que ser una
+  ilustración a pantalla completa/full-bleed) y refuerzo en inglés al final del prompt. La segunda no
+  es un bug sino una mejora real: se agregó un crédito de marca fijo "Dra. Lucía Chahin · Cardióloga"
+  quemado por edición real (`BRAND_LABEL` en `video-caption.ts`, dentro de `burnVideoBrief()`) — no
+  depende de lo que Veo decida generar, aparece siempre, en toda la duración del video, con un fundito
+  de entrada de 0,3s. Verificado con un frame sintético gratis (sin gastar cupo de Veo): el crédito de
+  marca es legible y no choca con la tarjeta del gancho (deja un margen amplio entre ambos, `y=26` para
+  el crédito vs `y=h*0.14` donde arranca el gancho). **Pendiente real, no verificado todavía**: falta
+  una segunda generación real de Veo con el prompt reforzado para confirmar que la instrucción nueva
+  evita el mockup de teléfono/app en la práctica (el fix del crédito de marca sí queda verificado, es
+  independiente del modelo de video). `npm test` (889/889), lint y build sin errores. Archivos:
+  `src/lib/ai.ts`, `src/lib/video-caption.ts`.
 - 2026-07-23 (cierre real del pendiente de la microinfografía animada, PR #166): quedaba explícitamente
   sin verificar un video de Veo real con el prompt nuevo (fondo/animación, sin consultorio). Con el cupo
   diario ya subido a mano por Seba (`DAILY_VIDEO_GENERATION_LIMIT=5` en `.env.local`), se generó un video
