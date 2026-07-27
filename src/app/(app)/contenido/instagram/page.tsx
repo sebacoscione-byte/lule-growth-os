@@ -1498,7 +1498,7 @@ export default function ContentStudioPage() {
           ...(isCarrusel
             ? { imageUrls: carruselImageUrls }
             : isReel
-            ? { videoUrl: item.video_url }
+            ? { videoUrl: item.video_url, trial: item.trial_reel }
             : freshVisualUrl ? { imageDataUrl: freshVisualUrl } : { imageUrl: item.visual_url }),
           caption: `${item.hook}\n\n${item.caption}\n\n${item.hashtags}`,
           format: item.format,
@@ -1992,7 +1992,12 @@ export default function ContentStudioPage() {
                           {item.format}{item.objective ? ` · ${CONTENT_OBJECTIVE_LABELS[item.objective]}` : ""} · {new Date(item.created_at).toLocaleDateString("es-AR")}
                         </p>
                       </div>
-                      <Badge variant="outline">{STATUS_LABELS[item.status]}</Badge>
+                      <div className="flex flex-col items-end gap-1">
+                        <Badge variant="outline">{STATUS_LABELS[item.status]}</Badge>
+                        {item.format === "reel" && item.trial_reel && (
+                          <Badge variant="outline" className="border-violet-300 text-violet-700 bg-violet-50">Prueba</Badge>
+                        )}
+                      </div>
                     </div>
                     {item.auto_publish_result && Object.values(item.auto_publish_result).includes("error") && (
                       <p className="text-xs font-medium text-red-600">
@@ -2873,6 +2878,26 @@ function Editor({
                 </Button>
                 <p className="text-[11px] text-gray-400">MP4 o MOV, hasta 100 MB.</p>
                 {videoUploadError && <p className="text-xs text-red-600 bg-red-50 rounded p-2">{videoUploadError}</p>}
+              </div>
+              <div className="flex flex-col gap-1.5 rounded-md border border-dashed border-gray-300 p-2.5">
+                <div className="flex flex-wrap items-center gap-3">
+                  <span className="text-xs font-medium text-gray-900">Reel de prueba (mostrar solo a no-seguidores)</span>
+                  <Button
+                    type="button"
+                    variant={item.trial_reel ? "default" : "outline"}
+                    size="sm"
+                    disabled={busy}
+                    onClick={() => onSave({ trial_reel: !item.trial_reel })}
+                  >
+                    {item.trial_reel ? "Activado" : "Desactivado"}
+                  </Button>
+                </div>
+                <p className="text-[11px] text-gray-500">
+                  Instagram lo publica solo para gente que no te sigue — no aparece en el feed ni en la
+                  pestaña Reels de tus seguidores actuales. Sirve para testear cómo funciona antes de
+                  decidir mostrárselo a tu audiencia habitual. Si te gustó el resultado, se &ldquo;gradúa&rdquo;
+                  a reel normal a mano desde la app nativa de Instagram (nunca pasa solo, automáticamente).
+                </p>
               </div>
             </CardContent>
           </Card>

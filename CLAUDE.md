@@ -1,6 +1,33 @@
 # Lule Growth OS — Contexto para Claude
 
 ## Estado actual
+- 2026-07-27 (Reels de prueba de Instagram — "Trial Reels"): Seba avisó que la cuenta ya superó el
+  umbral de seguidores que Meta exige para poder publicar reels de prueba (mostrados solo a gente que
+  no lo sigue, para testear una idea antes de decidir mostrarla a la audiencia habitual) y pidió
+  sumar esto a la app. Investigado antes de tocar código: la API de Meta (Instagram Graph API /
+  Content Publishing) sí soporta esto de forma nativa — al crear el contenedor de un reel
+  (`media_type=REELS`), se puede sumar `trial_params: { graduation_strategy: "MANUAL" | "SS_PERFORMANCE" }`.
+  Se usó `"MANUAL"` a propósito: el reel de prueba nunca pasa solo al feed de los seguidores por una
+  métrica de performance automática, la decisión de "graduarlo" queda siempre en manos de la Dra.
+  Lucía desde la app nativa de Instagram, después de ver los resultados. Implementado: nuevo campo
+  `trial_reel?: boolean` en `ContentItem` (no afecta el contenido en sí, es config de a quién se le
+  muestra — no resetea la pieza a borrador al cambiarlo, mismo criterio que `repeat_interval_days`);
+  `createVideoContainer`/`publishReelToInstagram` (`instagram-business.ts`) arman el `trial_params`
+  cuando corresponde; wireado en los dos caminos de publicación de un reel que ya existían
+  (`content-publish.ts`, usado por el cron y por "Publicar ahora"; y `/api/instagram-business/publish`,
+  usado por "Publicar solo en Instagram" desde el editor) — ninguno nuevo, ambos ya publicaban reels
+  normales desde antes. En el editor, la tarjeta "Video del reel" suma un interruptor "Reel de prueba
+  (mostrar solo a no-seguidores)" con la explicación de qué hace y que la graduación es siempre manual;
+  la card de Biblioteca muestra un badge "Prueba" cuando está activado, para verlo de un vistazo sin
+  entrar al editor. **No hay ninguna automatización de "graduar" el reel** — eso Meta solo lo permite
+  desde la app nativa, no hay endpoint de API para hacerlo por acá. Verificado en vivo con Playwright
+  (usuario E2E real, script temporal descartado después): el toggle aparece en una pieza reel nueva,
+  cambia a "Activado" al tocarlo, sigue "Activado" al salir a Biblioteca y volver a abrir la pieza
+  (confirma que quedó persistido en el servidor, no solo en memoria del navegador), y el badge
+  "Prueba" es visible en la card de Biblioteca — 0 errores de consola. `npm test` (889/889), lint y
+  build sin errores. Archivos: `src/types/index.ts`, `src/lib/instagram-business.ts`,
+  `src/lib/content-publish.ts`, `src/app/api/content/items/route.ts`,
+  `src/app/api/instagram-business/publish/route.ts`, `src/app/(app)/contenido/instagram/page.tsx`.
 - 2026-07-23 (mismo día, feedback de Seba tras seguir sin entender el panel del reel): a pesar del
   reordenamiento del punto anterior, Seba seguía sin entender la diferencia entre "Generar propuesta"
   y "Generar video con IA", y marcó que el "Guion del reel silencioso" (Escena 1/2/3, con texto en

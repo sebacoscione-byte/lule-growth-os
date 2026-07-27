@@ -120,6 +120,9 @@ export async function PATCH(request: NextRequest) {
     if (body.repeat_limit != null && (typeof body.repeat_limit !== "number" || body.repeat_limit < 1 || body.repeat_limit > 365)) {
       return NextResponse.json({ error: "Limite de repeticiones invalido" }, { status: 400 })
     }
+    if (body.trial_reel !== undefined && typeof body.trial_reel !== "boolean") {
+      return NextResponse.json({ error: "Reel de prueba invalido" }, { status: 400 })
+    }
     if ((body.google_text?.length ?? 0) > 1500 || (body.visual_headline?.length ?? 0) > 90 ||
       (body.visual_subtitle?.length ?? 0) > 90 || (body.image_prompt?.length ?? 0) > 2400 ||
       (body.image_alt_text?.length ?? 0) > 180 || (body.video_url?.length ?? 0) > 500 ||
@@ -180,6 +183,7 @@ export async function PATCH(request: NextRequest) {
       "archived_from_status",
       "repeat_interval_days",
       "repeat_limit",
+      "trial_reel",
     ]
     const changes = Object.fromEntries(
       editableFields
@@ -190,7 +194,8 @@ export async function PATCH(request: NextRequest) {
     // contenido": adjuntar la placa/video generado o subido, limpiar el resultado de publicacion
     // (deshacer) o registrar el estado previo al archivar no debe resetear a borrador. repeat_interval_days
     // es config de cronograma, no contenido -- cambiarla tampoco debe tirar la pieza de vuelta a borrador.
-    const nonContentFields = new Set(["status", "visual_url", "video_url", "auto_publish_result", "archived_from_status", "repeat_interval_days", "repeat_limit"])
+    // trial_reel es config de distribucion en Instagram (a quien se le muestra), no contenido en si.
+    const nonContentFields = new Set(["status", "visual_url", "video_url", "auto_publish_result", "archived_from_status", "repeat_interval_days", "repeat_limit", "trial_reel"])
     const hasContentChanges = editableFields.some(field => !nonContentFields.has(field) && body[field] !== undefined)
     const resetApproval = hasContentChanges && !body.status && ["approved", "published"].includes(current.status)
     // Al re-activar la repeticion (off -> on), arrancar el contador de cero para que el limite cuente

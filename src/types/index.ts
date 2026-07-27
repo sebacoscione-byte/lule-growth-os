@@ -213,6 +213,12 @@ export interface ContentItem {
   video_prompt?: string
   /** Propuesta estructurada (microinfografia animada) generada junto con video_prompt -- ver ContentVideoBrief. */
   video_brief?: ContentVideoBrief
+  /** Reel de prueba (Meta "Trial Reels"): se publica solo para gente que no te sigue -- tus seguidores
+   * no lo ven en su feed/pestaña Reels a menos que decidas "graduarlo" despues de ver como funciono.
+   * Requiere que la cuenta ya haya cruzado el umbral de seguidores que exige Meta para esta funcion
+   * (varia por cuenta, no publicado oficialmente). Solo aplica a format === "reel"; se ignora en el
+   * resto de los formatos. Ver createVideoContainer/publishReelToInstagram (trial_params). */
+  trial_reel?: boolean
   source: ContentSource | null
   created_at: string
   updated_at: string
