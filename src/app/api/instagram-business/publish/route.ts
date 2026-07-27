@@ -19,7 +19,7 @@ export async function POST(request: Request) {
 
     const body = await request.json() as {
       itemId?: string; imageDataUrl?: string; imageUrl?: string; imageUrls?: string[]; videoUrl?: string
-      caption?: string; format?: string
+      caption?: string; format?: string; trial?: boolean
     }
     if (!body.itemId || !body.format) {
       return NextResponse.json({ error: "Falta el identificador del contenido o el formato." }, { status: 400 })
@@ -42,7 +42,7 @@ export async function POST(request: Request) {
       if (!body.videoUrl) {
         return NextResponse.json({ error: "Falta el video subido de esta pieza." }, { status: 400 })
       }
-      const { mediaId } = await publishReelToInstagram(service, { videoUrl: body.videoUrl, caption: body.caption })
+      const { mediaId } = await publishReelToInstagram(service, { videoUrl: body.videoUrl, caption: body.caption, trial: body.trial })
       return NextResponse.json({ ok: true, mediaId })
     }
 

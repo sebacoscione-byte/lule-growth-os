@@ -36,6 +36,7 @@ export async function publishApprovedItem(
         const published = await publishReelToInstagram(supabase, {
           videoUrl: item.video_url,
           caption: `${item.hook}\n\n${item.caption}\n\n${item.hashtags}`,
+          trial: item.trial_reel,
         })
         instagramMediaId = published.mediaId
       } else {
