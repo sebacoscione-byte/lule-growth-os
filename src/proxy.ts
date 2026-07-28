@@ -76,7 +76,10 @@ export async function proxy(request: NextRequest) {
   if (!user && request.nextUrl.pathname === "/") {
     const url = request.nextUrl.clone()
     url.pathname = "/dra-lucia-chahin"
-    return NextResponse.redirect(url)
+    // 308 (permanente), no el 307 default: Search Console mostraba "/" como la página indexada
+    // y "/dra-lucia-chahin" como duplicada con canónica distinta a la declarada -- un 307 le dice
+    // a Google que no consolide la indexación en el destino porque podría cambiar.
+    return NextResponse.redirect(url, 308)
   }
 
   if (!user && !isLoginRoute && !isPublicRoute) {
