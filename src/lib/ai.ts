@@ -1040,7 +1040,11 @@ export async function generateContentVisual(input: {
   }
 
   const model = process.env.GEMINI_IMAGE_MODEL || "gemini-3.1-flash-image"
-  const aspectRatio = input.format === "historia" ? "9:16" : "4:5"
+  // Un reel es vertical (9:16) igual que una historia -- esta placa nunca es el contenido del reel
+  // en si (eso lo publica publishReelToInstagram con video_url), es la portada/miniatura que Meta
+  // muestra en la pestaña Reels via cover_url (ver createVideoContainer en instagram-business.ts),
+  // que Meta recomienda especificamente en 9:16 para que no quede recortada.
+  const aspectRatio = input.format === "historia" || input.format === "reel" ? "9:16" : "4:5"
   const prompt = `Create the final publish-ready Instagram ${input.format} visual for a cardiology practice.
 
 CONTENT:
@@ -1062,8 +1066,8 @@ FINAL ART DIRECTION:
   headline or subtitle wording, IGNORE that wording completely -- it may be outdated. Never render
   any text that is not the exact headline and subtitle given under CONTENT.
 - Headline must dominate; subtitle must remain readable on a small phone screen.
-- ${input.format === "historia"
-    ? "Keep all text and essential elements inside the central Story safe zone, away from the top and bottom interface areas."
+- ${input.format === "historia" || input.format === "reel"
+    ? "Keep all text and essential elements inside the central safe zone of the vertical 9:16 frame, away from the top and bottom edges."
     : "Use a 4:5 feed composition. For a carousel, make this an irresistible but medically responsible cover."}
 - No diagnosis, treatment claim, urgency marketing, fear, logos, watermark or extra text.
 - Do not depict the real doctor or invent her likeness.`

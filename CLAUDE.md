@@ -1,6 +1,62 @@
 # Lule Growth OS — Contexto para Claude
 
 ## Estado actual
+- 2026-07-28 (portada/miniatura para reels — antes no existía, ahora usa cover_url real de Meta):
+  Seba marcó en la Biblioteca que la card de un reel mostraba el placeholder genérico "Concepto
+  generado por IA" en vez de una imagen real (a diferencia de posts/historias/carruseles, que sí
+  muestran su placa) y que no tenía dónde subir una portada. Investigado antes de tocar código: la
+  generación de placa (`generateContentVisual`, ruta `/api/content/visual`) **nunca dejó de aceptar
+  `format: "reel"`** — lo único que faltaba era la UI, oculta a propósito en PR #169 (2026-07-23)
+  porque en ese momento la placa no se usaba para nada al publicar un reel (`publishReelToInstagram`
+  solo usa `video_url`). Se confirmó contra la documentación oficial de Meta
+  (developers.facebook.com/docs/instagram-platform) que el contenedor de un reel sí soporta un
+  parámetro real, `cover_url`: una imagen JPEG propia (≤8MB, sRGB) que Meta muestra como miniatura en
+  la pestaña Reels del perfil — con prioridad sobre `thumb_offset` (el frame del video que se usa si
+  no se manda `cover_url`). Esto cambia el diagnóstico: ya no es solo un problema de la Biblioteca
+  interna, es una limitación real de lo que se ve en el Instagram real de la cuenta.
+  **Implementado**: se volvió a mostrar la card de placa para reels (mismo componente que
+  post/historia/carrusel, sin duplicar código), renombrada **"Portada del reel (opcional)"** con una
+  aclaración explícita de que es solo la miniatura del perfil, nunca el contenido del reel (para no
+  repetir la confusión que motivó ocultarla la primera vez) — sigue sin ser obligatoria para aprobar
+  ni publicar un reel, que sigue dependiendo solo de `video_url`. **Bug real encontrado en el camino**:
+  `generateContentVisual` (`ai.ts`) generaba la placa de un reel en 4:5 (el ternario solo distinguía
+  "historia"), no en 9:16 vertical como pide Meta para no recortar la portada — corregido para tratar
+  "reel" igual que "historia" en aspecto y en la instrucción de zona segura. Como Gemini genera PNG
+  por default y Meta exige JPEG para `cover_url`, se agregó `convertImageToJpeg()` (nueva, en
+  `video-caption.ts`, reusa el mismo binario de ffmpeg ya bundleado) que convierte solo cuando
+  `format === "reel"` — tanto en la generación con IA (`/api/content/visual`) como en la **subida
+  manual** (`/api/content/upload-image`, ya soportaba PNG/JPEG/WEBP, ahora también normaliza a JPEG
+  para este caso puntual). El botón "Subir imagen propia (sin generar con IA)" de esa misma card ya
+  cubre el pedido explícito de Seba de poder cargar su propia portada — no hizo falta nada nuevo,
+  solo dejar de ocultar la card. `coverUrl` (`item.visual_url`) se sumó a
+  `createVideoContainer`/`publishReelToInstagram` (`instagram-business.ts`) y se conectó en los dos
+  caminos de publicación de un reel que ya existían (`content-publish.ts` y
+  `/api/instagram-business/publish`), igual que se hizo con `trial_reel` en la sesión anterior.
+  `next.config.mjs` suma `outputFileTracingIncludes` para `/api/content/visual` y
+  `/api/content/upload-image` (mismo bug de bundling de Vercel ya documentado varias veces con
+  ffmpeg — sin esto, el binario no viaja al deploy real). **Verificado en vivo con Playwright**
+  (usuario E2E real, script temporal descartado después): se abrió la pieza reel real
+  "¿DÓNDE HACER TU CONTROL?" (la misma que Seba mostró en su captura), se confirmó que la card nueva
+  aparece con el texto correcto y el botón de subida manual visible, y se generó una portada real con
+  IA — resultado: una composición 9:16 real (no 4:5), con el titular/subtítulo bien acentuados
+  quemados encima, sin errores de consola. Al volver a la Biblioteca, la card de esa misma pieza ya
+  mostraba la imagen real con badge "Placa generada" en vez del placeholder — el bug reportado quedó
+  confirmado corregido sobre el item real, no solo por tests. **Efecto secundario esperado, no un
+  bug**: como esta pieza ya estaba "Aprobada", generar la portada la devolvió a "Borrador" — es el
+  mismo mecanismo que ya existía para regenerar la placa de cualquier otro formato (edición de
+  contenido revierte la aprobación, documentado desde 2026-07-08), aplicado ahora también a la
+  portada del reel; queda pendiente que alguien la vuelva a aprobar a mano cuando esté conforme con
+  esa imagen (se ve bien: doctora de perfil trabajando, sin inventarle el rostro, acorde a
+  `IMAGE_PROMPT_RULES`). **Nota operativa de esta sesión**: para la verificación se levantó
+  `npm run dev` en segundo plano y, al terminar, se cortó con `Stop-Process -Name node -Force` —
+  eso mata **todos** los procesos `node.exe` de la máquina, no solo el dev server levantado acá;
+  había otros procesos `node` de más temprano en la sesión que también se cortaron. Si alguna otra
+  sesión/herramienta necesitaba uno de esos procesos, hay que reiniciarlo a mano. `npm test`
+  (889/889), lint y build sin errores. Archivos: `src/lib/ai.ts`, `src/lib/video-caption.ts`,
+  `src/lib/instagram-business.ts`, `src/lib/content-publish.ts`,
+  `src/app/api/content/visual/route.ts`, `src/app/api/content/upload-image/route.ts`,
+  `src/app/api/instagram-business/publish/route.ts`,
+  `src/app/(app)/contenido/instagram/page.tsx`, `next.config.mjs`.
 - 2026-07-28 (música de fondo sin copyright para los reels de IA — implementado, pendiente un paso
   manual de Seba para activarlo): Seba preguntó cómo sumarle música sin copyright a los reels que
   genera la app (Gemini le había sugerido buscarla "en la biblioteca de Instagram" o en Bensound).
