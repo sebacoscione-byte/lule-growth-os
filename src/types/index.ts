@@ -245,6 +245,11 @@ export interface ContentItem {
    * snapshotContentInsights) -- para no perder el ultimo dato bueno si nadie vuelve a abrir la
    * pieza o si Meta en algun momento deja de exponerlo para un post viejo. */
   instagram_insights?: ContentInstagramInsights
+  /** Snapshot tomado al clickear "Marcar como publicada manualmente" (approved -> published sin
+   * pasar por la API) -- guarda si en ese momento la pieza tenía "Reel de prueba" activado, para
+   * dar trazabilidad de esa combinación aunque después se apague el toggle. Solo tiene sentido
+   * práctico para reels; en el resto de los formatos queda con trial_reel: false. */
+  manual_publish_note?: { trial_reel: boolean; marked_at: string }
 }
 
 export interface ContentInstagramInsights {

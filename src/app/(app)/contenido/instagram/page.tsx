@@ -2008,6 +2008,15 @@ export default function ContentStudioPage() {
                         No se pudo publicar en {Object.entries(item.auto_publish_result).filter(([, v]) => v === "error").map(([k]) => k === "instagram" ? "Instagram" : "Google Business").join(" ni ")}. Reintentá con los botones de abajo.
                       </p>
                     )}
+                    {item.manual_publish_note && (
+                      <p
+                        className="text-xs text-gray-500"
+                        title={`Marcado como publicada a mano el ${new Date(item.manual_publish_note.marked_at).toLocaleString("es-AR")}`}
+                      >
+                        Publicada a mano{item.manual_publish_note.trial_reel ? " · estaba activada como reel de prueba" : ""}
+                        {" "}({new Date(item.manual_publish_note.marked_at).toLocaleDateString("es-AR")})
+                      </p>
+                    )}
                     {((item.tracked_visits ?? 0) > 0 || (item.tracked_interactions ?? 0) > 0) && (
                       <p className="text-xs text-gray-500">
                         {item.tracked_visits} visitas · {item.tracked_interactions} interacciones (link de seguimiento)
@@ -3345,8 +3354,15 @@ function Editor({
               <Button
                 variant="outline"
                 onClick={() => {
-                  if (!window.confirm("Usá esto solo si ya publicaste esta pieza vos mismo, a mano, desde la app de Instagram (por ejemplo para poder agregar el sticker de link). Esto NO publica nada — solo marca la pieza como publicada acá, para que el sistema no la vuelva a publicar sola. ¿Confirmar?")) return
-                  onSave({ status: "published", auto_publish_result: { instagram: "published" } })
+                  const trialWarning = item.trial_reel
+                    ? "\n\nOjo: esta pieza tiene activado \"Reel de prueba\" — Instagram la va a mostrar solo a gente que no te sigue hasta que la gradúes a mano desde la app. Se va a guardar esa condición junto con la marca de publicada a mano, para tener el rastro."
+                    : ""
+                  if (!window.confirm(`Usá esto solo si ya publicaste esta pieza vos mismo, a mano, desde la app de Instagram (por ejemplo para poder agregar el sticker de link). Esto NO publica nada — solo marca la pieza como publicada acá, para que el sistema no la vuelva a publicar sola.${trialWarning}\n\n¿Confirmar?`)) return
+                  onSave({
+                    status: "published",
+                    auto_publish_result: { instagram: "published" },
+                    manual_publish_note: { trial_reel: Boolean(item.trial_reel), marked_at: new Date().toISOString() },
+                  })
                 }}
                 disabled={busy}
                 className="gap-2"
