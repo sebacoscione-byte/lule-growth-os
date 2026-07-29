@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server"
 import { getServiceDb } from "@/lib/supabase/service"
 import { parseJsonBody } from "@/lib/api-validation"
 import { authorizeStaff } from "@/lib/staff-authz"
+import { convertImageToJpeg } from "@/lib/video-caption"
 
 const MAX_BYTES = 8 * 1024 * 1024
 const EXTENSION_BY_MIME: Record<string, string> = {
@@ -20,7 +21,7 @@ export async function POST(request: Request) {
   const parsedBody = await parseJsonBody(request)
   if (!parsedBody.ok) return NextResponse.json({ error: parsedBody.error }, { status: 400 })
 
-  const body = parsedBody.data as { itemId?: string; imageDataUrl?: string }
+  const body = parsedBody.data as { itemId?: string; imageDataUrl?: string; format?: string }
   if (!body.itemId || typeof body.imageDataUrl !== "string") {
     return NextResponse.json({ error: "Falta la imagen o el id de la pieza." }, { status: 400 })
   }
@@ -29,10 +30,22 @@ export async function POST(request: Request) {
   if (!match) {
     return NextResponse.json({ error: "Formato de imagen no soportado. Usá PNG, JPG o WEBP." }, { status: 400 })
   }
-  const mimeType = match[1]
-  const buffer = Buffer.from(match[2], "base64")
+  let mimeType = match[1]
+  let buffer: Buffer = Buffer.from(match[2], "base64")
   if (buffer.byteLength > MAX_BYTES) {
     return NextResponse.json({ error: "La imagen no puede superar los 8 MB." }, { status: 400 })
+  }
+
+  // Portada de reel: Meta exige JPEG para cover_url (ver createVideoContainer en
+  // instagram-business.ts) -- una subida manual en PNG/WEBP se convierte acá antes de guardarla.
+  if (body.format === "reel" && mimeType !== "image/jpeg") {
+    try {
+      buffer = await convertImageToJpeg(buffer)
+      mimeType = "image/jpeg"
+    } catch (error) {
+      console.error("No se pudo convertir la portada del reel a JPEG:",
+        error instanceof Error ? error.message : String(error))
+    }
   }
 
   try {

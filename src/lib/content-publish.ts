@@ -37,6 +37,7 @@ export async function publishApprovedItem(
           videoUrl: item.video_url,
           caption: `${item.hook}\n\n${item.caption}\n\n${item.hashtags}`,
           trial: item.trial_reel,
+          coverUrl: item.visual_url || undefined,
         })
         instagramMediaId = published.mediaId
       } else {

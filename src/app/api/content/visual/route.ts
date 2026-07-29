@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { generateContentVisual, getPublicAiError } from "@/lib/ai"
 import { truncateForImagePlate } from "@/lib/content-text"
+import { convertImageToJpeg } from "@/lib/video-caption"
 import { createClient } from "@/lib/supabase/server"
 import { getServiceDb } from "@/lib/supabase/service"
 import { authorizeStaff } from "@/lib/staff-authz"
@@ -42,13 +43,25 @@ export async function POST(request: Request) {
     let visual_persist_error: string | null = null
     try {
       const service = getServiceDb()
-      const extension = visual.mime_type === "image/png" ? "png" : "jpg"
+      let mimeType = visual.mime_type
+      let buffer: Buffer = Buffer.from(visual.image_data, "base64")
+      // Portada de reel: Meta exige JPEG para cover_url (ver createVideoContainer) -- el resto de
+      // los formatos no se usan como cover_url, así que se dejan tal cual genera Gemini.
+      if (body.format === "reel" && mimeType !== "image/jpeg") {
+        try {
+          buffer = await convertImageToJpeg(buffer)
+          mimeType = "image/jpeg"
+        } catch (error) {
+          console.error("No se pudo convertir la portada del reel a JPEG:",
+            error instanceof Error ? error.message : String(error))
+        }
+      }
+      const extension = mimeType === "image/png" ? "png" : "jpg"
       const itemId = typeof body.itemId === "string" && body.itemId ? body.itemId : "sin-id"
       const path = `${itemId}-${Date.now()}.${extension}`
-      const buffer = Buffer.from(visual.image_data, "base64")
       const { error: uploadError } = await service.storage
         .from("content-media")
-        .upload(path, buffer, { contentType: visual.mime_type, upsert: true })
+        .upload(path, buffer, { contentType: mimeType, upsert: true })
       if (uploadError) {
         console.error("No se pudo persistir la placa en content-media:", uploadError.message)
         visual_persist_error = uploadError.message

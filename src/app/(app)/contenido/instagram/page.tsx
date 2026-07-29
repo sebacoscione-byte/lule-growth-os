@@ -115,7 +115,9 @@ function CharacterCount({ value, limit }: { value: string; limit?: number }) {
 }
 
 function fallbackImagePrompt(item: ContentItem) {
-  const ratio = item.format === "historia" ? "9:16 vertical Instagram Story" : "4:5 vertical Instagram feed"
+  const ratio = item.format === "historia" || item.format === "reel"
+    ? "9:16 vertical Instagram Story"
+    : "4:5 vertical Instagram feed"
   return `Create a scroll-stopping premium editorial plate for a cardiology social media post about "${item.topic}". ${ratio}. Use one instantly understandable focal point and a relatable everyday moment that makes a potential patient feel recognized or motivated to take a preventive step. Create gentle visual tension between postponing care and choosing to take care of oneself, without fear, pain or urgency. Sophisticated deep blue, burgundy and warm neutral palette, natural cinematic lighting, realistic texture and depth. Reserve a clean, high-contrast area for the exact requested Spanish headline and subtitle. Avoid cold hospital imagery, generic medical stock photography, recognizable real physicians and advertising clichés. No extra text, no logos, no watermark.`
 }
 
@@ -1498,7 +1500,7 @@ export default function ContentStudioPage() {
           ...(isCarrusel
             ? { imageUrls: carruselImageUrls }
             : isReel
-            ? { videoUrl: item.video_url, trial: item.trial_reel }
+            ? { videoUrl: item.video_url, trial: item.trial_reel, coverUrl: item.visual_url || undefined }
             : freshVisualUrl ? { imageDataUrl: freshVisualUrl } : { imageUrl: item.visual_url }),
           caption: `${item.hook}\n\n${item.caption}\n\n${item.hashtags}`,
           format: item.format,
@@ -2504,7 +2506,7 @@ function Editor({
       const response = await fetch("/api/content/upload-image", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ itemId: item.id, imageDataUrl: dataUrl }),
+        body: JSON.stringify({ itemId: item.id, imageDataUrl: dataUrl, format: item.format }),
       })
       const data = await response.json()
       if (!response.ok || data.error) throw new Error(data.error ?? "No se pudo subir la imagen.")
@@ -2738,7 +2740,8 @@ function Editor({
               </CardTitle>
               <p className="text-xs text-gray-600">
                 Un reel necesita el video real para poder aprobar y publicar — generalo con IA
-                (microinfografía animada) o subí uno propio ya grabado. La placa/imagen no se usa acá.
+                (microinfografía animada) o subí uno propio ya grabado. Más abajo podés agregar una
+                portada opcional (la miniatura del perfil) — no reemplaza el video.
               </p>
             </CardHeader>
             <CardContent className="space-y-3">
@@ -2902,15 +2905,16 @@ function Editor({
             </CardContent>
           </Card>
         )}
-        {!isReel && (
         <Card className="border-violet-200 bg-violet-50/40">
           <CardHeader className="pb-3">
             <CardTitle className="flex items-center gap-2 text-base text-gray-900">
               <WandSparkles className="h-4 w-4 text-violet-600" />
-              Placa final con Gemini
+              {isReel ? "Portada del reel (opcional)" : "Placa final con Gemini"}
             </CardTitle>
             <p className="text-xs text-gray-600">
-              Gemini resuelve la escena, composición, tipografía, contraste y zonas seguras según el formato.
+              {isReel
+                ? "La miniatura que se ve en tu perfil de Instagram (pestaña Reels) y en la Biblioteca de acá — no es el contenido del reel en sí, eso lo define el video de arriba. Si no generás ni subís una, Instagram usa el primer frame del video como portada."
+                : "Gemini resuelve la escena, composición, tipografía, contraste y zonas seguras según el formato."}
             </p>
           </CardHeader>
           <CardContent className="space-y-3">
@@ -2919,7 +2923,7 @@ function Editor({
                 src={displayedVisualUrl}
                 alt={item.image_alt_text || `Placa visual sobre ${item.topic}`}
                 width={1024}
-                height={item.format === "historia" ? 1820 : 1280}
+                height={item.format === "historia" || isReel ? 1820 : 1280}
                 unoptimized
                 className="h-auto w-full rounded-xl border border-violet-100"
               />
@@ -3031,7 +3035,6 @@ function Editor({
             </div>
           </CardContent>
         </Card>
-        )}
         {isCarrusel && (
           <Card className="border-violet-200 bg-violet-50/40">
             <CardHeader className="pb-3">

@@ -225,6 +225,24 @@ export async function burnVideoBrief(input: {
 }
 
 /**
+ * Convierte cualquier imagen a JPEG. Meta exige JPEG especificamente para el parametro cover_url de
+ * un reel (createVideoContainer en instagram-business.ts, portada del reel en la pestaña Reels) --
+ * Gemini genera las placas en PNG por default (ver mimeType en generateContentVisual, ai.ts).
+ */
+export async function convertImageToJpeg(imageBuffer: Buffer): Promise<Buffer> {
+  const workDir = await mkdtemp(join(tmpdir(), "lule-image-jpeg-"))
+  try {
+    const inputPath = join(workDir, "input.img")
+    const outputPath = join(workDir, "output.jpg")
+    await writeFile(inputPath, imageBuffer)
+    await execFileAsync(ffmpegInstaller.path, ["-y", "-i", inputPath, "-q:v", "2", outputPath])
+    return await readFile(outputPath)
+  } finally {
+    await rm(workDir, { recursive: true, force: true })
+  }
+}
+
+/**
  * Reemplaza el audio del video (el "ambient sound only" que genera Veo, ver VIDEO_PROMPT_RULES en
  * ai.ts) por una pista de musica sin copyright de la mini-biblioteca propia, recortada a la
  * duracion real del clip con fundido de entrada/salida. Si todavia no hay ningun track descargado

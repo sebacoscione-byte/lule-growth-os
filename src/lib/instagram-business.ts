@@ -449,7 +449,7 @@ const REEL_CONTAINER_TIMEOUT_MS = 90_000
 export async function createVideoContainer(
   token: string,
   videoUrl: string,
-  options: { caption?: string; trial?: boolean } = {}
+  options: { caption?: string; trial?: boolean; coverUrl?: string } = {}
 ): Promise<string> {
   const params = new URLSearchParams({ media_type: "REELS", video_url: videoUrl, access_token: token })
   if (options.caption) params.set("caption", options.caption)
@@ -457,6 +457,10 @@ export async function createVideoContainer(
   // "MANUAL" para que nunca pase a los seguidores por si sola -- eso lo decide la doctora a mano desde
   // la app nativa de Instagram despues de ver como funciono, no un algoritmo de performance.
   if (options.trial) params.set("trial_params", JSON.stringify({ graduation_strategy: "MANUAL" }))
+  // Portada del reel (2026-07-28, ver docs de Meta): imagen JPEG publica que se muestra en la
+  // pestaña Reels del perfil. Opcional -- sin esto, Meta usa el primer frame del video (thumb_offset
+  // en 0 por default). Si algun dia se manda tambien thumb_offset, cover_url tiene prioridad.
+  if (options.coverUrl) params.set("cover_url", options.coverUrl)
 
   const res = await fetch(`${GRAPH_BASE}/me/media?${params}`, { method: "POST" })
   const data = await res.json() as ContainerResponse
@@ -469,10 +473,12 @@ export async function createVideoContainer(
  * (item.video_url, subido a mano por la doctora o generado con IA/Veo). A diferencia de
  * publishImageToInstagram, nunca recibe un archivo nuevo para subir, solo trabaja con una URL publica
  * ya existente. `trial: true` lo publica como Reel de prueba (solo visible para no-seguidores).
+ * `coverUrl` (opcional, item.visual_url) es solo la portada/miniatura de la pestaña Reels -- nunca
+ * el contenido del reel en si, que sigue siendo siempre `videoUrl`.
  */
 export async function publishReelToInstagram(
   supabase: SupabaseClient,
-  input: { videoUrl: string; caption?: string; trial?: boolean }
+  input: { videoUrl: string; caption?: string; trial?: boolean; coverUrl?: string }
 ): Promise<{ mediaId: string }> {
   const token = await getValidToken(supabase)
   if (!token) throw new Error("Instagram no esta conectado. Conectá la cuenta primero.")
@@ -480,6 +486,7 @@ export async function publishReelToInstagram(
   const containerId = await createVideoContainer(token, input.videoUrl, {
     caption: (input.caption ?? "").slice(0, 2200),
     trial: input.trial,
+    coverUrl: input.coverUrl,
   })
   await waitForContainerReady(token, containerId, REEL_CONTAINER_TIMEOUT_MS, "el video")
   const mediaId = await publishContainer(token, containerId)
