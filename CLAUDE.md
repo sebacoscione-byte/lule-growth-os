@@ -1,6 +1,49 @@
 # Lule Growth OS — Contexto para Claude
 
 ## Estado actual
+- 2026-07-28 (música de fondo sin copyright para los reels de IA — implementado, pendiente un paso
+  manual de Seba para activarlo): Seba preguntó cómo sumarle música sin copyright a los reels que
+  genera la app (Gemini le había sugerido buscarla "en la biblioteca de Instagram" o en Bensound).
+  Investigado antes de tocar código: la biblioteca de audio de Instagram **no** es una opción acá —
+  solo se puede adjuntar publicando manualmente desde la app de Instagram, no vía la Graph API que
+  usa `publishReelToInstagram`. La única forma real es quemar un archivo de audio con licencia
+  dentro del video antes de subirlo — mismo mecanismo que ya se usa para quemar el texto del brief
+  (`burnVideoBrief`), pero mezclando audio en vez de dibujar texto. Se eligió Pixabay Music (gratis,
+  licencia comercial sin atribución obligatoria) sobre una librería paga (Epidemic Sound/Artlist)
+  con una mitigación real: **hallazgo en la investigación** — algunos compositores que suben a
+  Pixabay también registran la misma pista en el Content ID de YouTube/Meta (a veces por colisión
+  de loops compartidos entre compositores), lo que puede hacer que Instagram silencie o bloquee el
+  reel después de publicado aunque la licencia esté en regla. Pixabay marca esas pistas con un
+  ícono de "Content ID Registered" en la página del track — se verificaron a mano, una por una
+  (visitando la página real de cada candidata), 4 pistas que NO tienen ese ícono: **Peaceful
+  Morning, Warm Acoustic Guitar, Gentle Ambient Atmosphere, Calm Classical Piano** (las 4
+  instrumentales, tono cálido/calmo, coherente con el resto de la cuenta — detalle completo, links
+  reales a cada página de Pixabay y la referencia sobre el riesgo de Content ID en
+  `src/lib/audio/reel-music/LICENSES.md`). Implementado `addBackgroundMusic()` en
+  `video-caption.ts`: reemplaza el audio ambiente que genera Veo (impredecible, "ambient sound
+  only" por `VIDEO_PROMPT_RULES`) por una de las 4 pistas elegida al azar, recortada a la duración
+  real del clip (ffprobe) con fundido de entrada/salida y volumen atenuado (queda de fondo detrás
+  de las tarjetas de texto, no compite por la atención) — wireado en `/api/content/video` como
+  último paso antes de persistir en Storage, mismo patrón defensivo que el brief (si falla, sigue
+  con el video tal cual antes que perder la generación de Veo, que tiene costo real). **Diseño
+  fail-open a propósito**: si en `src/lib/audio/reel-music/` no hay ningún `.mp3` todavía,
+  `addBackgroundMusic()` devuelve el video sin tocar — no bloquea nada. **Pendiente real, bloqueado
+  por algo que no se puede resolver por código**: los 4 archivos `.mp3` reales todavía NO están en
+  el repo — el botón de descarga de Pixabay está protegido por un desafío de Cloudflare Turnstile
+  (CAPTCHA) que un script no puede resolver, confirmado intentándolo (la descarga automática
+  devolvió la página de login de Pixabay en vez del audio). **Seba tiene que bajar los 4 archivos a
+  mano** (un click en "Free download" en cada link de la tabla de `LICENSES.md`, ~2 minutos) y
+  guardarlos en `src/lib/audio/reel-music/` con el nombre exacto que indica esa tabla — recién ahí
+  la música se activa sola, sin tocar código de nuevo. **Verificado en vivo**: la lógica de mezcla
+  de ffmpeg (recorte a duración, fundidos, volumen, reemplazo de audio sin recodificar el video) se
+  probó con un video y una pista de audio sintéticos (gratis, sin gastar cupo de Veo) — el output
+  dio exactamente 8s, con el audio de reemplazo correctamente recortado desde una pista de 30s.
+  Mismo bug de bundling de Vercel que en features anteriores de este archivo (fuente/binarios de
+  ffmpeg): `outputFileTracingIncludes` en `next.config.mjs` ahora también incluye
+  `src/lib/audio/reel-music/**`, si no el deploy real arrancaría sin los archivos y fallaría (o,
+  acá, degradaría en silencio al fail-open) recién al primer uso, no en build. `npm test`
+  (889/889), lint y build sin errores. Archivos: `src/lib/video-caption.ts`,
+  `src/app/api/content/video/route.ts`, `next.config.mjs`, `src/lib/audio/reel-music/LICENSES.md`.
 - 2026-07-28 (3 bugs reales en el texto que genera la IA para Instagram, reportados por Seba con
   capturas de un reel real): (1) el caption escribió "un ano" en vez de "un año" (sin la ñ, cambia
   completamente el significado de la palabra); (2) el hook/caption usaba "cardiólogo" en masculino

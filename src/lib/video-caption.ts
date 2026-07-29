@@ -1,6 +1,7 @@
 import { execFile } from "node:child_process"
 import { promisify } from "node:util"
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
+import { existsSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import ffmpegInstaller from "@ffmpeg-installer/ffmpeg"
@@ -22,6 +23,40 @@ const BRAND_LABEL = "Dra. Lucía Chahin · Cardióloga"
 const BRAND_FONT_SIZE = 24
 
 const execFileAsync = promisify(execFile)
+
+// Musica de fondo sin copyright para los reels generados con IA (2026-07-28, a pedido de Seba): Veo
+// solo genera "ambient sound only" (VIDEO_PROMPT_RULES en ai.ts) -- sonido ambiente impredecible, no
+// una musica de fondo pensada como tal. En vez de eso, se reemplaza el audio del clip por una pista
+// real de una mini-biblioteca propia, quemada por edicion real (mismo criterio que el texto del
+// brief: nunca generada/inventada por el modelo). Los 4 tracks son de Pixabay Music (Pixabay
+// Content License: uso comercial permitido, sin atribucion obligatoria) verificados a mano uno por
+// uno para confirmar que NO estan registrados en Content ID (Pixabay marca esas pistas con un
+// icono de "Content ID Registered" -- usarlas igual arriesgaria que Instagram silencie el reel
+// despues de publicado, aunque la licencia este en regla). Detalle de cada pista, fecha de
+// verificacion y el link a la pagina real de Pixabay en audio/reel-music/LICENSES.md -- si se suma
+// una pista nueva algun dia, repetir esa verificacion antes de agregarla acá.
+const MUSIC_DIR = join(__dirname, "audio", "reel-music")
+const MUSIC_TRACKS = [
+  "peaceful-morning-378816.mp3",
+  "warm-acoustic-guitar-232912.mp3",
+  "gentle-ambient-atmosphere-332292.mp3",
+  "calm-classical-piano-291012.mp3",
+]
+const MUSIC_FADE_IN_SECONDS = 0.6
+const MUSIC_FADE_OUT_SECONDS = 0.8
+// Atenuada a proposito: es musica de fondo detras de tarjetas de texto sin voz, no el foco de la
+// pieza -- tiene que acompañar, no competir por la atencion.
+const MUSIC_VOLUME = 0.45
+
+/** Elige un track al azar de los que efectivamente existen en disco. Si ninguno esta presente
+ * (Seba todavia no bajo los archivos reales, ver LICENSES.md) devuelve null -- el llamador salta
+ * el paso de musica en silencio, mismo criterio "fail-open" que GA/Places API en este proyecto: no
+ * bloquea la generacion del video por un asset opcional faltante. */
+function pickAvailableMusicTrack(): string | null {
+  const available = MUSIC_TRACKS.map(name => join(MUSIC_DIR, name)).filter(existsSync)
+  if (available.length === 0) return null
+  return available[Math.floor(Math.random() * available.length)]
+}
 
 // DejaVu Sans Bold: fuente estatica (no variable) con buena cobertura de acentos/ñ en español,
 // eleccion estandar para drawtext de ffmpeg en entornos headless (sin fontconfig del sistema).
@@ -180,6 +215,45 @@ export async function burnVideoBrief(input: {
       "-crf", "18",
       "-preset", "medium",
       "-codec:a", "copy",
+      outputPath,
+    ])
+
+    return await readFile(outputPath)
+  } finally {
+    await rm(workDir, { recursive: true, force: true })
+  }
+}
+
+/**
+ * Reemplaza el audio del video (el "ambient sound only" que genera Veo, ver VIDEO_PROMPT_RULES en
+ * ai.ts) por una pista de musica sin copyright de la mini-biblioteca propia, recortada a la
+ * duracion real del clip con fundido de entrada/salida. Si todavia no hay ningun track descargado
+ * en disco (ver LICENSES.md), devuelve el video sin tocar -- nunca bloquea la generacion por un
+ * asset opcional faltante.
+ */
+export async function addBackgroundMusic(videoBuffer: Buffer): Promise<Buffer> {
+  const musicPath = pickAvailableMusicTrack()
+  if (!musicPath) return videoBuffer
+
+  const workDir = await mkdtemp(join(tmpdir(), "lule-video-music-"))
+  try {
+    const inputPath = join(workDir, "input.mp4")
+    const outputPath = join(workDir, "output.mp4")
+    await writeFile(inputPath, videoBuffer)
+
+    const durationSeconds = await getDurationSeconds(inputPath)
+    const fadeOutStart = Math.max(0, durationSeconds - MUSIC_FADE_OUT_SECONDS)
+
+    await execFileAsync(ffmpegInstaller.path, [
+      "-y", "-i", inputPath, "-i", musicPath,
+      "-filter_complex",
+      `[1:a]atrim=0:${durationSeconds},afade=t=in:st=0:d=${MUSIC_FADE_IN_SECONDS},` +
+      `afade=t=out:st=${fadeOutStart}:d=${MUSIC_FADE_OUT_SECONDS},volume=${MUSIC_VOLUME}[aout]`,
+      "-map", "0:v", "-map", "[aout]",
+      // El video de entrada (fondo de Veo, ya con el brief quemado encima si corresponde) no se
+      // vuelve a codificar -- solo cambia el audio. -shortest es red de seguridad ante un
+      // redondeo minimo de duracion entre el atrim del audio y el video real.
+      "-c:v", "copy", "-c:a", "aac", "-b:a", "128k", "-shortest",
       outputPath,
     ])
 

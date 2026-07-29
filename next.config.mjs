@@ -64,13 +64,17 @@ const nextConfig = {
   serverExternalPackages: ["@ffmpeg-installer/ffmpeg", "@ffprobe-installer/ffprobe"],
   // /api/content/video (burnVideoBrief en video-caption.ts) usa ffmpeg/ffprobe (binarios de
   // @ffmpeg-installer / @ffprobe-installer, resueltos dinámicamente según plataforma -- el tracer
-  // automático de Next suele seguirlos bien) y una fuente propia para quemar texto
-  // (DejaVuSans-Bold.ttf, referenciada solo por ruta de archivo dentro de video-caption.ts, nunca
-  // importada -- el tracer automático NO tiene forma de detectarla sola). Sin esto, el deploy de
-  // Vercel puede arrancar sin el archivo y fallar recién al primer uso real, no en build.
+  // automático de Next suele seguirlos bien), una fuente propia para quemar texto
+  // (DejaVuSans-Bold.ttf) y, desde 2026-07-28, la mini-biblioteca de música de fondo sin copyright
+  // (audio/reel-music/*.mp3) -- las tres se referencian solo por ruta de archivo dentro de
+  // video-caption.ts, nunca importadas, así que el tracer automático NO tiene forma de detectarlas
+  // solo. Sin esto, el deploy de Vercel puede arrancar sin los archivos y fallar (o, en el caso de
+  // la música, degradar en silencio al fail-open de addBackgroundMusic) recién al primer uso real,
+  // no en build.
   outputFileTracingIncludes: {
     "/api/content/video": [
       "src/lib/fonts/DejaVuSans-Bold.ttf",
+      "src/lib/audio/reel-music/**",
       "node_modules/@ffmpeg-installer/**",
       "node_modules/@ffprobe-installer/**",
     ],
