@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 import { generateContentVideo, getPublicAiError } from "@/lib/ai"
-import { burnVideoBrief } from "@/lib/video-caption"
+import { addBackgroundMusic, burnVideoBrief } from "@/lib/video-caption"
 import { createClient } from "@/lib/supabase/server"
 import { getServiceDb } from "@/lib/supabase/service"
 import { authorizeStaff } from "@/lib/staff-authz"
@@ -45,6 +45,16 @@ export async function POST(request: Request) {
         // Seguimos con el fondo sin texto antes que perder la generación de Veo (tiene costo real) --
         // queda igual disponible el botón de "Agregar texto del guion al video" para reintentar.
       }
+    }
+
+    // Musica de fondo sin copyright (2026-07-28): reemplaza el audio ambiente que genera Veo por una
+    // pista real de la mini-biblioteca propia. Mismo criterio defensivo que el brief de arriba: si
+    // falla, seguimos con el video tal cual (con o sin captions) antes que perder la generación.
+    try {
+      buffer = await addBackgroundMusic(buffer)
+    } catch (error) {
+      console.error("[content/video] no se pudo agregar música de fondo:",
+        error instanceof Error ? error.message : String(error))
     }
 
     // Persistimos de una en Storage (service role, mismo patron que /api/content/visual): el video de
