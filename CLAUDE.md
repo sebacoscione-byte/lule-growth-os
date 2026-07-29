@@ -1,6 +1,21 @@
 # Lule Growth OS — Contexto para Claude
 
 ## Estado actual
+- 2026-07-29 (trazabilidad al marcar un reel de prueba como "publicada manualmente"): continuación
+  del punto de arriba — Seba pidió que, al marcar una pieza como publicada a mano (botón que existe
+  desde antes para reels/carruseles posteados fuera de la API, ej. para poder agregar el sticker de
+  link), quede registro de que en ese momento la pieza tenía "Reel de prueba" activado, en vez de
+  perderse ese contexto. Implementado: nuevo campo `manual_publish_note?: { trial_reel, marked_at }`
+  en `ContentItem`, sumado a la allowlist de `/api/content/items` (como campo no-contenido, igual
+  que `auto_publish_result`, no revierte a Borrador). El diálogo de confirmación de "Marcar como
+  publicada manualmente" ahora menciona explícitamente el estado de prueba cuando corresponde, y la
+  card de Biblioteca muestra una nota permanente ("Publicada a mano · estaba activada como reel de
+  prueba (dd/mm)") que no depende de que el toggle siga prendido después. Verificado en vivo con
+  Playwright (usuario E2E real, pieza reel de prueba sembrada directo en `content_pipeline` y
+  borrada después): el diálogo de confirmación mostró el texto de aviso nuevo y, tras confirmar, la
+  nota apareció en la card de Biblioteca. `npm test` (893/893), lint y build sin errores. Archivos:
+  `src/types/index.ts`, `src/app/api/content/items/route.ts`,
+  `src/app/(app)/contenido/instagram/page.tsx`.
 - 2026-07-29 (insights por post/reel dejan de perderse — antes se pedían en vivo y se descartaban):
   a raíz de una duda de Seba sobre un reel (publicado con "Reel de prueba" activado, ver el punto
   de "Reels de prueba" del 2026-07-27) que no aparecía en su perfil de Instagram — se investigó y

@@ -160,6 +160,12 @@ export async function PATCH(request: NextRequest) {
         Object.entries(body.auto_publish_result).every(([key, value]) => validKeys.includes(key) && validValues.includes(value as string))
       if (!valid) return NextResponse.json({ error: "Resultado de publicacion invalido" }, { status: 400 })
     }
+    if (body.manual_publish_note !== undefined) {
+      const note = body.manual_publish_note
+      const valid = typeof note === "object" && note !== null &&
+        typeof note.trial_reel === "boolean" && typeof note.marked_at === "string"
+      if (!valid) return NextResponse.json({ error: "Nota de publicacion manual invalida" }, { status: 400 })
+    }
 
     const now = new Date().toISOString()
     const editableFields: Array<keyof ContentItem> = [
@@ -184,6 +190,7 @@ export async function PATCH(request: NextRequest) {
       "repeat_interval_days",
       "repeat_limit",
       "trial_reel",
+      "manual_publish_note",
     ]
     const changes = Object.fromEntries(
       editableFields
@@ -195,7 +202,8 @@ export async function PATCH(request: NextRequest) {
     // (deshacer) o registrar el estado previo al archivar no debe resetear a borrador. repeat_interval_days
     // es config de cronograma, no contenido -- cambiarla tampoco debe tirar la pieza de vuelta a borrador.
     // trial_reel es config de distribucion en Instagram (a quien se le muestra), no contenido en si.
-    const nonContentFields = new Set(["status", "visual_url", "video_url", "auto_publish_result", "archived_from_status", "repeat_interval_days", "repeat_limit", "trial_reel"])
+    // manual_publish_note es metadata de auditoria (se escribe junto con status: "published"), no contenido.
+    const nonContentFields = new Set(["status", "visual_url", "video_url", "auto_publish_result", "archived_from_status", "repeat_interval_days", "repeat_limit", "trial_reel", "manual_publish_note"])
     const hasContentChanges = editableFields.some(field => !nonContentFields.has(field) && body[field] !== undefined)
     const resetApproval = hasContentChanges && !body.status && ["approved", "published"].includes(current.status)
     // Al re-activar la repeticion (off -> on), arrancar el contador de cero para que el limite cuente
