@@ -1,6 +1,39 @@
 # Lule Growth OS — Contexto para Claude
 
 ## Estado actual
+- 2026-07-28 (3 bugs reales en el texto que genera la IA para Instagram, reportados por Seba con
+  capturas de un reel real): (1) el caption escribió "un ano" en vez de "un año" (sin la ñ, cambia
+  completamente el significado de la palabra); (2) el hook/caption usaba "cardiólogo" en masculino
+  para referirse a la especialidad, pese a que la Dra. Lucía es mujer; (3) el "Atiendo en" del
+  caption decía siempre "Hospital Británico" a secas, sin el "(Central)" que sí usan las landings
+  públicas (`public-landings.ts`, `landings/[slug]/page.tsx`) para distinguirlo de otros centros de
+  la red Hospital Británico — información real que podía confundir a un paciente sobre a qué
+  edificio concurrir. **Causa raíz de (1) y, en parte, de (3)**: el pipeline automático que arma
+  este contenido (`generateContentPlan`, la función real detrás de "Generar propuesta completa" en
+  modo IA — no `buildContentPlanPrompt`, que es solo el modo manual) tiene su system prompt escrito
+  íntegramente en español SIN tildes ni "ñ" (por practicidad del desarrollador, ej. "espanol",
+  "cardiologa", "atendes"), incluyendo el hecho literal "Hospital Britanico" sin acento como parte
+  de "dónde atendés" — sin ninguna regla que le aclarara al modelo que ese estilo interno no debía
+  imitarse en la respuesta final, y sin el sufijo "(Central)" en ese dato. Fix: se agregaron dos
+  reglas nuevas a `PLAIN_TEXT_RULES` (compartida por `generateContentPlan`, `buildContentPlanPrompt`,
+  `generateInstagramContent` y `generateGooglePost`) — una de ORTOGRAFÍA que aclara explícitamente
+  que las instrucciones internas están sin tildes por practicidad pero que la respuesta SIEMPRE debe
+  llevarlas, con el propio caso real "año" no "ano" como ejemplo; y una de GÉNERO que prohíbe
+  "cardiólogo" en masculino y pide "cardióloga"/"consulta cardiológica"/"cardiología" en su lugar.
+  Las mismas dos reglas se sumaron también a `VIDEO_BRIEF_RULES` (usada por `generateVideoBrief`
+  para el gancho/mensajes/CTA de la microinfografía animada de reels, que no incluye
+  `PLAIN_TEXT_RULES`). Se corrigieron además los 4 lugares donde el nombre de la sede se pasaba sin
+  tilde y sin "(Central)" como dato literal (`HASHTAG_RULES`, y los system prompts de
+  `generateContentPlan`, `generateGooglePost` y `buildContentPlanPrompt`), alineándolo con el nombre
+  ya usado en las landings públicas. El ejemplo de gancho "3 señales para consultar al cardiólogo"
+  en `VIDEO_BRIEF_RULES` se cambió a "consultar con cardiología". **Verificado en vivo** con una
+  llamada real a Gemini (script temporal descartado después, sin tocar Supabase) replicando el
+  system prompt corregido para un reel de "Chequeo cardiovascular": el resultado real usó "más de un
+  año" (con ñ), "¿Creés que solo tenés que ir a la cardióloga...?" (femenino) y "Miércoles en Hospital
+  Británico (Sede Central)" — los tres bugs no se reprodujeron. No se regeneró el contenido de la
+  pieza real que Seba mostró en las capturas — el fix aplica hacia adelante, a la próxima vez que se
+  genere o regenere una propuesta. `npm test` (889/889), lint y build sin errores. Archivo:
+  `src/lib/ai.ts`.
 - 2026-07-27 (Reels de prueba de Instagram — "Trial Reels"): Seba avisó que la cuenta ya superó el
   umbral de seguidores que Meta exige para poder publicar reels de prueba (mostrados solo a gente que
   no lo sigue, para testear una idea antes de decidir mostrarla a la audiencia habitual) y pidió
