@@ -1408,9 +1408,11 @@ export default function ContentStudioPage() {
     }
   }
 
-  // Insights nativos (reach/likes/comments) se piden en vivo, a pedido — no hay un historial
-  // guardado, ver docs/BACKLOG.md. Solo disponible para piezas publicadas con este sistema desde
-  // que se agregó instagram_media_id (content-publish.ts).
+  // Insights nativos (reach/likes/comments) se piden en vivo -- el servidor guarda el resultado
+  // como item.instagram_insights (ver types/index.ts), así que no se pierden aunque no se vuelva
+  // a pedir; también se refrescan solos todos los días en el cron (content-insights.ts). Solo
+  // disponible para piezas publicadas con este sistema desde que se agregó instagram_media_id
+  // (content-publish.ts).
   async function loadInsights(item: ContentItem) {
     setInsights(previous => ({ ...previous, [item.id]: "loading" }))
     try {
@@ -2011,33 +2013,47 @@ export default function ContentStudioPage() {
                         {item.tracked_visits} visitas · {item.tracked_interactions} interacciones (link de seguimiento)
                       </p>
                     )}
-                    {item.status === "published" && item.instagram_media_id && (
-                      insights[item.id] && insights[item.id] !== "loading" && insights[item.id] !== "error" ? (
-                        <p className="text-xs text-gray-500">
-                          {(() => {
-                            const stats = insights[item.id] as InstagramMediaInsights
-                            return [
-                              stats.reach != null && `${stats.reach} alcance`,
-                              stats.likes != null && `${stats.likes} me gusta`,
-                              stats.comments != null && `${stats.comments} comentarios`,
-                              stats.saved != null && `${stats.saved} guardados`,
-                              stats.shares != null && `${stats.shares} compartidos`,
-                            ].filter(Boolean).join(" · ") || "Instagram no devolvió datos para este post."
-                          })()}
-                        </p>
-                      ) : (
-                        <Button
-                          type="button"
-                          variant="link"
-                          size="sm"
-                          className="h-auto p-0 text-xs"
-                          disabled={insights[item.id] === "loading"}
-                          onClick={() => loadInsights(item)}
-                        >
-                          {insights[item.id] === "loading" ? "Cargando insights..." : insights[item.id] === "error" ? "No se pudo cargar — reintentar" : "Ver insights de Instagram"}
-                        </Button>
+                    {item.status === "published" && item.instagram_media_id && (() => {
+                      const live = insights[item.id]
+                      const liveStats = live && live !== "loading" && live !== "error" ? live : null
+                      // Si todavía no se pidió de nuevo en esta sesión, mostramos el último snapshot
+                      // guardado (se actualiza solo, todos los días, en el cron -- ver
+                      // src/lib/content-insights.ts) en vez de obligar a clickear para ver algo.
+                      const stats: InstagramMediaInsights | null = liveStats ?? item.instagram_insights ?? null
+                      return (
+                        <div className="text-xs text-gray-500 space-y-0.5">
+                          {stats && (
+                            <p>
+                              {[
+                                stats.reach != null && `${stats.reach} alcance`,
+                                stats.likes != null && `${stats.likes} me gusta`,
+                                stats.comments != null && `${stats.comments} comentarios`,
+                                stats.saved != null && `${stats.saved} guardados`,
+                                stats.shares != null && `${stats.shares} compartidos`,
+                              ].filter(Boolean).join(" · ") || "Instagram no devolvió datos para este post."}
+                            </p>
+                          )}
+                          <Button
+                            type="button"
+                            variant="link"
+                            size="sm"
+                            className="h-auto p-0 text-xs"
+                            disabled={live === "loading"}
+                            onClick={() => loadInsights(item)}
+                          >
+                            {live === "loading"
+                              ? "Cargando insights..."
+                              : live === "error"
+                              ? "No se pudo cargar — reintentar"
+                              : liveStats
+                              ? "Actualizado ahora"
+                              : item.instagram_insights
+                              ? `Actualizar (guardado ${new Date(item.instagram_insights.fetched_at).toLocaleDateString("es-AR")})`
+                              : "Ver insights de Instagram"}
+                          </Button>
+                        </div>
                       )
-                    )}
+                    })()}
                     {item.status === "approved" && !item.repeat_interval_days && queueInfo.get(item.id) && (
                       <p className="text-xs text-gray-500">
                         {queueInfo.get(item.id)!.position === 1 ? "Próxima en publicarse" : `#${queueInfo.get(item.id)!.position} en la cola`}

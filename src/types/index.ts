@@ -239,6 +239,21 @@ export interface ContentItem {
   tracked_interactions?: number
   /** ID de media de Instagram devuelto por publishContainer() al publicar (post o carrusel). Permite pedir insights nativos (reach/likes/comments) después de publicado. null/undefined = nunca se publicó por API o se publicó antes de que esto existiera. */
   instagram_media_id?: string | null
+  /** Ultimo snapshot guardado de insights nativos de Instagram (reach/likes/comments/guardados/
+   * compartidos) de esta pieza. Se actualiza tanto al pedirlo a mano desde la UI
+   * (/api/content/insights/[itemId]) como automaticamente en el cron diario (ver
+   * snapshotContentInsights) -- para no perder el ultimo dato bueno si nadie vuelve a abrir la
+   * pieza o si Meta en algun momento deja de exponerlo para un post viejo. */
+  instagram_insights?: ContentInstagramInsights
+}
+
+export interface ContentInstagramInsights {
+  reach: number | null
+  likes: number | null
+  comments: number | null
+  saved: number | null
+  shares: number | null
+  fetched_at: string
 }
 
 export interface AutoPublishTrackSettings {

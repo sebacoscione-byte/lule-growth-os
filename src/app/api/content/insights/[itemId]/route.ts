@@ -1,15 +1,17 @@
 import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { authorizeStaff } from "@/lib/staff-authz"
-import { readContentItems } from "@/lib/content-pipeline"
+import { readContentItems, writeContentItems } from "@/lib/content-pipeline"
 import { getValidToken, getInstagramMediaInsights } from "@/lib/instagram-business"
 
 const CONTENT_ROLES = ["owner", "doctor"] as const
 
 // Insights nativos (reach/likes/comments/guardados/compartidos) de una pieza ya publicada por API.
-// Se piden en vivo a pedido (no se guarda un historial): media_id solo existe para piezas
-// publicadas por este sistema desde que se agregó a content-publish.ts, así que piezas viejas no
-// van a tener nada que consultar.
+// Se piden en vivo (media_id solo existe para piezas publicadas por este sistema desde que se
+// agregó a content-publish.ts, así que piezas viejas no van a tener nada que consultar) y el
+// resultado se guarda como instagram_insights en la pieza (ver types/index.ts) para no perderlo --
+// el mismo snapshot también se refresca solo, todos los días, en el cron (ver
+// src/lib/content-insights.ts), así que este endpoint no es la única forma de mantenerlo al día.
 export async function GET(
   _req: Request,
   { params }: { params: Promise<{ itemId: string }> }
@@ -31,6 +33,11 @@ export async function GET(
 
   try {
     const insights = await getInstagramMediaInsights(token, item.instagram_media_id)
+    const snapshot = { ...insights, fetched_at: new Date().toISOString() }
+    await writeContentItems(
+      supabase,
+      items.map(existing => existing.id === itemId ? { ...existing, instagram_insights: snapshot } : existing)
+    )
     return NextResponse.json({ insights })
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
