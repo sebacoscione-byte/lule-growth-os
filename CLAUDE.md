@@ -1,6 +1,36 @@
 # Lule Growth OS — Contexto para Claude
 
 ## Estado actual
+- 2026-07-29 (insights por post/reel dejan de perderse — antes se pedían en vivo y se descartaban):
+  a raíz de una duda de Seba sobre un reel (publicado con "Reel de prueba" activado, ver el punto
+  de "Reels de prueba" del 2026-07-27) que no aparecía en su perfil de Instagram — se investigó y
+  confirmó que el reel sí se había publicado (media_id real, contenedor esperado hasta `FINISHED`
+  antes de publicar) y que no verse en el perfil es el comportamiento esperado de un Trial Reel de
+  Meta (oculto para vos y tus seguidores hasta graduarlo a mano desde la app nativa; confirmado
+  contra la documentación oficial de Meta, que no expone ningún campo/endpoint para consultar el
+  estado de graduación por API) — Seba lo graduó manualmente desde el celular. Al preguntar cómo
+  hace la app para reflejar eso, se encontró que **"Ver insights de Instagram" (reach/likes/
+  comments/guardados/compartidos por post, agregado 2026-07-17) nunca guardaba nada** — se pedía en
+  vivo a la API de Meta cada vez y se descartaba al cerrar la pieza o recargar la página (decisión
+  explícita en su momento, ver `docs/BACKLOG.md`). Seba pidió que esta información no se pierda.
+  Implementado: nuevo campo `instagram_insights` en `ContentItem` (reach/likes/comments/guardados/
+  compartidos + `fetched_at`) — se guarda tanto al pedirlo a mano desde la card de Biblioteca
+  (`GET /api/content/insights/[itemId]`, ahora persiste el resultado con `writeContentItems`) como
+  automáticamente todos los días dentro del cron `publish-content` (`snapshotContentInsights()` en
+  `src/lib/content-insights.ts`, nuevo, mismo patrón que los snapshots de seguidores de
+  Instagram/Google Business ya existentes — no suma un cron job nuevo). Un fallo puntual al refrescar
+  una pieza (post viejo, métrica no habilitada para ese media) conserva el último snapshot bueno en
+  vez de borrarlo. La UI ahora muestra el último snapshot guardado apenas se abre Biblioteca (sin
+  tener que clickear primero) y el link cambia a "Actualizar (guardado d/m/aaaa)" en vez de
+  "Ver insights de Instagram" cuando ya hay un dato persistido. Tests nuevos en
+  `src/lib/content-insights.test.ts` (sin conexión → no hace nada; guarda snapshot por pieza con
+  `instagram_media_id` sin tocar el resto; un fallo puntual conserva el snapshot viejo de esa pieza
+  sin frenar a las demás; sin ninguna pieza con media_id no escribe nada). `npm test` (893/893),
+  lint y build sin errores. **No se pudo verificar en vivo contra la cuenta real de Instagram en
+  este entorno** (sin credenciales de Meta acá) — la próxima corrida real del cron confirma si el
+  refresco diario funciona sobre datos reales. Archivos: `src/types/index.ts`,
+  `src/lib/content-insights.ts` (nuevo, +tests), `src/app/api/content/insights/[itemId]/route.ts`,
+  `src/app/api/cron/publish-content/route.ts`, `src/app/(app)/contenido/instagram/page.tsx`.
 - 2026-07-28 (portada/miniatura para reels — antes no existía, ahora usa cover_url real de Meta):
   Seba marcó en la Biblioteca que la card de un reel mostraba el placeholder genérico "Concepto
   generado por IA" en vez de una imagen real (a diferencia de posts/historias/carruseles, que sí

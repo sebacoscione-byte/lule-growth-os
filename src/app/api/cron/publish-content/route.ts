@@ -14,6 +14,7 @@ import { runHandoffReminderCheck } from "@/lib/whatsapp-handoff"
 import { drainWhatsAppInboundQueue, getWhatsAppQueueHealth } from "@/lib/whatsapp-inbound-queue"
 import { checkWhatsAppCloudApiConfiguration } from "@/lib/whatsapp"
 import { snapshotInstagramFollowers } from "@/lib/instagram-followers"
+import { snapshotContentInsights } from "@/lib/content-insights"
 import { snapshotGoogleBusinessMetrics } from "@/lib/google-performance"
 import { sendCronFailureAlert } from "@/lib/alert-email"
 import type { AutoPublishTrackSettings, ContentChannel } from "@/types"
@@ -195,6 +196,11 @@ export async function GET(request: Request) {
     // contenido -- ver src/lib/instagram-followers.ts.
     const instagramFollowers = await snapshotInstagramFollowers(supabase, now)
 
+    // Snapshot de insights nativos (reach/likes/comments) de piezas ya publicadas por API (ver
+    // src/lib/content-insights.ts) -- mismo motivo que el resto: corre acá adentro, no en un cron
+    // propio, para no perder el dato aunque nadie vuelva a abrir la pieza en la UI.
+    const contentInsights = await snapshotContentInsights(supabase, now)
+
     // Insights de Google (Places + Business Performance) comparten este cron diario para respetar
     // el limite de 2 cron jobs de Vercel Hobby. La cuota 0 de GBP es un estado esperado y se guarda
     // como quota_blocked; no frena publicaciones ni genera una falsa alarma diaria.
@@ -210,6 +216,7 @@ export async function GET(request: Request) {
     const realWhatsappErrors = whatsappFollowup.errors.filter(e => !e.includes("todavía no está aprobado"))
     if (realWhatsappErrors.length > 0) failures.push(`Seguimiento WhatsApp: ${realWhatsappErrors.join("; ")}`)
     if (instagramFollowers.error) failures.push(`Seguidores de Instagram: ${instagramFollowers.error}`)
+    if (contentInsights.error) failures.push(`Insights de contenido: ${contentInsights.error}`)
     if (googleBusinessMetrics.error) failures.push(`Métricas de Google Business: ${googleBusinessMetrics.error}`)
     if (handoffReminder.error) failures.push(`Recordatorio de derivación a humano: ${handoffReminder.error}`)
     if (whatsappQueueError) failures.push("Cola WhatsApp: worker_unavailable")
@@ -230,7 +237,7 @@ export async function GET(request: Request) {
     return NextResponse.json({
       post: post.last_run_result, historia: historia.last_run_result, carrusel: carrusel.last_run_result,
       reel: reel.last_run_result,
-      whatsappFollowup, instagramFollowers,
+      whatsappFollowup, instagramFollowers, contentInsights,
       googleBusinessMetrics, handoffReminder, whatsappQueue, whatsappQueueHealth,
       whatsappMetaPreflight,
     })
