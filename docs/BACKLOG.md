@@ -278,9 +278,21 @@ por qué tipo de acción es, para que sepas qué esperar de cada uno. El detalle
   `https://draluciachahin.ar` verificada (archivo HTML) y `sitemap.xml` enviado, estado "Correcto"
   con las 9 URLs (8 páginas públicas + `/privacidad`). De paso se corrigió el mismo bug de siempre
   (`src/proxy.ts` redirigía a `/login` el archivo de verificación de Google — ver PR #108).
-- [ ] Verificar que las 8 páginas públicas queden **indexadas** (no solo que el sitemap se haya
-  leído bien) — la indexación real tarda de días a 1-2 semanas, revisar periódicamente en
-  Search Console → "Páginas".
+- [x] ~~Verificar que las 8 páginas públicas queden **indexadas**~~ **Primera verificación real
+  2026-07-27** — Seba compartió las capturas de Search Console: 5/13 URLs indexadas, 8 no
+  (3 motivos: crawled/discovered sin indexar en las landings secundarias — esperable a las ~7
+  semanas de un sitio nuevo — y **"Duplicada: Google ha elegido una versión canónica diferente"**
+  para `/dra-lucia-chahin`, la landing principal). **Bug real encontrado y corregido (PR #172,
+  mergeado y en producción)**: `proxy.ts` redirigía `/` → `/dra-lucia-chahin` con
+  `NextResponse.redirect(url)` sin status explícito → 307 (temporal) por default. Un 307 no le dice
+  a Google que consolide la indexación en el destino, así que Google indexó `/` en vez de la
+  landing real pese a que ésta ya declara su propio `<link rel="canonical">`. Cambiado a 308
+  (permanente) — verificado con `curl -I https://draluciachahin.ar/` en producción real, ya sirve
+  308. Se pidió reindexación manual de `/dra-lucia-chahin` desde Search Console el mismo día.
+  **Pendiente real**: confirmar en unos días/semanas que el próximo rastreo de Google elige
+  `/dra-lucia-chahin` como canónica en vez de `/` (Search Console tarda en reflejar el cambio, no
+  es instantáneo) — si el motivo "Duplicada" persiste pasadas 2-3 semanas con el 308 ya activo,
+  investigar de nuevo.
 - [ ] **Google Cloud (reseñas)**: revisar antes de octubre 2026 si se activa la cuenta completa o
   se deja pausar la prueba gratuita (Etapa 2).
 
@@ -1231,8 +1243,9 @@ orgánico de búsqueda y convierten con instrucciones claras para pedir turno.
 ### Acciones externas (las hace el equipo)
 - [x] ~~Configurar Google Search Console con el sitemap~~ ver "✍️ Contenido para cargar/publicar"
       más arriba — resuelto (2026-07-17)
-- [ ] Verificar indexación de las 8 páginas públicas en Search Console (7 + `/cardiologa-caba`
-      nueva) — pendiente real, ver más arriba (tarda días, no es instantáneo)
+- [x] ~~Verificar indexación de las 8 páginas públicas en Search Console~~ — primera verificación
+      real 2026-07-27, bug de redirect 307/308 encontrado y corregido, ver detalle más arriba.
+      Queda pendiente confirmar que Google re-indexa `/dra-lucia-chahin` en las próximas semanas.
 
 ---
 
@@ -1796,13 +1809,56 @@ Si se retoma: dimensionarlo como un proyecto propio (no una tarea suelta), reusa
 probado del bot de WhatsApp (idempotencia, outbox, guardrails) en vez de construir algo nuevo desde
 cero para Instagram.
 
-### [TECH] Texto de ayuda desactualizado en Configuración → Ubicaciones (campo WhatsApp propio)
-`src/app/(app)/configuracion/page.tsx` (~línea 999) dice: *"Si lo dejás vacío, el botón 'Consultar
-por WhatsApp' de la landing usa el WhatsApp del consultorio."* Eso ya no es cierto: desde el fix de
+### [TECH] ✅ Resuelto (2026-07-30): texto de ayuda desactualizado en Configuración → Ubicaciones (campo WhatsApp propio)
+`src/app/(app)/configuracion/page.tsx` (~línea 999) decía: *"Si lo dejás vacío, el botón 'Consultar
+por WhatsApp' de la landing usa el WhatsApp del consultorio."* Eso ya no era cierto: desde el fix de
 2026-07-06/07 (ver `feedback_ui_completeness_lule` en memoria, caso 2 — pedido explícito de Seba
 para CIMEL, "sacale el boton de whatsapp porque no tiene whatsapp"), `landing-interactions.tsx`
 oculta el botón por completo (`{sede.whatsapp && (...)}`) cuando el campo queda vacío, en vez de
-mostrar un fallback al WhatsApp del consultorio. Es solo el copy el que quedó desactualizado — el
-comportamiento actual (ocultar) es el correcto/deseado, reconfirmado el 2026-07-20 cuando Seba
-decidió no sumarle el bot a CIMEL. Fix sugerido: actualizar el texto de ayuda para que describa el
-comportamiento real ("si lo dejás vacío, no se muestra ningún botón de WhatsApp para esta sede").
+mostrar un fallback al WhatsApp del consultorio. Era solo el copy el que había quedado
+desactualizado — el comportamiento (ocultar) ya era el correcto/deseado, reconfirmado el 2026-07-20
+cuando Seba decidió no sumarle el bot a CIMEL. Corregido el texto de ayuda para que describa el
+comportamiento real: "si lo dejás vacío, no se muestra ningún botón de WhatsApp para esta sede".
+
+### [QA] Fix anti-mockup de teléfono/app en `VIDEO_PROMPT_RULES` — sin verificar con Veo real (2026-07-23)
+`src/lib/ai.ts` (PR #168) agregó una prohibición explícita contra que Veo enmarque la microinfografía
+como si fuera la captura de pantalla de un teléfono/app (bug real visto en un frame: Veo dibujó una
+barra de estado falsa con reloj, íconos y un nombre de app inventado — "caustion" — arriba del todo,
+interpretando el ícono de tensiómetro/gauge del prompt como una app de salud). El fix se aplicó al
+texto del prompt pero **nunca se generó un video real de Veo con el prompt reforzado** para confirmar
+que la instrucción nueva evita el mockup en la práctica — se agotó el cupo diario (`DAILY_VIDEO_GENERATION_LIMIT`)
+disponible esa sesión. El crédito de marca fijo ("Dra. Lucía Chahin · Cardióloga", quemado por
+`burnVideoBrief()`) sí quedó verificado, es independiente del modelo de video. Pendiente: la próxima
+vez que se genere un reel real con Veo, revisar el frame superior del clip para confirmar que ya no
+aparece ningún mockup de dispositivo/barra de estado — si sigue apareciendo, reforzar aún más el
+prompt o considerar recortar/tapar esa franja con la tarjeta de gancho (que ya ocupa esa zona en la
+composición final, `y: "h*0.14"` en `video-caption.ts`, así que en la práctica el crédito de marca +
+el gancho probablemente ya la cubren visualmente incluso si Veo insiste).
+
+### [ACCIÓN DE SEBA] Descargar las 4 pistas reales de música de fondo para reels (2026-07-28)
+`addBackgroundMusic()` (`src/lib/video-caption.ts`, PR #174) ya está mergeado y wireado en
+`/api/content/video`, pero los 4 archivos `.mp3` reales todavía no están en el repo — el botón de
+descarga de Pixabay está protegido por un desafío de Cloudflare Turnstile que un script no puede
+resolver (confirmado intentándolo: devuelve la página de login de Pixabay en vez del audio). Diseño
+fail-open: mientras falten los archivos, los reels se generan sin música, sin romper nada. Falta que
+Seba entre a los 4 links de `src/lib/audio/reel-music/LICENSES.md`, aprete "Free download" en cada
+uno, y guarde el archivo con el nombre exacto que indica esa tabla. Una vez hecho, además falta una
+verificación real de punta a punta con un reel generado con Veo (solo se probó con audio/video
+sintéticos, gratis) — revisar que el audio final suene bien y no quede desincronizado.
+
+### [BUG] Texto mal escrito dentro de una placa ya generada — "SINTOMAS DE ALAMA EN LA MUJER" (visto 2026-07-28)
+Pieza "Síntomas de alarma en la mujer" (post, categoría Educación, publicada 26/7/2026): el titular
+quemado dentro de la imagen por Gemini dice "SINTOMAS DE ALAMA EN LA MUJER" — sin tildes
+("SINTOMAS") y con una letra faltante ("ALAMA" en vez de "ALARMA", le falta la R). No es el mismo bug
+que el de tildes en texto de Instagram (caption/hook, corregido en PR #173 con reglas de prompt) —
+acá el error está renderizado por el **modelo de imagen** (`generateContentVisual`, Gemini dibuja el
+titular directamente sobre el píxel), no por el modelo de texto, así que la regla de ortografía de
+`PLAIN_TEXT_RULES` no lo alcanza. Visto de pasada mientras se investigaba otro pedido de Seba (portada
+de reels, PR #175), no se tocó porque no era el foco de esa tarea. Posible causa: los modelos de
+imagen generativa son notoriamente peores que los de texto renderizando texto legible/preciso dentro
+de la imagen (ya documentado como riesgo conocido en `VIDEO_PROMPT_RULES` para video). Posible fix a
+evaluar: pedirle a Gemini que verifique/regenere si el texto no coincide exactamente con
+`visual_headline`/`visual_subtitle` (más caro, requiere una segunda llamada o algún tipo de
+OCR/verificación), o aceptar que placas con texto quemado por IA necesitan revisión humana antes de
+aprobar (ya es el flujo actual: alguien mira la placa antes de aprobar, pero este typo pasó
+igual). No se regeneró la placa ya publicada — evaluar si vale la pena corregirla a mano en Instagram.
