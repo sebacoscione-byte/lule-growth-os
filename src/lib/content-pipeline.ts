@@ -166,14 +166,53 @@ export function estimateRepeatEndDate(
   return estimateAutoPublishDateForPosition(remaining, daysOfWeek, 1, now, todayAvailable)
 }
 
+// Offset usado como fallback de orden para una pieza evergreen (publicada, en repeticion) que nunca
+// se reordeno a mano: muy por encima de cualquier timestamp real, para que por default siga cayendo
+// despues de las piezas aprobadas nuevas (mismo comportamiento de siempre), pero permite que un
+// queue_rank manual la intercale en cualquier lugar de la cola una vez que se la reordena.
+const REPEAT_DEFAULT_RANK_OFFSET = 10_000_000_000_000
+
 /**
  * Orden efectivo dentro de la cola de un formato: `queue_rank` explicito (asignado al reordenar a
- * mano) tiene prioridad; si nunca se reordeno, se ordena por approved_at (FIFO, el de siempre). Los
- * ranks manuales son enteros chicos (1, 2, 3...) y los timestamps son numeros mucho mas grandes, asi
- * que una pieza reordenada a mano siempre queda antes que una que nunca se toco.
+ * mano) tiene prioridad; si nunca se reordeno, se ordena por approved_at (FIFO, el de siempre) para
+ * una pieza aprobada, o por "la mas atrasada primero" (con el offset de arriba) para una evergreen ya
+ * publicada. Los ranks manuales son enteros chicos (1, 2, 3...) y los fallbacks son numeros mucho mas
+ * grandes, asi que una pieza reordenada a mano siempre queda antes que una que nunca se toco.
  */
 function effectiveQueueRank(item: ContentItem): number {
-  return item.queue_rank ?? new Date(item.approved_at ?? item.created_at).getTime()
+  if (item.queue_rank != null) return item.queue_rank
+  if (item.status === "published" && item.repeat_interval_days) {
+    return REPEAT_DEFAULT_RANK_OFFSET + new Date(item.updated_at).getTime()
+  }
+  return new Date(item.approved_at ?? item.created_at).getTime()
+}
+
+/**
+ * Pura, sin I/O: si una pieza puede reordenarse a mano dentro de la cola de su formato -- una
+ * aprobada (de siempre) o una ya publicada que sigue repitiendose de verdad (con intervalo activo y,
+ * si tiene limite, sin haberlo alcanzado todavia). Se usa tanto para decidir que piezas se mueven
+ * juntas al reordenar como para mostrar las flechas de orden en la Biblioteca.
+ */
+export function isReorderableInQueue(item: ContentItem): boolean {
+  if (item.status === "approved") return true
+  if (item.status === "published" && item.repeat_interval_days && item.repeat_interval_days > 0) {
+    return item.repeat_limit == null || (item.repeat_count ?? 0) < item.repeat_limit
+  }
+  return false
+}
+
+/**
+ * Pura, sin I/O: posicion (1-indexada) de cada pieza reordenable (aprobada o evergreen repitiendose)
+ * dentro de la cola de su propio formato, segun el orden efectivo actual. A diferencia del "#N en la
+ * cola" que ve una pieza aprobada (que cuenta solo piezas nuevas, ver `pickNextPublishableItems`),
+ * esta posicion sirve para mostrarle a una pieza evergreen en que lugar de la tanda quedaria -- y que
+ * las flechas de reordenar tengan un numero visible que confirme que el cambio se aplico.
+ */
+export function reorderableQueuePositions(items: ContentItem[], format: AutoPublishFormat): Map<string, number> {
+  const ordered = items
+    .filter(item => isReorderableInQueue(item) && item.format === format)
+    .sort((a, b) => effectiveQueueRank(a) - effectiveQueueRank(b))
+  return new Map(ordered.map((queuedItem, index) => [queuedItem.id, index + 1]))
 }
 
 /**
@@ -212,10 +251,14 @@ export function pickNextPublishableItems(
   const approved = items
     .filter(item => item.status === "approved" && item.format === format)
     .sort((a, b) => effectiveQueueRank(a) - effectiveQueueRank(b))
-  const dueRepeats = items
-    .filter(item => item.format === format && isRepeatDue(item, now))
-    .sort((a, b) => new Date(a.updated_at).getTime() - new Date(b.updated_at).getTime())
+  const dueRepeats = items.filter(item => item.format === format && isRepeatDue(item, now))
+  // Orden final por queue_rank efectivo: por default una evergreen sigue cayendo despues de las
+  // piezas nuevas (mismo comportamiento de siempre, ver REPEAT_DEFAULT_RANK_OFFSET), pero si se la
+  // reordeno a mano (mismas flechas que ya existian para la cola aprobada, ver moveItemInQueue) puede
+  // intercalarse en cualquier lugar -- esto determina el orden real de publicacion de la corrida (ej.
+  // el orden en que unas Historias quedan una detras de otra para quien las mira).
   return [...approved.slice(0, Math.max(0, count)), ...dueRepeats]
+    .sort((a, b) => effectiveQueueRank(a) - effectiveQueueRank(b))
 }
 
 /** Pura, sin I/O: elige el proximo item para auto-publicar de un formato puntual. Ver `pickNextPublishableItems`. */
@@ -224,18 +267,20 @@ export function pickNextPublishableItem(items: ContentItem[], format: AutoPublis
 }
 
 /**
- * Pura, sin I/O: mueve una pieza aprobada un lugar hacia arriba o abajo dentro de la cola de su
- * propio formato. Al mover, normaliza `queue_rank` de TODA la cola de ese formato a enteros
+ * Pura, sin I/O: mueve una pieza reordenable (aprobada, o evergreen ya publicada y repitiendose, ver
+ * `isReorderableInQueue`) un lugar hacia arriba o abajo dentro de la cola de su propio formato. Al
+ * mover, normaliza `queue_rank` de TODA esa cola (aprobadas + evergreens activas) a enteros
  * secuenciales segun el orden efectivo actual (esto "migra" piezas viejas sin queue_rank al nuevo
- * sistema explicito) y despues intercambia el rank de las dos piezas afectadas. Si la pieza ya esta
- * en la punta de la cola en esa direccion, no hace nada.
+ * sistema explicito) y despues intercambia el rank de las dos piezas afectadas -- asi una evergreen
+ * puede intercalarse en cualquier lugar entre las piezas nuevas, en vez de salir siempre al final de
+ * la corrida. Si la pieza ya esta en la punta de la cola en esa direccion, no hace nada.
  */
 export function moveItemInQueue(items: ContentItem[], id: string, direction: "up" | "down"): ContentItem[] {
   const target = items.find(item => item.id === id)
-  if (!target || target.status !== "approved") return items
+  if (!target || !isReorderableInQueue(target)) return items
 
   const queueIds = items
-    .filter(item => item.status === "approved" && item.format === target.format)
+    .filter(item => isReorderableInQueue(item) && item.format === target.format)
     .sort((a, b) => effectiveQueueRank(a) - effectiveQueueRank(b))
     .map(item => item.id)
 

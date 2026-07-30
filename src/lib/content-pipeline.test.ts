@@ -2,7 +2,8 @@ import {
   shouldRunAutoPublish, isScheduledForFuture, isTodayScheduledDay, alreadyPublishedToday,
   estimateAutoPublishDrainDays, estimateAutoPublishDateForPosition, pickNextPublishableItem,
   pickNextPublishableItems, moveItemInQueue, resolveChannelsToPublish, DEFAULT_AUTO_PUBLISH_SETTINGS,
-  isRepeatDue, findRecentDuplicateTopic, estimateRepeatEndDate,
+  isRepeatDue, findRecentDuplicateTopic, estimateRepeatEndDate, isReorderableInQueue,
+  reorderableQueuePositions,
 } from "@/lib/content-pipeline"
 import type { AutoPublishTrackSettings, ContentItem } from "@/types"
 
@@ -407,9 +408,81 @@ describe("moveItemInQueue", () => {
     expect(pickNextPublishableItems(result, "post", 1).map(i => i.id)).toEqual(["post"])
   })
 
-  it("ignora piezas que no estan aprobadas", () => {
+  it("ignora piezas que no estan aprobadas ni son evergreens activas", () => {
     const draft = item({ id: "draft", format: "historia", status: "draft" })
     expect(moveItemInQueue([draft], "draft", "up")).toEqual([draft])
+  })
+
+  it("una evergreen que sigue repitiendose se puede intercalar entre piezas aprobadas nuevas", () => {
+    const a = item({ id: "a", format: "historia", approved_at: "2026-07-01T00:00:00.000Z" })
+    const b = item({ id: "b", format: "historia", approved_at: "2026-07-02T00:00:00.000Z" })
+    const evergreen = item({
+      id: "evergreen", format: "historia", status: "published",
+      repeat_interval_days: 1, updated_at: "2026-06-01T00:00:00.000Z",
+    })
+    // Orden efectivo de arranque (sin reordenar nunca): a, b, evergreen (la evergreen cae al final por
+    // default, ver REPEAT_DEFAULT_RANK_OFFSET). Subirla dos veces la deja primera.
+    const now = new Date("2026-07-10T00:00:00.000Z")
+    const once = moveItemInQueue([a, b, evergreen], "evergreen", "up")
+    expect(pickNextPublishableItems(once, "historia", 2, now).map(i => i.id)).toEqual(["a", "evergreen", "b"])
+    const twice = moveItemInQueue(once, "evergreen", "up")
+    expect(pickNextPublishableItems(twice, "historia", 2, now).map(i => i.id)).toEqual(["evergreen", "a", "b"])
+  })
+
+  it("no reordena una evergreen que ya agoto su limite de repeticiones", () => {
+    const a = item({ id: "a", format: "historia" })
+    const exhausted = item({
+      id: "exhausted", format: "historia", status: "published",
+      repeat_interval_days: 1, repeat_limit: 2, repeat_count: 2, updated_at: "2026-06-01T00:00:00.000Z",
+    })
+    expect(moveItemInQueue([a, exhausted], "exhausted", "up")).toEqual([a, exhausted])
+  })
+})
+
+describe("isReorderableInQueue", () => {
+  it("true para una pieza aprobada", () => {
+    expect(isReorderableInQueue(item({ status: "approved" }))).toBe(true)
+  })
+
+  it("true para una evergreen publicada sin limite de repeticiones", () => {
+    expect(isReorderableInQueue(item({ status: "published", repeat_interval_days: 1 }))).toBe(true)
+  })
+
+  it("true para una evergreen publicada con limite todavia no alcanzado", () => {
+    expect(isReorderableInQueue(item({
+      status: "published", repeat_interval_days: 1, repeat_limit: 5, repeat_count: 3,
+    }))).toBe(true)
+  })
+
+  it("false para una evergreen que ya agoto su limite de repeticiones", () => {
+    expect(isReorderableInQueue(item({
+      status: "published", repeat_interval_days: 1, repeat_limit: 2, repeat_count: 2,
+    }))).toBe(false)
+  })
+
+  it("false para una pieza publicada que no se repite", () => {
+    expect(isReorderableInQueue(item({ status: "published" }))).toBe(false)
+  })
+
+  it("false para un borrador", () => {
+    expect(isReorderableInQueue(item({ status: "draft" }))).toBe(false)
+  })
+})
+
+describe("reorderableQueuePositions", () => {
+  it("ordena aprobadas y evergreens activas juntas, por formato", () => {
+    const a = item({ id: "a", format: "historia", approved_at: "2026-07-01T00:00:00.000Z" })
+    const b = item({ id: "b", format: "historia", approved_at: "2026-07-02T00:00:00.000Z" })
+    const evergreen = item({
+      id: "evergreen", format: "historia", status: "published",
+      repeat_interval_days: 1, updated_at: "2026-06-01T00:00:00.000Z",
+    })
+    const post = item({ id: "post", format: "post" })
+    const positions = reorderableQueuePositions([a, b, evergreen, post], "historia")
+    expect(positions.get("a")).toBe(1)
+    expect(positions.get("b")).toBe(2)
+    expect(positions.get("evergreen")).toBe(3)
+    expect(positions.has("post")).toBe(false)
   })
 })
 

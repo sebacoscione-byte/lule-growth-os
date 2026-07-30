@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
-import { readContentItems, writeContentItems, moveItemInQueue } from "@/lib/content-pipeline"
+import { readContentItems, writeContentItems, moveItemInQueue, isReorderableInQueue } from "@/lib/content-pipeline"
 import { parseJsonBody } from "@/lib/api-validation"
 import { authorizeStaff } from "@/lib/staff-authz"
 
@@ -23,8 +23,11 @@ export async function POST(request: Request) {
     const items = await readContentItems(supabase)
     const item = items.find(existing => existing.id === itemId)
     if (!item) return NextResponse.json({ error: "Pieza no encontrada" }, { status: 404 })
-    if (item.status !== "approved") {
-      return NextResponse.json({ error: "Solo se puede reordenar una pieza aprobada" }, { status: 400 })
+    if (!isReorderableInQueue(item)) {
+      return NextResponse.json(
+        { error: "Solo se puede reordenar una pieza aprobada o una evergreen que siga repitiéndose" },
+        { status: 400 }
+      )
     }
 
     // moveItemInQueue puede tocar el queue_rank de toda la cola de ese formato (normalizacion), asi que

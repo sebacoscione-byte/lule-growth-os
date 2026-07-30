@@ -20,7 +20,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { createClient as createBrowserSupabaseClient } from "@/lib/supabase/client"
 import { parseAiJson } from "@/lib/parse-ai-json"
 import { truncateForImagePlate } from "@/lib/content-text"
-import { DEFAULT_AUTO_PUBLISH_SETTINGS, alreadyPublishedToday, estimateAutoPublishDrainDays, estimateAutoPublishDateForPosition, estimateRepeatEndDate, findRecentDuplicateTopic, pickNextPublishableItems } from "@/lib/content-pipeline"
+import { DEFAULT_AUTO_PUBLISH_SETTINGS, alreadyPublishedToday, estimateAutoPublishDrainDays, estimateAutoPublishDateForPosition, estimateRepeatEndDate, findRecentDuplicateTopic, pickNextPublishableItems, isReorderableInQueue, reorderableQueuePositions } from "@/lib/content-pipeline"
 import type { AutoPublishSettings, AutoPublishTrackSettings, ContentItem, ContentObjective, ContentSlide, ContentSource, ContentStatus, ContentVideoScores } from "@/types"
 import type { InstagramMediaInsights } from "@/lib/instagram-business"
 import { CONTENT_OBJECTIVE_GOALS, CONTENT_OBJECTIVE_LABELS, WEEKDAY_OPTIONS } from "@/types"
@@ -991,8 +991,14 @@ export default function ContentStudioPage() {
       const track = autoPublishSettings[format]
       const todayAvailable = isTodayAvailableForQueueEstimate(track, now)
       const queue = pickNextPublishableItems(items, format, items.length)
-      queue.forEach((queuedItem, index) => {
-        const position = index + 1
+      // Solo cuenta piezas aprobadas: una evergreen intercalada no le quita ni le suma dias de espera
+      // a una pieza nueva (se publica ADEMAS, sin competir por el cupo, ver pickNextPublishableItems),
+      // asi que su posicion para estimar fecha tiene que ignorar donde haya quedado reordenada una
+      // evergreen en el medio.
+      let position = 0
+      queue.forEach(queuedItem => {
+        if (queuedItem.status !== "approved") return
+        position += 1
         const date = estimateAutoPublishDateForPosition(position, track.days_of_week, track.items_per_run, now, todayAvailable)
         const etaLabel = date
           ? date.toDateString() === now.toDateString()
@@ -1005,10 +1011,22 @@ export default function ContentStudioPage() {
     return info
   }, [items, autoPublishSettings])
 
+  // Posicion (1-indexada) de cada pieza reordenable -- aprobada o evergreen repitiendose -- dentro de
+  // la cola de su propio formato, en el orden en que realmente saldrian publicadas una detras de otra
+  // en la misma corrida (ver reorderableQueuePositions). Se usa solo para mostrarle a una evergreen en
+  // que lugar de la tanda quedaria, ya que "#N en la cola" (arriba) cuenta solo piezas nuevas.
+  const runOrderByFormat = useMemo(() => {
+    const map = new Map<string, Map<string, number>>();
+    (["post", "historia", "carrusel", "reel"] as const).forEach(format => {
+      map.set(format, reorderableQueuePositions(items, format))
+    })
+    return map
+  }, [items])
+
   // Para las piezas marcadas para repetirse: cuándo sale la próxima y cuándo dejaría de publicarse
   // (si tiene límite de repeticiones). Se muestra en la card en vez de la línea de cola normal.
   const repeatInfo = useMemo(() => {
-    const info = new Map<string, { nextLabel: string; endLabel: string; nextDate: Date | null }>()
+    const info = new Map<string, { nextLabel: string; endLabel: string; nextDate: Date | null; runPosition: number | null }>()
     const now = new Date()
     const fmt = (date: Date) => date.toLocaleDateString("es-AR", { day: "numeric", month: "short" })
     items.forEach(item => {
@@ -1038,10 +1056,11 @@ export default function ContentStudioPage() {
         const reps = `${item.repeat_limit} ${item.repeat_limit === 1 ? "repetición" : "repeticiones"}`
         endLabel = endDate ? `deja de publicarse ~${fmt(endDate)} (${reps})` : `ya completó sus ${reps}`
       }
-      info.set(item.id, { nextLabel, endLabel, nextDate })
+      const runPosition = isReorderableInQueue(item) ? runOrderByFormat.get(item.format)?.get(item.id) ?? null : null
+      info.set(item.id, { nextLabel, endLabel, nextDate, runPosition })
     })
     return info
-  }, [items, autoPublishSettings, queueInfo])
+  }, [items, autoPublishSettings, queueInfo, runOrderByFormat])
 
   const filteredItems = useMemo(() => {
     const query = libraryQuery.trim().toLocaleLowerCase("es")
@@ -2072,6 +2091,12 @@ export default function ContentStudioPage() {
                     {(item.status === "approved" || item.status === "published") && item.repeat_interval_days && repeatInfo.get(item.id) && (
                       <div className="rounded-md bg-gray-50 px-2.5 py-1.5 text-xs text-gray-600">
                         <p><span className="font-medium text-gray-800">Se repite</span> · próxima: {repeatInfo.get(item.id)!.nextLabel}</p>
+                        {repeatInfo.get(item.id)!.runPosition != null && (
+                          <p>
+                            Orden de publicación ese día: lugar {repeatInfo.get(item.id)!.runPosition}
+                            {item.status === "published" ? " — usá las flechas para cambiarlo" : ""}
+                          </p>
+                        )}
                         <p>{repeatInfo.get(item.id)!.endLabel}</p>
                       </div>
                     )}
@@ -2091,7 +2116,7 @@ export default function ContentStudioPage() {
                           Publicar ahora
                         </Button>
                       )}
-                      {item.status === "approved" && (
+                      {isReorderableInQueue(item) && (
                         <Button
                           variant="ghost"
                           size="icon"
@@ -2103,7 +2128,7 @@ export default function ContentStudioPage() {
                           <ChevronUp className="h-4 w-4" />
                         </Button>
                       )}
-                      {item.status === "approved" && (
+                      {isReorderableInQueue(item) && (
                         <Button
                           variant="ghost"
                           size="icon"
