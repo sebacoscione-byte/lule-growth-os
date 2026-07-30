@@ -1025,14 +1025,20 @@ ${HASHTAG_RULES}
   }
 }
 
-export async function generateContentVisual(input: {
-  category: string
-  topic: string
-  format: "reel" | "historia" | "carrusel" | "post"
-  visual_headline: string
-  visual_subtitle: string
-  image_prompt: string
-}): Promise<{ mime_type: string; image_data: string }> {
+type ContentVisualFormat = "reel" | "historia" | "carrusel" | "post"
+
+// Tamaños que le pedimos a OpenAI para el respaldo (ver generatePhotoWithOpenAI) -- gpt-image-2 acepta
+// cualquier WIDTHxHEIGHT divisible por 16; estos valores son la relacion 4:5/9:16 exacta más cercana,
+// para que composeContentPlate() reciba una foto con una relación de aspecto similar a la que le pide
+// a Gemini (igual la recorta/escala al slot final, así que no necesita ser pixel-perfecto).
+const OPENAI_IMAGE_SIZE: Record<ContentVisualFormat, string> = {
+  post: "832x1040",
+  carrusel: "832x1040",
+  historia: "1008x1792",
+  reel: "1008x1792",
+}
+
+async function generatePhotoWithGemini(prompt: string, promptHash: string): Promise<Buffer> {
   const apiKey = process.env.GEMINI_API_KEY
   if (!apiKey) throw new Error("GEMINI_API_KEY no esta configurada.")
 
@@ -1042,38 +1048,6 @@ export async function generateContentVisual(input: {
   }
 
   const model = process.env.GEMINI_IMAGE_MODEL || "gemini-3.1-flash-image"
-  // Un reel es vertical (9:16) igual que una historia -- esta placa nunca es el contenido del reel
-  // en si (eso lo publica publishReelToInstagram con video_url), es la portada/miniatura que Meta
-  // muestra en la pestaña Reels via cover_url (ver createVideoContainer en instagram-business.ts),
-  // que Meta recomienda especificamente en 9:16 para que no quede recortada.
-  const aspectRatio = input.format === "historia" || input.format === "reel" ? "9:16" : "4:5"
-  // 2026-07-30: Gemini generaba la placa ENTERA de una sola pasada (foto + titular + subtitulo
-  // quemados por el propio modelo) -- eso es lo que hacia el texto poco confiable (llego a inventar
-  // una tercera linea deforme, o a comerse letras de "ALARMA"; ver docs/BACKLOG.md). Ahora el modelo
-  // SOLO genera la foto/escena, sin texto de ningun tipo; composeContentPlate() (content-plate.ts)
-  // arma el titular/subtitulo/marca por edicion real (ffmpeg drawtext), igual que burnVideoBrief
-  // hace con los videos -- garantiza ortografia perfecta siempre, no depende de que el modelo de
-  // imagen "acierte" el texto.
-  const prompt = `Create ONLY a high-quality photographic or illustrative scene for a cardiology practice's Instagram ${input.format}. This image will be combined with a separate branded text panel afterward -- it must contain ABSOLUTELY NO text, letters, numbers, words, logos, watermarks, UI elements or lettering of any kind, in any language.
-
-CONTENT CONTEXT (for scene direction only -- never render any of this as visible text):
-- Category: ${input.category}
-- Topic: ${input.topic}
-
-CREATIVE DIRECTION (the scene to depict):
-${input.image_prompt}
-
-FINAL ART DIRECTION:
-- Produce one polished ${aspectRatio} photographic/illustrative composition, not a mockup or template preview.
-- Leave open, uncluttered negative space across the LEFT third of the frame (soft or simple background there) -- a text panel will be placed over that area afterward. Keep the main subject/focal point positioned across the right two-thirds of the frame.
-- The image must feel warm, professional and trustworthy to an adult patient in Argentina, with a clear focal point and generous breathing room.
-- ABSOLUTELY NO text, letters, numbers, words, logos, watermarks, UI elements, phone/app mockups, captions or invented/decorative lettering anywhere in the image, in any language.
-- No diagnosis, treatment claim, urgency marketing, fear, or extra text of any kind.
-- Do not depict the real doctor or invent her likeness.
-
-FINAL CHECK before rendering: the finished image must contain ZERO text characters, letters, numbers, logos or lettering of any kind anywhere in the frame -- verify this before finalizing.`
-  const promptHash = hashPrompt(prompt)
-
   try {
     const response = await fetch(
       `https://generativelanguage.googleapis.com/v1/models/${encodeURIComponent(model)}:generateContent`,
@@ -1098,20 +1072,124 @@ FINAL CHECK before rendering: the finished image must contain ZERO text characte
     const photoData = part?.inlineData?.data || part?.inline_data?.data
     if (!photoData) throw new Error("Gemini no devolvio una imagen.")
 
-    const plateBuffer = await composeContentPlate({
-      photoBuffer: Buffer.from(photoData, "base64"),
-      headline: input.visual_headline,
-      subtitle: input.visual_subtitle,
-      format: input.format,
-    })
-
     await logRequest("gemini", model, promptHash, "content_visual", true)
-    return { mime_type: "image/png", image_data: plateBuffer.toString("base64") }
+    return Buffer.from(photoData, "base64")
   } catch (error) {
     await logRequest("gemini", model, promptHash, "content_visual", false,
       error instanceof Error ? error.message : String(error))
     throw error
   }
+}
+
+/**
+ * Respaldo opcional si Gemini falla (cupo diario agotado, error transitorio, etc.) -- mismo patron
+ * que el fallback Gemini->Anthropic de generateText, aplicado ahora a la generacion de fotos (2026-07-30,
+ * a pedido explicito de Seba: "que tambien ChatGPT genere imagenes si lo necesitara"). Solo se activa
+ * si OPENAI_API_KEY esta configurada; si no, el error original de Gemini se propaga sin cambios (ver
+ * generateContentVisual). Usa gpt-image-2 por default (verificado 2026-07-30 contra la documentacion
+ * oficial de OpenAI -- gpt-image-1 se discontinua el 23/9/2026, no usar ese nombre). Requiere que la
+ * organizacion de OpenAI este verificada en developer console para poder usar modelos GPT Image; sin
+ * eso, esta llamada falla con un error de verificacion (no bloquea nada, cae al error original de
+ * Gemini si tambien falla). No verificado en vivo -- este entorno no tiene OPENAI_API_KEY.
+ */
+async function generatePhotoWithOpenAI(prompt: string, promptHash: string, format: ContentVisualFormat): Promise<Buffer> {
+  const apiKey = process.env.OPENAI_API_KEY
+  if (!apiKey) throw new Error("OPENAI_API_KEY no esta configurada.")
+
+  const model = process.env.OPENAI_IMAGE_MODEL || "gpt-image-2"
+  try {
+    const response = await fetch("https://api.openai.com/v1/images/generations", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Authorization": `Bearer ${apiKey}` },
+      body: JSON.stringify({
+        model,
+        prompt,
+        size: OPENAI_IMAGE_SIZE[format],
+        quality: "medium",
+        response_format: "b64_json",
+      }),
+    })
+    const data = await response.json() as {
+      data?: Array<{ b64_json?: string }>
+      error?: { message?: string }
+    }
+    if (!response.ok) throw new Error(data.error?.message || `OpenAI respondio con estado ${response.status}.`)
+
+    const photoData = data.data?.[0]?.b64_json
+    if (!photoData) throw new Error("OpenAI no devolvio una imagen.")
+
+    await logRequest("openai", model, promptHash, "content_visual", true)
+    return Buffer.from(photoData, "base64")
+  } catch (error) {
+    await logRequest("openai", model, promptHash, "content_visual", false,
+      error instanceof Error ? error.message : String(error))
+    throw error
+  }
+}
+
+export async function generateContentVisual(input: {
+  category: string
+  topic: string
+  format: ContentVisualFormat
+  visual_headline: string
+  visual_subtitle: string
+  image_prompt: string
+}): Promise<{ mime_type: string; image_data: string }> {
+  // Un reel es vertical (9:16) igual que una historia -- esta placa nunca es el contenido del reel
+  // en si (eso lo publica publishReelToInstagram con video_url), es la portada/miniatura que Meta
+  // muestra en la pestaña Reels via cover_url (ver createVideoContainer en instagram-business.ts),
+  // que Meta recomienda especificamente en 9:16 para que no quede recortada.
+  const aspectRatio = input.format === "historia" || input.format === "reel" ? "9:16" : "4:5"
+  // 2026-07-30: Gemini generaba la placa ENTERA de una sola pasada (foto + titular + subtitulo
+  // quemados por el propio modelo) -- eso es lo que hacia el texto poco confiable (llego a inventar
+  // una tercera linea deforme, o a comerse letras de "ALARMA"; ver docs/BACKLOG.md). Ahora el modelo
+  // SOLO genera la foto/escena, sin texto de ningun tipo; composeContentPlate() (content-plate.ts)
+  // arma el titular/subtitulo/marca por edicion real (ffmpeg drawtext), igual que burnVideoBrief
+  // hace con los videos -- garantiza ortografia perfecta siempre, no depende de que el modelo de
+  // imagen "acierte" el texto. El mismo prompt (agnostico de proveedor) se usa para Gemini y para el
+  // respaldo de OpenAI (ver generatePhotoWithOpenAI) -- ninguno de los dos dibuja texto.
+  const prompt = `Create ONLY a high-quality photographic or illustrative scene for a cardiology practice's Instagram ${input.format}. This image will be combined with a separate branded text panel afterward -- it must contain ABSOLUTELY NO text, letters, numbers, words, logos, watermarks, UI elements or lettering of any kind, in any language.
+
+CONTENT CONTEXT (for scene direction only -- never render any of this as visible text):
+- Category: ${input.category}
+- Topic: ${input.topic}
+
+CREATIVE DIRECTION (the scene to depict):
+${input.image_prompt}
+
+FINAL ART DIRECTION:
+- Produce one polished ${aspectRatio} photographic/illustrative composition, not a mockup or template preview.
+- Leave open, uncluttered negative space across the LEFT third of the frame (soft or simple background there) -- a text panel will be placed over that area afterward. Keep the main subject/focal point positioned across the right two-thirds of the frame.
+- The image must feel warm, professional and trustworthy to an adult patient in Argentina, with a clear focal point and generous breathing room.
+- ABSOLUTELY NO text, letters, numbers, words, logos, watermarks, UI elements, phone/app mockups, captions or invented/decorative lettering anywhere in the image, in any language.
+- No diagnosis, treatment claim, urgency marketing, fear, or extra text of any kind.
+- Do not depict the real doctor or invent her likeness.
+
+FINAL CHECK before rendering: the finished image must contain ZERO text characters, letters, numbers, logos or lettering of any kind anywhere in the frame -- verify this before finalizing.`
+  const promptHash = hashPrompt(prompt)
+
+  let photoBuffer: Buffer
+  try {
+    photoBuffer = await generatePhotoWithGemini(prompt, promptHash)
+  } catch (geminiError) {
+    if (!process.env.OPENAI_API_KEY) throw geminiError
+    try {
+      photoBuffer = await generatePhotoWithOpenAI(prompt, promptHash, input.format)
+    } catch {
+      // Los dos proveedores fallaron -- se propaga el error de Gemini (el route.ts ya sabe
+      // interpretar sus mensajes de cuota/rate limit para mostrar un aviso claro al usuario).
+      throw geminiError
+    }
+  }
+
+  const plateBuffer = await composeContentPlate({
+    photoBuffer,
+    headline: input.visual_headline,
+    subtitle: input.visual_subtitle,
+    format: input.format,
+  })
+
+  return { mime_type: "image/png", image_data: plateBuffer.toString("base64") }
 }
 
 /**

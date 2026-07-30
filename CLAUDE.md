@@ -1,6 +1,38 @@
 # Lule Growth OS — Contexto para Claude
 
 ## Estado actual
+- 2026-07-30 (mismo día, continuación — respaldo con OpenAI + corrección de costo real): Seba pidió
+  sumar que ChatGPT (OpenAI) también pueda generar las fotos "si lo necesitara", después de preguntar
+  la diferencia de costo entre el Gemini actual y OpenAI. **Corrección importante encontrada al
+  investigar esa pregunta**: la documentación de este archivo asumía que generar la placa con Gemini
+  era prácticamente gratis (por analogía con el tier gratuito de texto, `gemini-3.5-flash`) — **es
+  incorrecto**, verificado contra el pricing público de Google: `gemini-3.1-flash-image` (el modelo de
+  imagen real) **no tiene tier gratuito por API**, cuesta ~USD 0.045-0.151 por imagen (default
+  ≈USD 0.067). Cada placa generada hasta hoy tuvo ese costo real, nunca trackeado como gasto esperado
+  — recomendado que Seba revise el gasto acumulado real en Google Cloud Console → Billing (filtro
+  "Generative Language API"). Comparado contra OpenAI no hay diferencia de costo significativa:
+  `gpt-image-2` (el modelo vigente — NO `gpt-image-1`, que se discontinúa el 23/9/2026) cuesta
+  ~USD 0.009-0.21 según calidad, mismo rango que Gemini — la decisión de sumarlo es por
+  resiliencia/calidad de foto, no por ahorro. Sección "Optimización de tokens / costos de IA"
+  reescrita con el número correcto, y la comparación con Veo ajustada (ninguno de los dos es gratis;
+  la diferencia real es de escala de costo, no de "gratis vs. pago").
+  **Implementado**: `generateContentVisual()` (`ai.ts`) ahora intenta Gemini primero (sin cambios de
+  comportamiento) y, solo si esa llamada falla (cupo diario agotado, error transitorio) **y**
+  `OPENAI_API_KEY` está configurada, cae automáticamente a `gpt-image-2` para generar la misma foto —
+  mismo patrón que el fallback Gemini→Anthropic ya existente para texto, aplicado ahora a fotos. Sin
+  `OPENAI_API_KEY` (el caso hoy), cero cambios de comportamiento. Refactor interno: `generatePhotoWithGemini()`/
+  `generatePhotoWithOpenAI()` extraídas como funciones separadas, ambas logueando en `ai_requests` con
+  su propio `provider` (mismo mecanismo de auditoría que ya existía, sin dashboard nuevo). Nuevas env
+  vars `OPENAI_API_KEY`/`OPENAI_IMAGE_MODEL` (default `gpt-image-2`, verificado contra la
+  documentación oficial de OpenAI el mismo día). **Sin límite diario propio para el respaldo** —
+  decisión deliberada dado el bajo volumen de este proyecto (solo se activa cuando Gemini ya falló);
+  revisar si hiciera falta un límite si el volumen cambiara. **Requiere verificación de organización
+  en OpenAI** (developer console) antes de poder usar modelos GPT Image — sin eso, el fallback falla
+  con un error de verificación (no rompe nada, cae al error original de Gemini si ambos fallan). `npm
+  test` (893/893), lint y build sin errores. **No verificado en vivo** (este entorno no tiene
+  `OPENAI_API_KEY`) — falta que Seba cargue una key real de una organización verificada para confirmar
+  que el fallback funciona de punta a punta; mientras no esté configurada, el comportamiento de la app
+  no cambia en nada. Archivos: `src/lib/ai.ts`, `CLAUDE.md`, `docs/BACKLOG.md`.
 - 2026-07-30 (Opción A implementada: las placas ya no dependen de que la IA dibuje texto — cierra el
   punto de abajo): continuación directa de la sesión anterior (misma fecha, PR #178 ya mergeado).
   Seba pidió cotizar la Opción B (OpenAI `gpt-image-1`) antes de descartarla y avanzar con la Opción A
@@ -1188,10 +1220,15 @@ SUPABASE_DB_PASSWORD=   # Para migraciones: npm run migrate. Ver: Supabase → P
 AI_PROVIDER=auto
 GEMINI_API_KEY=
 GEMINI_MODEL=gemini-3.5-flash
+GEMINI_IMAGE_MODEL=gemini-3.1-flash-image  # Placas de Instagram (foto) — tiene costo real, ver "Generación de imágenes" abajo
 GEMINI_VIDEO_MODEL=veo-3.1-fast-generate-preview  # Video de reels con IA — ver "Video de reels con IA (Veo)" abajo
 DAILY_VIDEO_GENERATION_LIMIT=3  # Tope diario, propio y mas estricto que DAILY_AI_REQUEST_LIMIT: tiene costo real por generación
 ANTHROPIC_API_KEY=
 ANTHROPIC_MODEL=claude-sonnet-4-6
+# Respaldo opcional de generación de fotos si Gemini falla (cupo agotado, error transitorio) — ver
+# "Respaldo opcional con OpenAI" abajo. Sin esto, el comportamiento es igual que antes (solo Gemini).
+OPENAI_API_KEY=
+OPENAI_IMAGE_MODEL=gpt-image-2  # Vigente al 2026-07-30 — NO usar "gpt-image-1" (se discontinúa 23/9/2026)
 # Google Business Profile API (OAuth 2.0)
 GOOGLE_CLIENT_ID=
 GOOGLE_CLIENT_SECRET=
@@ -1262,6 +1299,59 @@ respuestas, solo elige cuál de las categorías fijas aplica). Análisis de cost
   del orden de centésimas de centavo por llamada (mensajes cortos, salida limitada a 20 tokens) —
   no es una preocupación real a la escala de un consultorio.
 
+### Generación de imágenes (placas de Instagram) — costo real, no es gratis (corregido 2026-07-30)
+
+**Corrección importante**: este documento asumía que generar la placa visual de una pieza (Gemini
+Image, `generateContentVisual()` en `src/lib/ai.ts`) era prácticamente gratis, por analogía con el
+tier gratuito de texto (`gemini-3.5-flash`, ver arriba). **Eso es incorrecto** — verificado el
+2026-07-30 contra el pricing público de Google: `gemini-3.1-flash-image` **no tiene tier gratuito por
+API** ("API developers on the free tier cannot generate images with this model"), cuesta entre
+~USD 0.045 y USD 0.151 por imagen según resolución (default 1024px ≈ **USD 0.067**). Cada placa que
+la app generó hasta ahora (y las que genera hoy con el pipeline de `composeContentPlate()`, ver más
+abajo — sigue llamando al mismo modelo de imagen, solo que ahora únicamente para la foto, no para el
+texto) tuvo un costo real de ese orden. Esto nunca bloqueó nada porque el proyecto de Google Cloud
+detrás de `GEMINI_API_KEY` ya tiene facturación paga activa (lo sabíamos por Veo), pero **nunca se
+trackeó como gasto esperado** — recomendado revisar el gasto real acumulado en Google Cloud Console →
+Billing, filtrado por "Generative Language API", para tener el número real.
+
+**Costo comparado con OpenAI (gpt-image), para contexto**: en el mismo rango, no hay un proveedor
+claramente más barato — `gpt-image-1` (USD 0.011-0.25 según calidad, **se discontinúa el 23/9/2026**,
+no usar ese nombre de modelo) y sus sucesores `gpt-image-1.5`/`gpt-image-2` (USD 0.009-0.21) se
+solapan con el rango de Gemini. La decisión de sumar OpenAI (ver abajo) es por resiliencia/calidad de
+foto, no por ahorro.
+
+### Respaldo opcional con OpenAI (`gpt-image-2`) si Gemini falla (2026-07-30)
+
+A pedido explícito de Seba ("avancemos para que también ChatGPT genere imágenes si lo necesitara"),
+`generateContentVisual()` ahora intenta generar la foto con Gemini primero (comportamiento de
+siempre) y, **solo si esa llamada falla** (cupo diario agotado — `DAILY_LIMIT_EXCEEDED`, error
+transitorio de la API, etc.) **y `OPENAI_API_KEY` está configurada**, cae automáticamente a generar
+la misma foto con OpenAI (`gpt-image-2`) en su lugar — mismo patrón que el fallback Gemini→Anthropic
+ya existente para texto (`generateText`), aplicado ahora a la generación de fotos. Si `OPENAI_API_KEY`
+no está configurada (el caso por default, hoy), el comportamiento es idéntico al de antes: el error
+original de Gemini se propaga sin cambios.
+
+- **Variables nuevas**: `OPENAI_API_KEY` (sin esto, el respaldo simplemente no se activa nunca — no
+  hace falta "desactivarlo" a propósito). `OPENAI_IMAGE_MODEL` opcional, default `gpt-image-2` — el
+  modelo vigente al 2026-07-30, verificado contra la documentación oficial de OpenAI (no se asumió
+  `gpt-image-1`, que se discontinúa el 23/9/2026, mismo error que ya se evitó con Sora para video).
+- **Requiere verificación de organización en OpenAI**: la documentación oficial exige completar la
+  "API Organization Verification" en developer console antes de poder usar los modelos GPT Image — si
+  Seba carga `OPENAI_API_KEY` de una organización sin verificar, el fallback va a fallar con un error
+  de verificación (no rompe nada, el error original de Gemini sigue siendo el que ve el usuario final
+  si ambos proveedores fallan).
+- **Sin límite diario propio** (a diferencia de Veo): como solo se activa cuando Gemini ya falló, se
+  consideró que no hace falta un segundo sistema de cupo para el volumen de este proyecto (pocas
+  piezas por semana) — si el volumen de uso cambiara y esto se volviera un gasto recurrente en vez de
+  una excepción, agregar un límite propio (mismo patrón que `DAILY_VIDEO_GENERATION_LIMIT`).
+- Las llamadas a OpenAI quedan logueadas en `ai_requests` con `provider: "openai"` (mismo mecanismo
+  que Gemini/Anthropic, `logRequest()`), auditable desde ahí sin un dashboard nuevo.
+- **No verificado en vivo** (este entorno no tiene `OPENAI_API_KEY`) — la lógica se armó siguiendo la
+  documentación oficial de la API de OpenAI (endpoint `POST /v1/images/generations`, parámetros
+  `model`/`prompt`/`size`/`quality`/`response_format`), pero falta que Seba cargue una key real (con
+  la organización verificada) para confirmar que el fallback funciona de punta a punta. Mientras no
+  esté configurada, el comportamiento de la app no cambia en nada respecto a antes.
+
 ### Video de reels con IA (Veo) — costo real, sin tier gratuito (2026-07-23)
 
 En el editor de una pieza formato reel, además de subir un video propio, se puede generar el video con
@@ -1273,9 +1363,10 @@ sucesor anunciado** — se descartó por ahora, queda como una eventual "segunda
 mejorar calidad más adelante. Veo quedó verificado en vivo con una generación real (clip de 8s
 vertical, tier Fast, ~$0.88, 67s de principio a fin) antes de integrarlo al código.
 
-- **Sin tier gratuito, a diferencia de las placas**: cada generación exitosa tiene costo real
+- **Sin tier gratuito** (igual que las placas, ver arriba — la diferencia real es de escala de
+  costo, no de "gratis vs. pago"): cada generación exitosa tiene costo real
   (`GEMINI_VIDEO_MODEL=veo-3.1-fast-generate-preview` por default — Fast 720p, ~$0.10-0.12/seg, un
-  clip de hasta 8s sale ~$0.80-1). Necesita que el proyecto de Google Cloud detrás de `GEMINI_API_KEY`
+  clip de hasta 8s sale ~$0.80-1, un orden de magnitud más caro que una placa individual). Necesita que el proyecto de Google Cloud detrás de `GEMINI_API_KEY`
   tenga facturación paga activa (a diferencia del resto de la IA de este proyecto) — confirmalo en
   aistudio.google.com → Proyectos → tu proyecto → columna "Nivel de facturación" (tiene que decir un
   nivel pago, no "Nivel gratuito").

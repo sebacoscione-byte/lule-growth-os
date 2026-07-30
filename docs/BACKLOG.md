@@ -77,6 +77,46 @@ quiere afinar el estilo fotográfico hacia el tono "editorial/cálido/premium" d
 ChatGPT, se puede reforzar más `IMAGE_PROMPT_RULES` — hoy ya pide luz natural/paleta cálida pero no
 copia ese estilo puntual.
 
+---
+
+## [FEATURE] ✅ Respaldo con OpenAI (`gpt-image-2`) si Gemini falla + corrección de costo real (2026-07-30)
+
+A pedido explícito de Seba ("avancemos para que también ChatGPT genere imágenes si lo necesitara"),
+tras responder la pregunta de costo comparado (ver punto de arriba).
+
+**Corrección de costo importante encontrada en el camino**: la documentación del proyecto asumía que
+generar la placa con Gemini era prácticamente gratis (por analogía con el tier gratuito de texto,
+`gemini-3.5-flash`). **Es incorrecto** — `gemini-3.1-flash-image` (el modelo de imagen real) **no
+tiene tier gratuito por API**, cuesta ~USD 0.045-0.151 por imagen (default ≈USD 0.067). Cada placa
+generada hasta hoy tuvo ese costo real, nunca trackeado como gasto esperado — recomendado que Seba
+revise el gasto acumulado real en Google Cloud Console → Billing (filtro "Generative Language API").
+Comparado contra OpenAI, no hay diferencia de costo significativa: `gpt-image-2` (el vigente, no
+`gpt-image-1`, que se discontinúa 23/9/2026) cuesta ~USD 0.009-0.21 según calidad, mismo rango que
+Gemini. `CLAUDE.md` actualizado con esta corrección.
+
+**Implementado**: `generateContentVisual()` (`ai.ts`) intenta generar la foto con Gemini primero
+(comportamiento de siempre); si esa llamada falla (cupo diario agotado, error transitorio, etc.) **y**
+`OPENAI_API_KEY` está configurada, cae automáticamente a `gpt-image-2` para la misma foto — mismo
+patrón que el fallback Gemini→Anthropic ya existente para texto (`generateText`), aplicado ahora a la
+generación de fotos. Sin `OPENAI_API_KEY` configurada (el caso hoy), el comportamiento es idéntico al
+de antes — ningún cambio visible. Nuevas env vars: `OPENAI_API_KEY`, `OPENAI_IMAGE_MODEL` (default
+`gpt-image-2`, verificado contra la documentación oficial de OpenAI el mismo día — no se asumió
+`gpt-image-1`).
+
+- **Requiere verificación de organización en OpenAI** (developer console) antes de poder usar modelos
+  GPT Image — si se carga `OPENAI_API_KEY` de una organización sin verificar, el fallback falla con un
+  error de verificación (no rompe nada, cae al error original de Gemini si ambos fallan).
+- **Sin límite diario propio** para el respaldo (a diferencia de `DAILY_VIDEO_GENERATION_LIMIT` de
+  Veo) — decisión deliberada dado el volumen bajo de este proyecto (solo se activa cuando Gemini ya
+  falló); revisar si hiciera falta un límite propio si el volumen de uso cambiara.
+- Las llamadas a OpenAI quedan logueadas en `ai_requests` con `provider: "openai"`, mismo mecanismo
+  que Gemini/Anthropic — auditable sin dashboard nuevo.
+- **No verificado en vivo** — este entorno no tiene `OPENAI_API_KEY`. La lógica sigue la documentación
+  oficial de la API de OpenAI (`POST /v1/images/generations`), pero falta que Seba cargue una key real
+  (de una organización verificada) para confirmar que el fallback funciona de punta a punta. `npm
+  test` (893/893), lint y build sin errores — no hay tests automatizados de esta ruta (mismo criterio
+  que el resto de funciones que tocan ffmpeg/APIs de imagen en este archivo, no mockeadas en Jest).
+
 Pendiente separado, del reporte original: la placa YA PUBLICADA con el typo ("SINTOMAS DE ALAMA") no
 se regeneró — ver la entrada `[BUG]` correspondiente más abajo en este archivo, ahora con una nota de
 que regenerarla es trivial con el pipeline nuevo.
