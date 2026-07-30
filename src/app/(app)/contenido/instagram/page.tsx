@@ -2084,7 +2084,15 @@ export default function ContentStudioPage() {
                     })()}
                     {item.status === "approved" && !item.repeat_interval_days && queueInfo.get(item.id) && (
                       <p className="text-xs text-gray-500">
-                        {queueInfo.get(item.id)!.position === 1 ? "Próxima en publicarse" : `#${queueInfo.get(item.id)!.position} en la cola`}
+                        {(() => {
+                          // El numero mostrado usa el orden REAL de la corrida (aprobadas + evergreens
+                          // activas intercaladas, ver runOrderByFormat) -- no el conteo de "posicion"
+                          // interno (solo aprobadas) que se usa para estimar la fecha (etaLabel) mas
+                          // abajo. Si una evergreen se reordeno por delante de esta pieza, ya no le
+                          // corresponde decir "Próxima en publicarse".
+                          const runPosition = runOrderByFormat.get(item.format)?.get(item.id) ?? queueInfo.get(item.id)!.position
+                          return runPosition === 1 ? "Próxima en publicarse" : `#${runPosition} en la cola`
+                        })()}
                         {" "}· {queueInfo.get(item.id)!.etaLabel}
                       </p>
                     )}
