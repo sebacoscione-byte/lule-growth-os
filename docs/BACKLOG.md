@@ -111,11 +111,21 @@ de antes — ningún cambio visible. Nuevas env vars: `OPENAI_API_KEY`, `OPENAI_
   falló); revisar si hiciera falta un límite propio si el volumen de uso cambiara.
 - Las llamadas a OpenAI quedan logueadas en `ai_requests` con `provider: "openai"`, mismo mecanismo
   que Gemini/Anthropic — auditable sin dashboard nuevo.
-- **No verificado en vivo** — este entorno no tiene `OPENAI_API_KEY`. La lógica sigue la documentación
-  oficial de la API de OpenAI (`POST /v1/images/generations`), pero falta que Seba cargue una key real
-  (de una organización verificada) para confirmar que el fallback funciona de punta a punta. `npm
-  test` (893/893), lint y build sin errores — no hay tests automatizados de esta ruta (mismo criterio
-  que el resto de funciones que tocan ffmpeg/APIs de imagen en este archivo, no mockeadas en Jest).
+- **Bug real encontrado y corregido verificando en vivo (2026-07-30, ya con `OPENAI_API_KEY` real
+  cargada por Seba)**: el request original mandaba `response_format: "b64_json"` (siguiendo la
+  documentación de la API de imágenes de OpenAI) — `gpt-image-2` lo **rechaza con 400 "Unknown
+  parameter: response_format"**, a diferencia de `gpt-image-1`/DALL-E que sí lo aceptaban. La API más
+  nueva ya no deja elegir formato de respuesta (siempre devuelve `b64_json`). Sacado del request.
+  Verificado en vivo que, sin ese parámetro, la llamada pasa la validación y llega hasta
+  `"billing_hard_limit_reached"` (esperado — la cuenta de OpenAI todavía no tiene crédito cargado,
+  ver pendiente abajo).
+- **Pendiente real, no técnico**: falta que Seba cargue crédito en OpenAI (Billing → Add credits,
+  proyecto "App Lule" ya creado) para completar la verificación de punta a punta (confirmar que la
+  respuesta exitosa trae `data[0].b64_json` como se asume en el código). Hasta entonces, el respaldo
+  sigue sin poder usarse en la práctica (fallaría igual que sin la key, por el límite de billing) —
+  pero ya no por el bug del parámetro, que quedó confirmado y corregido. `npm test` (893/893), lint y
+  build sin errores — no hay tests automatizados de esta ruta (mismo criterio que el resto de
+  funciones que tocan ffmpeg/APIs de imagen en este archivo, no mockeadas en Jest).
 
 Pendiente separado, del reporte original: la placa YA PUBLICADA con el typo ("SINTOMAS DE ALAMA") no
 se regeneró — ver la entrada `[BUG]` correspondiente más abajo en este archivo, ahora con una nota de

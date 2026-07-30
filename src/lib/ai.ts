@@ -1090,7 +1090,9 @@ async function generatePhotoWithGemini(prompt: string, promptHash: string): Prom
  * oficial de OpenAI -- gpt-image-1 se discontinua el 23/9/2026, no usar ese nombre). Requiere que la
  * organizacion de OpenAI este verificada en developer console para poder usar modelos GPT Image; sin
  * eso, esta llamada falla con un error de verificacion (no bloquea nada, cae al error original de
- * Gemini si tambien falla). No verificado en vivo -- este entorno no tiene OPENAI_API_KEY.
+ * Gemini si tambien falla). Request verificado en vivo el 2026-07-30 (pasa la validacion de la API
+ * real, error real de "billing_hard_limit_reached" -- falta credito cargado en la cuenta de OpenAI
+ * para confirmar la respuesta exitosa de punta a punta).
  */
 async function generatePhotoWithOpenAI(prompt: string, promptHash: string, format: ContentVisualFormat): Promise<Buffer> {
   const apiKey = process.env.OPENAI_API_KEY
@@ -1106,7 +1108,9 @@ async function generatePhotoWithOpenAI(prompt: string, promptHash: string, forma
         prompt,
         size: OPENAI_IMAGE_SIZE[format],
         quality: "medium",
-        response_format: "b64_json",
+        // NO mandar "response_format" -- verificado en vivo el 2026-07-30 que gpt-image-2 lo rechaza
+        // con 400 "Unknown parameter: response_format" (a diferencia de gpt-image-1/DALL-E, que si lo
+        // aceptaban). La API mas nueva ya no deja elegir formato de respuesta; devuelve b64_json fijo.
       }),
     })
     const data = await response.json() as {
