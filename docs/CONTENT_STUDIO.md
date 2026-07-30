@@ -37,13 +37,22 @@ La revision humana guarda todos los campos editables de la pieza. Para aprobar s
 
 Cada pieza nueva incluye:
 
-- `image_prompt`: direccion creativa en ingles decidida por la IA.
+- `image_prompt`: direccion creativa en ingles decidida por la IA (describe SOLO la foto/escena).
 - `image_alt_text`: descripcion breve en espanol para accesibilidad.
-- `visual_headline` y `visual_subtitle`: textos que Gemini integra en la placa final.
+- `visual_headline` y `visual_subtitle`: titular y subtitulo de la placa.
 
-El prompt visual define una sola direccion creativa, proporcion vertical, punto focal, composicion, luz, color, jerarquia tipografica y zonas seguras. Pide una pieza editorial legible en pantalla chica y prohibe logos, marcas de agua, texto extra, collages, gradientes genericos y cliches medicos.
+El prompt visual define una sola direccion creativa, proporcion vertical, punto focal, composicion, luz, color y zonas seguras. Pide una pieza editorial, prohibe logos, marcas de agua, collages, gradientes genericos y cliches medicos.
 
-El editor llama a Gemini Image para generar una placa final 4:5 para feed/carrusel o 9:16 para historia. La persona revisa el resultado y lo descarga; no tiene que armar la composicion visual.
+**Desde el 2026-07-30, Gemini ya no dibuja ningun texto dentro de la imagen** (antes generaba foto +
+titular + subtitulo en una sola pasada, lo cual llego a inventar lineas deformes o comerse letras --
+ver `docs/BACKLOG.md`). Ahora Gemini genera SOLO la foto/escena (con espacio negativo pedido en el
+tercio izquierdo del encuadre) y `composeContentPlate()` (`src/lib/content-plate.ts`) arma la placa
+final por edicion real con ffmpeg: panel de marca a la izquierda (paleta/tipografia de la landing
+publica -- `ink`/`paper`/`cardiac`, Fraunces+Inter) + la foto a la derecha + titular/subtitulo/nombre/
+especialidad quemados con texto real, nunca dibujados por el modelo de imagen. Garantiza ortografia
+perfecta siempre. El editor llama a `generateContentVisual` (que hace ambos pasos internamente) para
+generar una placa final 4:5 para feed/carrusel o 9:16 para historia. La persona revisa el resultado y
+lo descarga; no tiene que armar la composicion visual.
 
 Variables:
 

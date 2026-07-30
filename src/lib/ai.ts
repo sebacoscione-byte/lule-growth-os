@@ -3,6 +3,7 @@ import { createHash } from "crypto"
 import { createClient as createSupabaseClient } from "@supabase/supabase-js"
 import { parseAiJson } from "@/lib/parse-ai-json"
 import { EMERGENCY_REPLY, MEDICAL_BOUNDARY_REPLY, isEmergencyMessage, isMedicalBoundaryMessage } from "@/lib/medical-safety"
+import { composeContentPlate } from "@/lib/content-plate"
 import { z } from "zod"
 import type { ClassifyResult, ContentObjective, ContentSource, ContentVideoBrief, ContentVideoScores, WhatsAppIntent } from "@/types"
 
@@ -216,9 +217,13 @@ const IMAGE_PROMPT_RULES = `DIRECCION VISUAL PARA GEMINI:
 - Describi sujeto, accion, encuadre, lente o perspectiva, iluminacion, profundidad, paleta, textura, estado de animo y ubicacion del espacio negativo.
 - Usa este orden dentro del prompt: objetivo y tema; escena principal; composicion; luz y color; acabado editorial; espacio negativo; restricciones.
 - Indica proporcion vertical 4:5 para feed; usa 9:16 solo si el formato es historia.
-- Reserva una zona limpia de alto contraste para integrar el titular y subtitulo sin tapar el punto focal.
-- El texto debe ser breve, grande, legible en pantalla chica y con jerarquia clara. Usa como maximo dos familias o pesos tipograficos.
-- Para historia, manten texto y elementos importantes dentro de la zona segura central, lejos de los bordes superior e inferior.
+- IMPORTANTE (2026-07-30): esta escena es SOLO la foto/ilustracion de fondo -- el titular, subtitulo,
+  nombre y especialidad se agregan despues por edicion real sobre un panel de texto propio (ver
+  composeContentPlate en content-plate.ts), nunca los dibuja el modelo de imagen. Por eso "image_prompt"
+  nunca debe mencionar texto, letras, titulares ni tipografia -- describi unicamente la escena
+  fotografica/ilustrada. Pedi que el punto focal/sujeto quede ubicado en los dos tercios derechos del
+  encuadre, con espacio negativo simple y prolijo en el tercio izquierdo (ahi va el panel de texto).
+- Para historia, manten el sujeto y los elementos importantes dentro de la zona segura central, lejos de los bordes superior e inferior.
 - Para carrusel, crea una portada que abra una brecha de curiosidad y se entienda en menos de tres segundos.
 - Pedi iluminacion natural o cinematografica suave, profundidad, textura y una paleta sobria con acentos bordo, azul profundo o verde azulado.
 - Prioriza escenas humanas cotidianas, objetos o metaforas visuales inteligentes. Evita la placa de texto generica.
@@ -229,14 +234,11 @@ const IMAGE_PROMPT_RULES = `DIRECCION VISUAL PARA GEMINI:
   es la unica profesional de esta cuenta. Nunca describas ni dejes ambigua una mano, brazo, guardapolvo
   o silueta de aspecto masculino en ese rol: especifica en el prompt que es una mano/muñeca femenina
   (sin inventar el rostro real).
-- PROHIBIDO dentro de la imagen: texto adicional al titular y subtitulo solicitados, logos, marcas de agua, interfaces, diagnosticos, estudios legibles, anatomia gore, personas angustiadas, corazon rojo de stock, estetoscopio flotante o ECG decorativo.
+- PROHIBIDO dentro de la imagen: cualquier texto, letra, numero, titulo, logo, marca de agua, interfaz, diagnostico, estudio legible, anatomia gore, personas angustiadas, corazon rojo de stock, estetoscopio flotante o ECG decorativo.
 - No pedir collages, infografias, posters, flyers, marcos, placas, fondos con gradiente ni composiciones divididas.
-- El prompt debe terminar reforzando, en ingles y de forma 100% GENERICA (nunca citando el titular o
-  subtitulo especifico entre comillas dentro del prompt): "Render only the exact requested Spanish
-  headline and subtitle exactly as provided separately. No extra text, no logos, no watermark." El
-  titular y subtitulo real se van a pasar aparte al momento de generar la imagen final -- si citas el
-  texto especifico dentro de esta direccion visual, esa cita puede quedar vieja/desactualizada mas
-  adelante si el titular o subtitulo cambian despues sin regenerar esta misma direccion visual.
+- El prompt debe terminar reforzando, en ingles: "Do not render any text, letters, numbers, logos or
+  watermarks anywhere in the image." Nunca menciones el titular ni el subtitulo dentro de "image_prompt"
+  -- esta escena nunca los renderiza, se agregan aparte por edicion real (ver nota de arriba).
 - Inclui "image_alt_text": descripcion accesible en espanol, factual y breve, maximo 180 caracteres.`
 
 // 2026-07-15: Instagram y Google Business NO interpretan Markdown -- un post real salio publicado
@@ -1045,34 +1047,31 @@ export async function generateContentVisual(input: {
   // muestra en la pestaña Reels via cover_url (ver createVideoContainer en instagram-business.ts),
   // que Meta recomienda especificamente en 9:16 para que no quede recortada.
   const aspectRatio = input.format === "historia" || input.format === "reel" ? "9:16" : "4:5"
-  const prompt = `Create the final publish-ready Instagram ${input.format} visual for a cardiology practice.
+  // 2026-07-30: Gemini generaba la placa ENTERA de una sola pasada (foto + titular + subtitulo
+  // quemados por el propio modelo) -- eso es lo que hacia el texto poco confiable (llego a inventar
+  // una tercera linea deforme, o a comerse letras de "ALARMA"; ver docs/BACKLOG.md). Ahora el modelo
+  // SOLO genera la foto/escena, sin texto de ningun tipo; composeContentPlate() (content-plate.ts)
+  // arma el titular/subtitulo/marca por edicion real (ffmpeg drawtext), igual que burnVideoBrief
+  // hace con los videos -- garantiza ortografia perfecta siempre, no depende de que el modelo de
+  // imagen "acierte" el texto.
+  const prompt = `Create ONLY a high-quality photographic or illustrative scene for a cardiology practice's Instagram ${input.format}. This image will be combined with a separate branded text panel afterward -- it must contain ABSOLUTELY NO text, letters, numbers, words, logos, watermarks, UI elements or lettering of any kind, in any language.
 
-CONTENT:
+CONTENT CONTEXT (for scene direction only -- never render any of this as visible text):
 - Category: ${input.category}
 - Topic: ${input.topic}
-- Exact Spanish headline: "${input.visual_headline}"
-- Exact Spanish subtitle: "${input.visual_subtitle}"
 
-CREATIVE DIRECTION:
+CREATIVE DIRECTION (the scene to depict):
 ${input.image_prompt}
 
 FINAL ART DIRECTION:
-- Produce one polished ${aspectRatio} composition, not a mockup or template preview.
-- The visual must stop the scroll, communicate one idea in under three seconds and feel trustworthy to an adult patient in Argentina.
-- Use a clear focal point, strong visual hierarchy, high text/background contrast and generous breathing room.
-- TEXT — READ CAREFULLY. The ONLY text allowed anywhere in the entire image is exactly these two Spanish strings, and nothing else:
-    HEADLINE: "${input.visual_headline}"
-    SUBTITLE: "${input.visual_subtitle}"
-  Render each string exactly ONCE, character for character and letter for letter, keeping every accent (á é í ó ú) and the letter ñ, and keeping every word in the exact same order. Do NOT translate, rephrase, abbreviate, shorten, split, reorder or drop any word (for example, never drop an article such as "LA"). Spell every single word correctly and proof-read the spelling before finalizing (for example it must read "ALARMA", never "ALAMA").
-- Do NOT render ANY other text: no third line, no byline, no credential or title, no doctor name, no caption, no label, no watermark, no logo, no English words, no descriptive words, and no invented, decorative or garbled lettering. The CREATIVE DIRECTION above is written in English and only describes the SCENE to paint — none of its words may EVER appear as visible text inside the image.
-- Headline must dominate; subtitle must remain readable on a small phone screen.
-- ${input.format === "historia" || input.format === "reel"
-    ? "Keep all text and essential elements inside the central safe zone of the vertical 9:16 frame, away from the top and bottom edges."
-    : "Use a 4:5 feed composition. For a carousel, make this an irresistible but medically responsible cover."}
-- No diagnosis, treatment claim, urgency marketing, fear, logos, watermark or extra text.
+- Produce one polished ${aspectRatio} photographic/illustrative composition, not a mockup or template preview.
+- Leave open, uncluttered negative space across the LEFT third of the frame (soft or simple background there) -- a text panel will be placed over that area afterward. Keep the main subject/focal point positioned across the right two-thirds of the frame.
+- The image must feel warm, professional and trustworthy to an adult patient in Argentina, with a clear focal point and generous breathing room.
+- ABSOLUTELY NO text, letters, numbers, words, logos, watermarks, UI elements, phone/app mockups, captions or invented/decorative lettering anywhere in the image, in any language.
+- No diagnosis, treatment claim, urgency marketing, fear, or extra text of any kind.
 - Do not depict the real doctor or invent her likeness.
 
-FINAL CHECK before rendering: the finished image must contain ONLY the two Spanish strings above (HEADLINE and SUBTITLE), each spelled perfectly with correct accents and ñ, every word present and in order, and ZERO other text characters of any kind.`
+FINAL CHECK before rendering: the finished image must contain ZERO text characters, letters, numbers, logos or lettering of any kind anywhere in the frame -- verify this before finalizing.`
   const promptHash = hashPrompt(prompt)
 
   try {
@@ -1096,12 +1095,18 @@ FINAL CHECK before rendering: the finished image must contain ONLY the two Spani
     if (!response.ok) throw new Error(data.error?.message || `Gemini respondio con estado ${response.status}.`)
 
     const part = data.candidates?.[0]?.content?.parts?.find(candidate => candidate.inlineData?.data || candidate.inline_data?.data)
-    const imageData = part?.inlineData?.data || part?.inline_data?.data
-    const mimeType = part?.inlineData?.mimeType || part?.inline_data?.mime_type || "image/png"
-    if (!imageData) throw new Error("Gemini no devolvio una imagen.")
+    const photoData = part?.inlineData?.data || part?.inline_data?.data
+    if (!photoData) throw new Error("Gemini no devolvio una imagen.")
+
+    const plateBuffer = await composeContentPlate({
+      photoBuffer: Buffer.from(photoData, "base64"),
+      headline: input.visual_headline,
+      subtitle: input.visual_subtitle,
+      format: input.format,
+    })
 
     await logRequest("gemini", model, promptHash, "content_visual", true)
-    return { mime_type: mimeType, image_data: imageData }
+    return { mime_type: "image/png", image_data: plateBuffer.toString("base64") }
   } catch (error) {
     await logRequest("gemini", model, promptHash, "content_visual", false,
       error instanceof Error ? error.message : String(error))

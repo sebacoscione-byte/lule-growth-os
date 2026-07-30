@@ -3,130 +3,83 @@
 
 ---
 
-## [DESDE LA PC] Verificar `GEMINI_IMAGE_MODEL` en Vercel — texto mal en las placas (2026-07-30)
+## [DECISIÓN] ✅ Opción A implementada y verificada en vivo (2026-07-30): las placas ya no dependen de que la IA dibuje texto
 
-Seba reportó (con captura) que las placas de Instagram generadas por IA salían con el texto mal:
-una **tercera línea inventada y deforme** quemada en la imagen ("Professional medel acardiojogist
-del agottrita") y, en otra pieza, el **titular mal escrito** ("ALAMA" en vez de "ALARMA", y comiéndose
-artículos como "LA"). El texto de las placas lo renderiza el propio modelo de imagen de Gemini
-(`gemini-3.1-flash-image`), quemado dentro de la imagen — no lo componemos nosotros.
+Continuación directa de los dos puntos de arriba (bug de texto + pedido de repensar la generación de
+placas). Seba pidió cotizar la Opción B (OpenAI `gpt-image-1`) y avanzar con la Opción A igual — se
+implementó la Opción A completa (no un parche de prompt), verificada de punta a punta con una llamada
+real a Gemini (no solo con la foto de referencia estática).
 
-- [x] **Mitigación ya mergeada** (PR de la rama `claude/image-text-generation-bug-d3k1h7`): se
-  endureció el prompt de `generateContentVisual` (`src/lib/ai.ts`) — whitelist explícito de que el
-  único texto permitido son el titular y el subtítulo, render carácter por carácter con acentos/ñ
-  sin traducir/abreviar/reordenar, prohibición explícita de bylines/credenciales/palabras en inglés/
-  lettering inventado, y un FINAL CHECK de cierre. Reduce el riesgo pero **no lo elimina** (el modelo
-  es no determinístico). `npm test` (893/893), lint y build OK. No verificable en vivo desde la nube
-  (sin `GEMINI_API_KEY` en ese entorno).
-- [ ] **Revisar Vercel (requiere la PC / dashboard, un agente en la nube no puede):** se rastreó por
-  git que **en el repo NO cambió nada** que explique la regresión — el modelo de imagen, el endpoint,
-  el prompt de render y `IMAGE_PROMPT_RULES` (parte de texto) están estables desde antes de que las
-  placas salieran bien. O sea el "algo se rompió" vino **de afuera del código**. Chequear en el
-  dashboard de Vercel:
-  1. **Settings → Environment Variables → `GEMINI_IMAGE_MODEL`**: confirmar que dice
-     `gemini-3.1-flash-image`. Si quedó apuntando a otro modelo, o cargada como "Sensitive" con un
-     valor raro (ya pasó con `GEMINI_MODEL`, que tenía una API key adentro — ver nota del 2026-07-15),
-     ese es el culpable y revertirla es el fix instantáneo, sin código.
-  2. De paso, confirmar que `GEMINI_API_KEY` no haya quedado pisada.
-  3. **Deployments:** correlacionar la línea de tiempo — ¿hubo un deploy o una edición de env var
-     justo antes de que empezaran a salir mal las placas?
-- [ ] **Después de verificar Vercel:** regenerar una placa real desde la app y confirmar si el texto
-  sale bien. Si con la env var correcta el problema persiste, es degradación del modelo del lado de
-  Google (o varianza) — ahí el fix confiable de fondo es dejar de depender del modelo para el texto:
-  que Gemini genere solo el fondo/escena y quemar el titular+subtítulo con nuestro propio render
-  (ffmpeg/DejaVu, mismo patrón que `burnVideoBrief` para los videos). Cambio más grande, evaluar solo
-  si reforzar el prompt no alcanza.
+**Costo de la Opción B, respondido antes de descartarla como prioridad (fuente: búsqueda web
+2026-07-30)**: `gpt-image-1` cuesta ~USD 0.011 (baja calidad) a ~USD 0.167-0.25 (alta calidad,
+según resolución) por imagen — nada gratis, a diferencia de Gemini hoy. Más importante: **`gpt-image-1`
+se discontinúa el 23/9/2026** (en menos de 2 meses), mismo patrón que ya llevó a descartar Sora para
+video (ver `project_veo_vs_sora_decision` en memoria) — igual de mala idea integrarlo por nombre. Los
+sucesores (`gpt-image-1.5`/`gpt-image-2`) tienen pricing similar (~USD 0.009-0.21 según calidad). Esto
+refuerza la Opción A: agnóstica del proveedor de imagen, no se rompe si OpenAI/Google cambian de
+modelo.
 
----
+**Qué se implementó (Opción A, `src/lib/content-plate.ts`, nuevo)**:
+- `generateContentVisual()` (`ai.ts`) ya NO le pide a Gemini que dibuje el titular/subtítulo — el
+  prompt se reescribió para pedir **solo la foto/escena**, con una prohibición explícita y reforzada
+  de cualquier texto/letra/número/logo, y la instrucción de dejar espacio negativo en el tercio
+  izquierdo del encuadre (ahí va el panel de texto). `IMAGE_PROMPT_RULES` (compartida con
+  `generateContentPlan`/`buildContentPlanPrompt`/`generateInstagramContent`/
+  `regenerateImageDirection`) se actualizó en el mismo sentido — ya no le pide a la IA de texto que
+  redacte instrucciones sobre cómo debe verse el titular dentro de la imagen, ni que cite el titular
+  como texto a renderizar.
+- `composeContentPlate()` (nuevo) arma la placa final por edición real con ffmpeg (mismo mecanismo
+  que `burnVideoBrief` usa para los videos, no una dependencia nueva): panel de marca a la izquierda
+  (color `paper` del sitio, `#F6F4EE`) + la foto generada por IA a la derecha (recortada desde el
+  borde derecho para preservar al sujeto) + titular en **Fraunces Bold** (con la última línea en
+  acento `cardiac`, `#B23B34`, imitando el efecto de la referencia de ChatGPT) + subtítulo en **Inter
+  Regular** + nombre/especialidad en Inter Bold + una barra de acento al pie a modo de firma de marca
+  simplificada. **Reusa la paleta y tipografía YA establecidas de la landing pública**
+  (`ink`/`paper`/`cardiac`, Fraunces+Inter — ver `src/app/globals.css`) en vez de inventar un estilo
+  nuevo, así el feed de Instagram y el sitio comparten una sola identidad visual.
+- Tipografías bajadas de Google Fonts (SIL Open Font License, libre) el mismo día — `Fraunces-Bold.ttf`,
+  `Inter-Regular.ttf`, `Inter-Bold.ttf` en `src/lib/fonts/` (ver `LICENSES.md` ahí mismo), mismo patrón
+  que `DejaVuSans-Bold.ttf` ya bundleado para los videos.
+- El wrap de líneas usa una fórmula calibrada a mano (caracteres por línea según el ancho disponible
+  del panel y el tamaño de fuente) en vez de un valor fijo — un valor optimista inicial hacía que
+  "SÍNTOMAS DE ALARMA" pisara el borde de la foto; el valor final es deliberadamente conservador
+  (nunca invade la foto, a costa de wrappear una línea de más en headlines muy largos).
+- `next.config.mjs`: `outputFileTracingIncludes` de `/api/content/visual` suma las 3 fuentes nuevas
+  (antes solo tenía el ffmpeg de `convertImageToJpeg`), y se agregó una entrada nueva para
+  `/api/cron/publish-content` (que también puede llamar a `generateContentVisual` como red de
+  seguridad si a una pieza le falta la placa) — sin esto el deploy real de Vercel arrancaría sin los
+  archivos.
+- **`generateContentVisual()` mantiene exactamente la misma firma/forma de retorno** — ningún otro
+  archivo (`/api/content/visual/route.ts`, `/api/cron/publish-content/route.ts`) necesitó cambios.
 
-## [DECISIÓN + REVISIÓN] Repensar cómo generamos las placas + evaluar ChatGPT como generador de imágenes (2026-07-30)
+**Verificado en vivo de punta a punta (no solo con la foto de referencia estática)**: se hizo una
+llamada real a Gemini con el prompt nuevo (categoría "Educación", tema "Síntomas de alarma en la
+mujer") — la foto resultante no tiene NINGÚN texto/letra/logo inventado (confirmado visualmente), y al
+componerla con `composeContentPlate()` el resultado final tiene el titular/subtítulo perfectos
+("SÍNTOMAS DE ALARMA" / "EN LA MUJER" en acento, "El corazón no siempre avisa de la misma manera"),
+sin ningún error de ortografía ni línea inventada — el mismo escenario exacto que reportó el bug queda
+confirmado resuelto sobre un caso real, no solo en teoría. También se probaron y verificaron
+visualmente un titular corto y el formato 9:16 (historia/portada de reel). `npm test` (893/893), lint
+y build sin errores.
 
-Seba generó una placa con ChatGPT que le gustó mucho más que las nuestras y pidió (1) revisar cómo
-generamos las imágenes y (2) evaluar si vale la pena sumar generación de imágenes con ChatGPT.
-Referencia guardada en `docs/assets/placa-referencia-chatgpt-2026-07-30.png` (misma pieza que la que
-salió mal con Gemini — "Síntomas de alarma en la mujer").
+**Con esto, el ítem de "Verificar `GEMINI_IMAGE_MODEL` en Vercel" queda superado, no solo resuelto**:
+como el modelo de imagen ya NO dibuja ningún texto (solo la foto), ya no importa para la confiabilidad
+del texto qué modelo puntual esté configurado ahí — cualquier modelo de imagen razonable puede generar
+una foto. Sigue siendo una buena idea que Seba chequee alguna vez que esa env var no tenga un valor
+raro cargado por error (mismo incidente que ya pasó con `GEMINI_MODEL` en 2026-07-15), pero ya no es
+un bloqueante ni la causa raíz de nada.
 
-**Qué tiene la de ChatGPT que la nuestra no** (no es solo el texto):
-- **Texto perfecto**: acentos y ñ correctos, sin líneas inventadas. Palabras acentuadas en color
-  ("EN LA MUJER" en bordo, "corazón" en negrita dentro del subtítulo).
-- **Identidad de marca real y consistente**: logo de hoja arriba a la izquierda, logo
-  corazón-estetoscopio con "DRA. LUCÍA CHAHÍN / CARDIOLOGÍA", ícono de latido, paleta fija (crema +
-  verde azulado + bordo).
-- **Layout diseñado, no full-bleed generado**: panel de texto crema a la izquierda + foto a la
-  derecha + onda turquesa de pie. La foto (mujer con la mano en el pecho) es lo único "generado"; el
-  resto es una plantilla de marca.
+**Pendiente real, queda como polish, no bloquea nada** (la placa ya es sustancialmente más confiable y
+prolija que antes sin esto): íconos de marca vectoriales (hoja, corazón-estetoscopio, latido) y una
+onda decorativa real en vez de la barra de acento simplificada actual — requieren assets de diseño que
+hoy no existen (`docs/assets/placa-referencia-chatgpt-2026-07-30.png` sigue como referencia). Si Seba
+quiere afinar el estilo fotográfico hacia el tono "editorial/cálido/premium" de la referencia de
+ChatGPT, se puede reforzar más `IMAGE_PROMPT_RULES` — hoy ya pide luz natural/paleta cálida pero no
+copia ese estilo puntual.
 
-**El aprendizaje de fondo (la parte de "revisar cómo generamos las imágenes"):** hoy le pedimos al
-modelo que genere TODO de una — escena + texto + composición — en una sola imagen full-bleed. Eso es
-justo lo que hace el texto poco confiable (ver entrada de arriba) y lo que nos deja sin identidad de
-marca consistente. La referencia sugiere separar responsabilidades. Dos caminos a evaluar (no
-excluyentes):
-
-- [ ] **Opción A — Plantilla de marca + texto quemado por nosotros (cambio estructural, el más
-  confiable).** El modelo genera SOLO la foto/escena; el titular, subtítulo, logos, onda y colores
-  los compone nuestro código sobre una plantilla fija (SVG/`sharp`/canvas, o el mismo stack de
-  ffmpeg/DejaVu que ya usamos en `burnVideoBrief` para los videos). Garantiza texto perfecto SIEMPRE
-  e identidad de marca consistente pieza a pieza — que es lo que realmente hace ver "pro" a la
-  referencia. Requiere: diseñar la plantilla (paleta, tipografías, posiciones, variante 4:5 y 9:16),
-  un set de logos/íconos de marca (hoy no existen como assets). Esfuerzo alto, pero resuelve de raíz
-  el bug de texto y sube la calidad general. Independiente del proveedor de imagen.
-- [ ] **Opción B — Sumar OpenAI (`gpt-image-1`) como generador de imágenes (el pedido explícito).**
-  El modelo de imagen de OpenAI (el que usa ChatGPT) renderiza texto notablemente mejor que
-  `gemini-3.1-flash-image`. Evaluar: integrarlo como proveedor alternativo en `generateContentVisual`
-  (patrón similar al `AI_PROVIDER` de texto — Gemini/Anthropic), o incluso solo para placas.
-  Considerar: **costo** (gpt-image-1 no tiene tier gratuito — ~USD 0.02-0.19 por imagen según
-  calidad/tamaño; hoy las placas con Gemini son casi gratis), nueva dependencia/API key de OpenAI,
-  y que **aun con mejor modelo, generar texto+layout en una sola pasada sigue siendo menos confiable
-  que la Opción A**. Verificar el nombre/estado real del modelo y pricing vigente antes de integrar
-  (no darlo por sabido).
-- [ ] **Recomendación preliminar (a validar con Seba):** la referencia se ve así de bien sobre todo
-  por el **layout de marca + texto nítido**, no solo por "mejor IA". La Opción A da el mayor salto de
-  calidad y confiabilidad y es agnóstica del proveedor; la Opción B es un buen complemento (mejor
-  foto/mejor texto si igual se quiere generar todo junto) pero por sí sola no garantiza el texto ni
-  la identidad de marca. Decisión de Seba sobre alcance/esfuerzo antes de implementar.
-
-**Hallazgos de la respuesta de ChatGPT (2026-07-30, Seba le pidió que explicara cómo la generó):**
-- **Confirmado: ChatGPT también dibujó el texto como píxeles dentro de una sola imagen**, NO como
-  capa de texto con fuente real. Sin capas editables, sin tipografías superpuestas, sin logos
-  prediseñados, sin composición posterior. Todo (foto, título, subtítulo, nombre, hoja,
-  corazón-estetoscopio, latido, ondas) salió en una única generación. Él mismo aclara que el texto
-  "se ve bastante correcto pero no mantiene kerning/interlineado/tamaño exactos" y **no es
-  reproducible de forma determinista**. → Refuerza que la Opción B (gpt-image-1) por sí sola NO
-  resuelve la confiabilidad del texto: rendería mejor en promedio, pero sigue siendo el modelo
-  dibujando letras, con el mismo riesgo de fondo.
-- **ChatGPT recomienda por su cuenta exactamente la Opción A**: separar (1) foto generada por IA sin
-  ningún texto, (2) plantilla fija editable con título/subtítulo/marca/íconos/ondas, (3) assets
-  vectoriales fijos (hoja, corazón-estetoscopio, latido), (4) paleta y tipografías definidas a mano.
-  Es la única forma de mantener layout/letras/logos/posiciones consistentes entre publicaciones.
-- **El formato real era 1:1**, no 4:5 (dato para la plantilla).
-- **El salto de estilo (de "infografía médica azul" a "editorial, femenina, cálida, fotográfica,
-  premium") vino de pasarle una CAPTURA DEL FEED existente como referencia**, no de una plantilla ni
-  de un prompt secreto (el llamado técnico fue con `prompt: null`, la herramienta lo armó sola). La
-  descripción registrada más cercana fue: *"A polished, minimalist healthcare graphic pairs a softly
-  lit woman on the right—hands over her chest, conveying concern—with bold Spanish messaging on the
-  left... Cream, teal, and muted coral tones, gentle heart/ECG motifs, and branding for 'DRA. LUCÍA
-  CHAHÍN · CARDIOLOGÍA'."*
-- [ ] **Quick win posible para el pipeline actual (mientras se decide la Opción A):** nuestra
-  `generateContentVisual` hoy manda solo texto, sin imagen de referencia. Evaluar (a) endurecer la
-  dirección de arte hacia ese estilo editorial/cálido/fotográfico/femenino, y (b) si el modelo de
-  imagen lo soporta, pasar una imagen de referencia de estilo. Es una mejora de calidad, NO arregla
-  la confiabilidad del texto (para eso sigue siendo la Opción A).
-- **Conclusión afinada:** la Opción A queda como el camino recomendado (ahora respaldado también por
-  ChatGPT). La Opción B es opcional/complementaria. El diferencial de la referencia = layout de marca
-  + assets fijos + texto nítido, todo lo cual la Opción A entrega de forma determinista.
-
-**Assets recibidos para prototipar la Opción A (se van sumando a `docs/assets/`):**
-- [x] **Foto sin texto 1:1** (`docs/assets/foto-sin-texto-sintomas-mujer-1x1.png`): mujer con manos
-  sobre el pecho, interior doméstico cálido, espacio negativo limpio a la izquierda, sin letras ni
-  logos. Sirve para prototipar la superposición de texto/marca por código.
-- [ ] **Íconos de marca como SVG** (hoja, corazón-estetoscopio, latido/ECG) — pendiente pedir/recibir.
-- [ ] **Onda inferior como SVG** — pendiente.
-- [ ] **Paleta HEX exacta** (crema, verde petróleo, bordo/coral, turquesa, gris texto) — pendiente.
-- [ ] **Tipografías libres** (serif editorial para título + sans para cuerpo, con pesos y jerarquía) —
-  pendiente.
-- [ ] **Prompt de foto reutilizable** (inglés, parametrizable por tema, con espacio negativo a la
-  izquierda) — pendiente.
-- [ ] **Spec de layout 1:1** (coordenadas/márgenes de cada bloque para 1080x1080) — pendiente.
+Pendiente separado, del reporte original: la placa YA PUBLICADA con el typo ("SINTOMAS DE ALAMA") no
+se regeneró — ver la entrada `[BUG]` correspondiente más abajo en este archivo, ahora con una nota de
+que regenerarla es trivial con el pipeline nuevo.
 
 ---
 
@@ -1846,19 +1799,24 @@ uno, y guarde el archivo con el nombre exacto que indica esa tabla. Una vez hech
 verificación real de punta a punta con un reel generado con Veo (solo se probó con audio/video
 sintéticos, gratis) — revisar que el audio final suene bien y no quede desincronizado.
 
-### [BUG] Texto mal escrito dentro de una placa ya generada — "SINTOMAS DE ALAMA EN LA MUJER" (visto 2026-07-28)
+### [BUG] ✅ Causa raíz resuelta de fondo (2026-07-30) — Texto mal escrito dentro de una placa ya generada, "SINTOMAS DE ALAMA EN LA MUJER" (visto 2026-07-28)
 Pieza "Síntomas de alarma en la mujer" (post, categoría Educación, publicada 26/7/2026): el titular
 quemado dentro de la imagen por Gemini dice "SINTOMAS DE ALAMA EN LA MUJER" — sin tildes
 ("SINTOMAS") y con una letra faltante ("ALAMA" en vez de "ALARMA", le falta la R). No es el mismo bug
 que el de tildes en texto de Instagram (caption/hook, corregido en PR #173 con reglas de prompt) —
-acá el error está renderizado por el **modelo de imagen** (`generateContentVisual`, Gemini dibuja el
-titular directamente sobre el píxel), no por el modelo de texto, así que la regla de ortografía de
-`PLAIN_TEXT_RULES` no lo alcanza. Visto de pasada mientras se investigaba otro pedido de Seba (portada
-de reels, PR #175), no se tocó porque no era el foco de esa tarea. Posible causa: los modelos de
-imagen generativa son notoriamente peores que los de texto renderizando texto legible/preciso dentro
-de la imagen (ya documentado como riesgo conocido en `VIDEO_PROMPT_RULES` para video). Posible fix a
-evaluar: pedirle a Gemini que verifique/regenere si el texto no coincide exactamente con
-`visual_headline`/`visual_subtitle` (más caro, requiere una segunda llamada o algún tipo de
-OCR/verificación), o aceptar que placas con texto quemado por IA necesitan revisión humana antes de
-aprobar (ya es el flujo actual: alguien mira la placa antes de aprobar, pero este typo pasó
-igual). No se regeneró la placa ya publicada — evaluar si vale la pena corregirla a mano en Instagram.
+acá el error estaba renderizado por el **modelo de imagen** (`generateContentVisual`, Gemini dibujaba
+el titular directamente sobre el píxel), no por el modelo de texto, así que la regla de ortografía de
+`PLAIN_TEXT_RULES` no lo alcanzaba.
+
+**Resuelto de fondo el 2026-07-30** (ver `[DECISIÓN] Opción A implementada` más arriba en este mismo
+archivo): Gemini ya no dibuja NINGÚN texto dentro de la imagen — solo genera la foto, y el
+titular/subtítulo se queman por edición real (`composeContentPlate`, ffmpeg + Fraunces/Inter), que
+nunca puede inventar una letra o comerse un acento porque el texto sale literal de
+`visual_headline`/`visual_subtitle`. No es un refuerzo de prompt más (como el intento del mismo día
+anterior) — es la clase entera de bug ("el modelo dibuja letras y a veces las dibuja mal") la que deja
+de poder ocurrir para piezas nuevas.
+
+**Sigue sin regenerarse la placa YA PUBLICADA con el typo** — con el pipeline nuevo, corregirla es tan
+simple como abrir esa pieza en Biblioteca y volver a generar la placa (sale con la marca/tipografía
+nueva, no un parche del mismo estilo viejo) y resubirla a mano en Instagram si Seba decide que vale la
+pena. No se hizo porque no estaba pedido explícitamente sobre esa pieza puntual.
