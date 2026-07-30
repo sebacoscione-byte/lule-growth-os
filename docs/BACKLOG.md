@@ -39,6 +39,54 @@ artículos como "LA"). El texto de las placas lo renderiza el propio modelo de i
 
 ---
 
+## [DECISIÓN + REVISIÓN] Repensar cómo generamos las placas + evaluar ChatGPT como generador de imágenes (2026-07-30)
+
+Seba generó una placa con ChatGPT que le gustó mucho más que las nuestras y pidió (1) revisar cómo
+generamos las imágenes y (2) evaluar si vale la pena sumar generación de imágenes con ChatGPT.
+Referencia guardada en `docs/assets/placa-referencia-chatgpt-2026-07-30.png` (misma pieza que la que
+salió mal con Gemini — "Síntomas de alarma en la mujer").
+
+**Qué tiene la de ChatGPT que la nuestra no** (no es solo el texto):
+- **Texto perfecto**: acentos y ñ correctos, sin líneas inventadas. Palabras acentuadas en color
+  ("EN LA MUJER" en bordo, "corazón" en negrita dentro del subtítulo).
+- **Identidad de marca real y consistente**: logo de hoja arriba a la izquierda, logo
+  corazón-estetoscopio con "DRA. LUCÍA CHAHÍN / CARDIOLOGÍA", ícono de latido, paleta fija (crema +
+  verde azulado + bordo).
+- **Layout diseñado, no full-bleed generado**: panel de texto crema a la izquierda + foto a la
+  derecha + onda turquesa de pie. La foto (mujer con la mano en el pecho) es lo único "generado"; el
+  resto es una plantilla de marca.
+
+**El aprendizaje de fondo (la parte de "revisar cómo generamos las imágenes"):** hoy le pedimos al
+modelo que genere TODO de una — escena + texto + composición — en una sola imagen full-bleed. Eso es
+justo lo que hace el texto poco confiable (ver entrada de arriba) y lo que nos deja sin identidad de
+marca consistente. La referencia sugiere separar responsabilidades. Dos caminos a evaluar (no
+excluyentes):
+
+- [ ] **Opción A — Plantilla de marca + texto quemado por nosotros (cambio estructural, el más
+  confiable).** El modelo genera SOLO la foto/escena; el titular, subtítulo, logos, onda y colores
+  los compone nuestro código sobre una plantilla fija (SVG/`sharp`/canvas, o el mismo stack de
+  ffmpeg/DejaVu que ya usamos en `burnVideoBrief` para los videos). Garantiza texto perfecto SIEMPRE
+  e identidad de marca consistente pieza a pieza — que es lo que realmente hace ver "pro" a la
+  referencia. Requiere: diseñar la plantilla (paleta, tipografías, posiciones, variante 4:5 y 9:16),
+  un set de logos/íconos de marca (hoy no existen como assets). Esfuerzo alto, pero resuelve de raíz
+  el bug de texto y sube la calidad general. Independiente del proveedor de imagen.
+- [ ] **Opción B — Sumar OpenAI (`gpt-image-1`) como generador de imágenes (el pedido explícito).**
+  El modelo de imagen de OpenAI (el que usa ChatGPT) renderiza texto notablemente mejor que
+  `gemini-3.1-flash-image`. Evaluar: integrarlo como proveedor alternativo en `generateContentVisual`
+  (patrón similar al `AI_PROVIDER` de texto — Gemini/Anthropic), o incluso solo para placas.
+  Considerar: **costo** (gpt-image-1 no tiene tier gratuito — ~USD 0.02-0.19 por imagen según
+  calidad/tamaño; hoy las placas con Gemini son casi gratis), nueva dependencia/API key de OpenAI,
+  y que **aun con mejor modelo, generar texto+layout en una sola pasada sigue siendo menos confiable
+  que la Opción A**. Verificar el nombre/estado real del modelo y pricing vigente antes de integrar
+  (no darlo por sabido).
+- [ ] **Recomendación preliminar (a validar con Seba):** la referencia se ve así de bien sobre todo
+  por el **layout de marca + texto nítido**, no solo por "mejor IA". La Opción A da el mayor salto de
+  calidad y confiabilidad y es agnóstica del proveedor; la Opción B es un buen complemento (mejor
+  foto/mejor texto si igual se quiere generar todo junto) pero por sí sola no garantiza el texto ni
+  la identidad de marca. Decisión de Seba sobre alcance/esfuerzo antes de implementar.
+
+---
+
 ## Inbox — handoff humano y móvil (2026-07-17)
 
 - [x] Separar handoff pendiente de conversación tomada usando `taken_at`; una conversación tomada ya
