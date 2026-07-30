@@ -1,6 +1,55 @@
 # Lule Growth OS — Contexto para Claude
 
 ## Estado actual
+- 2026-07-30 (Opción A implementada: las placas ya no dependen de que la IA dibuje texto — cierra el
+  punto de abajo): continuación directa de la sesión anterior (misma fecha, PR #178 ya mergeado).
+  Seba pidió cotizar la Opción B (OpenAI `gpt-image-1`) antes de descartarla y avanzar con la Opción A
+  de todas formas. **Costo de Opción B (búsqueda web)**: `gpt-image-1` cuesta ~USD 0.011 (baja) a
+  ~USD 0.167-0.25 (alta calidad) por imagen, sin tier gratuito — pero **se discontinúa el 23/9/2026**
+  (menos de 2 meses), mismo patrón que ya descartó Sora para video (`project_veo_vs_sora_decision`).
+  Los sucesores (`gpt-image-1.5`/`gpt-image-2`) tienen pricing similar. Esto reforzó ir con la Opción A
+  (agnóstica del proveedor de imagen) en vez de atarse a un modelo por nombre.
+  **Implementado de punta a punta**: `generateContentVisual()` (`ai.ts`) ya no le pide a Gemini que
+  dibuje titular/subtítulo — el prompt se reescribió para pedir SOLO la foto/escena (prohibición
+  reforzada de cualquier texto/letra/logo, espacio negativo pedido en el tercio izquierdo del
+  encuadre). `IMAGE_PROMPT_RULES` (compartida con `generateContentPlan`/`buildContentPlanPrompt`/
+  `generateInstagramContent`/`regenerateImageDirection`) se actualizó igual — ya no le pide a la IA de
+  texto que redacte instrucciones de cómo debe verse el titular dentro de la imagen. Nuevo
+  `src/lib/content-plate.ts` (`composeContentPlate()`) arma la placa final por edición real con ffmpeg
+  (mismo mecanismo que `burnVideoBrief` usa para los videos, ninguna dependencia nueva): panel de marca
+  a la izquierda (color `paper` del sitio) + la foto de la IA a la derecha (recortada desde el borde
+  derecho para preservar al sujeto) + titular en **Fraunces Bold** (última línea en acento `cardiac`,
+  imitando el efecto de la referencia de ChatGPT) + subtítulo en **Inter Regular** + nombre/especialidad
+  en Inter Bold + una barra de acento al pie a modo de firma de marca simplificada — **reusa la paleta
+  y tipografía YA establecidas de la landing pública** (`ink`/`paper`/`cardiac`, Fraunces+Inter, ver
+  `src/app/globals.css`) en vez de inventar un estilo nuevo. Tipografías bajadas de Google Fonts (SIL
+  Open Font License) el mismo día a `src/lib/fonts/` (`Fraunces-Bold.ttf`, `Inter-Regular.ttf`,
+  `Inter-Bold.ttf`, + `LICENSES.md`), mismo patrón que `DejaVuSans-Bold.ttf` ya bundleado. El wrap de
+  líneas usa una fórmula calibrada a mano (caracteres por línea según ancho disponible y tamaño de
+  fuente) — un valor optimista inicial hacía que "SÍNTOMAS DE ALARMA" pisara el borde de la foto en las
+  pruebas; el valor final es deliberadamente conservador. `next.config.mjs`: `outputFileTracingIncludes`
+  de `/api/content/visual` suma las 3 fuentes nuevas, y se agregó una entrada nueva para
+  `/api/cron/publish-content` (también puede llamar a `generateContentVisual` como red de seguridad) —
+  sin esto el deploy real de Vercel arrancaría sin los archivos. `generateContentVisual()` mantiene
+  exactamente la misma firma/forma de retorno, así que ningún otro archivo (las dos rutas que la llaman)
+  necesitó cambios. **Verificado en vivo de punta a punta, no solo con la foto de referencia estática**:
+  llamada real a Gemini con el prompt nuevo (categoría Educación, tema "Síntomas de alarma en la mujer",
+  el mismo caso exacto del bug reportado) — la foto resultante no tiene ningún texto/letra/logo
+  inventado (confirmado visualmente), y compuesta con `composeContentPlate()` el resultado final tiene
+  el titular/subtítulo perfectos, sin ningún error de ortografía ni línea inventada. También se probaron
+  y verificaron visualmente un titular corto y el formato 9:16 (historia/portada de reel). `npm test`
+  (893/893), lint y build sin errores. **El pendiente de "verificar `GEMINI_IMAGE_MODEL` en Vercel" del
+  punto de abajo queda superado, no solo resuelto**: como el modelo de imagen ya no dibuja ningún texto,
+  ya no importa para la confiabilidad del texto qué modelo puntual esté configurado ahí. **Pendiente
+  real, queda como polish, no bloquea nada**: íconos de marca vectoriales (hoja, corazón-estetoscopio,
+  latido) y una onda decorativa real en vez de la barra de acento simplificada actual — requieren assets
+  de diseño que hoy no existen. La placa YA PUBLICADA con el typo original no se regeneró (no estaba
+  pedido explícitamente sobre esa pieza puntual) — con el pipeline nuevo, hacerlo es tan simple como
+  volver a generar la placa de esa pieza en Biblioteca. Detalle completo, incluidas las capturas del
+  proceso de calibración del layout, en `docs/BACKLOG.md`. Archivos: `src/lib/ai.ts`,
+  `src/lib/content-plate.ts` (nuevo), `src/lib/fonts/Fraunces-Bold.ttf` (nuevo),
+  `src/lib/fonts/Inter-Regular.ttf` (nuevo), `src/lib/fonts/Inter-Bold.ttf` (nuevo),
+  `src/lib/fonts/LICENSES.md` (nuevo), `next.config.mjs`, `docs/BACKLOG.md`.
 - 2026-07-30 (texto mal en las placas generadas por IA + revisión de cómo generamos imágenes): Seba
   reportó con captura que las placas de Instagram generadas por IA salían con el texto mal: una
   **tercera línea inventada y deforme** quemada en la imagen ("Professional medel acardiojogist del

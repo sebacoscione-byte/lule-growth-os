@@ -78,11 +78,26 @@ const nextConfig = {
       "node_modules/@ffmpeg-installer/**",
       "node_modules/@ffprobe-installer/**",
     ],
-    // Portada de reel (2026-07-28): estas dos rutas usan convertImageToJpeg() (video-caption.ts,
-    // solo ffmpeg, no ffprobe) para cumplir el requisito de JPEG de cover_url -- mismo motivo que
-    // arriba, sin esto el deploy de Vercel puede arrancar sin el binario.
-    "/api/content/visual": ["node_modules/@ffmpeg-installer/**"],
+    // generateContentVisual (ai.ts) ahora compone la placa con composeContentPlate() (content-plate.ts,
+    // 2026-07-30: el modelo de imagen solo genera la foto, el titular/subtitulo/marca se queman por
+    // edicion real con ffmpeg + Fraunces/Inter) ademas de convertImageToJpeg() para portadas de reel --
+    // mismo motivo que arriba, sin esto el deploy de Vercel puede arrancar sin el binario/las fuentes.
+    "/api/content/visual": [
+      "src/lib/fonts/Fraunces-Bold.ttf",
+      "src/lib/fonts/Inter-Regular.ttf",
+      "src/lib/fonts/Inter-Bold.ttf",
+      "node_modules/@ffmpeg-installer/**",
+    ],
     "/api/content/upload-image": ["node_modules/@ffmpeg-installer/**"],
+    // El cron de publicacion automatica puede llamar a generateContentVisual() como red de seguridad
+    // si a una pieza aprobada le falta la placa (caso raro, ver publish-content/route.ts) -- necesita
+    // los mismos assets que /api/content/visual.
+    "/api/cron/publish-content": [
+      "src/lib/fonts/Fraunces-Bold.ttf",
+      "src/lib/fonts/Inter-Regular.ttf",
+      "src/lib/fonts/Inter-Bold.ttf",
+      "node_modules/@ffmpeg-installer/**",
+    ],
   },
   // TECH-01 (docs/BACKLOG.md): headers de seguridad generales. El CSP de arriba se sumó después
   // (2026-07-18) una vez que este entorno pudo probar login/OAuth/GA de punta a punta.
