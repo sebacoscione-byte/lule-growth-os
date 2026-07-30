@@ -1,6 +1,50 @@
 # Lule Growth OS — Contexto para Claude
 
 ## Estado actual
+- 2026-07-30 (texto mal en las placas generadas por IA + revisión de cómo generamos imágenes): Seba
+  reportó con captura que las placas de Instagram generadas por IA salían con el texto mal: una
+  **tercera línea inventada y deforme** quemada en la imagen ("Professional medel acardiojogist del
+  agottrita") y, en otra pieza, el **titular mal escrito** ("ALAMA" por "ALARMA", comiéndose el "LA").
+  Investigado antes de tocar código: el texto de las placas lo **renderiza el propio modelo de imagen
+  de Gemini** (`gemini-3.1-flash-image`) quemado dentro de la imagen — no lo componemos nosotros. La
+  línea deforme es una alucinación clásica: el modelo agarra palabras descriptivas de la dirección
+  creativa (en inglés) y las dibuja como si fueran texto. **Se verificó por git que en el repo NO
+  cambió nada** que explique la regresión: el modelo de imagen, el endpoint (`.../v1/models/…`), el
+  prompt de render de `generateContentVisual` (último toque #175, solo la zona segura de reels) y la
+  parte de texto de `IMAGE_PROMPT_RULES` están estables desde antes de que las placas salieran bien.
+  O sea el "algo se rompió" vino **de afuera del código** → causas probables: `GEMINI_IMAGE_MODEL`
+  cambiado en Vercel (lo más fácil de revertir), degradación del modelo del lado de Google, o
+  varianza del modelo (no determinístico). **Fix aplicado (la opción que eligió Seba, "reforzar el
+  prompt")**: se endureció el prompt de `generateContentVisual` (`src/lib/ai.ts`) — whitelist
+  explícito de que el ÚNICO texto permitido son el titular y el subtítulo, render carácter por
+  carácter con acentos/ñ sin traducir/abreviar/reordenar/comerse palabras (con "LA" y "ALARMA"/"ALAMA"
+  como ejemplos), prohibición explícita de bylines/credenciales/palabras en inglés/lettering inventado,
+  aclaración de que la CREATIVE DIRECTION describe la escena y sus palabras nunca deben aparecer como
+  texto, y un FINAL CHECK de cierre. `npm test` (893/893), lint y build sin errores. **No verificable
+  en vivo** (este entorno en la nube no tiene `GEMINI_API_KEY`) — se confirma regenerando una placa
+  real una vez deployado. Refuerza el riesgo pero no lo elimina (modelo no determinístico).
+  **Contexto de producto sumado al backlog** (`docs/BACKLOG.md`, dos entradas): (1) **`[DESDE LA PC]`**
+  verificar `GEMINI_IMAGE_MODEL`/`GEMINI_API_KEY` en Vercel + correlacionar con Deployments (paso que
+  un agente en la nube no puede hacer); (2) **`[DECISIÓN + REVISIÓN]`** repensar cómo generamos las
+  placas — Seba mostró una placa que generó con ChatGPT muchísimo mejor (texto perfecto + identidad de
+  marca real: logo hoja, logo corazón-estetoscopio, "DRA. LUCÍA CHAHÍN / CARDIOLOGÍA", onda de pie,
+  palabras acentuadas en color). Al pedirle a ChatGPT que explicara cómo la generó, **confirmó que él
+  también dibujó el texto como píxeles en una sola imagen** (sin capas/fuentes/logos reales, no
+  determinista) y **recomienda por su cuenta la "Opción A"**: que la IA genere solo la foto sin texto
+  y que el titular/subtítulo/marca/íconos/ondas se compongan por código sobre una plantilla fija (SVG/
+  `sharp`/canvas o el stack de ffmpeg/DejaVu de `burnVideoBrief`). Datos: el formato real era **1:1**
+  (no 4:5), y el salto de estilo vino de pasarle **una captura del feed como referencia**. Conclusión
+  afinada: Opción A = camino recomendado y determinista; Opción B (sumar OpenAI `gpt-image-1`) =
+  opcional/complementaria, por sí sola no garantiza el texto. **Assets guardados en `docs/assets/`**:
+  `placa-referencia-chatgpt-2026-07-30.png` (la referencia) y `foto-sin-texto-sintomas-mujer-1x1.png`
+  (foto 1:1 sin texto, con espacio negativo a la izquierda, primer asset para prototipar). Checklist de
+  assets que faltan pedir a ChatGPT en el backlog (SVGs de íconos y onda, paleta HEX, tipografías
+  libres, prompt de foto reutilizable, spec de layout 1:1). **Lección**: cuando el texto de una placa
+  sale mal y el código de generación no cambió, revisar primero las env vars del deploy (`GEMINI_*` en
+  Vercel) antes de asumir un bug de código — este proyecto ya tuvo `GEMINI_MODEL` con una API key
+  cargada por error (2026-07-15), mismo patrón de "variable sensible con valor equivocado". Todo en la
+  rama `claude/image-text-generation-bug-d3k1h7` (5 commits); **no se abrió PR** (Seba no lo pidió).
+  Archivos: `src/lib/ai.ts`, `docs/BACKLOG.md`, `docs/assets/` (2 imágenes nuevas).
 - 2026-07-29 (trazabilidad al marcar un reel de prueba como "publicada manualmente"): continuación
   del punto de arriba — Seba pidió que, al marcar una pieza como publicada a mano (botón que existe
   desde antes para reels/carruseles posteados fuera de la API, ej. para poder agregar el sticker de
