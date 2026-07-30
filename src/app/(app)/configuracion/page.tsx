@@ -996,7 +996,7 @@ export default function ConfiguracionPage() {
                       <Input value={locationDraft.whatsapp} onChange={e => updateLocationDraft({ whatsapp: e.target.value })} placeholder="Ej: 11 5051-9982" />
                       <p className="text-xs text-gray-400 mt-1">
                         Solo si la institución tiene su propio WhatsApp para turnos (ej: Swity de Swiss Medical).
-                        Si lo dejás vacío, el botón &ldquo;Consultar por WhatsApp&rdquo; de la landing usa el WhatsApp del consultorio.
+                        Si lo dejás vacío, no se muestra ningún botón de WhatsApp para esta sede en la landing.
                       </p>
                     </Field>
                     <Field label="Días y horarios">
