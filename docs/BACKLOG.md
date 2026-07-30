@@ -85,6 +85,36 @@ excluyentes):
   foto/mejor texto si igual se quiere generar todo junto) pero por sí sola no garantiza el texto ni
   la identidad de marca. Decisión de Seba sobre alcance/esfuerzo antes de implementar.
 
+**Hallazgos de la respuesta de ChatGPT (2026-07-30, Seba le pidió que explicara cómo la generó):**
+- **Confirmado: ChatGPT también dibujó el texto como píxeles dentro de una sola imagen**, NO como
+  capa de texto con fuente real. Sin capas editables, sin tipografías superpuestas, sin logos
+  prediseñados, sin composición posterior. Todo (foto, título, subtítulo, nombre, hoja,
+  corazón-estetoscopio, latido, ondas) salió en una única generación. Él mismo aclara que el texto
+  "se ve bastante correcto pero no mantiene kerning/interlineado/tamaño exactos" y **no es
+  reproducible de forma determinista**. → Refuerza que la Opción B (gpt-image-1) por sí sola NO
+  resuelve la confiabilidad del texto: rendería mejor en promedio, pero sigue siendo el modelo
+  dibujando letras, con el mismo riesgo de fondo.
+- **ChatGPT recomienda por su cuenta exactamente la Opción A**: separar (1) foto generada por IA sin
+  ningún texto, (2) plantilla fija editable con título/subtítulo/marca/íconos/ondas, (3) assets
+  vectoriales fijos (hoja, corazón-estetoscopio, latido), (4) paleta y tipografías definidas a mano.
+  Es la única forma de mantener layout/letras/logos/posiciones consistentes entre publicaciones.
+- **El formato real era 1:1**, no 4:5 (dato para la plantilla).
+- **El salto de estilo (de "infografía médica azul" a "editorial, femenina, cálida, fotográfica,
+  premium") vino de pasarle una CAPTURA DEL FEED existente como referencia**, no de una plantilla ni
+  de un prompt secreto (el llamado técnico fue con `prompt: null`, la herramienta lo armó sola). La
+  descripción registrada más cercana fue: *"A polished, minimalist healthcare graphic pairs a softly
+  lit woman on the right—hands over her chest, conveying concern—with bold Spanish messaging on the
+  left... Cream, teal, and muted coral tones, gentle heart/ECG motifs, and branding for 'DRA. LUCÍA
+  CHAHÍN · CARDIOLOGÍA'."*
+- [ ] **Quick win posible para el pipeline actual (mientras se decide la Opción A):** nuestra
+  `generateContentVisual` hoy manda solo texto, sin imagen de referencia. Evaluar (a) endurecer la
+  dirección de arte hacia ese estilo editorial/cálido/fotográfico/femenino, y (b) si el modelo de
+  imagen lo soporta, pasar una imagen de referencia de estilo. Es una mejora de calidad, NO arregla
+  la confiabilidad del texto (para eso sigue siendo la Opción A).
+- **Conclusión afinada:** la Opción A queda como el camino recomendado (ahora respaldado también por
+  ChatGPT). La Opción B es opcional/complementaria. El diferencial de la referencia = layout de marca
+  + assets fijos + texto nítido, todo lo cual la Opción A entrega de forma determinista.
+
 ---
 
 ## Inbox — handoff humano y móvil (2026-07-17)
