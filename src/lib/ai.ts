@@ -1060,17 +1060,19 @@ FINAL ART DIRECTION:
 - Produce one polished ${aspectRatio} composition, not a mockup or template preview.
 - The visual must stop the scroll, communicate one idea in under three seconds and feel trustworthy to an adult patient in Argentina.
 - Use a clear focal point, strong visual hierarchy, high text/background contrast and generous breathing room.
-- Render the exact Spanish headline and subtitle once, with correct accents and no spelling changes.
-- The headline and subtitle to render are ONLY the ones given above under CONTENT, character for
-  character. If the CREATIVE DIRECTION text above happens to mention, quote or reference any other
-  headline or subtitle wording, IGNORE that wording completely -- it may be outdated. Never render
-  any text that is not the exact headline and subtitle given under CONTENT.
+- TEXT — READ CAREFULLY. The ONLY text allowed anywhere in the entire image is exactly these two Spanish strings, and nothing else:
+    HEADLINE: "${input.visual_headline}"
+    SUBTITLE: "${input.visual_subtitle}"
+  Render each string exactly ONCE, character for character and letter for letter, keeping every accent (á é í ó ú) and the letter ñ, and keeping every word in the exact same order. Do NOT translate, rephrase, abbreviate, shorten, split, reorder or drop any word (for example, never drop an article such as "LA"). Spell every single word correctly and proof-read the spelling before finalizing (for example it must read "ALARMA", never "ALAMA").
+- Do NOT render ANY other text: no third line, no byline, no credential or title, no doctor name, no caption, no label, no watermark, no logo, no English words, no descriptive words, and no invented, decorative or garbled lettering. The CREATIVE DIRECTION above is written in English and only describes the SCENE to paint — none of its words may EVER appear as visible text inside the image.
 - Headline must dominate; subtitle must remain readable on a small phone screen.
 - ${input.format === "historia" || input.format === "reel"
     ? "Keep all text and essential elements inside the central safe zone of the vertical 9:16 frame, away from the top and bottom edges."
     : "Use a 4:5 feed composition. For a carousel, make this an irresistible but medically responsible cover."}
 - No diagnosis, treatment claim, urgency marketing, fear, logos, watermark or extra text.
-- Do not depict the real doctor or invent her likeness.`
+- Do not depict the real doctor or invent her likeness.
+
+FINAL CHECK before rendering: the finished image must contain ONLY the two Spanish strings above (HEADLINE and SUBTITLE), each spelled perfectly with correct accents and ñ, every word present and in order, and ZERO other text characters of any kind.`
   const promptHash = hashPrompt(prompt)
 
   try {
