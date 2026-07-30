@@ -43,8 +43,8 @@
   sale mal y el código de generación no cambió, revisar primero las env vars del deploy (`GEMINI_*` en
   Vercel) antes de asumir un bug de código — este proyecto ya tuvo `GEMINI_MODEL` con una API key
   cargada por error (2026-07-15), mismo patrón de "variable sensible con valor equivocado". Todo en la
-  rama `claude/image-text-generation-bug-d3k1h7` (5 commits); **no se abrió PR** (Seba no lo pidió).
-  Archivos: `src/lib/ai.ts`, `docs/BACKLOG.md`, `docs/assets/` (2 imágenes nuevas).
+  rama `claude/image-text-generation-bug-d3k1h7`, **PR #178** abierto hacia `main` (a pedido de Seba
+  al cierre). Archivos: `src/lib/ai.ts`, `docs/BACKLOG.md`, `docs/assets/` (2 imágenes nuevas).
 - 2026-07-29 (trazabilidad al marcar un reel de prueba como "publicada manualmente"): continuación
   del punto de arriba — Seba pidió que, al marcar una pieza como publicada a mano (botón que existe
   desde antes para reels/carruseles posteados fuera de la API, ej. para poder agregar el sticker de
