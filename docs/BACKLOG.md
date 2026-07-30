@@ -115,6 +115,19 @@ excluyentes):
   ChatGPT). La Opción B es opcional/complementaria. El diferencial de la referencia = layout de marca
   + assets fijos + texto nítido, todo lo cual la Opción A entrega de forma determinista.
 
+**Assets recibidos para prototipar la Opción A (se van sumando a `docs/assets/`):**
+- [x] **Foto sin texto 1:1** (`docs/assets/foto-sin-texto-sintomas-mujer-1x1.png`): mujer con manos
+  sobre el pecho, interior doméstico cálido, espacio negativo limpio a la izquierda, sin letras ni
+  logos. Sirve para prototipar la superposición de texto/marca por código.
+- [ ] **Íconos de marca como SVG** (hoja, corazón-estetoscopio, latido/ECG) — pendiente pedir/recibir.
+- [ ] **Onda inferior como SVG** — pendiente.
+- [ ] **Paleta HEX exacta** (crema, verde petróleo, bordo/coral, turquesa, gris texto) — pendiente.
+- [ ] **Tipografías libres** (serif editorial para título + sans para cuerpo, con pesos y jerarquía) —
+  pendiente.
+- [ ] **Prompt de foto reutilizable** (inglés, parametrizable por tema, con espacio negativo a la
+  izquierda) — pendiente.
+- [ ] **Spec de layout 1:1** (coordenadas/márgenes de cada bloque para 1080x1080) — pendiente.
+
 ---
 
 ## Inbox — handoff humano y móvil (2026-07-17)
