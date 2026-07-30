@@ -1,5 +1,132 @@
 # Backlog — Lule Growth OS
-**Actualizado:** 2026-07-20 | **Basado en:** PRD Estrategia de Captación v2.1
+**Actualizado:** 2026-07-30 | **Basado en:** PRD Estrategia de Captación v2.1
+
+---
+
+## [DESDE LA PC] Verificar `GEMINI_IMAGE_MODEL` en Vercel — texto mal en las placas (2026-07-30)
+
+Seba reportó (con captura) que las placas de Instagram generadas por IA salían con el texto mal:
+una **tercera línea inventada y deforme** quemada en la imagen ("Professional medel acardiojogist
+del agottrita") y, en otra pieza, el **titular mal escrito** ("ALAMA" en vez de "ALARMA", y comiéndose
+artículos como "LA"). El texto de las placas lo renderiza el propio modelo de imagen de Gemini
+(`gemini-3.1-flash-image`), quemado dentro de la imagen — no lo componemos nosotros.
+
+- [x] **Mitigación ya mergeada** (PR de la rama `claude/image-text-generation-bug-d3k1h7`): se
+  endureció el prompt de `generateContentVisual` (`src/lib/ai.ts`) — whitelist explícito de que el
+  único texto permitido son el titular y el subtítulo, render carácter por carácter con acentos/ñ
+  sin traducir/abreviar/reordenar, prohibición explícita de bylines/credenciales/palabras en inglés/
+  lettering inventado, y un FINAL CHECK de cierre. Reduce el riesgo pero **no lo elimina** (el modelo
+  es no determinístico). `npm test` (893/893), lint y build OK. No verificable en vivo desde la nube
+  (sin `GEMINI_API_KEY` en ese entorno).
+- [ ] **Revisar Vercel (requiere la PC / dashboard, un agente en la nube no puede):** se rastreó por
+  git que **en el repo NO cambió nada** que explique la regresión — el modelo de imagen, el endpoint,
+  el prompt de render y `IMAGE_PROMPT_RULES` (parte de texto) están estables desde antes de que las
+  placas salieran bien. O sea el "algo se rompió" vino **de afuera del código**. Chequear en el
+  dashboard de Vercel:
+  1. **Settings → Environment Variables → `GEMINI_IMAGE_MODEL`**: confirmar que dice
+     `gemini-3.1-flash-image`. Si quedó apuntando a otro modelo, o cargada como "Sensitive" con un
+     valor raro (ya pasó con `GEMINI_MODEL`, que tenía una API key adentro — ver nota del 2026-07-15),
+     ese es el culpable y revertirla es el fix instantáneo, sin código.
+  2. De paso, confirmar que `GEMINI_API_KEY` no haya quedado pisada.
+  3. **Deployments:** correlacionar la línea de tiempo — ¿hubo un deploy o una edición de env var
+     justo antes de que empezaran a salir mal las placas?
+- [ ] **Después de verificar Vercel:** regenerar una placa real desde la app y confirmar si el texto
+  sale bien. Si con la env var correcta el problema persiste, es degradación del modelo del lado de
+  Google (o varianza) — ahí el fix confiable de fondo es dejar de depender del modelo para el texto:
+  que Gemini genere solo el fondo/escena y quemar el titular+subtítulo con nuestro propio render
+  (ffmpeg/DejaVu, mismo patrón que `burnVideoBrief` para los videos). Cambio más grande, evaluar solo
+  si reforzar el prompt no alcanza.
+
+---
+
+## [DECISIÓN + REVISIÓN] Repensar cómo generamos las placas + evaluar ChatGPT como generador de imágenes (2026-07-30)
+
+Seba generó una placa con ChatGPT que le gustó mucho más que las nuestras y pidió (1) revisar cómo
+generamos las imágenes y (2) evaluar si vale la pena sumar generación de imágenes con ChatGPT.
+Referencia guardada en `docs/assets/placa-referencia-chatgpt-2026-07-30.png` (misma pieza que la que
+salió mal con Gemini — "Síntomas de alarma en la mujer").
+
+**Qué tiene la de ChatGPT que la nuestra no** (no es solo el texto):
+- **Texto perfecto**: acentos y ñ correctos, sin líneas inventadas. Palabras acentuadas en color
+  ("EN LA MUJER" en bordo, "corazón" en negrita dentro del subtítulo).
+- **Identidad de marca real y consistente**: logo de hoja arriba a la izquierda, logo
+  corazón-estetoscopio con "DRA. LUCÍA CHAHÍN / CARDIOLOGÍA", ícono de latido, paleta fija (crema +
+  verde azulado + bordo).
+- **Layout diseñado, no full-bleed generado**: panel de texto crema a la izquierda + foto a la
+  derecha + onda turquesa de pie. La foto (mujer con la mano en el pecho) es lo único "generado"; el
+  resto es una plantilla de marca.
+
+**El aprendizaje de fondo (la parte de "revisar cómo generamos las imágenes"):** hoy le pedimos al
+modelo que genere TODO de una — escena + texto + composición — en una sola imagen full-bleed. Eso es
+justo lo que hace el texto poco confiable (ver entrada de arriba) y lo que nos deja sin identidad de
+marca consistente. La referencia sugiere separar responsabilidades. Dos caminos a evaluar (no
+excluyentes):
+
+- [ ] **Opción A — Plantilla de marca + texto quemado por nosotros (cambio estructural, el más
+  confiable).** El modelo genera SOLO la foto/escena; el titular, subtítulo, logos, onda y colores
+  los compone nuestro código sobre una plantilla fija (SVG/`sharp`/canvas, o el mismo stack de
+  ffmpeg/DejaVu que ya usamos en `burnVideoBrief` para los videos). Garantiza texto perfecto SIEMPRE
+  e identidad de marca consistente pieza a pieza — que es lo que realmente hace ver "pro" a la
+  referencia. Requiere: diseñar la plantilla (paleta, tipografías, posiciones, variante 4:5 y 9:16),
+  un set de logos/íconos de marca (hoy no existen como assets). Esfuerzo alto, pero resuelve de raíz
+  el bug de texto y sube la calidad general. Independiente del proveedor de imagen.
+- [ ] **Opción B — Sumar OpenAI (`gpt-image-1`) como generador de imágenes (el pedido explícito).**
+  El modelo de imagen de OpenAI (el que usa ChatGPT) renderiza texto notablemente mejor que
+  `gemini-3.1-flash-image`. Evaluar: integrarlo como proveedor alternativo en `generateContentVisual`
+  (patrón similar al `AI_PROVIDER` de texto — Gemini/Anthropic), o incluso solo para placas.
+  Considerar: **costo** (gpt-image-1 no tiene tier gratuito — ~USD 0.02-0.19 por imagen según
+  calidad/tamaño; hoy las placas con Gemini son casi gratis), nueva dependencia/API key de OpenAI,
+  y que **aun con mejor modelo, generar texto+layout en una sola pasada sigue siendo menos confiable
+  que la Opción A**. Verificar el nombre/estado real del modelo y pricing vigente antes de integrar
+  (no darlo por sabido).
+- [ ] **Recomendación preliminar (a validar con Seba):** la referencia se ve así de bien sobre todo
+  por el **layout de marca + texto nítido**, no solo por "mejor IA". La Opción A da el mayor salto de
+  calidad y confiabilidad y es agnóstica del proveedor; la Opción B es un buen complemento (mejor
+  foto/mejor texto si igual se quiere generar todo junto) pero por sí sola no garantiza el texto ni
+  la identidad de marca. Decisión de Seba sobre alcance/esfuerzo antes de implementar.
+
+**Hallazgos de la respuesta de ChatGPT (2026-07-30, Seba le pidió que explicara cómo la generó):**
+- **Confirmado: ChatGPT también dibujó el texto como píxeles dentro de una sola imagen**, NO como
+  capa de texto con fuente real. Sin capas editables, sin tipografías superpuestas, sin logos
+  prediseñados, sin composición posterior. Todo (foto, título, subtítulo, nombre, hoja,
+  corazón-estetoscopio, latido, ondas) salió en una única generación. Él mismo aclara que el texto
+  "se ve bastante correcto pero no mantiene kerning/interlineado/tamaño exactos" y **no es
+  reproducible de forma determinista**. → Refuerza que la Opción B (gpt-image-1) por sí sola NO
+  resuelve la confiabilidad del texto: rendería mejor en promedio, pero sigue siendo el modelo
+  dibujando letras, con el mismo riesgo de fondo.
+- **ChatGPT recomienda por su cuenta exactamente la Opción A**: separar (1) foto generada por IA sin
+  ningún texto, (2) plantilla fija editable con título/subtítulo/marca/íconos/ondas, (3) assets
+  vectoriales fijos (hoja, corazón-estetoscopio, latido), (4) paleta y tipografías definidas a mano.
+  Es la única forma de mantener layout/letras/logos/posiciones consistentes entre publicaciones.
+- **El formato real era 1:1**, no 4:5 (dato para la plantilla).
+- **El salto de estilo (de "infografía médica azul" a "editorial, femenina, cálida, fotográfica,
+  premium") vino de pasarle una CAPTURA DEL FEED existente como referencia**, no de una plantilla ni
+  de un prompt secreto (el llamado técnico fue con `prompt: null`, la herramienta lo armó sola). La
+  descripción registrada más cercana fue: *"A polished, minimalist healthcare graphic pairs a softly
+  lit woman on the right—hands over her chest, conveying concern—with bold Spanish messaging on the
+  left... Cream, teal, and muted coral tones, gentle heart/ECG motifs, and branding for 'DRA. LUCÍA
+  CHAHÍN · CARDIOLOGÍA'."*
+- [ ] **Quick win posible para el pipeline actual (mientras se decide la Opción A):** nuestra
+  `generateContentVisual` hoy manda solo texto, sin imagen de referencia. Evaluar (a) endurecer la
+  dirección de arte hacia ese estilo editorial/cálido/fotográfico/femenino, y (b) si el modelo de
+  imagen lo soporta, pasar una imagen de referencia de estilo. Es una mejora de calidad, NO arregla
+  la confiabilidad del texto (para eso sigue siendo la Opción A).
+- **Conclusión afinada:** la Opción A queda como el camino recomendado (ahora respaldado también por
+  ChatGPT). La Opción B es opcional/complementaria. El diferencial de la referencia = layout de marca
+  + assets fijos + texto nítido, todo lo cual la Opción A entrega de forma determinista.
+
+**Assets recibidos para prototipar la Opción A (se van sumando a `docs/assets/`):**
+- [x] **Foto sin texto 1:1** (`docs/assets/foto-sin-texto-sintomas-mujer-1x1.png`): mujer con manos
+  sobre el pecho, interior doméstico cálido, espacio negativo limpio a la izquierda, sin letras ni
+  logos. Sirve para prototipar la superposición de texto/marca por código.
+- [ ] **Íconos de marca como SVG** (hoja, corazón-estetoscopio, latido/ECG) — pendiente pedir/recibir.
+- [ ] **Onda inferior como SVG** — pendiente.
+- [ ] **Paleta HEX exacta** (crema, verde petróleo, bordo/coral, turquesa, gris texto) — pendiente.
+- [ ] **Tipografías libres** (serif editorial para título + sans para cuerpo, con pesos y jerarquía) —
+  pendiente.
+- [ ] **Prompt de foto reutilizable** (inglés, parametrizable por tema, con espacio negativo a la
+  izquierda) — pendiente.
+- [ ] **Spec de layout 1:1** (coordenadas/márgenes de cada bloque para 1080x1080) — pendiente.
 
 ---
 
