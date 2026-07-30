@@ -354,11 +354,9 @@ por qué tipo de acción es, para que sepas qué esperar de cada uno. El detalle
   cubriendo la duda más frecuente ("¿dónde atendés?"). El "7" del PRD original
   (`docs/PRD-estrategia-captacion.md`) era una sugerencia de cobertura por ángulo, no un requisito
   — decisión explícita de Seba: 3 alcanza.
-- [ ] **Opcional, no bloqueante** — destacada "Turnos" (explica el paso a paso de 4 pasos para
-  pedir turno, reduce preguntas repetidas por DM). Es la única de las 4 restantes del PRD
-  (Turnos/Ecocardiograma/Cardiología/FAQ) con impacto real de fricción; las otras tres son
-  contenido educativo "nice to have". Acción nativa de Instagram (Highlights) — no queda
-  registrada en ninguna tabla de esta app, no se puede confirmar por código.
+- [x] ~~Opcional, no bloqueante — destacada "Turnos"~~ **Confirmado por Seba (2026-07-30)**: ya
+  existe. Acción nativa de Instagram (Highlights), no queda registrada en ninguna tabla de esta app,
+  así que no se podía confirmar por código — solo por su palabra.
 - [x] ~~Cargar las obras sociales reales por sede en Configuración~~ **Resuelto, verificado contra
   producción (2026-07-17)**: CIMEL Lanús (3 coberturas), Swiss Medical Lomas (1), Hospital
   Británico (7) ya tienen `obras_sociales` cargado — ya no están vacías.
@@ -1856,7 +1854,5 @@ nunca puede inventar una letra o comerse un acento porque el texto sale literal 
 anterior) — es la clase entera de bug ("el modelo dibuja letras y a veces las dibuja mal") la que deja
 de poder ocurrir para piezas nuevas.
 
-**Sigue sin regenerarse la placa YA PUBLICADA con el typo** — con el pipeline nuevo, corregirla es tan
-simple como abrir esa pieza en Biblioteca y volver a generar la placa (sale con la marca/tipografía
-nueva, no un parche del mismo estilo viejo) y resubirla a mano en Instagram si Seba decide que vale la
-pena. No se hizo porque no estaba pedido explícitamente sobre esa pieza puntual.
+**La placa ya publicada con el typo fue corregida por Seba a mano (2026-07-30)** — la regeneró y la
+resubió manualmente a Instagram. No quedó ningún pendiente sobre esa pieza puntual.
