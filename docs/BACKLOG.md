@@ -1,5 +1,41 @@
 # Backlog — Lule Growth OS
-**Actualizado:** 2026-07-20 | **Basado en:** PRD Estrategia de Captación v2.1
+**Actualizado:** 2026-07-30 | **Basado en:** PRD Estrategia de Captación v2.1
+
+---
+
+## [DESDE LA PC] Verificar `GEMINI_IMAGE_MODEL` en Vercel — texto mal en las placas (2026-07-30)
+
+Seba reportó (con captura) que las placas de Instagram generadas por IA salían con el texto mal:
+una **tercera línea inventada y deforme** quemada en la imagen ("Professional medel acardiojogist
+del agottrita") y, en otra pieza, el **titular mal escrito** ("ALAMA" en vez de "ALARMA", y comiéndose
+artículos como "LA"). El texto de las placas lo renderiza el propio modelo de imagen de Gemini
+(`gemini-3.1-flash-image`), quemado dentro de la imagen — no lo componemos nosotros.
+
+- [x] **Mitigación ya mergeada** (PR de la rama `claude/image-text-generation-bug-d3k1h7`): se
+  endureció el prompt de `generateContentVisual` (`src/lib/ai.ts`) — whitelist explícito de que el
+  único texto permitido son el titular y el subtítulo, render carácter por carácter con acentos/ñ
+  sin traducir/abreviar/reordenar, prohibición explícita de bylines/credenciales/palabras en inglés/
+  lettering inventado, y un FINAL CHECK de cierre. Reduce el riesgo pero **no lo elimina** (el modelo
+  es no determinístico). `npm test` (893/893), lint y build OK. No verificable en vivo desde la nube
+  (sin `GEMINI_API_KEY` en ese entorno).
+- [ ] **Revisar Vercel (requiere la PC / dashboard, un agente en la nube no puede):** se rastreó por
+  git que **en el repo NO cambió nada** que explique la regresión — el modelo de imagen, el endpoint,
+  el prompt de render y `IMAGE_PROMPT_RULES` (parte de texto) están estables desde antes de que las
+  placas salieran bien. O sea el "algo se rompió" vino **de afuera del código**. Chequear en el
+  dashboard de Vercel:
+  1. **Settings → Environment Variables → `GEMINI_IMAGE_MODEL`**: confirmar que dice
+     `gemini-3.1-flash-image`. Si quedó apuntando a otro modelo, o cargada como "Sensitive" con un
+     valor raro (ya pasó con `GEMINI_MODEL`, que tenía una API key adentro — ver nota del 2026-07-15),
+     ese es el culpable y revertirla es el fix instantáneo, sin código.
+  2. De paso, confirmar que `GEMINI_API_KEY` no haya quedado pisada.
+  3. **Deployments:** correlacionar la línea de tiempo — ¿hubo un deploy o una edición de env var
+     justo antes de que empezaran a salir mal las placas?
+- [ ] **Después de verificar Vercel:** regenerar una placa real desde la app y confirmar si el texto
+  sale bien. Si con la env var correcta el problema persiste, es degradación del modelo del lado de
+  Google (o varianza) — ahí el fix confiable de fondo es dejar de depender del modelo para el texto:
+  que Gemini genere solo el fondo/escena y quemar el titular+subtítulo con nuestro propio render
+  (ffmpeg/DejaVu, mismo patrón que `burnVideoBrief` para los videos). Cambio más grande, evaluar solo
+  si reforzar el prompt no alcanza.
 
 ---
 
