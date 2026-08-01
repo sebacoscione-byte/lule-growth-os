@@ -571,46 +571,59 @@ async function generateText(options: GenerateOptions): Promise<string> {
 
   const errors: unknown[] = []
   const providerOrder = options.provider ? [options.provider] : getProviderOrder()
-  for (const provider of providerOrder) {
+  // Un proveedor en modo JSON puede devolver texto no vacio pero truncado/invalido (visto en vivo
+  // con Gemini: finishReason "STOP" y candidatesTokenCount muy por debajo de maxOutputTokens, pero
+  // el JSON corta a mitad de un string sin cerrar comillas/llaves) -- confirmado 2026-08-01 que es
+  // intermitente e independiente del prompt: el mismo pedido repetido varias veces seguidas a veces
+  // sale bien y a veces no. Antes de saltar al siguiente proveedor (o de darse por vencido, si es el
+  // unico configurado), vale la pena reintentar una vez MAS con el MISMO proveedor -- mas rapido y
+  // sin depender de que haya un respaldo con saldo disponible, y en la practica alcanza para que la
+  // mayoria de los truncamientos se resuelvan solos. Solo aplica al truncamiento de JSON -- un error
+  // de API key invalida, cupo agotado, etc. va a fallar identico en el reintento, asi que esos casos
+  // saltan directo al proximo proveedor sin gastar el reintento.
+  const JSON_TRUNCATION_RETRIES = 1
+  providerLoop: for (const provider of providerOrder) {
     const model = provider === "gemini"
       ? (process.env.GEMINI_MODEL ?? "gemini-3.5-flash")
       : (process.env.ANTHROPIC_MODEL ?? "claude-sonnet-4-6")
-    try {
-      const text = provider === "gemini"
-        ? await generateWithGemini(options)
-        : await generateWithAnthropic(options)
-      // Un proveedor en modo JSON puede devolver texto no vacio pero truncado/invalido (visto en vivo
-      // con Gemini: finishReason "STOP" y candidatesTokenCount muy por debajo de maxOutputTokens, pero
-      // el JSON corta a mitad de un string sin cerrar comillas/llaves -- intermitente, no depende del
-      // prompt). generateWithGemini/generateWithAnthropic no lo detectan porque devuelven texto no
-      // vacio sin error. Validar aca, ANTES de cachear y ANTES de loguear exito, para que se trate
-      // como una falla real de este proveedor: dispara el fallback al proximo proveedor del loop en
-      // vez de propagar un JSON invalido al caller (que antes terminaba en el mensaje generico "No se
-      // pudo generar la respuesta con IA", confundiendo con un problema de configuracion) y evita
-      // cachear para siempre una respuesta truncada bajo el mismo promptHash.
-      if (options.json) {
-        try {
-          JSON.parse(text)
-        } catch {
-          throw new Error(`El proveedor de IA (${provider}) devolvio una respuesta JSON incompleta o invalida.`)
+    for (let attempt = 0; attempt <= JSON_TRUNCATION_RETRIES; attempt++) {
+      try {
+        const text = provider === "gemini"
+          ? await generateWithGemini(options)
+          : await generateWithAnthropic(options)
+        // generateWithGemini/generateWithAnthropic no detectan el truncamiento porque devuelven texto
+        // no vacio sin error. Validar aca, ANTES de cachear y ANTES de loguear exito, para que se
+        // trate como una falla real de este intento: dispara el reintento/fallback en vez de propagar
+        // un JSON invalido al caller (que antes terminaba en el mensaje generico "No se pudo generar
+        // la respuesta con IA", confundiendo con un problema de configuracion) y evita cachear para
+        // siempre una respuesta truncada bajo el mismo promptHash.
+        if (options.json) {
+          try {
+            JSON.parse(text)
+          } catch {
+            throw new Error(`El proveedor de IA (${provider}) devolvio una respuesta JSON incompleta o invalida.`)
+          }
         }
+        if (cacheMode === "safe_non_personal") {
+          await saveCachedOutput(promptHash, purpose, promptText, text)
+        }
+        await logRequest(provider, model, promptHash, purpose, true)
+        return text
+      } catch (error) {
+        errors.push(error)
+        await logRequest(
+          provider,
+          model,
+          promptHash,
+          purpose,
+          false,
+          cacheMode === "none" ? "patient_context_request_failed" : (error instanceof Error ? error.message : String(error))
+        )
+        const isJsonTruncation = Boolean(options.json) && error instanceof Error && error.message.includes("JSON incompleta o invalida")
+        if (isJsonTruncation && attempt < JSON_TRUNCATION_RETRIES) continue // reintenta el mismo proveedor
+        if (options.provider || getRequestedProvider() !== "auto") break providerLoop
+        continue providerLoop // agota este proveedor, pasa al siguiente (modo auto)
       }
-      if (cacheMode === "safe_non_personal") {
-        await saveCachedOutput(promptHash, purpose, promptText, text)
-      }
-      await logRequest(provider, model, promptHash, purpose, true)
-      return text
-    } catch (error) {
-      errors.push(error)
-      await logRequest(
-        provider,
-        model,
-        promptHash,
-        purpose,
-        false,
-        cacheMode === "none" ? "patient_context_request_failed" : (error instanceof Error ? error.message : String(error))
-      )
-      if (options.provider || getRequestedProvider() !== "auto") break
     }
   }
   // Propaga el error del ULTIMO proveedor intentado, no del primero (bug real 2026-08-01: con el
