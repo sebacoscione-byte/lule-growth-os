@@ -1,6 +1,34 @@
 # Lule Growth OS — Contexto para Claude
 
 ## Estado actual
+- 2026-08-01 (diagnóstico: "falla mucho la generación de contenido", PR #186): Seba reportó que tanto
+  "Generar propuesta" como "Generar imagen" venían fallando seguido. Investigado con datos reales de
+  producción (`ai_requests`, misma base que local — no hay staging) y reproducido en vivo contra las
+  APIs reales de Gemini/Anthropic (script temporal, descartado después). **Causa raíz encontrada**:
+  (1) Gemini trunca el JSON de `content_plan` de forma intermitente (~30% en la prueba en vivo de
+  hoy — bug ya conocido, `finishReason: STOP` con el texto cortado a mitad de un string, no depende
+  del prompt); (2) el fallback automático a Anthropic (agregado 2026-07-19) **sí se dispara** —
+  confirmado en los logs reales — pero **la cuenta de Anthropic no tiene saldo**:
+  `"Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to
+  upgrade or purchase credits."`; (3) **bug real de código encontrado en el camino**: `generateText()`
+  siempre propagaba el error del PRIMER proveedor intentado (Gemini, "JSON incompleta o inválida"),
+  nunca el del último (Anthropic) — así que `getPublicAiError()`, que ya tenía prevista una rama
+  específica para detectar "credit balance"/"billing" y mostrar un aviso claro, nunca llegaba a
+  activarse: el usuario veía "intentá de nuevo", que no soluciona nada mientras la cuenta siga sin
+  saldo. Mismo patrón corregido en `generateContentVisual()` (imágenes): si Gemini falla y el
+  respaldo de OpenAI también falla, ahora se propaga el error de OpenAI (el último intentado) en vez
+  del de Gemini — relevante porque el 2026-07-30 ya se había documentado que OpenAI tenía el mismo
+  problema de billing (`billing_hard_limit_reached`) al verificar ese fallback por primera vez, sin
+  confirmar después si se resolvió. **Fix de código ya mergeado** (`errors[errors.length - 1]` en vez
+  de `errors[0]`, mismo criterio en el catch final de `generateContentVisual`), con test nuevo que
+  fija el comportamiento (`ai.test.ts`). **Esto NO resuelve el problema de fondo** — es de billing, no
+  de código: **pendiente que Seba cargue saldo en Anthropic Console (Plans & Billing) y revise
+  OpenAI Platform → Billing** (probablemente en la misma situación desde el 2026-07-30, nunca
+  confirmado que se haya resuelto). Sin esas dos cuentas de respaldo con saldo, cuando Gemini falla
+  —algo que pasa con cierta frecuencia, ver punto 1— no hay red de seguridad real, por más que el
+  fallback esté bien implementado; el aviso en pantalla ahora al menos va a decir claramente "no tiene
+  saldo disponible" en vez del genérico de "intentá de nuevo". `npm test` (905/905), lint y build sin
+  errores. Archivos: `src/lib/ai.ts`, `src/lib/ai.test.ts`.
 - 2026-07-30 (mismo día, continuación — respaldo con OpenAI + corrección de costo real): Seba pidió
   sumar que ChatGPT (OpenAI) también pueda generar las fotos "si lo necesitara", después de preguntar
   la diferencia de costo entre el Gemini actual y OpenAI. **Corrección importante encontrada al
