@@ -613,7 +613,14 @@ async function generateText(options: GenerateOptions): Promise<string> {
       if (options.provider || getRequestedProvider() !== "auto") break
     }
   }
-  throw errors[0] || new Error("No hay un proveedor de IA disponible.")
+  // Propaga el error del ULTIMO proveedor intentado, no del primero (bug real 2026-08-01: con el
+  // fallback automatico Gemini->Anthropic activo, si Gemini trunca Y Anthropic tambien falla (ej. sin
+  // saldo -- "Your credit balance is too low"), el codigo SI intentaba el fallback pero el error que
+  // se propagaba siempre era el de Gemini ("JSON incompleta o invalida") -- getPublicAiError() ya
+  // tiene una rama especifica para detectar "credit balance"/"billing", pero nunca se activaba porque
+  // ese mensaje real (el de Anthropic) quedaba descartado. El ultimo error es el que refleja por que
+  // la cadena completa de fallback termino fallando.
+  throw errors[errors.length - 1] || new Error("No hay un proveedor de IA disponible.")
 }
 
 // ---------------------------------------------------------------------------
@@ -1179,10 +1186,13 @@ FINAL CHECK before rendering: the finished image must contain ZERO text characte
     if (!process.env.OPENAI_API_KEY) throw geminiError
     try {
       photoBuffer = await generatePhotoWithOpenAI(prompt, promptHash, input.format)
-    } catch {
-      // Los dos proveedores fallaron -- se propaga el error de Gemini (el route.ts ya sabe
-      // interpretar sus mensajes de cuota/rate limit para mostrar un aviso claro al usuario).
-      throw geminiError
+    } catch (openaiError) {
+      // Los dos proveedores fallaron -- se propaga el error de OpenAI (el ULTIMO intentado), no el de
+      // Gemini (bug real 2026-08-01, mismo patron que el fallback de texto en generateText: propagar
+      // siempre el error del primer proveedor esconde la razon real cuando el respaldo tambien falla
+      // -- ej. OpenAI sin saldo, "billing_hard_limit_reached" -- y getPublicAiError() nunca llega a
+      // mostrar el aviso claro de billing que ya tiene previsto para ese caso).
+      throw openaiError
     }
   }
 

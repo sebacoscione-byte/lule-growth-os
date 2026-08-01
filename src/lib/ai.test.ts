@@ -239,4 +239,32 @@ describe("generateText valida JSON antes de dar por exitosa la respuesta (bug re
       anthropicCreateMock.mockReset()
     }
   })
+
+  // Bug real 2026-08-01: en produccion, Gemini trunca el JSON (falla conocida, intermitente) Y el
+  // fallback a Anthropic TAMBIEN falla (cuenta sin saldo: "Your credit balance is too low..."). El
+  // fallback SI se disparaba, pero generateText siempre tiraba el error del PRIMER proveedor
+  // (Gemini, "JSON incompleta o invalida") -- el usuario nunca veia el aviso real de "sin saldo" que
+  // getPublicAiError ya sabe mostrar, y "intenta de nuevo" es enganioso cuando el bloqueo real es de
+  // billing, no un bache puntual.
+  it("si Gemini Y el fallback a Anthropic fallan, se propaga el error de Anthropic (el ultimo intentado), no el de Gemini", async () => {
+    process.env.AI_PROVIDER = ""
+    const previousAnthropicKey = process.env.ANTHROPIC_API_KEY
+    process.env.ANTHROPIC_API_KEY = "test-key"
+    anthropicCreateMock.mockRejectedValue(
+      new Error('400 {"type":"error","error":{"type":"invalid_request_error","message":"Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits."}}')
+    )
+    fetchSpy = jest.spyOn(global, "fetch").mockResolvedValue(geminiHttpResponse(truncatedJson))
+
+    expect.assertions(2)
+    try {
+      await generateContentPlan(planInput)
+    } catch (error) {
+      expect(error).toBeInstanceOf(Error)
+      expect(getPublicAiError(error)).toMatch(/no tiene saldo disponible/i)
+    } finally {
+      if (previousAnthropicKey === undefined) delete process.env.ANTHROPIC_API_KEY
+      else process.env.ANTHROPIC_API_KEY = previousAnthropicKey
+      anthropicCreateMock.mockReset()
+    }
+  })
 })
