@@ -1,6 +1,23 @@
 # Lule Growth OS — Contexto para Claude
 
 ## Estado actual
+- 2026-08-01 (mismo día, continuación — reintento automático antes del fallback, PR #188): Seba
+  preguntó por qué fallaba Gemini en primer lugar. Respuesta: es un glitch conocido de la API de
+  Gemini en modo JSON (`responseMimeType: "application/json"`) — a veces corta el texto a mitad de
+  un string con `finishReason: "STOP"` (no `"MAX_TOKENS"`, o sea que no es que se quede sin
+  presupuesto de tokens, decide parar antes de tiempo), de forma intermitente e independiente del
+  prompt (confirmado repitiendo el mismo pedido varias veces seguidas en la investigación de PR
+  #186: a veces sale bien, a veces no). Seba pidió agregar un reintento automático al mismo Gemini
+  antes de recurrir al fallback a Anthropic. Implementado: `generateText()` ahora reintenta una vez
+  más con el MISMO proveedor específicamente cuando el error es de truncamiento de JSON (no para
+  otros errores como API key inválida o cupo agotado, que fallarían igual en el reintento — esos
+  siguen saltando directo al siguiente proveedor sin gastar el reintento extra). Reduce la
+  frecuencia real de fallos de forma independiente de si Anthropic/OpenAI tienen saldo cargado (ver
+  punto de arriba) — no reemplaza esa necesidad, la complementa. Solo aplica a `generateText`
+  (texto/JSON); la generación de imágenes no usa modo JSON, no le aplica este bug. 3 tests nuevos en
+  `ai.test.ts` (se recupera solo en el reintento; agota el reintento y recién ahí falla; un error no
+  relacionado con truncamiento no gasta el reintento). `npm test` (906/906), lint y build sin
+  errores. Archivos: `src/lib/ai.ts`, `src/lib/ai.test.ts`.
 - 2026-08-01 (diagnóstico: "falla mucho la generación de contenido", PR #186): Seba reportó que tanto
   "Generar propuesta" como "Generar imagen" venían fallando seguido. Investigado con datos reales de
   producción (`ai_requests`, misma base que local — no hay staging) y reproducido en vivo contra las
