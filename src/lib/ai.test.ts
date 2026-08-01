@@ -217,6 +217,37 @@ describe("generateText valida JSON antes de dar por exitosa la respuesta (bug re
     expect(result.image_alt_text).toBe("alt")
   })
 
+  // 2026-08-01: el truncamiento de JSON de Gemini es intermitente (confirmado en vivo -- el mismo
+  // pedido repetido a veces sale bien y a veces no), asi que antes de saltar a otro proveedor vale la
+  // pena reintentar una vez mas con el mismo. AI_PROVIDER="gemini" aisla el escenario a un unico
+  // proveedor para poder medir la cantidad exacta de intentos.
+  it("si el primer intento trunca, reintenta el mismo proveedor antes de rendirse", async () => {
+    let callCount = 0
+    fetchSpy = jest.spyOn(global, "fetch").mockImplementation(async () => {
+      callCount += 1
+      return callCount === 1 ? geminiHttpResponse(truncatedJson) : geminiHttpResponse(JSON.stringify(validPlan))
+    })
+    const result = await generateContentPlan(planInput)
+    expect(result.hook).toBe("hook")
+    expect(callCount).toBe(2)
+  })
+
+  it("agota el reintento (2 intentos) y recien ahi tira el error de JSON truncado", async () => {
+    fetchSpy = jest.spyOn(global, "fetch").mockResolvedValue(geminiHttpResponse(truncatedJson))
+    await expect(generateContentPlan(planInput)).rejects.toThrow(/JSON incompleta o invalida/i)
+    expect(fetchSpy).toHaveBeenCalledTimes(2)
+  })
+
+  it("un error que no es de truncamiento (ej. API key invalida) NO se reintenta -- salta directo al siguiente paso", async () => {
+    fetchSpy = jest.spyOn(global, "fetch").mockResolvedValue({
+      ok: false,
+      status: 401,
+      json: async () => ({ error: { message: "API key not valid" } }),
+    } as unknown as Response)
+    await expect(generateContentPlan(planInput)).rejects.toThrow(/API key not valid/i)
+    expect(fetchSpy).toHaveBeenCalledTimes(1)
+  })
+
   // Caso cerrado 2026-07-20 (ver docs/BACKLOG.md): se habia reportado que el fallback a Anthropic no
   // se disparaba en un caso real -- confirmado que la causa era un AI_PROVIDER viejo en memoria de un
   // npm run dev ya corriendo (no recarga .env.local en caliente), no un bug de logica. Este test fija
