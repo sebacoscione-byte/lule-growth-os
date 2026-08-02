@@ -1068,37 +1068,54 @@ async function generatePhotoWithGemini(prompt: string, promptHash: string): Prom
   }
 
   const model = process.env.GEMINI_IMAGE_MODEL || "gemini-3.1-flash-image"
-  try {
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1/models/${encodeURIComponent(model)}:generateContent`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
-        body: JSON.stringify({
-          contents: [{ role: "user", parts: [{ text: prompt }] }],
-        }),
+  // La llamada a la API de imagenes de Gemini a veces falla de forma puntual/transitoria (network
+  // blip, 5xx momentaneo, o un 200 OK sin datos de imagen en la respuesta) -- mismo patron que el
+  // truncamiento de JSON del texto (ver generateText, corregido 2026-08-01), pero hasta ahora la
+  // generacion de imagen NUNCA tenia ningun reintento propio (confirmado 2026-08-02: "Generar placa
+  // final" seguia fallando pese a tener credito disponible en la cuenta de Gemini -- reproducido en
+  // vivo que un segundo intento manual identico sale bien). Antes de rendirse (o de recurrir al
+  // respaldo de OpenAI en generateContentVisual), reintenta una vez mas -- salvo que el error sea de
+  // cuota/rate-limit, que no se soluciona reintentando de inmediato (ver el 429 dedicado que arma
+  // route.ts para ese caso).
+  const MAX_RETRIES = 1
+  let lastError: unknown
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1/models/${encodeURIComponent(model)}:generateContent`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
+          body: JSON.stringify({
+            contents: [{ role: "user", parts: [{ text: prompt }] }],
+          }),
+        }
+      )
+      const data = await response.json() as {
+        candidates?: Array<{ content?: { parts?: Array<{
+          inlineData?: { mimeType?: string; data?: string }
+          inline_data?: { mime_type?: string; data?: string }
+        }> } }>
+        error?: { message?: string }
       }
-    )
-    const data = await response.json() as {
-      candidates?: Array<{ content?: { parts?: Array<{
-        inlineData?: { mimeType?: string; data?: string }
-        inline_data?: { mime_type?: string; data?: string }
-      }> } }>
-      error?: { message?: string }
+      if (!response.ok) throw new Error(data.error?.message || `Gemini respondio con estado ${response.status}.`)
+
+      const part = data.candidates?.[0]?.content?.parts?.find(candidate => candidate.inlineData?.data || candidate.inline_data?.data)
+      const photoData = part?.inlineData?.data || part?.inline_data?.data
+      if (!photoData) throw new Error("Gemini no devolvio una imagen.")
+
+      await logRequest("gemini", model, promptHash, "content_visual", true)
+      return Buffer.from(photoData, "base64")
+    } catch (error) {
+      lastError = error
+      await logRequest("gemini", model, promptHash, "content_visual", false,
+        error instanceof Error ? error.message : String(error))
+      const message = error instanceof Error ? error.message : String(error)
+      const isQuotaError = /quota|resource_exhausted|rate limit/i.test(message)
+      if (isQuotaError || attempt >= MAX_RETRIES) break
     }
-    if (!response.ok) throw new Error(data.error?.message || `Gemini respondio con estado ${response.status}.`)
-
-    const part = data.candidates?.[0]?.content?.parts?.find(candidate => candidate.inlineData?.data || candidate.inline_data?.data)
-    const photoData = part?.inlineData?.data || part?.inline_data?.data
-    if (!photoData) throw new Error("Gemini no devolvio una imagen.")
-
-    await logRequest("gemini", model, promptHash, "content_visual", true)
-    return Buffer.from(photoData, "base64")
-  } catch (error) {
-    await logRequest("gemini", model, promptHash, "content_visual", false,
-      error instanceof Error ? error.message : String(error))
-    throw error
   }
+  throw lastError
 }
 
 /**
