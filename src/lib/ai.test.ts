@@ -2,6 +2,7 @@ import {
   buildContentPlanPrompt,
   classifyMessage,
   generateContentPlan,
+  generateContentVisual,
   generateFollowupSuggestion,
   generateReply,
   getPublicAiError,
@@ -297,5 +298,77 @@ describe("generateText valida JSON antes de dar por exitosa la respuesta (bug re
       else process.env.ANTHROPIC_API_KEY = previousAnthropicKey
       anthropicCreateMock.mockReset()
     }
+  })
+})
+
+// 2026-08-02: Seba reporto que "Generar placa final" seguia fallando con "No se pudo generar la
+// respuesta con IA" pese a tener credito disponible en Gemini -- reproducido en vivo que un segundo
+// intento identico sale bien, o sea la llamada a la API de imagenes de Gemini falla de forma puntual/
+// transitoria (network blip, 5xx momentaneo, o un 200 OK sin datos de imagen), y a diferencia del
+// texto (que ya reintenta desde el 2026-08-01), la generacion de imagen nunca tenia ningun reintento.
+describe("generatePhotoWithGemini reintenta ante una falla transitoria (bug real 2026-08-02)", () => {
+  // PNG real minimo (1x1) para que composeContentPlate (ffmpeg real, no mockeado) pueda decodificarlo.
+  const MINIMAL_PNG_BASE64 =
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII="
+
+  const visualInput = {
+    category: "Chequeo cardiovascular",
+    topic: "Diagnostico",
+    format: "post" as const,
+    visual_headline: "Titulo",
+    visual_subtitle: "Subtitulo",
+    image_prompt: "A calm cardiology scene, no text.",
+  }
+
+  function geminiImageResponse(hasPhoto: boolean) {
+    return {
+      ok: true,
+      json: async () => ({
+        candidates: hasPhoto
+          ? [{ content: { parts: [{ inlineData: { mimeType: "image/png", data: MINIMAL_PNG_BASE64 } }] } }]
+          : [{ content: { parts: [{}] } }], // 200 OK pero sin datos de imagen -- el caso real reportado
+      }),
+    } as unknown as Response
+  }
+
+  let fetchSpy: jest.SpiedFunction<typeof fetch>
+  let previousGeminiKey: string | undefined
+
+  beforeEach(() => {
+    previousGeminiKey = process.env.GEMINI_API_KEY
+    process.env.GEMINI_API_KEY = "test-key" // el fetch va mockeado, el valor real no importa
+  })
+
+  afterEach(() => {
+    fetchSpy.mockRestore()
+    if (previousGeminiKey === undefined) delete process.env.GEMINI_API_KEY
+    else process.env.GEMINI_API_KEY = previousGeminiKey
+  })
+
+  it("si el primer intento no trae imagen, reintenta y arma la placa igual", async () => {
+    let callCount = 0
+    fetchSpy = jest.spyOn(global, "fetch").mockImplementation(async () => {
+      callCount += 1
+      return geminiImageResponse(callCount > 1)
+    })
+    const result = await generateContentVisual(visualInput)
+    expect(result.mime_type).toBe("image/png")
+    expect(callCount).toBe(2)
+  })
+
+  it("agota el reintento (2 intentos) y recien ahi tira el error", async () => {
+    fetchSpy = jest.spyOn(global, "fetch").mockResolvedValue(geminiImageResponse(false))
+    await expect(generateContentVisual(visualInput)).rejects.toThrow(/Gemini no devolvio una imagen/i)
+    expect(fetchSpy).toHaveBeenCalledTimes(2)
+  })
+
+  it("un error de cuota/rate-limit NO se reintenta (no se soluciona reintentando de inmediato)", async () => {
+    fetchSpy = jest.spyOn(global, "fetch").mockResolvedValue({
+      ok: false,
+      status: 429,
+      json: async () => ({ error: { message: "Resource has been exhausted (e.g. check quota)." } }),
+    } as unknown as Response)
+    await expect(generateContentVisual(visualInput)).rejects.toThrow(/resource has been exhausted/i)
+    expect(fetchSpy).toHaveBeenCalledTimes(1)
   })
 })
