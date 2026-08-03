@@ -371,4 +371,36 @@ describe("generatePhotoWithGemini reintenta ante una falla transitoria (bug real
     await expect(generateContentVisual(visualInput)).rejects.toThrow(/resource has been exhausted/i)
     expect(fetchSpy).toHaveBeenCalledTimes(1)
   })
+
+  // 2026-08-03: Seba pidio poder elegir entre el motor actual (V2, foto sola + texto compuesto aparte)
+  // y el original (V1, Gemini dibuja la placa entera de una sola pasada) por pieza, para comparar.
+  it("sin version (o 'v2'): el prompt NUNCA menciona el titular/subtitulo real -- los compone composeContentPlate aparte", async () => {
+    let callCount = 0
+    fetchSpy = jest.spyOn(global, "fetch").mockImplementation(async (_url, init) => {
+      callCount += 1
+      const body = JSON.parse((init as RequestInit).body as string)
+      const sentPrompt = body.contents[0].parts[0].text as string
+      expect(sentPrompt).not.toContain(visualInput.visual_headline)
+      expect(sentPrompt).not.toContain(visualInput.visual_subtitle)
+      return geminiImageResponse(true)
+    })
+    const result = await generateContentVisual(visualInput)
+    expect(result.mime_type).toBe("image/png")
+    expect(callCount).toBe(1)
+  })
+
+  it("version 'v1': el prompt SI incluye el titular/subtitulo exactos -- Gemini dibuja la placa entera, sin composeContentPlate", async () => {
+    let sentPrompt = ""
+    fetchSpy = jest.spyOn(global, "fetch").mockImplementation(async (_url, init) => {
+      const body = JSON.parse((init as RequestInit).body as string)
+      sentPrompt = body.contents[0].parts[0].text as string
+      return geminiImageResponse(true)
+    })
+    const result = await generateContentVisual({ ...visualInput, version: "v1" })
+    expect(sentPrompt).toContain(visualInput.visual_headline)
+    expect(sentPrompt).toContain(visualInput.visual_subtitle)
+    // V1 no pasa por composeContentPlate (ffmpeg) -- el mime_type es el que devolvio Gemini tal cual.
+    expect(result.mime_type).toBe("image/png")
+    expect(result.image_data).toBe(MINIMAL_PNG_BASE64)
+  })
 })

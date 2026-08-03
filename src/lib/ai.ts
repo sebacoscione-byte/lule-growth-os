@@ -1058,7 +1058,7 @@ const OPENAI_IMAGE_SIZE: Record<ContentVisualFormat, string> = {
   reel: "1008x1792",
 }
 
-async function generatePhotoWithGemini(prompt: string, promptHash: string): Promise<Buffer> {
+async function generatePhotoWithGemini(prompt: string, promptHash: string): Promise<{ buffer: Buffer; mimeType: string }> {
   const apiKey = process.env.GEMINI_API_KEY
   if (!apiKey) throw new Error("GEMINI_API_KEY no esta configurada.")
 
@@ -1102,10 +1102,11 @@ async function generatePhotoWithGemini(prompt: string, promptHash: string): Prom
 
       const part = data.candidates?.[0]?.content?.parts?.find(candidate => candidate.inlineData?.data || candidate.inline_data?.data)
       const photoData = part?.inlineData?.data || part?.inline_data?.data
+      const mimeType = part?.inlineData?.mimeType || part?.inline_data?.mime_type || "image/png"
       if (!photoData) throw new Error("Gemini no devolvio una imagen.")
 
       await logRequest("gemini", model, promptHash, "content_visual", true)
-      return Buffer.from(photoData, "base64")
+      return { buffer: Buffer.from(photoData, "base64"), mimeType }
     } catch (error) {
       lastError = error
       await logRequest("gemini", model, promptHash, "content_visual", false,
@@ -1131,7 +1132,7 @@ async function generatePhotoWithGemini(prompt: string, promptHash: string): Prom
  * real, error real de "billing_hard_limit_reached" -- falta credito cargado en la cuenta de OpenAI
  * para confirmar la respuesta exitosa de punta a punta).
  */
-async function generatePhotoWithOpenAI(prompt: string, promptHash: string, format: ContentVisualFormat): Promise<Buffer> {
+async function generatePhotoWithOpenAI(prompt: string, promptHash: string, format: ContentVisualFormat): Promise<{ buffer: Buffer; mimeType: string }> {
   const apiKey = process.env.OPENAI_API_KEY
   if (!apiKey) throw new Error("OPENAI_API_KEY no esta configurada.")
 
@@ -1160,7 +1161,8 @@ async function generatePhotoWithOpenAI(prompt: string, promptHash: string, forma
     if (!photoData) throw new Error("OpenAI no devolvio una imagen.")
 
     await logRequest("openai", model, promptHash, "content_visual", true)
-    return Buffer.from(photoData, "base64")
+    // gpt-image-2 siempre devuelve PNG (no hay parametro para elegir otro formato, ver nota arriba).
+    return { buffer: Buffer.from(photoData, "base64"), mimeType: "image/png" }
   } catch (error) {
     await logRequest("openai", model, promptHash, "content_visual", false,
       error instanceof Error ? error.message : String(error))
@@ -1168,28 +1170,61 @@ async function generatePhotoWithOpenAI(prompt: string, promptHash: string, forma
   }
 }
 
-export async function generateContentVisual(input: {
+/**
+ * Prompt V1 (version original, vigente hasta el 2026-07-30): le pide a Gemini que dibuje la placa
+ * ENTERA de una sola pasada -- foto + titular + subtitulo quemados por el propio modelo de imagen.
+ * Reconstruido tal cual del commit 4f67944 (el que introdujo V2/Opcion A), para que "V1" en el
+ * selector sea exactamente el comportamiento historico, no una aproximacion nueva. Mas "editorial"/
+ * fotografico que V2, pero con riesgo real de texto mal escrito o inventado (ver docs/BACKLOG.md,
+ * 2026-07-30) -- por eso V2 es el default y este queda como opcion explicita para comparar.
+ */
+function buildVisualPromptV1(input: {
   category: string
   topic: string
   format: ContentVisualFormat
   visual_headline: string
   visual_subtitle: string
   image_prompt: string
-}): Promise<{ mime_type: string; image_data: string }> {
-  // Un reel es vertical (9:16) igual que una historia -- esta placa nunca es el contenido del reel
-  // en si (eso lo publica publishReelToInstagram con video_url), es la portada/miniatura que Meta
-  // muestra en la pestaña Reels via cover_url (ver createVideoContainer en instagram-business.ts),
-  // que Meta recomienda especificamente en 9:16 para que no quede recortada.
-  const aspectRatio = input.format === "historia" || input.format === "reel" ? "9:16" : "4:5"
-  // 2026-07-30: Gemini generaba la placa ENTERA de una sola pasada (foto + titular + subtitulo
-  // quemados por el propio modelo) -- eso es lo que hacia el texto poco confiable (llego a inventar
-  // una tercera linea deforme, o a comerse letras de "ALARMA"; ver docs/BACKLOG.md). Ahora el modelo
-  // SOLO genera la foto/escena, sin texto de ningun tipo; composeContentPlate() (content-plate.ts)
-  // arma el titular/subtitulo/marca por edicion real (ffmpeg drawtext), igual que burnVideoBrief
-  // hace con los videos -- garantiza ortografia perfecta siempre, no depende de que el modelo de
-  // imagen "acierte" el texto. El mismo prompt (agnostico de proveedor) se usa para Gemini y para el
-  // respaldo de OpenAI (ver generatePhotoWithOpenAI) -- ninguno de los dos dibuja texto.
-  const prompt = `Create ONLY a high-quality photographic or illustrative scene for a cardiology practice's Instagram ${input.format}. This image will be combined with a separate branded text panel afterward -- it must contain ABSOLUTELY NO text, letters, numbers, words, logos, watermarks, UI elements or lettering of any kind, in any language.
+}, aspectRatio: string): string {
+  return `Create the final publish-ready Instagram ${input.format} visual for a cardiology practice.
+
+CONTENT:
+- Category: ${input.category}
+- Topic: ${input.topic}
+- Exact Spanish headline: "${input.visual_headline}"
+- Exact Spanish subtitle: "${input.visual_subtitle}"
+
+CREATIVE DIRECTION:
+${input.image_prompt}
+
+FINAL ART DIRECTION:
+- Produce one polished ${aspectRatio} composition, not a mockup or template preview.
+- The visual must stop the scroll, communicate one idea in under three seconds and feel trustworthy to an adult patient in Argentina.
+- Use a clear focal point, strong visual hierarchy, high text/background contrast and generous breathing room.
+- TEXT — READ CAREFULLY. The ONLY text allowed anywhere in the entire image is exactly these two Spanish strings, and nothing else:
+    HEADLINE: "${input.visual_headline}"
+    SUBTITLE: "${input.visual_subtitle}"
+  Render each string exactly ONCE, character for character and letter for letter, keeping every accent (á é í ó ú) and the letter ñ, and keeping every word in the exact same order. Do NOT translate, rephrase, abbreviate, shorten, split, reorder or drop any word (for example, never drop an article such as "LA"). Spell every single word correctly and proof-read the spelling before finalizing (for example it must read "ALARMA", never "ALAMA").
+- Do NOT render ANY other text: no third line, no byline, no credential or title, no doctor name, no caption, no label, no watermark, no logo, no English words, no descriptive words, and no invented, decorative or garbled lettering. The CREATIVE DIRECTION above is written in English and only describes the SCENE to paint — none of its words may EVER appear as visible text inside the image.
+- Headline must dominate; subtitle must remain readable on a small phone screen.
+- ${input.format === "historia" || input.format === "reel"
+      ? "Keep all text and essential elements inside the central safe zone of the vertical 9:16 frame, away from the top and bottom edges."
+      : "Use a 4:5 feed composition. For a carousel, make this an irresistible but medically responsible cover."}
+- No diagnosis, treatment claim, urgency marketing, fear, logos, watermark or extra text.
+- Do not depict the real doctor or invent her likeness.
+
+FINAL CHECK before rendering: the finished image must contain ONLY the two Spanish strings above (HEADLINE and SUBTITLE), each spelled perfectly with correct accents and ñ, every word present and in order, and ZERO other text characters of any kind.`
+}
+
+/** Prompt V2 (default desde el 2026-07-30, "Opcion A"): SOLO la foto/escena, sin texto de ningun
+ * tipo -- composeContentPlate() arma el titular/subtitulo/marca aparte, por edicion real. */
+function buildVisualPromptV2(input: {
+  category: string
+  topic: string
+  format: ContentVisualFormat
+  image_prompt: string
+}, aspectRatio: string): string {
+  return `Create ONLY a high-quality photographic or illustrative scene for a cardiology practice's Instagram ${input.format}. This image will be combined with a separate branded text panel afterward -- it must contain ABSOLUTELY NO text, letters, numbers, words, logos, watermarks, UI elements or lettering of any kind, in any language.
 
 CONTENT CONTEXT (for scene direction only -- never render any of this as visible text):
 - Category: ${input.category}
@@ -1207,15 +1242,36 @@ FINAL ART DIRECTION:
 - Do not depict the real doctor or invent her likeness.
 
 FINAL CHECK before rendering: the finished image must contain ZERO text characters, letters, numbers, logos or lettering of any kind anywhere in the frame -- verify this before finalizing.`
+}
+
+export async function generateContentVisual(input: {
+  category: string
+  topic: string
+  format: ContentVisualFormat
+  visual_headline: string
+  visual_subtitle: string
+  image_prompt: string
+  /** "v2" (default, tambien si se omite): motor actual, foto sola + texto compuesto aparte. "v1":
+   * motor original, Gemini dibuja la placa entera (foto + texto) en una sola pasada -- ver
+   * buildVisualPromptV1/buildVisualPromptV2 y el selector "Motor de generacion" del editor. */
+  version?: "v1" | "v2"
+}): Promise<{ mime_type: string; image_data: string }> {
+  const version = input.version === "v1" ? "v1" : "v2"
+  // Un reel es vertical (9:16) igual que una historia -- esta placa nunca es el contenido del reel
+  // en si (eso lo publica publishReelToInstagram con video_url), es la portada/miniatura que Meta
+  // muestra en la pestaña Reels via cover_url (ver createVideoContainer en instagram-business.ts),
+  // que Meta recomienda especificamente en 9:16 para que no quede recortada.
+  const aspectRatio = input.format === "historia" || input.format === "reel" ? "9:16" : "4:5"
+  const prompt = version === "v1" ? buildVisualPromptV1(input, aspectRatio) : buildVisualPromptV2(input, aspectRatio)
   const promptHash = hashPrompt(prompt)
 
-  let photoBuffer: Buffer
+  let photo: { buffer: Buffer; mimeType: string }
   try {
-    photoBuffer = await generatePhotoWithGemini(prompt, promptHash)
+    photo = await generatePhotoWithGemini(prompt, promptHash)
   } catch (geminiError) {
     if (!process.env.OPENAI_API_KEY) throw geminiError
     try {
-      photoBuffer = await generatePhotoWithOpenAI(prompt, promptHash, input.format)
+      photo = await generatePhotoWithOpenAI(prompt, promptHash, input.format)
     } catch (openaiError) {
       // Los dos proveedores fallaron -- se propaga el error de OpenAI (el ULTIMO intentado), no el de
       // Gemini (bug real 2026-08-01, mismo patron que el fallback de texto en generateText: propagar
@@ -1226,8 +1282,15 @@ FINAL CHECK before rendering: the finished image must contain ZERO text characte
     }
   }
 
+  // V1: Gemini/OpenAI ya devolvieron la placa entera (foto + texto) -- no hay nada que componer.
+  if (version === "v1") {
+    return { mime_type: photo.mimeType, image_data: photo.buffer.toString("base64") }
+  }
+
+  // V2 (default): la foto todavia no tiene titular/subtitulo/marca -- se componen aparte por edicion
+  // real, garantizando ortografia perfecta siempre (no depende de que el modelo de imagen "acierte").
   const plateBuffer = await composeContentPlate({
-    photoBuffer,
+    photoBuffer: photo.buffer,
     headline: input.visual_headline,
     subtitle: input.visual_subtitle,
     format: input.format,

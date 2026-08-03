@@ -111,6 +111,9 @@ export async function PATCH(request: NextRequest) {
     if (body.visual_style && !["rose", "blue", "teal"].includes(body.visual_style)) {
       return NextResponse.json({ error: "Estilo visual invalido" }, { status: 400 })
     }
+    if (body.visual_generation_version && !["v1", "v2"].includes(body.visual_generation_version)) {
+      return NextResponse.json({ error: "Motor de generacion invalido" }, { status: 400 })
+    }
     if (body.format && !["reel", "historia", "carrusel", "post"].includes(body.format)) {
       return NextResponse.json({ error: "Formato invalido" }, { status: 400 })
     }
@@ -178,6 +181,7 @@ export async function PATCH(request: NextRequest) {
       "visual_headline",
       "visual_subtitle",
       "visual_style",
+      "visual_generation_version",
       "image_prompt",
       "image_alt_text",
       "slides",

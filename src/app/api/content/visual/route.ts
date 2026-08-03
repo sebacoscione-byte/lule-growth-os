@@ -23,6 +23,9 @@ export async function POST(request: Request) {
     if (!FORMATS.includes(body.format as typeof FORMATS[number])) {
       return NextResponse.json({ error: "Formato visual invalido." }, { status: 400 })
     }
+    if (body.version !== undefined && body.version !== "v1" && body.version !== "v2") {
+      return NextResponse.json({ error: "Motor de generacion invalido." }, { status: 400 })
+    }
 
     const visual = await generateContentVisual({
       category: (body.category as string).slice(0, 160),
@@ -31,6 +34,7 @@ export async function POST(request: Request) {
       visual_headline: (body.visual_headline as string).slice(0, 90),
       visual_subtitle: truncateForImagePlate(body.visual_subtitle as string, 120),
       image_prompt: (body.image_prompt as string).slice(0, 2400),
+      version: body.version as "v1" | "v2" | undefined,
     })
 
     // Persistimos la placa en Storage de una: si no se guarda ahora, se pierde al navegar
