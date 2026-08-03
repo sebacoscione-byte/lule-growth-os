@@ -4,7 +4,7 @@
 - [x] Resolver fuentes desde el root real de ejecución, sin depender de `__dirname` bundleado.
 - [x] Aplicar el mismo hardening al compositor de video y agregar una regresión.
 - [x] Ejecutar lint, 95 suites/916 tests y build de producción sin warnings.
-- [ ] Publicar por rama + PR, verificar CI/preview y mergear.
+- [x] Publicar por rama + PR, verificar CI/preview y mergear.
 
 ---
 
