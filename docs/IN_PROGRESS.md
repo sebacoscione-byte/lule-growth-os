@@ -1,3 +1,13 @@
+# EN CURSO (2026-08-03) — corregir generación visual V2 en Vercel
+
+- [x] Confirmar que Gemini responde y que la falla ocurre en la composición FFmpeg de V2.
+- [x] Resolver fuentes desde el root real de ejecución, sin depender de `__dirname` bundleado.
+- [x] Aplicar el mismo hardening al compositor de video y agregar una regresión.
+- [x] Ejecutar lint, 95 suites/916 tests y build de producción sin warnings.
+- [x] Publicar por rama + PR, verificar CI/preview y mergear.
+
+---
+
 # CERRADO (2026-07-18) — atención particular como capacidad de sede
 
 - [x] Reconstruir el último intercambio de Sebastián Coscione con consentimiento vigente.

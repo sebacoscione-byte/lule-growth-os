@@ -4,6 +4,11 @@ import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import ffmpegInstaller from "@ffmpeg-installer/ffmpeg"
+import {
+  CONTENT_PLATE_FONT_DISPLAY,
+  CONTENT_PLATE_FONT_SANS,
+  CONTENT_PLATE_FONT_SANS_BOLD,
+} from "@/lib/runtime-assets"
 
 const execFileAsync = promisify(execFile)
 
@@ -17,11 +22,12 @@ const COLOR_CARDIAC = "0xB23B34"
 // Fraunces (display serif) + Inter (sans) son las mismas familias que usa la landing publica
 // (next/font/google alla, TTF real bundleado aca -- drawtext de ffmpeg no puede usar next/font).
 // Bajadas desde Google Fonts (SIL Open Font License, libre y redistribuible) -- ver LICENSES.md en
-// este mismo directorio. Co-ubicadas junto a DejaVuSans-Bold.ttf para que el file tracing de
-// Next.js las incluya en el bundle de la funcion (ver next.config.mjs).
-const FONT_DISPLAY = join(__dirname, "fonts", "Fraunces-Bold.ttf")
-const FONT_SANS = join(__dirname, "fonts", "Inter-Regular.ttf")
-const FONT_SANS_BOLD = join(__dirname, "fonts", "Inter-Bold.ttf")
+// src/lib/fonts. Se resuelven desde process.cwd() (ver runtime-assets.ts), no desde __dirname:
+// Turbopack puede convertir __dirname en una ruta virtual /ROOT que no existe en Vercel, aunque el
+// file tracing haya incluido correctamente las fuentes (ver next.config.mjs).
+const FONT_DISPLAY = CONTENT_PLATE_FONT_DISPLAY
+const FONT_SANS = CONTENT_PLATE_FONT_SANS
+const FONT_SANS_BOLD = CONTENT_PLATE_FONT_SANS_BOLD
 
 const BRAND_NAME = "DRA. LUCÍA CHAHÍN"
 const BRAND_SPECIALTY = "C A R D I O L O G Í A"

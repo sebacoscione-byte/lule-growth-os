@@ -6,6 +6,7 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import ffmpegInstaller from "@ffmpeg-installer/ffmpeg"
 import ffprobeInstaller from "@ffprobe-installer/ffprobe"
+import { REEL_MUSIC_DIR, VIDEO_CAPTION_FONT } from "@/lib/runtime-assets"
 
 // Paleta de las tarjetas de texto de la microinfografia (2026-07-23) -- mismo azul profundo que
 // VIDEO_PROMPT_RULES pide para el fondo animado, nunca rosa como color dominante (pedido explicito).
@@ -35,7 +36,7 @@ const execFileAsync = promisify(execFile)
 // despues de publicado, aunque la licencia este en regla). Detalle de cada pista, fecha de
 // verificacion y el link a la pagina real de Pixabay en audio/reel-music/LICENSES.md -- si se suma
 // una pista nueva algun dia, repetir esa verificacion antes de agregarla acá.
-const MUSIC_DIR = join(__dirname, "audio", "reel-music")
+const MUSIC_DIR = REEL_MUSIC_DIR
 const MUSIC_TRACKS = [
   "peaceful-morning-378816.mp3",
   "warm-acoustic-guitar-232912.mp3",
@@ -53,7 +54,11 @@ const MUSIC_VOLUME = 0.45
  * el paso de musica en silencio, mismo criterio "fail-open" que GA/Places API en este proyecto: no
  * bloquea la generacion del video por un asset opcional faltante. */
 function pickAvailableMusicTrack(): string | null {
-  const available = MUSIC_TRACKS.map(name => join(MUSIC_DIR, name)).filter(existsSync)
+  // /api/content/video ya incluye audio/reel-music/** explícitamente en next.config.mjs. Evita que
+  // Turbopack intente expandir este nombre dinámico desde process.cwd() y tracee el proyecto entero.
+  const available = MUSIC_TRACKS
+    .map(name => join(/* turbopackIgnore: true */ MUSIC_DIR, name))
+    .filter(existsSync)
   if (available.length === 0) return null
   return available[Math.floor(Math.random() * available.length)]
 }
@@ -62,8 +67,9 @@ function pickAvailableMusicTrack(): string | null {
 // eleccion estandar para drawtext de ffmpeg en entornos headless (sin fontconfig del sistema).
 // Licencia Bitstream Vera / DejaVu (libre, redistribuible), ver
 // https://dejavu-fonts.github.io/License.html. Co-ubicada en este mismo directorio para que el
-// file tracing de Next.js la incluya en el bundle de la funcion (ver next.config.mjs).
-const FONT_PATH = join(__dirname, "fonts", "DejaVuSans-Bold.ttf")
+// file tracing de Next.js la incluya en el bundle de la funcion (ver next.config.mjs). La ruta se
+// ancla al root real de ejecución porque __dirname puede quedar bundleado como /ROOT en Vercel.
+const FONT_PATH = VIDEO_CAPTION_FONT
 
 /** ffmpeg trata ":" como separador de opciones y "\" como caracter de escape dentro del filtergraph
  * -- las rutas de Windows (unidad + backslashes) rompen el parser si no se normalizan. En Linux
