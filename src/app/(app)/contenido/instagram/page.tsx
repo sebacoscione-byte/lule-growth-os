@@ -22,7 +22,7 @@ import { parseAiJson } from "@/lib/parse-ai-json"
 import { truncateForImagePlate } from "@/lib/content-text"
 import { DEFAULT_AUTO_PUBLISH_SETTINGS, alreadyPublishedToday, estimateAutoPublishDrainDays, estimateAutoPublishDateForPosition, estimateRepeatEndDate, findRecentDuplicateTopic, pickNextPublishableItems, isReorderableInQueue, reorderableQueuePositions } from "@/lib/content-pipeline"
 import { buildFallbackVideoPrompt, getVeoPromptQualityIssues } from "@/lib/video-prompt"
-import type { AutoPublishSettings, AutoPublishTrackSettings, ContentItem, ContentObjective, ContentSlide, ContentSource, ContentStatus, ContentVideoScores } from "@/types"
+import type { AutoPublishSettings, AutoPublishTrackSettings, ContentItem, ContentObjective, ContentSlide, ContentSource, ContentStatus, ContentVideoScores, VideoGenerationVersion } from "@/types"
 import type { InstagramMediaInsights } from "@/lib/instagram-business"
 import { CONTENT_OBJECTIVE_GOALS, CONTENT_OBJECTIVE_LABELS, WEEKDAY_OPTIONS } from "@/types"
 
@@ -84,7 +84,7 @@ const STYLE_CLASSES = {
 const EDITABLE_FIELDS: Array<keyof ContentItem> = [
   "format", "hook", "caption", "google_text", "hashtags", "visual_headline",
   "visual_subtitle", "visual_style", "image_prompt", "image_alt_text", "slides",
-  "video_prompt",
+  "video_prompt", "video_generation_version",
 ]
 
 // video_url no entra en EDITABLE_FIELDS (igual que visual_url) a proposito: subir el video no cuenta
@@ -122,8 +122,8 @@ function fallbackImagePrompt(item: ContentItem) {
   return `Create a scroll-stopping premium editorial plate for a cardiology social media post about "${item.topic}". ${ratio}. Use one instantly understandable focal point and a relatable everyday moment that makes a potential patient feel recognized or motivated to take a preventive step. Create gentle visual tension between postponing care and choosing to take care of oneself, without fear, pain or urgency. Sophisticated deep blue, burgundy and warm neutral palette, natural cinematic lighting, realistic texture and depth. Reserve a clean, high-contrast area for the exact requested Spanish headline and subtitle. Avoid cold hospital imagery, generic medical stock photography, recognizable real physicians and advertising clichés. No extra text, no logos, no watermark.`
 }
 
-function fallbackVideoPrompt(item: ContentItem) {
-  return buildFallbackVideoPrompt(item.topic)
+function fallbackVideoPrompt(item: ContentItem, version: VideoGenerationVersion) {
+  return buildFallbackVideoPrompt(item.topic, version)
 }
 
 function VisualCard({ item, compact = false, trueAspect = false }: { item: ContentItem; compact?: boolean; trueAspect?: boolean }) {
@@ -2301,9 +2301,11 @@ function Editor({
   const fileInputRef = useRef<HTMLInputElement>(null)
   const videoInputRef = useRef<HTMLInputElement>(null)
   const imagePrompt = item.image_prompt?.trim() || fallbackImagePrompt(item)
-  const videoPrompt = item.video_prompt?.trim() || fallbackVideoPrompt(item)
-  const videoPromptIssues = getVeoPromptQualityIssues(videoPrompt)
-  const videoNeedsProposal = !item.video_brief || videoPromptIssues.length > 0
+  const videoGenerationVersion: VideoGenerationVersion = item.video_generation_version ?? "v2"
+  const videoPrompt = item.video_prompt?.trim() || fallbackVideoPrompt(item, videoGenerationVersion)
+  const videoPromptIssues = getVeoPromptQualityIssues(videoPrompt, videoGenerationVersion)
+  const videoNeedsProposal = !item.video_brief ||
+    item.video_brief.generation_version !== videoGenerationVersion || videoPromptIssues.length > 0
   const displayedVisualUrl = generatedVisual?.itemId === item.id ? generatedVisual.url : item.visual_url
   const isHistoria = item.format === "historia"
   const isCarrusel = item.format === "carrusel"
@@ -2645,14 +2647,24 @@ function Editor({
       const response = await fetch("/api/content/video-brief", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ category: item.category, topic: item.topic, objective: item.objective ?? "conversion" }),
+        body: JSON.stringify({
+          category: item.category,
+          topic: item.topic,
+          objective: item.objective ?? "conversion",
+          version: videoGenerationVersion,
+        }),
       })
       const data = await response.json()
       if (!response.ok || data.error) {
         setVideoDirectionError(data.error ?? "No se pudo generar la propuesta de video.")
         return
       }
-      await onSave({ hook: data.hook, video_prompt: data.video_prompt, video_brief: data.brief })
+      await onSave({
+        hook: data.hook,
+        video_prompt: data.video_prompt,
+        video_brief: data.brief,
+        video_generation_version: videoGenerationVersion,
+      })
     } catch {
       setVideoDirectionError("No se pudo conectar con la IA para generar la propuesta.")
     } finally {
@@ -2691,6 +2703,7 @@ function Editor({
         body: JSON.stringify({
           itemId: item.id,
           video_prompt: videoPrompt,
+          version: videoGenerationVersion,
           ...(item.video_brief ? { hook: item.hook, messages: item.video_brief.messages, cta: item.video_brief.cta } : {}),
         }),
       })
@@ -2700,12 +2713,23 @@ function Editor({
         setAiVideoHelpUrl(typeof data.help_url === "string" ? data.help_url : null)
         return
       }
-      await onSave({ video_url: data.video_url, video_prompt: videoPrompt })
+      await onSave({
+        video_url: data.video_url,
+        video_prompt: videoPrompt,
+        video_generation_version: videoGenerationVersion,
+      })
     } catch {
       setAiVideoError("No se pudo conectar con Veo para generar el video.")
     } finally {
       setAiVideoGenerating(false)
     }
+  }
+
+  async function selectVideoGenerationVersion(version: VideoGenerationVersion) {
+    if (version === videoGenerationVersion) return
+    setVideoDirectionError(null)
+    setAiVideoError(null)
+    await onSave({ video_generation_version: version })
   }
 
   async function regenerateImageDirection() {
@@ -2842,7 +2866,41 @@ function Editor({
                 )}
 
                 <div className="space-y-2 rounded-md border border-violet-200 bg-violet-50/60 p-2.5">
-                  <p className="text-[11px] font-semibold uppercase tracking-wide text-violet-700">Microinfografía animada (Veo + texto real)</p>
+                  <div className="space-y-1.5">
+                    <p className="text-[11px] font-semibold uppercase tracking-wide text-violet-700">Motor de generación de video</p>
+                    <div className="grid grid-cols-2 gap-2">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant={videoGenerationVersion === "v2" ? "default" : "outline"}
+                        onClick={() => selectVideoGenerationVersion("v2")}
+                        disabled={videoDirectionGenerating || aiVideoGenerating}
+                        className="h-auto min-h-10 flex-col gap-0.5 py-1.5"
+                      >
+                        <span>Calidad (V2)</span>
+                        <span className="text-[9px] font-normal opacity-80">Veo Standard · documental</span>
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant={videoGenerationVersion === "v1" ? "default" : "outline"}
+                        onClick={() => selectVideoGenerationVersion("v1")}
+                        disabled={videoDirectionGenerating || aiVideoGenerating}
+                        className="h-auto min-h-10 flex-col gap-0.5 py-1.5"
+                      >
+                        <span>Original (V1)</span>
+                        <span className="text-[9px] font-normal opacity-80">Veo Fast · ilustrado</span>
+                      </Button>
+                    </div>
+                    <p className="text-[10px] text-violet-700/80">
+                      {videoGenerationVersion === "v2"
+                        ? "V2 usa una sola toma documental, movimiento físico mínimo y exclusiones separadas para evitar personas, utilería clínica, recortes de papel y objetos deformados."
+                        : "V1 conserva la microinfografía ilustrada que usaba el sistema antes del motor documental."}
+                    </p>
+                  </div>
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-violet-700">
+                    {videoGenerationVersion === "v2" ? "Video documental (Veo + texto real)" : "Microinfografía animada original (Veo + texto real)"}
+                  </p>
                   <p className="text-[11px] text-violet-700/80">
                     Veo genera solo el fondo/animación (sin texto); el gancho, los mensajes y el CTA se
                     escriben aparte y se queman encima por edición real, para que salgan siempre bien
@@ -2924,13 +2982,15 @@ function Editor({
                     {aiVideoGenerating ? "Generando... puede tardar unos minutos" : item.video_url ? "Regenerar video con IA" : "Generar video con IA"}
                   </Button>
                   <p className="text-[11px] text-violet-700/80">
-                    Tiene costo real por intento (aprox. USD 1), sin límite gratuito.
+                    Tiene costo real por intento ({videoGenerationVersion === "v2" ? "aprox. USD 3,20" : "aprox. USD 0,80"}), sin límite gratuito.
                   </p>
                   {videoNeedsProposal && (
                     <div className="rounded-md border border-amber-200 bg-amber-50 p-2 text-[11px] text-amber-800">
                       <p className="font-medium">
                         {item.video_brief
-                          ? "La dirección visual actual puede producir un video artificial. Regenerá la propuesta."
+                          ? item.video_brief.generation_version !== videoGenerationVersion
+                            ? "La propuesta pertenece al otro motor. Regenerala para aplicar la versión elegida."
+                            : "La dirección visual actual puede producir un video artificial. Regenerá la propuesta."
                           : "Generá la propuesta antes del video para evitar gastar un intento con una dirección genérica."}
                       </p>
                       {videoPromptIssues.length > 0 && (

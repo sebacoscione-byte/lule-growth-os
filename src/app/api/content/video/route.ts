@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server"
 import { getServiceDb } from "@/lib/supabase/service"
 import { authorizeStaff } from "@/lib/staff-authz"
 import { getVeoPromptQualityIssues } from "@/lib/video-prompt"
+import type { VideoGenerationVersion } from "@/types"
 
 const CONTENT_ROLES = ["owner", "doctor"] as const
 
@@ -25,8 +26,9 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Falta la dirección de video para generar el clip." }, { status: 400 })
     }
     const itemId = typeof body.itemId === "string" && body.itemId ? body.itemId : "sin-id"
+    const version: VideoGenerationVersion = body.version === "v1" ? "v1" : "v2"
     const videoPrompt = (body.video_prompt as string).slice(0, 2400)
-    const promptIssues = getVeoPromptQualityIssues(videoPrompt)
+    const promptIssues = getVeoPromptQualityIssues(videoPrompt, version)
     if (promptIssues.length > 0) {
       return NextResponse.json({
         code: "VIDEO_PROMPT_NEEDS_REFRESH",
@@ -49,7 +51,7 @@ export async function POST(request: Request) {
       }, { status: 400 })
     }
 
-    const video = await generateContentVideo({ video_prompt: videoPrompt })
+    const video = await generateContentVideo({ video_prompt: videoPrompt, version })
     let buffer: Buffer = Buffer.from(video.video_data, "base64")
 
     // El brief se compone sobre el fondo en la misma llamada: un solo click, un video final.

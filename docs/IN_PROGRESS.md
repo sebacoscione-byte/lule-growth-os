@@ -1,3 +1,14 @@
+# EN CURSO (2026-08-03) — separar V1/V2 y mejorar videos publicables
+
+- [x] Reconstruir el motor previo y confirmar que el paper-cut actual está impuesto por el prompt.
+- [x] Investigar la guía y los parámetros vigentes de Veo 3.1 en documentación oficial de Google.
+- [x] Restaurar V1 ilustrado con Veo Fast y crear V2 documental con Veo Standard.
+- [x] Separar exclusiones en `negativePrompt`, limitar el clip a una escena/acción/cámara y bloquear artefactos comunes.
+- [x] Ejecutar lint, 101 suites/936 tests y build de producción.
+- [ ] Publicar por rama + PR, verificar preview y mergear.
+
+---
+
 # HOTFIX EN CURSO (2026-08-03) — MIME de Gemini Image en V2.1
 
 - [x] Confirmar en logs de producción el rechazo de `image/png` en Interactions API.

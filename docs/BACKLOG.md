@@ -1,5 +1,17 @@
 # Backlog — Lule Growth OS
-**Actualizado:** 2026-07-30 | **Basado en:** PRD Estrategia de Captación v2.1
+**Actualizado:** 2026-08-03 | **Basado en:** PRD Estrategia de Captación v2.1
+
+---
+
+## [DECISIÓN] ✅ Generación de video separada en V1/V2 (2026-08-03)
+
+El paper-cut incorporado como corrección defensiva evitó personas y utilería médica deformada, pero
+el resultado seguía viéndose claramente generado por IA. Se conserva como referencia histórica en V1
+(microinfografía ilustrada con Veo Fast) y V2 pasa a ser el motor de calidad recomendado: Veo Standard,
+una sola toma documental, un sujeto físico simple, movimiento mínimo y cámara controlada. Las
+exclusiones de texto, personas, anatomía, recortes de papel, CGI y artefactos se envían por separado en
+`negativePrompt`, siguiendo la guía oficial vigente de Google. El selector y la propuesta quedan
+versionados por pieza para impedir mezclar un prompt V1 con una generación V2.
 
 ---
 

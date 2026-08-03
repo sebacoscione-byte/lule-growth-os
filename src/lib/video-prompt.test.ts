@@ -1,50 +1,70 @@
 import {
-  VEO_REQUEST_PARAMETERS,
+  VEO_V2_NEGATIVE_PROMPT,
   buildFallbackVideoPrompt,
   getVeoPromptQualityIssues,
+  getVeoRequestParameters,
   isPublishableVeoPrompt,
 } from "@/lib/video-prompt"
 
-const LEGACY_DRAFT_PROMPT = `A single continuous 6-second cinematic B-roll shot for a cardiology practice reel about "TU CONTROL CARDIOVASCULAR EN LANUS". Slow gentle camera dolly-in or soft pan, warm natural lighting, sophisticated deep blue, burgundy and warm neutral palette, realistic organic texture. No people speaking, gesturing to explain, or looking directly at camera -- if a partial medical figure appears (hand, arm, coat), it must read as clearly feminine, never inventing a real face. No on-screen text, logos or watermark. Ambient sound only, no dialogue, no voiceover. Vertical 9:16 composition.`
+const PAPER_CUT_PROMPT = `An 8-second vertical 9:16 2D editorial motion graphic. Subject and context: an ivory paper-cut field with one curved teal route. Action: a deep-blue dot travels once along the route. Style: restrained editorial cut-paper animation with clean edges. Camera and composition: locked camera, front-facing composition. Palette and light: ivory, deep blue and teal. Typography-free, entirely graphic, unpopulated frame; soft paper movement only, no speech. Fixed camera, seamless gentle loop.`
 
-describe("calidad del prompt de Veo", () => {
-  it("rechaza el prompt legado exacto que produjo el consultorio artificial", () => {
-    const issues = getVeoPromptQualityIssues(LEGACY_DRAFT_PROMPT)
+describe("versiones del prompt de Veo", () => {
+  it("V1 conserva el fallback ilustrado original", () => {
+    const prompt = buildFallbackVideoPrompt("Atención en Lanús", "v1")
+
+    expect(prompt).toMatch(/^An 8-second vertical 9:16 clean medical motion graphic/)
+    expect(prompt).toMatch(/flat or semi-flat illustration/i)
+    expect(getVeoPromptQualityIssues(prompt, "v1")).toEqual([])
+    expect(isPublishableVeoPrompt(prompt, "v1")).toBe(true)
+  })
+
+  it("V2 construye una toma documental completa y publicable", () => {
+    const prompt = buildFallbackVideoPrompt("Atención en Lanús", "v2")
+
+    expect(prompt).toMatch(/^An 8-second vertical 9:16 natural documentary video\./)
+    expect(prompt).toContain("Subject and setting:")
+    expect(prompt).toContain("Physical motion:")
+    expect(prompt).toContain("Camera and composition:")
+    expect(prompt).toContain("Natural light and finish:")
+    expect(prompt).toContain("Ambient sound:")
+    expect(prompt).toMatch(/locked tripod/i)
+    expect(prompt).not.toMatch(/paper[- ]cut|2D|motion graphic|doctor|hand|stethoscope|anatomical heart/i)
+    expect(getVeoPromptQualityIssues(prompt, "v2")).toEqual([])
+  })
+
+  it("V2 rechaza el paper-cut que produjo el ejemplo artificial", () => {
+    const issues = getVeoPromptQualityIssues(PAPER_CUT_PROMPT, "v2")
 
     expect(issues).toEqual(expect.arrayContaining([
-      expect.stringMatching(/publicidad cinematografica/i),
-      expect.stringMatching(/fotorrealismo/i),
-      expect.stringMatching(/personas/i),
+      expect.stringMatching(/formato documental V2/i),
+      expect.stringMatching(/ilustrada o sintética/i),
     ]))
-    expect(isPublishableVeoPrompt(LEGACY_DRAFT_PROMPT)).toBe(false)
+    expect(isPublishableVeoPrompt(PAPER_CUT_PROMPT, "v2")).toBe(false)
   })
 
-  it("construye un fallback 2D controlado y publicable", () => {
-    const prompt = buildFallbackVideoPrompt("TU CONTROL CARDIOVASCULAR EN LANUS")
+  it("V2 rechaza personas y utilería clínica aunque el resto de la estructura sea válida", () => {
+    const risky = `${buildFallbackVideoPrompt("prevención", "v2")} A doctor hand points to an anatomical heart model.`
 
-    expect(prompt).toMatch(/^An 8-second vertical 9:16 2D editorial motion graphic/)
-    expect(prompt).toMatch(/locked camera/i)
-    expect(prompt).toMatch(/typography-free/i)
-    expect(prompt).not.toMatch(/cinematic|b-?roll|dolly|photorealistic|doctor|hand|stethoscope/i)
-    expect(getVeoPromptQualityIssues(prompt)).toEqual([])
-  })
-
-  it("rechaza personas, utileria clinica y movimientos de camara aunque el inicio sea correcto", () => {
-    const risky = `${buildFallbackVideoPrompt("prevencion")} A doctor hand points to an anatomical heart model while the camera dollies in.`
-
-    expect(getVeoPromptQualityIssues(risky)).toEqual(expect.arrayContaining([
+    expect(getVeoPromptQualityIssues(risky, "v2")).toEqual(expect.arrayContaining([
       expect.stringMatching(/personas/i),
-      expect.stringMatching(/utileria clinica/i),
-      expect.stringMatching(/publicidad cinematografica/i),
+      expect.stringMatching(/utilería clínica/i),
     ]))
   })
 
-  it("fija ocho segundos para que el clip coincida con el guion compuesto", () => {
-    expect(VEO_REQUEST_PARAMETERS).toEqual({
+  it("envía negativePrompt separado solo en V2 y mantiene duración numérica", () => {
+    expect(getVeoRequestParameters("v1")).toEqual({
       aspectRatio: "9:16",
       resolution: "720p",
       durationSeconds: 8,
     })
-    expect(typeof VEO_REQUEST_PARAMETERS.durationSeconds).toBe("number")
+    expect(getVeoRequestParameters("v2")).toEqual({
+      aspectRatio: "9:16",
+      resolution: "720p",
+      durationSeconds: 8,
+      negativePrompt: VEO_V2_NEGATIVE_PROMPT,
+    })
+    expect(typeof getVeoRequestParameters("v2").durationSeconds).toBe("number")
+    expect(VEO_V2_NEGATIVE_PROMPT).toMatch(/paper-cut art.*human figures|human figures.*paper-cut art/i)
+    expect(VEO_V2_NEGATIVE_PROMPT).not.toMatch(/\b(?:no|don't)\b/i)
   })
 })

@@ -2,7 +2,7 @@ import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { generateVideoBrief, getPublicAiError } from "@/lib/ai"
 import { authorizeStaff } from "@/lib/staff-authz"
-import type { ContentObjective } from "@/types"
+import type { ContentObjective, VideoGenerationVersion } from "@/types"
 
 const CONTENT_ROLES = ["owner", "doctor"] as const
 const OBJECTIVES = ["alcance", "educacion", "confianza", "conversion"] as const
@@ -18,11 +18,13 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Faltan datos para proponer el video." }, { status: 400 })
     }
     const objective = OBJECTIVES.includes(body.objective as ContentObjective) ? (body.objective as ContentObjective) : "conversion"
+    const version: VideoGenerationVersion = body.version === "v1" ? "v1" : "v2"
 
     const result = await generateVideoBrief({
       category: body.category.slice(0, 160),
       topic: body.topic.slice(0, 200),
       objective,
+      version,
     })
 
     return NextResponse.json(result)
