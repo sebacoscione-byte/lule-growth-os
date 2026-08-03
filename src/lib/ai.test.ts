@@ -390,7 +390,7 @@ describe("generatePhotoWithGemini reintenta ante una falla transitoria (bug real
         model: "gemini-3.1-flash-image",
         response_format: {
           type: "image",
-          mime_type: "image/png",
+          mime_type: "image/jpeg",
           aspect_ratio: "4:5",
           image_size: "2K",
         },

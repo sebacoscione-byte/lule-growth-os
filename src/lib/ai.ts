@@ -1092,7 +1092,9 @@ async function generatePhotoWithGemini(
             input: prompt,
             response_format: {
               type: "image",
-              mime_type: "image/png",
+              // Interactions API rechaza image/png para Gemini Image (incidente real 2026-08-03).
+              // JPEG es el unico MIME aceptado; V2 igual compone y devuelve la placa final en PNG.
+              mime_type: "image/jpeg",
               aspect_ratio: aspectRatio,
               image_size: "2K",
             },

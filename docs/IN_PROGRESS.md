@@ -1,3 +1,11 @@
+# HOTFIX EN CURSO (2026-08-03) — MIME de Gemini Image en V2.1
+
+- [x] Confirmar en logs de producción el rechazo de `image/png` en Interactions API.
+- [x] Solicitar `image/jpeg` y cubrir el contrato con una regresión.
+- [x] Ejecutar lint, 100 suites/930 tests y build; publicar por PR, verificar preview y mergear.
+
+---
+
 # EN CURSO (2026-08-03) — integrar foto y texto en V2.1
 
 - [x] Revisar el corte rígido actual y las capacidades vigentes de Gemini Image.
