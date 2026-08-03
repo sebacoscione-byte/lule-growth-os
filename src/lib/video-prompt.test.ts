@@ -43,7 +43,8 @@ describe("calidad del prompt de Veo", () => {
     expect(VEO_REQUEST_PARAMETERS).toEqual({
       aspectRatio: "9:16",
       resolution: "720p",
-      durationSeconds: "8",
+      durationSeconds: 8,
     })
+    expect(typeof VEO_REQUEST_PARAMETERS.durationSeconds).toBe("number")
   })
 })

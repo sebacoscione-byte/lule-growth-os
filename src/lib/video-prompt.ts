@@ -24,7 +24,7 @@ const LOCKED_CAMERA_PATTERN = /(?:locked|static|fixed) camera/i
 export const VEO_REQUEST_PARAMETERS = {
   aspectRatio: "9:16",
   resolution: "720p",
-  durationSeconds: "8",
+  durationSeconds: 8,
 } as const
 
 /**
