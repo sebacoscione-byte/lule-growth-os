@@ -203,6 +203,13 @@ export interface ContentItem {
   visual_headline: string
   visual_subtitle: string
   visual_style: "rose" | "blue" | "teal"
+  /** Que motor usa "Generar placa final" para esta pieza. "v2" (default, sin este campo tambien
+   * cuenta como v2): Gemini genera SOLO la foto, el titular/subtitulo/marca se componen aparte por
+   * edicion real (composeContentPlate, ffmpeg) -- ortografia siempre perfecta. "v1": la version
+   * original hasta el 2026-07-30, Gemini dibuja la placa entera en una sola pasada (foto + texto) --
+   * mas "editorial"/fotografico pero con riesgo real de texto mal escrito o inventado (ver
+   * docs/BACKLOG.md). Elegible por pieza para poder comparar/regenerar con el otro motor. */
+  visual_generation_version?: "v1" | "v2"
   image_prompt?: string
   image_alt_text?: string
   slides?: ContentSlide[]

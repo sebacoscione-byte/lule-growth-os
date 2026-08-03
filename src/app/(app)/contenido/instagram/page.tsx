@@ -2363,6 +2363,7 @@ function Editor({
           visual_headline: item.visual_headline,
           visual_subtitle: item.visual_subtitle,
           image_prompt: imagePrompt,
+          version: item.visual_generation_version ?? "v2",
         }),
       })
       const data = await response.json()
@@ -2976,6 +2977,34 @@ function Editor({
             </p>
           </CardHeader>
           <CardContent className="space-y-3">
+            <div className="flex flex-wrap items-center gap-2 rounded-md border border-dashed border-violet-200 bg-white p-2.5">
+              <span className="text-xs font-medium text-gray-900">Motor de generación:</span>
+              <div className="flex gap-1.5">
+                <Button
+                  type="button"
+                  variant={(item.visual_generation_version ?? "v2") === "v2" ? "default" : "outline"}
+                  size="sm"
+                  disabled={busy}
+                  onClick={() => onSave({ visual_generation_version: "v2" })}
+                >
+                  Actual (V2)
+                </Button>
+                <Button
+                  type="button"
+                  variant={item.visual_generation_version === "v1" ? "default" : "outline"}
+                  size="sm"
+                  disabled={busy}
+                  onClick={() => onSave({ visual_generation_version: "v1" })}
+                >
+                  Original (V1)
+                </Button>
+              </div>
+              <p className="w-full text-[11px] text-gray-500">
+                {(item.visual_generation_version ?? "v2") === "v2"
+                  ? "Gemini genera solo la foto; el titular, subtítulo y marca se agregan aparte por edición real — ortografía siempre perfecta."
+                  : "Gemini dibuja la placa entera (foto + texto) en una sola pasada — estilo más fotográfico, pero con riesgo real de texto mal escrito o inventado."}
+              </p>
+            </div>
             {displayedVisualUrl ? (
               <Image
                 src={displayedVisualUrl}
