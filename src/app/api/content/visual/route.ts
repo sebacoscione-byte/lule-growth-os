@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server"
-import { generateContentVisual, getPublicAiError } from "@/lib/ai"
+import { generateContentVisual, getPublicAiError, regenerateImageDirection } from "@/lib/ai"
 import { truncateForImagePlate } from "@/lib/content-text"
+import { getImagePromptQualityIssues, recentImagePrompts } from "@/lib/image-prompt-quality"
+import { readContentItems } from "@/lib/content-pipeline"
 import { convertImageToJpeg } from "@/lib/video-caption"
 import { createClient } from "@/lib/supabase/server"
 import { getServiceDb } from "@/lib/supabase/service"
@@ -27,14 +29,61 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Motor de generacion invalido." }, { status: 400 })
     }
 
+    const version = body.version as "v1" | "v2" | undefined
+    let imagePrompt = (body.image_prompt as string).slice(0, 2400)
+    let imageDirectionRefreshed = false
+    let imagePromptIssues: string[] = []
+
+    // V2 separa foto y texto. Antes de consumir un intento de imagen, evita el cliché recurrente
+    // "médica + escritorio + utilería clínica" y escenas demasiado parecidas a piezas recientes.
+    // V1 queda intacta para que siga siendo una comparación fiel con el motor histórico.
+    if (version !== "v1") {
+      const items = await readContentItems(supabase).catch(error => {
+        console.error("No se pudieron leer prompts recientes para controlar diversidad:",
+          error instanceof Error ? error.message : String(error))
+        return []
+      })
+      const recentPrompts = recentImagePrompts(
+        items,
+        typeof body.sourceItemId === "string"
+          ? body.sourceItemId
+          : typeof body.itemId === "string" ? body.itemId : undefined
+      )
+      imagePromptIssues = getImagePromptQualityIssues(imagePrompt, recentPrompts)
+      if (imagePromptIssues.length > 0) {
+        let candidate = imagePrompt
+        for (let attempt = 0; attempt < 2; attempt++) {
+          const direction = await regenerateImageDirection({
+            category: (body.category as string).slice(0, 160),
+            topic: (body.topic as string).slice(0, 200),
+            format: body.format as typeof FORMATS[number],
+            visual_headline: (body.visual_headline as string).slice(0, 90),
+            visual_subtitle: truncateForImagePlate(body.visual_subtitle as string, 120),
+            caption: typeof body.caption === "string" && body.caption.trim()
+              ? body.caption.slice(0, 3000)
+              : `${body.topic}. ${body.visual_subtitle}`.slice(0, 3000),
+            previous_image_prompt: candidate,
+            recent_image_prompts: [imagePrompt, ...recentPrompts],
+          })
+          candidate = direction.image_prompt
+          if (getImagePromptQualityIssues(candidate, [imagePrompt, ...recentPrompts]).length === 0) break
+          if (attempt === 1) {
+            throw new Error("La IA no logró proponer una escena suficientemente distinta. Volvé a intentar.")
+          }
+        }
+        imagePrompt = candidate
+        imageDirectionRefreshed = true
+      }
+    }
+
     const visual = await generateContentVisual({
       category: (body.category as string).slice(0, 160),
       topic: (body.topic as string).slice(0, 200),
       format: body.format as typeof FORMATS[number],
       visual_headline: (body.visual_headline as string).slice(0, 90),
       visual_subtitle: truncateForImagePlate(body.visual_subtitle as string, 120),
-      image_prompt: (body.image_prompt as string).slice(0, 2400),
-      version: body.version as "v1" | "v2" | undefined,
+      image_prompt: imagePrompt,
+      version,
     })
 
     // Persistimos la placa en Storage de una: si no se guarda ahora, se pierde al navegar
@@ -78,7 +127,14 @@ export async function POST(request: Request) {
       visual_persist_error = message
     }
 
-    return NextResponse.json({ ...visual, visual_url, visual_persist_error })
+    return NextResponse.json({
+      ...visual,
+      visual_url,
+      visual_persist_error,
+      image_prompt: imagePrompt,
+      image_direction_refreshed: imageDirectionRefreshed,
+      image_prompt_issues: imagePromptIssues,
+    })
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
     // Sin esto, un fallo de generateContentVisual (ej. composeContentPlate/ffmpeg) queda invisible:

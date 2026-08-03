@@ -54,6 +54,19 @@ perfecta siempre. El editor llama a `generateContentVisual` (que hace ambos paso
 generar una placa final 4:5 para feed/carrusel o 9:16 para historia. La persona revisa el resultado y
 lo descarga; no tiene que armar la composicion visual.
 
+El panel izquierdo es deliberadamente constante: es el sistema de marca de V2, no una imagen
+reutilizada. La escena del lado derecho sí tiene que cambiar. Antes de gastar un intento, la ruta de
+generación compara los motivos del `image_prompt` con las piezas recientes y detecta también el cliché
+de consultorio armado con médica parcial + escritorio + utilería clínica. Si aparece cualquiera de
+esos problemas, pide automáticamente otra dirección visual y persiste el prompt realmente usado. No
+hay caché de fotografías entre piezas.
+
+Los contenidos de sede, cercanía o cómo pedir turno no se resuelven por defecto con una médica en un
+consultorio. Priorizan un recorrido local/calendario en ilustración editorial táctil, un momento
+documental de llegada que no identifique un edificio real o una naturaleza muerta concreta de
+preparación para la consulta. Los consultorios y equipos quedan reservados para estudios o acciones
+médicas que necesiten ese contexto.
+
 Variables:
 
 - `GEMINI_IMAGE_MODEL`: modelo de imagen; por defecto `gemini-3.1-flash-image`.
