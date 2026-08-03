@@ -77,6 +77,11 @@ export async function POST(request: Request) {
     return NextResponse.json({ ...visual, visual_url, visual_persist_error })
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
+    // Sin esto, un fallo de generateContentVisual (ej. composeContentPlate/ffmpeg) queda invisible:
+    // no pasa por logRequest (eso solo cubre las llamadas a Gemini/OpenAI) y route.ts solo devolvia el
+    // mensaje generico de getPublicAiError al cliente, sin dejar ningun rastro server-side de la causa
+    // real (bug real 2026-08-03: la placa seguia fallando en produccion sin ninguna pista en los logs).
+    console.error("No se pudo generar la placa visual:", message)
     const normalized = message.toLowerCase()
     if (normalized.includes("quota") || normalized.includes("resource_exhausted") || normalized.includes("rate limit")) {
       return NextResponse.json({
