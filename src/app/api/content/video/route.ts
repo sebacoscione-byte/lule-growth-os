@@ -4,6 +4,7 @@ import { addBackgroundMusic, burnVideoBrief } from "@/lib/video-caption"
 import { createClient } from "@/lib/supabase/server"
 import { getServiceDb } from "@/lib/supabase/service"
 import { authorizeStaff } from "@/lib/staff-authz"
+import { getVeoPromptQualityIssues } from "@/lib/video-prompt"
 
 const CONTENT_ROLES = ["owner", "doctor"] as const
 
@@ -24,27 +25,40 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Falta la dirección de video para generar el clip." }, { status: 400 })
     }
     const itemId = typeof body.itemId === "string" && body.itemId ? body.itemId : "sin-id"
+    const videoPrompt = (body.video_prompt as string).slice(0, 2400)
+    const promptIssues = getVeoPromptQualityIssues(videoPrompt)
+    if (promptIssues.length > 0) {
+      return NextResponse.json({
+        code: "VIDEO_PROMPT_NEEDS_REFRESH",
+        error: "La dirección visual es antigua o puede generar un video artificial. Regenerá la propuesta antes de crear el video.",
+        issues: promptIssues,
+      }, { status: 400 })
+    }
 
-    const video = await generateContentVideo({ video_prompt: (body.video_prompt as string).slice(0, 2400) })
+    // Un fondo suelto no es una pieza publicable: exigir el brief antes de consumir el intento pago
+    // garantiza que el resultado incluya gancho, valor y CTA compuestos con texto real.
+    const hook = typeof body.hook === "string" ? body.hook.trim() : ""
+    const messages = Array.isArray(body.messages)
+      ? body.messages.filter((m): m is string => typeof m === "string" && Boolean(m.trim())).slice(0, 3)
+      : []
+    const cta = typeof body.cta === "string" ? body.cta.trim() : ""
+    if (!hook || messages.length === 0 || !cta) {
+      return NextResponse.json({
+        code: "VIDEO_BRIEF_REQUIRED",
+        error: "Generá primero la propuesta de microinfografía antes de crear el video.",
+      }, { status: 400 })
+    }
+
+    const video = await generateContentVideo({ video_prompt: videoPrompt })
     let buffer: Buffer = Buffer.from(video.video_data, "base64")
 
-    // Si viene el brief (microinfografia: gancho/mensajes/CTA), se compone de una sobre el fondo que
-    // acaba de generar Veo -- un solo click, un solo video final. Sin brief (uso del video_prompt
-    // suelto, sin pasar por "Generar propuesta"), se sube el fondo tal cual generado.
-    const hook = typeof body.hook === "string" ? body.hook.trim() : ""
-    if (hook) {
-      const messages = Array.isArray(body.messages)
-        ? body.messages.filter((m): m is string => typeof m === "string").slice(0, 3)
-        : []
-      const cta = typeof body.cta === "string" ? body.cta.trim() : ""
-      try {
-        buffer = await burnVideoBrief({ videoBuffer: buffer, hook, messages, cta })
-      } catch (error) {
-        console.error("[content/video] no se pudo componer el brief sobre el video:",
-          error instanceof Error ? error.message : String(error))
-        // Seguimos con el fondo sin texto antes que perder la generación de Veo (tiene costo real) --
-        // queda igual disponible el botón de "Agregar texto del guion al video" para reintentar.
-      }
+    // El brief se compone sobre el fondo en la misma llamada: un solo click, un video final.
+    try {
+      buffer = await burnVideoBrief({ videoBuffer: buffer, hook, messages, cta })
+    } catch (error) {
+      console.error("[content/video] no se pudo componer el brief sobre el video:",
+        error instanceof Error ? error.message : String(error))
+      // Seguimos con el fondo antes que perder la generación paga; la UI permite reintentar el texto.
     }
 
     // Musica de fondo sin copyright (2026-07-28): reemplaza el audio ambiente que genera Veo por una

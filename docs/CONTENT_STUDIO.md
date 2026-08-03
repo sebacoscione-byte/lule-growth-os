@@ -71,12 +71,30 @@ Cada pieza debe cumplir una secuencia:
 
 La captacion no puede usar miedo, culpa, escasez, promesas ni asumir que el lector tiene una condicion. El editor muestra este checklist antes de aprobar.
 
+## Reels generados con IA
+
+Los reels de IA se construyen como una microinfografia de 8 segundos en dos capas:
+
+- Veo genera solamente un fondo editorial 2D, deliberadamente ilustrado y sin tipografia.
+- FFmpeg agrega el gancho, los mensajes, el CTA, la identificacion profesional y la musica con assets
+  reales. El texto nunca queda a cargo del modelo de video.
+
+Antes de generar el video pago es obligatorio crear una propuesta. La UI y `/api/content/video`
+bloquean prompts legados o editados que pidan B-roll cinematografico, fotorrealismo, personas, manos,
+consultorios, utileria clinica o movimientos de camara publicitarios. Esto evita repetir el caso real de
+un borrador de atencion en Lanus cuyo fallback pedia `cinematic B-roll`, `dolly-in` y `realistic organic
+texture`: Veo respondio con una profesional artificial, un corazon anatomico de plastico, estetoscopio
+y monitor decorativo, exactamente los elementos inducidos por esa direccion.
+
+La direccion nueva usa una metafora grafica unica, camara fija, maximo dos movimientos sutiles, paleta
+marfil/azul/verde azulado y un acento borgona. El request fija `9:16`, `720p` y 8 segundos para coincidir
+con los tiempos de las tarjetas de texto.
+
 ## Canales
 
-- Instagram: generacion y descarga de placa con Gemini y copia del texto listo para publicar. La
-  publicacion directa por API (manual o automatica) soporta `post`, `historia` y `carrusel`. El reel
-  sigue sin soporte: requiere video real y la app solo genera imagenes estaticas — usar "Copiar
-  Instagram" para publicarlo a mano.
+- Instagram: generacion y descarga de placas con Gemini y reels con Veo + composicion FFmpeg. La
+  publicacion directa por API (manual o automatica) soporta `post`, `historia`, `carrusel` y `reel`;
+  un reel no puede aprobarse hasta tener un archivo de video real generado o subido.
 - Google Business: publicacion desde la app solo para contenido aprobado y cuando Google habilita la API para la cuenta. Solo texto (`google_text`), sin imagen.
 
 ## Carruseles (2026-07-11)

@@ -21,6 +21,7 @@ import { createClient as createBrowserSupabaseClient } from "@/lib/supabase/clie
 import { parseAiJson } from "@/lib/parse-ai-json"
 import { truncateForImagePlate } from "@/lib/content-text"
 import { DEFAULT_AUTO_PUBLISH_SETTINGS, alreadyPublishedToday, estimateAutoPublishDrainDays, estimateAutoPublishDateForPosition, estimateRepeatEndDate, findRecentDuplicateTopic, pickNextPublishableItems, isReorderableInQueue, reorderableQueuePositions } from "@/lib/content-pipeline"
+import { buildFallbackVideoPrompt, getVeoPromptQualityIssues } from "@/lib/video-prompt"
 import type { AutoPublishSettings, AutoPublishTrackSettings, ContentItem, ContentObjective, ContentSlide, ContentSource, ContentStatus, ContentVideoScores } from "@/types"
 import type { InstagramMediaInsights } from "@/lib/instagram-business"
 import { CONTENT_OBJECTIVE_GOALS, CONTENT_OBJECTIVE_LABELS, WEEKDAY_OPTIONS } from "@/types"
@@ -122,7 +123,7 @@ function fallbackImagePrompt(item: ContentItem) {
 }
 
 function fallbackVideoPrompt(item: ContentItem) {
-  return `A single continuous 6-second cinematic B-roll shot for a cardiology practice reel about "${item.topic}". Slow gentle camera dolly-in or soft pan, warm natural lighting, sophisticated deep blue, burgundy and warm neutral palette, realistic organic texture. No people speaking, gesturing to explain, or looking directly at camera -- if a partial medical figure appears (hand, arm, coat), it must read as clearly feminine, never inventing a real face. No on-screen text, logos or watermark. Ambient sound only, no dialogue, no voiceover. Vertical 9:16 composition.`
+  return buildFallbackVideoPrompt(item.topic)
 }
 
 function VisualCard({ item, compact = false, trueAspect = false }: { item: ContentItem; compact?: boolean; trueAspect?: boolean }) {
@@ -2301,6 +2302,8 @@ function Editor({
   const videoInputRef = useRef<HTMLInputElement>(null)
   const imagePrompt = item.image_prompt?.trim() || fallbackImagePrompt(item)
   const videoPrompt = item.video_prompt?.trim() || fallbackVideoPrompt(item)
+  const videoPromptIssues = getVeoPromptQualityIssues(videoPrompt)
+  const videoNeedsProposal = !item.video_brief || videoPromptIssues.length > 0
   const displayedVisualUrl = generatedVisual?.itemId === item.id ? generatedVisual.url : item.visual_url
   const isHistoria = item.format === "historia"
   const isCarrusel = item.format === "carrusel"
@@ -2654,6 +2657,14 @@ function Editor({
    * video final (ver /api/content/video).
    */
   async function generateAiVideo() {
+    if (videoNeedsProposal) {
+      setAiVideoError(
+        item.video_brief
+          ? "La dirección visual es antigua o riesgosa. Regenerá la propuesta antes de gastar otro intento de video."
+          : "Generá primero la propuesta de microinfografía. Así el video sale con dirección visual y texto listos para publicar."
+      )
+      return
+    }
     if (
       item.video_url &&
       !window.confirm("Ya hay un video cargado en esta pieza. Generar uno nuevo con IA lo va a reemplazar (tiene costo real). ¿Continuar?")
@@ -2893,7 +2904,7 @@ function Editor({
                   <Button
                     type="button"
                     onClick={generateAiVideo}
-                    disabled={aiVideoGenerating || Boolean(item.video_brief && Object.values(item.video_brief.scores).some(v => v < VIDEO_SCORE_MIN))}
+                    disabled={aiVideoGenerating || videoNeedsProposal || Boolean(item.video_brief && Object.values(item.video_brief.scores).some(v => v < VIDEO_SCORE_MIN))}
                     className="w-full gap-2"
                   >
                     {aiVideoGenerating ? <Loader2 className="h-4 w-4 animate-spin" /> : <WandSparkles className="h-4 w-4" />}
@@ -2902,6 +2913,20 @@ function Editor({
                   <p className="text-[11px] text-violet-700/80">
                     Tiene costo real por intento (aprox. USD 1), sin límite gratuito.
                   </p>
+                  {videoNeedsProposal && (
+                    <div className="rounded-md border border-amber-200 bg-amber-50 p-2 text-[11px] text-amber-800">
+                      <p className="font-medium">
+                        {item.video_brief
+                          ? "La dirección visual actual puede producir un video artificial. Regenerá la propuesta."
+                          : "Generá la propuesta antes del video para evitar gastar un intento con una dirección genérica."}
+                      </p>
+                      {videoPromptIssues.length > 0 && (
+                        <ul className="mt-1 list-disc space-y-0.5 pl-4">
+                          {videoPromptIssues.map(issue => <li key={issue}>{issue}</li>)}
+                        </ul>
+                      )}
+                    </div>
+                  )}
                   {aiVideoError && (
                     <div className="space-y-1.5 rounded bg-red-50 p-2">
                       <p className="text-[11px] text-red-600">{aiVideoError}</p>
