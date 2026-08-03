@@ -1,6 +1,52 @@
 # Lule Growth OS — Contexto para Claude
 
 ## Estado actual
+- 2026-08-03 (continuación de la investigación de fallas en generación de contenido, PR #190/#191/#192):
+  Seba siguió reportando que "Generar placa final" fallaba pese a tener crédito disponible en Gemini
+  (confirmado con captura del panel de billing de Google AI Studio). Tres hallazgos/cambios reales:
+  (1) **la generación de imagen tampoco tenía ningún reintento** (a diferencia del texto, arreglado el
+  día anterior en PR #188) — reproducido en vivo que un segundo intento manual idéntico sale bien.
+  `generatePhotoWithGemini()` ahora reintenta una vez más, salvo error de cuota/rate-limit (PR #190).
+  (2) **hallazgo metodológico importante**: los scripts de diagnóstico "en vivo" de este proyecto
+  (patrón usado desde 2026-07-19, un test de Jest que llama a la API real) **NO son representativos
+  del runtime de producción** para nada que dependa del bundling de Next.js — Jest importa el módulo
+  TypeScript directo, sin pasar por Turbopack/`serverExternalPackages`/`outputFileTracingIncludes`.
+  Esto importa especialmente en este proyecto porque tiene un historial largo de bugs específicos de
+  ese bundling (ffmpeg, fuentes .ttf). La pieza puntual reportada por Seba se reprodujo exitosamente
+  con Jest, pero seguía fallando en la app real — recién se pudo reproducir de forma fiel corriendo
+  `npm run build && npm run start` local + Playwright (login real, clicks reales en la UI real). Con
+  esa pieza puntual, el resultado fue éxito (sin poder confirmar la causa exacta de lo que vio Seba,
+  porque no dejaba ningún rastro — ver punto 3). (3) Se encontró que un fallo de `generateContentVisual()`
+  **después** de que la foto ya se generó bien (ej. `composeContentPlate`/ffmpeg) no pasaba por
+  `logRequest()` — quedaba completamente invisible, ni una fila en `ai_requests` ni nada en la consola
+  del servidor. Se agregó el `console.error` que faltaba en el catch final de `/api/content/visual`
+  (PR #191) para que la próxima vez quede un rastro real revisable en los logs de Vercel. De paso, se
+  limpió en producción una frase vieja ("Render only the exact requested Spanish headline...") que
+  quedó en el `image_prompt` de 3 piezas en borrador de antes del rediseño del 2026-07-30 — dato, no
+  código, hecho con un script puntual leyendo/escribiendo `app_config.content_pipeline` sin tocar el
+  resto de cada item. **Cierre de la investigación**: tras estos tres cambios, verificado en vivo con
+  Playwright contra un build de producción real que la pieza reportada genera bien de punta a punta.
+  Seba después mostró la placa resultante y pidió una feature nueva, no un bug fix (ver debajo).
+  `npm test` (909-911/909-911 según el PR), lint y build sin errores en los tres.
+- 2026-08-03 (selector V1/V2 para el motor de generación de la placa, PR #192): viendo la placa ya
+  funcionando (punto de arriba), Seba dijo "es horrible el modelo actual" y pidió poder elegir entre
+  el motor de imagen actual (V2, desde 2026-07-30: Gemini genera solo la foto, `composeContentPlate`
+  arma titular/subtítulo/marca aparte por edición real) y el original (V1, hasta el 2026-07-30: Gemini
+  dibuja la placa entera en una sola pasada — más "editorial"/fotográfico, pero con el riesgo real de
+  texto mal escrito o inventado que motivó el cambio a V2 en su momento). El prompt V1 se reconstruyó
+  **tal cual** desde el commit que introdujo V2 (`4f67944`), no es una aproximación nueva. Nuevo campo
+  `ContentItem.visual_generation_version?: "v1" | "v2"` (default `"v2"` si no está seteado — no rompe
+  piezas existentes), selector en la card "Placa final con Gemini"/"Portada del reel" del editor que
+  se guarda al toque (mismo patrón que el toggle de "Reel de prueba") — como afecta el resultado visual
+  final, cambiarlo revierte una pieza aprobada a borrador (igual que `format`/`visual_style`).
+  `generatePhotoWithGemini`/`generatePhotoWithOpenAI` ahora devuelven también el `mime_type` real de
+  la imagen (antes se asumía PNG vía `composeContentPlate`) — V1 lo necesita porque no pasa por esa
+  composición. **Verificado en vivo** contra un build de producción real + Playwright: cambiar el
+  selector a V1 en una pieza real y generar la placa dio el estilo histórico (foto + texto quemado por
+  Gemini en una sola imagen), visualmente distinto del panel prolijo de V2 — confirma que el toggle
+  funciona de punta a punta, no solo en tests unitarios. `npm test` (911/911), lint y build sin errores.
+  Archivos: `src/lib/ai.ts` (+tests), `src/types/index.ts`, `src/app/api/content/items/route.ts`,
+  `src/app/api/content/visual/route.ts`, `src/app/(app)/contenido/instagram/page.tsx`.
 - 2026-08-01 (mismo día, continuación — reintento automático antes del fallback, PR #188): Seba
   preguntó por qué fallaba Gemini en primer lugar. Respuesta: es un glitch conocido de la API de
   Gemini en modo JSON (`responseMimeType: "application/json"`) — a veces corta el texto a mitad de
