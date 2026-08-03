@@ -172,12 +172,19 @@ export interface ContentVideoScores {
   brand_consistency: number
 }
 
+/** Motor visual del reel. V1 conserva la microinfografía ilustrada original; V2 usa video
+ * documental y Veo Standard con controles específicos contra artefactos generativos. */
+export type VideoGenerationVersion = "v1" | "v2"
+
 /** Propuesta estructurada de un reel tipo "microinfografia medica animada" (2026-07-23, reemplaza el
  * criterio anterior de B-roll cinematografico). item.hook es el gancho (0,0-1,2s, reusa el mismo
  * campo que el hook de Instagram) e item.video_prompt es el prompt de Veo (fondo/animacion, sin
  * texto) -- este objeto cubre el resto de la propuesta: mensajes secundarios (1,2-6,2s), CTA
  * (6,2-8,0s) y las notas/puntajes para revision humana antes de aprobar. */
 export interface ContentVideoBrief {
+  /** Permite detectar que una propuesta quedó vieja después de cambiar el motor en el editor.
+   * Las propuestas históricas pueden no tenerlo y se consideran pendientes de regeneración. */
+  generation_version?: VideoGenerationVersion
   objective: string
   messages: string[]
   cta: string
@@ -219,6 +226,9 @@ export interface ContentItem {
   video_url?: string
   /** Direccion de video (en ingles) para generar el video con IA -- solo se usa para el camino "Generar con IA", no para subir un video propio. */
   video_prompt?: string
+  /** "v1": microinfografía ilustrada clásica con Veo Fast. "v2" (default): toma documental
+   * realista con Veo Standard y negative prompt separado. */
+  video_generation_version?: VideoGenerationVersion
   /** Propuesta estructurada (microinfografia animada) generada junto con video_prompt -- ver ContentVideoBrief. */
   video_brief?: ContentVideoBrief
   /** Reel de prueba (Meta "Trial Reels"): se publica solo para gente que no te sigue -- tus seguidores

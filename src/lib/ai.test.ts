@@ -5,10 +5,44 @@ import {
   generateContentVisual,
   generateFollowupSuggestion,
   generateReply,
+  getContentVideoModel,
   getPublicAiError,
   stripMarkdownArtifacts,
 } from "@/lib/ai"
 import { EMERGENCY_REPLY, MEDICAL_BOUNDARY_REPLY } from "@/lib/medical-safety"
+
+describe("selección de modelo de video", () => {
+  const originalGeneric = process.env.GEMINI_VIDEO_MODEL
+  const originalV1 = process.env.GEMINI_VIDEO_MODEL_V1
+  const originalV2 = process.env.GEMINI_VIDEO_MODEL_V2
+
+  afterEach(() => {
+    if (originalGeneric === undefined) delete process.env.GEMINI_VIDEO_MODEL
+    else process.env.GEMINI_VIDEO_MODEL = originalGeneric
+    if (originalV1 === undefined) delete process.env.GEMINI_VIDEO_MODEL_V1
+    else process.env.GEMINI_VIDEO_MODEL_V1 = originalV1
+    if (originalV2 === undefined) delete process.env.GEMINI_VIDEO_MODEL_V2
+    else process.env.GEMINI_VIDEO_MODEL_V2 = originalV2
+  })
+
+  it("mantiene V1 en Fast y V2 en Standard por defecto", () => {
+    delete process.env.GEMINI_VIDEO_MODEL
+    delete process.env.GEMINI_VIDEO_MODEL_V1
+    delete process.env.GEMINI_VIDEO_MODEL_V2
+
+    expect(getContentVideoModel("v1")).toBe("veo-3.1-fast-generate-preview")
+    expect(getContentVideoModel("v2")).toBe("veo-3.1-generate-preview")
+  })
+
+  it("no deja que el override histórico de V1 degrade silenciosamente V2", () => {
+    process.env.GEMINI_VIDEO_MODEL = "veo-legacy-fast"
+    delete process.env.GEMINI_VIDEO_MODEL_V1
+    delete process.env.GEMINI_VIDEO_MODEL_V2
+
+    expect(getContentVideoModel("v1")).toBe("veo-legacy-fast")
+    expect(getContentVideoModel("v2")).toBe("veo-3.1-generate-preview")
+  })
+})
 
 // content_plan pega a Supabase (cache/log de ai_requests, ai_outputs) ademas del proveedor de IA --
 // mockeado para no tocar la base real (local y prod comparten Supabase, ver CLAUDE.md) y para poder

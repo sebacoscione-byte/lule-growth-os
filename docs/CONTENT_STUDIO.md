@@ -93,22 +93,28 @@ La captacion no puede usar miedo, culpa, escasez, promesas ni asumir que el lect
 
 ## Reels generados con IA
 
-Los reels de IA se construyen como una microinfografia de 8 segundos en dos capas:
+Los reels de IA se construyen como una pieza de 8 segundos en dos capas:
 
-- Veo genera solamente un fondo editorial 2D, deliberadamente ilustrado y sin tipografia.
+- Veo genera solamente la escena visual sin tipografia.
 - FFmpeg agrega el gancho, los mensajes, el CTA, la identificacion profesional y la musica con assets
   reales. El texto nunca queda a cargo del modelo de video.
 
-Antes de generar el video pago es obligatorio crear una propuesta. La UI y `/api/content/video`
-bloquean prompts legados o editados que pidan B-roll cinematografico, fotorrealismo, personas, manos,
-consultorios, utileria clinica o movimientos de camara publicitarios. Esto evita repetir el caso real de
-un borrador de atencion en Lanus cuyo fallback pedia `cinematic B-roll`, `dolly-in` y `realistic organic
-texture`: Veo respondio con una profesional artificial, un corazon anatomico de plastico, estetoscopio
-y monitor decorativo, exactamente los elementos inducidos por esa direccion.
+El editor permite elegir el motor por pieza:
 
-La direccion nueva usa una metafora grafica unica, camara fija, maximo dos movimientos sutiles, paleta
-marfil/azul/verde azulado y un acento borgona. El request fija `9:16`, `720p` y 8 segundos para coincidir
-con los tiempos de las tarjetas de texto.
+- **V1 Original**: conserva la microinfografia ilustrada anterior y usa Veo 3.1 Fast. Es mas economica
+  (8 segundos a USD 0,10/s segun la tarifa vigente de Google), pero deliberadamente se ve ilustrada.
+- **V2 Calidad** (default): usa Veo 3.1 Standard y una toma documental de un unico momento. El prompt
+  se estructura como sujeto/escena, movimiento fisico, camara/composicion, luz/acabado y ambiente. Solo
+  permite un movimiento de camara fiable y evita transformaciones, personas, manos, anatomia y utileria
+  clinica generica. Cuesta aproximadamente USD 3,20 por clip de 8 segundos a la tarifa vigente.
+
+V2 envia las exclusiones en el parametro `negativePrompt` separado, como recomienda Google, en vez de
+mezclar una lista de prohibiciones dentro de la descripcion positiva. Entre las exclusiones estan texto,
+interfaces, personas, recortes de papel, vectores, CGI, objetos duplicados/deformados y movimiento
+antinatural. La UI y `/api/content/video` validan cada prompt contra el contrato de la version elegida
+antes de consumir el intento pago. Cambiar de version obliga a regenerar la propuesta.
+
+Ambos requests fijan `9:16`, `720p` y 8 segundos para coincidir con los tiempos del texto compuesto.
 
 ## Canales
 

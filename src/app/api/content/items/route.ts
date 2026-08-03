@@ -114,6 +114,9 @@ export async function PATCH(request: NextRequest) {
     if (body.visual_generation_version && !["v1", "v2"].includes(body.visual_generation_version)) {
       return NextResponse.json({ error: "Motor de generacion invalido" }, { status: 400 })
     }
+    if (body.video_generation_version && !["v1", "v2"].includes(body.video_generation_version)) {
+      return NextResponse.json({ error: "Motor de video invalido" }, { status: 400 })
+    }
     if (body.format && !["reel", "historia", "carrusel", "post"].includes(body.format)) {
       return NextResponse.json({ error: "Formato invalido" }, { status: 400 })
     }
@@ -147,6 +150,7 @@ export async function PATCH(request: NextRequest) {
         scoreKeys.every(key => typeof brief.scores[key as keyof typeof brief.scores] === "number" &&
           brief.scores[key as keyof typeof brief.scores] >= 1 && brief.scores[key as keyof typeof brief.scores] <= 5)
       const validBrief = brief !== null && typeof brief === "object" &&
+        (brief.generation_version === undefined || ["v1", "v2"].includes(brief.generation_version)) &&
         typeof brief.objective === "string" && brief.objective.length <= 300 &&
         Array.isArray(brief.messages) && brief.messages.length >= 1 && brief.messages.length <= 3 &&
         brief.messages.every((m: unknown) => typeof m === "string" && m.length <= 200) &&
@@ -188,6 +192,7 @@ export async function PATCH(request: NextRequest) {
       "visual_url",
       "video_url",
       "video_prompt",
+      "video_generation_version",
       "video_brief",
       "auto_publish_result",
       "archived_from_status",

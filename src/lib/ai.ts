@@ -5,13 +5,13 @@ import { parseAiJson } from "@/lib/parse-ai-json"
 import { EMERGENCY_REPLY, MEDICAL_BOUNDARY_REPLY, isEmergencyMessage, isMedicalBoundaryMessage } from "@/lib/medical-safety"
 import { composeContentPlate } from "@/lib/content-plate"
 import {
-  PUBLISHABLE_VIDEO_PROMPT_RULES,
-  VEO_REQUEST_PARAMETERS,
   buildFallbackVideoPrompt,
+  getVideoPromptRules,
+  getVeoRequestParameters,
   isPublishableVeoPrompt,
 } from "@/lib/video-prompt"
 import { z } from "zod"
-import type { ClassifyResult, ContentObjective, ContentSource, ContentVideoBrief, ContentVideoScores, WhatsAppIntent } from "@/types"
+import type { ClassifyResult, ContentObjective, ContentSource, ContentVideoBrief, ContentVideoScores, VideoGenerationVersion, WhatsAppIntent } from "@/types"
 
 export type AiMode = "manual" | "gemini_api"
 
@@ -314,10 +314,6 @@ const OBJECTIVE_GUIDANCE: Record<ContentObjective, string> = {
   confianza: "Objetivo CONFIANZA: priorizá mostrar cercanía, criterio médico y empatía por sobre dar información nueva. El CTA invita a comentar una duda o conocer más sobre la consulta.",
   conversion: "Objetivo CONVERSION: priorizá conectar el aprendizaje con la decisión de pedir turno. El CTA invita explícitamente a pedir turno por los canales disponibles.",
 }
-
-// La direccion vive separada de la llamada al proveedor porque la UI y la API tambien la validan
-// antes de gastar un intento pago de video.
-const VIDEO_PROMPT_RULES = PUBLISHABLE_VIDEO_PROMPT_RULES
 
 // 2026-07-23: estructura y criterio de contenido para la "microinfografia medica animada" -- reglas
 // de Seba, transcriptas casi literal porque son muy especificas (ejemplos exactos de ganchos buenos y
@@ -1327,10 +1323,12 @@ export async function generateVideoBrief(input: {
   category: string
   topic: string
   objective: ContentObjective
+  version?: VideoGenerationVersion
 }): Promise<{ hook: string; video_prompt: string; brief: ContentVideoBrief }> {
   if (getAiMode() === "manual") {
     throw new Error("Modo manual activo: la generación automática está deshabilitada.")
   }
+  const version = input.version ?? "v2"
   const text = await generateText({
     maxTokens: 1200,
     json: true,
@@ -1338,7 +1336,7 @@ export async function generateVideoBrief(input: {
     cacheSystem: true,
     system: `${VIDEO_BRIEF_RULES}
 
-${VIDEO_PROMPT_RULES}
+${getVideoPromptRules(version)}
 
 ${PATIENT_ACQUISITION_RULES}
 
@@ -1377,9 +1375,9 @@ Devolvé SOLO un JSON PLANO con esta forma exacta, sin ningún otro campo ni ani
   const candidateVideoPrompt = parsed.video_prompt.trim().slice(0, 2400)
   // El modelo de texto tambien puede desviarse. Nunca trasladar esa desviacion a un intento pago:
   // si la direccion no pasa el contrato editorial, usar un fallback seguro y determinista.
-  const videoPrompt = isPublishableVeoPrompt(candidateVideoPrompt)
+  const videoPrompt = isPublishableVeoPrompt(candidateVideoPrompt, version)
     ? candidateVideoPrompt
-    : buildFallbackVideoPrompt(input.topic)
+    : buildFallbackVideoPrompt(input.topic, version)
 
   const rawScores = (parsed.scores ?? {}) as Record<string, unknown>
   const clampScore = (key: keyof ContentVideoScores) =>
@@ -1397,6 +1395,7 @@ Devolvé SOLO un JSON PLANO con esta forma exacta, sin ningún otro campo ni ani
     hook: parsed.hook,
     video_prompt: videoPrompt,
     brief: {
+      generation_version: version,
       objective: typeof parsed.objective === "string" ? parsed.objective : "",
       messages,
       cta: typeof parsed.cta === "string" ? parsed.cta : "",
@@ -1412,6 +1411,15 @@ const VEO_POLL_INTERVAL_MS = 10_000
 // final tambien consumen tiempo dentro de esa misma funcion serverless.
 const VEO_POLL_TIMEOUT_MS = 260_000
 
+/** V1 conserva Veo Fast; V2 prioriza consistencia y control con Veo Standard. Los overrides son
+ * separados para que una variable histórica de V1 no degrade silenciosamente la calidad de V2. */
+export function getContentVideoModel(version: VideoGenerationVersion): string {
+  if (version === "v1") {
+    return process.env.GEMINI_VIDEO_MODEL_V1 || process.env.GEMINI_VIDEO_MODEL || "veo-3.1-fast-generate-preview"
+  }
+  return process.env.GEMINI_VIDEO_MODEL_V2 || "veo-3.1-generate-preview"
+}
+
 /**
  * Genera el UNICO plano de video de un reel con Veo (Gemini API). A diferencia de generateContentVisual
  * (respuesta sincronica en segundos), Veo es un proceso asincronico de "operacion de larga duracion":
@@ -1424,6 +1432,7 @@ const VEO_POLL_TIMEOUT_MS = 260_000
  */
 export async function generateContentVideo(input: {
   video_prompt: string
+  version?: VideoGenerationVersion
 }): Promise<{ mime_type: string; video_data: string }> {
   if (getAiMode() === "manual") {
     throw new Error("Modo manual activo: la generación automática está deshabilitada.")
@@ -1436,8 +1445,9 @@ export async function generateContentVideo(input: {
     throw new Error(`DAILY_VIDEO_LIMIT_EXCEEDED:${dailyLimit}`)
   }
 
-  const model = process.env.GEMINI_VIDEO_MODEL || "veo-3.1-fast-generate-preview"
-  const promptHash = hashPrompt(input.video_prompt)
+  const version = input.version ?? "v2"
+  const model = getContentVideoModel(version)
+  const promptHash = hashPrompt(`${version}:${input.video_prompt}`)
   const base = "https://generativelanguage.googleapis.com/v1beta"
 
   try {
@@ -1446,7 +1456,7 @@ export async function generateContentVideo(input: {
       headers: { "x-goog-api-key": apiKey, "Content-Type": "application/json" },
       body: JSON.stringify({
         instances: [{ prompt: input.video_prompt }],
-        parameters: VEO_REQUEST_PARAMETERS,
+        parameters: getVeoRequestParameters(version),
       }),
     })
     const startData = await startRes.json() as { name?: string; error?: { message?: string } }

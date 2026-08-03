@@ -47,6 +47,7 @@ describe("POST /api/content/video", () => {
     const response = await POST(request({
       itemId: "draft-1",
       video_prompt: LEGACY_PROMPT,
+      version: "v2",
       hook: "Tu control cerca",
       messages: ["Atención los martes"],
       cta: "Pedí turno",
@@ -60,7 +61,8 @@ describe("POST /api/content/video", () => {
   it("exige la propuesta completa antes de generar el fondo", async () => {
     const response = await POST(request({
       itemId: "draft-1",
-      video_prompt: buildFallbackVideoPrompt("Atención en Lanús"),
+      video_prompt: buildFallbackVideoPrompt("Atención en Lanús", "v2"),
+      version: "v2",
     }))
 
     expect(response.status).toBe(400)
@@ -69,22 +71,38 @@ describe("POST /api/content/video", () => {
   })
 
   it("genera y compone una dirección editorial válida", async () => {
-    const videoPrompt = buildFallbackVideoPrompt("Atención en Lanús")
+    const videoPrompt = buildFallbackVideoPrompt("Atención en Lanús", "v2")
     const response = await POST(request({
       itemId: "draft-1",
       video_prompt: videoPrompt,
+      version: "v2",
       hook: "Tu control cerca",
       messages: ["Atención los martes"],
       cta: "Pedí turno",
     }))
 
     expect(response.status).toBe(200)
-    expect(generateContentVideo).toHaveBeenCalledWith({ video_prompt: videoPrompt })
+    expect(generateContentVideo).toHaveBeenCalledWith({ video_prompt: videoPrompt, version: "v2" })
     expect(burnVideoBrief).toHaveBeenCalledWith(expect.objectContaining({
       hook: "Tu control cerca",
       messages: ["Atención los martes"],
       cta: "Pedí turno",
     }))
     expect(await response.json()).toEqual({ video_url: "https://media.example/video.mp4" })
+  })
+
+  it("mantiene operativo el motor ilustrado V1", async () => {
+    const videoPrompt = buildFallbackVideoPrompt("Atención en Lanús", "v1")
+    const response = await POST(request({
+      itemId: "draft-1",
+      video_prompt: videoPrompt,
+      version: "v1",
+      hook: "Tu control cerca",
+      messages: ["Atención los martes"],
+      cta: "Pedí turno",
+    }))
+
+    expect(response.status).toBe(200)
+    expect(generateContentVideo).toHaveBeenCalledWith({ video_prompt: videoPrompt, version: "v1" })
   })
 })
