@@ -1,3 +1,12 @@
+# EN CURSO (2026-08-03) — evitar imágenes V2 repetitivas
+
+- [x] Comparar los dos borradores reales y descartar reutilización de archivo o caché.
+- [x] Detectar prompts visuales genéricos o demasiado parecidos a piezas recientes antes de generar.
+- [x] Diversificar la dirección visual de contenidos de sede/conversión y cubrir el caso con tests.
+- [x] Ejecutar lint, 99 suites/928 tests y build; publicar por rama + PR, verificar preview y mergear.
+
+---
+
 # HOTFIX EN CURSO (2026-08-03) — tipo de duración en el request de Veo
 
 - [x] Confirmar en logs de producción que Veo rechazó `durationSeconds` como string.

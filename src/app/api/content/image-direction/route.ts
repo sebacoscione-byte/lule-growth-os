@@ -2,6 +2,8 @@ import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { regenerateImageDirection, getPublicAiError } from "@/lib/ai"
 import { authorizeStaff } from "@/lib/staff-authz"
+import { readContentItems } from "@/lib/content-pipeline"
+import { getImagePromptQualityIssues, recentImagePrompts } from "@/lib/image-prompt-quality"
 
 const FORMATS = ["reel", "historia", "carrusel", "post"] as const
 const CONTENT_ROLES = ["owner", "doctor"] as const
@@ -21,17 +23,37 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Formato inválido." }, { status: 400 })
     }
 
-    const direction = await regenerateImageDirection({
-      category: (body.category as string).slice(0, 160),
-      topic: (body.topic as string).slice(0, 200),
-      format: body.format as typeof FORMATS[number],
-      visual_headline: (body.visual_headline as string).slice(0, 90),
-      visual_subtitle: (body.visual_subtitle as string).slice(0, 90),
-      caption: (body.caption as string).slice(0, 3000),
-      previous_image_prompt: typeof body.previous_image_prompt === "string" ? body.previous_image_prompt : undefined,
+    const items = await readContentItems(supabase).catch(error => {
+      console.error("[content/image-direction] no se pudieron leer prompts recientes:",
+        error instanceof Error ? error.message : String(error))
+      return []
     })
+    const recentPrompts = recentImagePrompts(
+      items,
+      typeof body.itemId === "string" ? body.itemId : undefined
+    )
+    const originalPrompt = typeof body.previous_image_prompt === "string" ? body.previous_image_prompt : ""
+    let previousPrompt = originalPrompt
+    let direction: Awaited<ReturnType<typeof regenerateImageDirection>> | undefined
+    for (let attempt = 0; attempt < 2; attempt++) {
+      direction = await regenerateImageDirection({
+        category: (body.category as string).slice(0, 160),
+        topic: (body.topic as string).slice(0, 200),
+        format: body.format as typeof FORMATS[number],
+        visual_headline: (body.visual_headline as string).slice(0, 90),
+        visual_subtitle: (body.visual_subtitle as string).slice(0, 90),
+        caption: (body.caption as string).slice(0, 3000),
+        previous_image_prompt: previousPrompt || undefined,
+        recent_image_prompts: [originalPrompt, ...recentPrompts].filter(Boolean),
+      })
+      if (getImagePromptQualityIssues(direction.image_prompt, [originalPrompt, ...recentPrompts]).length === 0) break
+      previousPrompt = direction.image_prompt
+      if (attempt === 1) {
+        throw new Error("La IA no logró proponer una escena suficientemente distinta. Volvé a intentar.")
+      }
+    }
 
-    return NextResponse.json(direction)
+    return NextResponse.json(direction!)
   } catch (error) {
     console.error("[content/image-direction]", error instanceof Error ? error.message : String(error))
     return NextResponse.json({ error: getPublicAiError(error) }, { status: 500 })

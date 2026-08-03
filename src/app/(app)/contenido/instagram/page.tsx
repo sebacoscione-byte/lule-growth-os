@@ -2360,12 +2360,14 @@ function Editor({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           itemId: item.id,
+          sourceItemId: item.id,
           category: item.category,
           topic: item.topic,
           format: item.format,
           visual_headline: item.visual_headline,
           visual_subtitle: item.visual_subtitle,
           image_prompt: imagePrompt,
+          caption: item.caption,
           version: item.visual_generation_version ?? "v2",
         }),
       })
@@ -2375,6 +2377,9 @@ function Editor({
         setVisualHelpUrl(typeof data.help_url === "string" ? data.help_url : null)
         return
       }
+      const usedImagePrompt = typeof data.image_prompt === "string" && data.image_prompt.trim()
+        ? data.image_prompt
+        : imagePrompt
       onGeneratedVisual({ itemId: item.id, url: `data:${data.mime_type};base64,${data.image_data}` })
       if (data.visual_url) {
         // Texto alternativo (accesibilidad interna, no se le muestra al usuario): se recalcula solo
@@ -2388,13 +2393,13 @@ function Editor({
               topic: item.topic,
               visual_headline: item.visual_headline,
               visual_subtitle: item.visual_subtitle,
-              image_prompt: imagePrompt,
+              image_prompt: usedImagePrompt,
             }),
           })
           const altData = await altResponse.json()
           if (altResponse.ok && altData.image_alt_text) altText = altData.image_alt_text
         } catch { /* best-effort */ }
-        onSave({ visual_url: data.visual_url, image_prompt: imagePrompt, ...(altText ? { image_alt_text: altText } : {}) })
+        onSave({ visual_url: data.visual_url, image_prompt: usedImagePrompt, ...(altText ? { image_alt_text: altText } : {}) })
       } else {
         setVisualError(
           `La placa se generó pero no se pudo guardar (${data.visual_persist_error ?? "error desconocido"}). ` +
@@ -2414,25 +2419,31 @@ function Editor({
    * para la portada (con imagePrompt, el look compartido) como para cada slide del carrusel (con la
    * escena propia de esa slide vía promptOverride), con un titular/subtítulo distinto por imagen.
    */
-  async function generateOneVisual(headline: string, subtitle: string, idSuffix: string, promptOverride?: string): Promise<{ visual_url?: string; error?: string }> {
+  async function generateOneVisual(headline: string, subtitle: string, idSuffix: string, promptOverride?: string): Promise<{ visual_url?: string; image_prompt?: string; error?: string }> {
     try {
       const response = await fetch("/api/content/visual", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           itemId: `${item.id}${idSuffix}`,
+          sourceItemId: item.id,
           category: item.category,
           topic: item.topic,
           format: item.format,
           visual_headline: headline || item.topic.slice(0, 90),
           visual_subtitle: subtitle,
           image_prompt: promptOverride ?? imagePrompt,
+          caption: item.caption,
+          version: item.visual_generation_version ?? "v2",
         }),
       })
       const data = await response.json()
       if (!response.ok || data.error) return { error: data.error ?? "No se pudo generar la imagen." }
       if (!data.visual_url) return { error: `Se generó pero no se pudo guardar (${data.visual_persist_error ?? "error desconocido"}).` }
-      return { visual_url: data.visual_url }
+      return {
+        visual_url: data.visual_url,
+        image_prompt: typeof data.image_prompt === "string" ? data.image_prompt : promptOverride ?? imagePrompt,
+      }
     } catch {
       return { error: "No se pudo conectar con Gemini para generar esta imagen." }
     }
@@ -2453,6 +2464,7 @@ function Editor({
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
+            itemId: item.id,
             category: item.category,
             topic: item.topic,
             format: item.format,
@@ -2501,7 +2513,7 @@ function Editor({
     if (result.error) {
       setSlideErrors(previous => ({ ...previous, [index]: result.error as string }))
     } else {
-      onSave({ slides: (item.slides ?? []).map((s, i) => i === index ? { ...s, visual_url: result.visual_url, image_prompt: slidePrompt ?? s.image_prompt } : s) })
+      onSave({ slides: (item.slides ?? []).map((s, i) => i === index ? { ...s, visual_url: result.visual_url, image_prompt: result.image_prompt ?? slidePrompt ?? s.image_prompt } : s) })
     }
     setSlideGeneratingIndex(null)
   }
@@ -2524,7 +2536,7 @@ function Editor({
       setBulkGenerating(false)
       return
     }
-    onSave({ visual_url: cover.visual_url, image_prompt: imagePrompt })
+    onSave({ visual_url: cover.visual_url, image_prompt: cover.image_prompt ?? imagePrompt })
     const slides = item.slides ?? []
     const nextSlides: ContentSlide[] = [...slides]
     setSlideSceneFallbackWarning({})
@@ -2546,7 +2558,7 @@ function Editor({
         setBulkGenerating(false)
         return
       }
-      nextSlides[index] = { ...slides[index], visual_url: result.visual_url, image_prompt: slidePrompt ?? slides[index].image_prompt }
+      nextSlides[index] = { ...slides[index], visual_url: result.visual_url, image_prompt: result.image_prompt ?? slidePrompt ?? slides[index].image_prompt }
       onSave({ slides: [...nextSlides] })
     }
     setBulkGenerating(false)
@@ -2707,7 +2719,8 @@ function Editor({
       const response = await fetch("/api/content/image-direction", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+      body: JSON.stringify({
+          itemId: item.id,
           category: item.category,
           topic: item.topic,
           format: item.format,

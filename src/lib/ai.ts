@@ -178,14 +178,13 @@ const IMAGE_PROMPT_RULES = `DIRECCION VISUAL PARA GEMINI:
 - La escena debe activar curiosidad o identificacion en un paciente potencial: mostrar un momento cotidiano reconocible, una decision preventiva o el beneficio emocional de ocuparse de la salud.
 - Debe existir una tension visual suave entre "seguir postergando" y "ocuparse a tiempo", sin representar peligro, dolor, miedo ni urgencia.
 - La imagen debe sentirse cercana y confiable: evita el pasillo de guardia, la luz fria fluorescente,
-  el ambiente esteril-asustador o la publicidad de stock generica. Pero un consultorio medico calido y
-  profesional (luz natural, materiales nobles, plantas, tonos calidos) es una ubicacion valida y en
-  muchos casos la correcta -- no es lo mismo que "hospitalario" en el sentido frio/institucional que hay
-  que evitar.
+  el ambiente esteril-asustador y la publicidad de stock generica. Un consultorio es valido cuando la
+  accion medica concreta del tema realmente lo exige, pero NO es el fondo por defecto para representar
+  confianza, cercania, una sede o una consulta. No uses adjetivos vagos como "premium", "cinematic",
+  "trustworthy" o "calm" como sustituto de una escena y una accion especificas.
 - Elegi una sola direccion creativa concreta segun de que habla el tema:
-  - Si el tema es un estudio, procedimiento o consulta que sucede en el consultorio (ecocardiograma,
-    consulta cardiologica, estudios cardiologicos, chequeo cardiovascular, atencion en una sede, como
-    pedir turno), la escena TIENE que transcurrir en un consultorio o sala de estudios reconocible como
+  - Si el tema es un estudio o procedimiento concreto que sucede en el consultorio (ecocardiograma,
+    Holter, MAPA u otro estudio cardiologico), la escena TIENE que transcurrir en un consultorio o sala de estudios reconocible como
     tal (camilla, equipo correspondiente al estudio mencionado en uso o listo para usarse, ambiente
     clinico profesional pero calido) -- nunca en un living, dormitorio u otro espacio domestico generico.
     Un instrumento medico (ej. el transductor de un ecografo) apoyado sobre una mesa ratona sin ningun
@@ -210,6 +209,16 @@ const IMAGE_PROMPT_RULES = `DIRECCION VISUAL PARA GEMINI:
     corresponda) y lo que se ve en pantalla tienen que corresponder exactamente a ESE estudio puntual,
     no a un estudio similar o mas generico, y no alcanza con un "product shot" del equipo solo si el
     estudio real requiere que este puesto sobre una persona para tener sentido.
+  - Si el tema es atencion en una sede, cercania, disponibilidad, como pedir turno o una invitacion a
+    control sin un estudio puntual, NO uses la escena comodin de medica en consultorio. Comunica acceso
+    y proximo paso mediante un arquetipo visual distinto: una ilustracion editorial tactil de recorrido
+    local/calendario sin texto, un momento documental de llegada visto desde atras sin identificar un
+    edificio real, o una naturaleza muerta concreta de preparacion para la consulta. No inventes la
+    arquitectura, carteleria, personal ni equipamiento de una sede real. Elegi UNO de esos arquetipos.
+  - Si el tema es una consulta o chequeo general, mostra una unica accion humana significativa (escucha,
+    conversacion o medicion concreta) con encuadre documental. Nunca rellenes la escena con un conjunto
+    decorativo de escritorio + guardapolvo + estetoscopio + tablet/monitor + planta: ese combo produce
+    imagenes de stock intercambiables y no aporta informacion.
   - Si el tema es sobre habitos, prevencion o factores de riesgo sin un procedimiento en consultorio
     (alimentacion, actividad fisica, presion tomada en casa, adherencia a un tratamiento), preferi un
     momento humano cotidiano vinculado directamente al tema (ej: preparar una comida saludable para un
@@ -221,6 +230,8 @@ const IMAGE_PROMPT_RULES = `DIRECCION VISUAL PARA GEMINI:
     cayendo, un nudo desatandose: no comunican "salud" ni "cardiologia" por si solas). No mezcles
     conceptos.
 - Describi sujeto, accion, encuadre, lente o perspectiva, iluminacion, profundidad, paleta, textura, estado de animo y ubicacion del espacio negativo.
+- Cambia el arquetipo visual segun el tema. No resuelvas dos piezas distintas reorganizando la misma
+  medica parcial, el mismo escritorio de madera y los mismos accesorios clinicos.
 - Usa este orden dentro del prompt: objetivo y tema; escena principal; composicion; luz y color; acabado editorial; espacio negativo; restricciones.
 - Indica proporcion vertical 4:5 para feed; usa 9:16 solo si el formato es historia.
 - IMPORTANTE (2026-07-30): esta escena es SOLO la foto/ilustracion de fondo -- el titular, subtitulo,
@@ -1490,12 +1501,20 @@ export async function regenerateImageDirection(input: {
   visual_subtitle: string
   caption: string
   previous_image_prompt?: string
+  recent_image_prompts?: string[]
 }): Promise<{ image_prompt: string; image_alt_text: string }> {
   if (getAiMode() === "manual") {
     throw new Error("Modo manual activo: la generación automática está deshabilitada.")
   }
   const avoidPrevious = input.previous_image_prompt
     ? `\nLa direccion anterior fue esta, DESCARTALA y proponé un concepto visual distinto (otro sujeto/escena, no una variacion menor): """${input.previous_image_prompt}"""`
+    : ""
+  const avoidRecent = (input.recent_image_prompts ?? [])
+    .filter(prompt => prompt.trim())
+    .slice(0, 8)
+    .map((prompt, index) => `${index + 1}) ${prompt.slice(0, 900)}`)
+  const recentContext = avoidRecent.length > 0
+    ? `\n\nDirecciones de piezas recientes que NO tenés que repetir ni parafrasear. Cambiá el arquetipo visual, no sólo la posición de los mismos objetos:\n${avoidRecent.join("\n")}`
     : ""
   const text = await generateText({
     maxTokens: 700,
@@ -1514,7 +1533,7 @@ Devolve SOLO un JSON PLANO con esta forma exacta, sin importar el formato: { "im
 Nunca devuelvas un array "slides" ni ninguna otra forma -- es SIEMPRE este unico objeto con esas dos claves.`,
     messages: [{
       role: "user",
-      content: `Categoria: ${input.category}\nTema: ${input.topic}\nFormato: ${input.format}\nTitular: "${input.visual_headline}"\nSubtitulo: "${input.visual_subtitle}"\nCaption completo:\n${input.caption}${avoidPrevious}`,
+      content: `Categoria: ${input.category}\nTema: ${input.topic}\nFormato: ${input.format}\nTitular: "${input.visual_headline}"\nSubtitulo: "${input.visual_subtitle}"\nCaption completo:\n${input.caption}${avoidPrevious}${recentContext}`,
     }],
   })
   const parsed = parseJson<{ image_prompt?: unknown; image_alt_text?: unknown }>(text)
