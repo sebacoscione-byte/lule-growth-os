@@ -1,3 +1,12 @@
+# HOTFIX EN CURSO (2026-08-03) — tipo de duración en el request de Veo
+
+- [x] Confirmar en logs de producción que Veo rechazó `durationSeconds` como string.
+- [x] Enviar `durationSeconds: 8` como número y cubrir el contrato con una regresión de tipo.
+- [x] Ejecutar lint, 97 suites/923 tests y build de producción.
+- [ ] Publicar por rama + PR, verificar CI/preview y mergear.
+
+---
+
 # EN CURSO (2026-08-03) — mejorar calidad publicable de videos generados
 
 - [x] Revisar el borrador real y reconstruir el prompt exacto enviado a Veo.
