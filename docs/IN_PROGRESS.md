@@ -1,3 +1,13 @@
+# EN CURSO (2026-08-03) — integrar foto y texto en V2.1
+
+- [x] Revisar el corte rígido actual y las capacidades vigentes de Gemini Image.
+- [x] Reemplazar las dos columnas por foto full-bleed y cobertura marfil degradada.
+- [x] Fijar relación de aspecto y resolución 2K en el request de Gemini.
+- [x] Cubrir composición y contrato de API con regresiones visuales/estructurales.
+- [x] Ejecutar lint, 100 suites/930 tests y build; publicar por rama + PR, verificar preview y mergear.
+
+---
+
 # EN CURSO (2026-08-03) — evitar imágenes V2 repetitivas
 
 - [x] Comparar los dos borradores reales y descartar reutilización de archivo o caché.

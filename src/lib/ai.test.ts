@@ -324,9 +324,12 @@ describe("generatePhotoWithGemini reintenta ante una falla transitoria (bug real
     return {
       ok: true,
       json: async () => ({
-        candidates: hasPhoto
-          ? [{ content: { parts: [{ inlineData: { mimeType: "image/png", data: MINIMAL_PNG_BASE64 } }] } }]
-          : [{ content: { parts: [{}] } }], // 200 OK pero sin datos de imagen -- el caso real reportado
+        steps: [{
+          type: "model_output",
+          content: hasPhoto
+            ? [{ type: "image", mime_type: "image/png", data: MINIMAL_PNG_BASE64 }]
+            : [{ type: "text", text: "sin imagen" }], // 200 OK pero sin datos de imagen -- el caso real reportado
+        }],
       }),
     } as unknown as Response
   }
@@ -379,9 +382,19 @@ describe("generatePhotoWithGemini reintenta ante una falla transitoria (bug real
     fetchSpy = jest.spyOn(global, "fetch").mockImplementation(async (_url, init) => {
       callCount += 1
       const body = JSON.parse((init as RequestInit).body as string)
-      const sentPrompt = body.contents[0].parts[0].text as string
+      const sentPrompt = body.input as string
       expect(sentPrompt).not.toContain(visualInput.visual_headline)
       expect(sentPrompt).not.toContain(visualInput.visual_subtitle)
+      expect(_url).toBe("https://generativelanguage.googleapis.com/v1beta/interactions")
+      expect(body).toMatchObject({
+        model: "gemini-3.1-flash-image",
+        response_format: {
+          type: "image",
+          mime_type: "image/png",
+          aspect_ratio: "4:5",
+          image_size: "2K",
+        },
+      })
       return geminiImageResponse(true)
     })
     const result = await generateContentVisual(visualInput)
@@ -393,7 +406,7 @@ describe("generatePhotoWithGemini reintenta ante una falla transitoria (bug real
     let sentPrompt = ""
     fetchSpy = jest.spyOn(global, "fetch").mockImplementation(async (_url, init) => {
       const body = JSON.parse((init as RequestInit).body as string)
-      sentPrompt = body.contents[0].parts[0].text as string
+      sentPrompt = body.input as string
       return geminiImageResponse(true)
     })
     const result = await generateContentVisual({ ...visualInput, version: "v1" })
@@ -402,5 +415,16 @@ describe("generatePhotoWithGemini reintenta ante una falla transitoria (bug real
     // V1 no pasa por composeContentPlate (ffmpeg) -- el mime_type es el que devolvio Gemini tal cual.
     expect(result.mime_type).toBe("image/png")
     expect(result.image_data).toBe(MINIMAL_PNG_BASE64)
+  })
+
+  it("fija 9:16 y 2K en la API para historia/reel, no solo dentro del prompt", async () => {
+    fetchSpy = jest.spyOn(global, "fetch").mockImplementation(async (_url, init) => {
+      const body = JSON.parse((init as RequestInit).body as string)
+      expect(body.response_format).toMatchObject({ aspect_ratio: "9:16", image_size: "2K" })
+      return geminiImageResponse(true)
+    })
+
+    await generateContentVisual({ ...visualInput, format: "reel" })
+    expect(fetchSpy).toHaveBeenCalledTimes(1)
   })
 })

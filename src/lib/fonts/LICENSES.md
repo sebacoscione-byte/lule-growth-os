@@ -12,7 +12,7 @@ vía `drawtext` de ffmpeg — no se puede usar `next/font` ahí, necesita un arc
 
 Fraunces e Inter se bajaron el 2026-07-30 directo de `fonts.gstatic.com` (mismos archivos que sirve
 Google Fonts, formato TTF real — necesario porque `drawtext`/freetype no soporta WOFF2) para que la
-placa de Instagram (panel de texto + foto) comparta la misma identidad tipográfica que la landing
+placa de Instagram (foto full-bleed + cobertura de texto) comparta la misma identidad tipográfica que la landing
 pública (`ink`/`paper`/`cardiac`, ver `src/app/globals.css`), en vez de inventar una fuente nueva.
 Libres de usar y redistribuir sin atribución obligatoria (SIL OFL permite embeber la fuente en un
 producto).

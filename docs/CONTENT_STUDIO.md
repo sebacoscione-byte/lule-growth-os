@@ -46,16 +46,19 @@ El prompt visual define una sola direccion creativa, proporcion vertical, punto 
 **Desde el 2026-07-30, Gemini ya no dibuja ningun texto dentro de la imagen** (antes generaba foto +
 titular + subtitulo en una sola pasada, lo cual llego a inventar lineas deformes o comerse letras --
 ver `docs/BACKLOG.md`). Ahora Gemini genera SOLO la foto/escena (con espacio negativo pedido en el
-tercio izquierdo del encuadre) y `composeContentPlate()` (`src/lib/content-plate.ts`) arma la placa
-final por edicion real con ffmpeg: panel de marca a la izquierda (paleta/tipografia de la landing
-publica -- `ink`/`paper`/`cardiac`, Fraunces+Inter) + la foto a la derecha + titular/subtitulo/nombre/
-especialidad quemados con texto real, nunca dibujados por el modelo de imagen. Garantiza ortografia
+zona izquierda simple y de bajo detalle) y `composeContentPlate()` (`src/lib/content-plate.ts`) arma
+la placa final por edicion real con ffmpeg. Desde V2.1 la foto ocupa todo el lienzo y una cobertura
+marfil casi opaca detrás del texto se desvanece suavemente hacia el centro; ya no hay dos columnas ni
+un corte vertical. Sobre esa composición se queman titular/subtitulo/nombre/especialidad con texto
+real y la paleta/tipografia de la landing publica (`ink`/`paper`/`cardiac`, Fraunces+Inter), nunca
+dibujados por el modelo de imagen. Garantiza ortografia
 perfecta siempre. El editor llama a `generateContentVisual` (que hace ambos pasos internamente) para
 generar una placa final 4:5 para feed/carrusel o 9:16 para historia. La persona revisa el resultado y
 lo descarga; no tiene que armar la composicion visual.
 
-El panel izquierdo es deliberadamente constante: es el sistema de marca de V2, no una imagen
-reutilizada. La escena del lado derecho sí tiene que cambiar. Antes de gastar un intento, la ruta de
+La cobertura izquierda es deliberadamente constante: es el sistema de marca de V2.1, no una imagen
+reutilizada. Al tener transición y fotografía full-bleed, funciona como una capa editorial integrada
+en vez de una mitad pegada. La escena sí tiene que cambiar. Antes de gastar un intento, la ruta de
 generación compara los motivos del `image_prompt` con las piezas recientes y detecta también el cliché
 de consultorio armado con médica parcial + escritorio + utilería clínica. Si aparece cualquiera de
 esos problemas, pide automáticamente otra dirección visual y persiste el prompt realmente usado. No
@@ -70,6 +73,10 @@ médicas que necesiten ese contexto.
 Variables:
 
 - `GEMINI_IMAGE_MODEL`: modelo de imagen; por defecto `gemini-3.1-flash-image`.
+
+La integración de Gemini usa Interactions API y fija el formato como configuración real —4:5 para
+feed/carrusel y 9:16 para historia/reel— con salida 2K. No depende sólo de escribir la proporción en
+el prompt, y evita recortes destructivos antes de componer la placa final a 1080 px.
 
 La generacion automatica de placas requiere cuota disponible para modelos de imagen en la clave de Gemini. Algunas claves tienen limite gratuito `0`; en ese caso la app muestra el enlace para revisar cuota o activar billing en lugar de un error generico.
 
