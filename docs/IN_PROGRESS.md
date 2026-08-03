@@ -3,7 +3,7 @@
 - [x] Confirmar en logs de producción que Veo rechazó `durationSeconds` como string.
 - [x] Enviar `durationSeconds: 8` como número y cubrir el contrato con una regresión de tipo.
 - [x] Ejecutar lint, 97 suites/923 tests y build de producción.
-- [ ] Publicar por rama + PR, verificar CI/preview y mergear.
+- [x] Publicar por rama + PR, verificar CI/preview y mergear.
 
 ---
 
