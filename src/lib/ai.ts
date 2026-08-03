@@ -238,8 +238,10 @@ const IMAGE_PROMPT_RULES = `DIRECCION VISUAL PARA GEMINI:
   nombre y especialidad se agregan despues por edicion real sobre un panel de texto propio (ver
   composeContentPlate en content-plate.ts), nunca los dibuja el modelo de imagen. Por eso "image_prompt"
   nunca debe mencionar texto, letras, titulares ni tipografia -- describi unicamente la escena
-  fotografica/ilustrada. Pedi que el punto focal/sujeto quede ubicado en los dos tercios derechos del
-  encuadre, con espacio negativo simple y prolijo en el tercio izquierdo (ahi va el panel de texto).
+  fotografica/ilustrada. Pedi que el punto focal y todos los objetos significativos queden contenidos
+  en el 40% derecho, con el 55% izquierdo simple, parejo y de bajo detalle. La foto se usa full-bleed y
+  una cobertura marfil degradada se superpone desde la izquierda: no debe haber objetos importantes ni
+  primeros planos borrosos cruzando esa zona o dominando el tercio inferior.
 - Para historia, manten el sujeto y los elementos importantes dentro de la zona segura central, lejos de los bordes superior e inferior.
 - Para carrusel, crea una portada que abra una brecha de curiosidad y se entienda en menos de tres segundos.
 - Pedi iluminacion natural o cinematografica suave, profundidad, textura y una paleta sobria con acentos bordo, azul profundo o verde azulado.
@@ -1049,7 +1051,11 @@ const OPENAI_IMAGE_SIZE: Record<ContentVisualFormat, string> = {
   reel: "1008x1792",
 }
 
-async function generatePhotoWithGemini(prompt: string, promptHash: string): Promise<{ buffer: Buffer; mimeType: string }> {
+async function generatePhotoWithGemini(
+  prompt: string,
+  promptHash: string,
+  aspectRatio: "4:5" | "9:16"
+): Promise<{ buffer: Buffer; mimeType: string }> {
   const apiKey = process.env.GEMINI_API_KEY
   if (!apiKey) throw new Error("GEMINI_API_KEY no esta configurada.")
 
@@ -1072,28 +1078,46 @@ async function generatePhotoWithGemini(prompt: string, promptHash: string): Prom
   let lastError: unknown
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
     try {
+      // Interactions API (contrato vigente 2026-08): a diferencia del generateContent historico,
+      // permite fijar la proporcion y resolucion como parametros reales. Antes V2 solo escribia
+      // "4:5"/"9:16" dentro del prompt y Gemini podia devolver otra geometria, que despues sufria un
+      // crop agresivo. 2K deja margen para componer a 1080 px sin perder nitidez.
       const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1/models/${encodeURIComponent(model)}:generateContent`,
+        "https://generativelanguage.googleapis.com/v1beta/interactions",
         {
           method: "POST",
           headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
           body: JSON.stringify({
-            contents: [{ role: "user", parts: [{ text: prompt }] }],
+            model,
+            input: prompt,
+            response_format: {
+              type: "image",
+              mime_type: "image/png",
+              aspect_ratio: aspectRatio,
+              image_size: "2K",
+            },
           }),
         }
       )
       const data = await response.json() as {
-        candidates?: Array<{ content?: { parts?: Array<{
-          inlineData?: { mimeType?: string; data?: string }
-          inline_data?: { mime_type?: string; data?: string }
-        }> } }>
+        output_image?: { mime_type?: string; data?: string }
+        steps?: Array<{
+          type?: string
+          content?: Array<{ type?: string; mime_type?: string; data?: string }>
+        }>
         error?: { message?: string }
       }
       if (!response.ok) throw new Error(data.error?.message || `Gemini respondio con estado ${response.status}.`)
 
-      const part = data.candidates?.[0]?.content?.parts?.find(candidate => candidate.inlineData?.data || candidate.inline_data?.data)
-      const photoData = part?.inlineData?.data || part?.inline_data?.data
-      const mimeType = part?.inlineData?.mimeType || part?.inline_data?.mime_type || "image/png"
+      // output_image es la conveniencia del SDK; REST expone la imagen dentro del ultimo
+      // model_output. Se aceptan ambos para que el parser sea tolerante al transporte utilizado.
+      const imageBlocks = (data.steps ?? [])
+        .filter(step => step.type === "model_output")
+        .flatMap(step => step.content ?? [])
+        .filter(content => content.type === "image" && content.data)
+      const image = data.output_image?.data ? data.output_image : imageBlocks.at(-1)
+      const photoData = image?.data
+      const mimeType = image?.mime_type || "image/png"
       if (!photoData) throw new Error("Gemini no devolvio una imagen.")
 
       await logRequest("gemini", model, promptHash, "content_visual", true)
@@ -1207,8 +1231,8 @@ FINAL ART DIRECTION:
 FINAL CHECK before rendering: the finished image must contain ONLY the two Spanish strings above (HEADLINE and SUBTITLE), each spelled perfectly with correct accents and ñ, every word present and in order, and ZERO other text characters of any kind.`
 }
 
-/** Prompt V2 (default desde el 2026-07-30, "Opcion A"): SOLO la foto/escena, sin texto de ningun
- * tipo -- composeContentPlate() arma el titular/subtitulo/marca aparte, por edicion real. */
+/** Prompt V2.1 (valor persistido "v2", default): SOLO la foto/escena full-bleed, sin texto de ningun
+ * tipo -- composeContentPlate() integra cobertura/titular/subtitulo/marca aparte, por edicion real. */
 function buildVisualPromptV2(input: {
   category: string
   topic: string
@@ -1226,7 +1250,7 @@ ${input.image_prompt}
 
 FINAL ART DIRECTION:
 - Produce one polished ${aspectRatio} photographic/illustrative composition, not a mockup or template preview.
-- Leave open, uncluttered negative space across the LEFT third of the frame (soft or simple background there) -- a text panel will be placed over that area afterward. Keep the main subject/focal point positioned across the right two-thirds of the frame.
+- Compose for a full-bleed image with the main subject and all meaningful objects contained in the RIGHT 40% of the frame. Keep the LEFT 55% quiet, low-detail and tonally even because a soft opaque-to-transparent text scrim will blend over it afterward. Do not place a foreground object across the lower edge or let blurred objects dominate the bottom third.
 - The image must feel warm, professional and trustworthy to an adult patient in Argentina, with a clear focal point and generous breathing room.
 - ABSOLUTELY NO text, letters, numbers, words, logos, watermarks, UI elements, phone/app mockups, captions or invented/decorative lettering anywhere in the image, in any language.
 - No diagnosis, treatment claim, urgency marketing, fear, or extra text of any kind.
@@ -1258,7 +1282,7 @@ export async function generateContentVisual(input: {
 
   let photo: { buffer: Buffer; mimeType: string }
   try {
-    photo = await generatePhotoWithGemini(prompt, promptHash)
+    photo = await generatePhotoWithGemini(prompt, promptHash, aspectRatio)
   } catch (geminiError) {
     if (!process.env.OPENAI_API_KEY) throw geminiError
     try {

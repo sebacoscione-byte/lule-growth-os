@@ -3011,7 +3011,9 @@ function Editor({
             <p className="text-xs text-gray-600">
               {isReel
                 ? "La miniatura que se ve en tu perfil de Instagram (pestaña Reels) y en la Biblioteca de acá — no es el contenido del reel en sí, eso lo define el video de arriba. Si no generás ni subís una, Instagram usa el primer frame del video como portada."
-                : "Gemini resuelve la escena, composición, tipografía, contraste y zonas seguras según el formato."}
+                : (item.visual_generation_version ?? "v2") === "v2"
+                  ? "Gemini genera la escena; la app integra foto full-bleed, cobertura de lectura y tipografía real según el formato."
+                  : "Gemini resuelve la placa completa, incluida la tipografía, en una sola generación."}
             </p>
           </CardHeader>
           <CardContent className="space-y-3">
@@ -3025,7 +3027,7 @@ function Editor({
                   disabled={busy}
                   onClick={() => onSave({ visual_generation_version: "v2" })}
                 >
-                  Actual (V2)
+                  Actual (V2.1)
                 </Button>
                 <Button
                   type="button"
@@ -3039,7 +3041,7 @@ function Editor({
               </div>
               <p className="w-full text-[11px] text-gray-500">
                 {(item.visual_generation_version ?? "v2") === "v2"
-                  ? "Gemini genera solo la foto; el titular, subtítulo y marca se agregan aparte por edición real — ortografía siempre perfecta."
+                  ? "Gemini genera la foto full-bleed en 2K; la cobertura degradada, el titular, subtítulo y marca se agregan por edición real — sin corte al medio y con ortografía perfecta."
                   : "Gemini dibuja la placa entera (foto + texto) en una sola pasada — estilo más fotográfico, pero con riesgo real de texto mal escrito o inventado."}
               </p>
             </div>
