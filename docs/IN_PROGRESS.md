@@ -1,3 +1,13 @@
+# EN CURSO (2026-08-03) — mejorar calidad publicable de videos generados
+
+- [x] Revisar el borrador real y reconstruir el prompt exacto enviado a Veo.
+- [x] Identificar el fallback legado (`cinematic B-roll`) que produjo el consultorio artificial.
+- [x] Reemplazarlo por dirección editorial 2D y bloquear prompts legados antes de consumir crédito.
+- [x] Ejecutar lint, 97 suites/923 tests, build y verificar el nuevo prompt para el mismo caso de Lanús.
+- [x] Publicar por rama + PR, verificar CI/preview y mergear.
+
+---
+
 # EN CURSO (2026-08-03) — corregir generación visual V2 en Vercel
 
 - [x] Confirmar que Gemini responde y que la falla ocurre en la composición FFmpeg de V2.
