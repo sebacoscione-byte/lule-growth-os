@@ -25,9 +25,16 @@ export const VEO_V2_NEGATIVE_PROMPT = [
 ].join(", ")
 
 export function getVeoRequestParameters(version: VideoGenerationVersion) {
-  return version === "v2" || version === "v2_direct"
-    ? { ...COMMON_VEO_PARAMETERS, personGeneration: "allow_adult", negativePrompt: VEO_V2_NEGATIVE_PROMPT }
-    : COMMON_VEO_PARAMETERS
+  if (version === "v2") {
+    // Veo 3.1 image-to-video solo admite allow_adult. El fotograma aprobado ya fija una persona adulta.
+    return { ...COMMON_VEO_PARAMETERS, personGeneration: "allow_adult", negativePrompt: VEO_V2_NEGATIVE_PROMPT }
+  }
+  if (version === "v2_direct") {
+    // Veo 3.1 text-to-video rechaza allow_adult y exige allow_all. El prompt positivo sigue limitando
+    // la escena a una persona adulta; este valor solo adapta el request al contrato actual de Google.
+    return { ...COMMON_VEO_PARAMETERS, personGeneration: "allow_all", negativePrompt: VEO_V2_NEGATIVE_PROMPT }
+  }
+  return COMMON_VEO_PARAMETERS
 }
 
 export function getVeoRequestInstance(
