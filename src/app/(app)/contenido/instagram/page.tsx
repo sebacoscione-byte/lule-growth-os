@@ -22,7 +22,7 @@ import { parseAiJson } from "@/lib/parse-ai-json"
 import { truncateForImagePlate } from "@/lib/content-text"
 import { DEFAULT_AUTO_PUBLISH_SETTINGS, alreadyPublishedToday, estimateAutoPublishDrainDays, estimateAutoPublishDateForPosition, estimateRepeatEndDate, findRecentDuplicateTopic, pickNextPublishableItems, isReorderableInQueue, reorderableQueuePositions } from "@/lib/content-pipeline"
 import { buildFallbackVideoPrompt, getVeoPromptQualityIssues } from "@/lib/video-prompt"
-import type { AutoPublishSettings, AutoPublishTrackSettings, ContentItem, ContentObjective, ContentSlide, ContentSource, ContentStatus, ContentVideoScores, VideoGenerationVersion } from "@/types"
+import type { AutoPublishSettings, AutoPublishTrackSettings, ContentItem, ContentObjective, ContentSlide, ContentSource, ContentStatus, ContentVideoBrandScores, ContentVideoScores, VideoGenerationVersion } from "@/types"
 import type { InstagramMediaInsights } from "@/lib/instagram-business"
 import { CONTENT_OBJECTIVE_GOALS, CONTENT_OBJECTIVE_LABELS, WEEKDAY_OPTIONS } from "@/types"
 
@@ -67,6 +67,19 @@ const VIDEO_SCORE_LABELS: Array<[keyof ContentVideoScores, string]> = [
   ["brand_consistency", "Consistencia de marca"],
 ]
 const VIDEO_SCORE_MIN = 4
+const VIDEO_BRAND_SCORE_LABELS: Array<[keyof ContentVideoBrandScores, string]> = [
+  ["semanticRelevance", "Relevancia semántica"],
+  ["firstSecondHook", "Impacto inicial"],
+  ["meaningfulMotion", "Movimiento con sentido"],
+  ["humanAuthenticity", "Autenticidad humana"],
+  ["medicalCredibility", "Credibilidad médica"],
+  ["profileVisualConsistency", "Identidad del perfil"],
+  ["originalityVersusRecentPosts", "Originalidad reciente"],
+  ["artifactRisk", "Bajo riesgo de artefactos"],
+]
+const VIDEO_BRAND_BLOCKING_KEYS: Array<keyof ContentVideoBrandScores> = [
+  "semanticRelevance", "humanAuthenticity", "medicalCredibility", "profileVisualConsistency", "originalityVersusRecentPosts",
+]
 
 const STATUS_LABELS: Record<ContentStatus, string> = {
   draft: "Borrador",
@@ -84,7 +97,7 @@ const STYLE_CLASSES = {
 const EDITABLE_FIELDS: Array<keyof ContentItem> = [
   "format", "hook", "caption", "google_text", "hashtags", "visual_headline",
   "visual_subtitle", "visual_style", "image_prompt", "image_alt_text", "slides",
-  "video_prompt", "video_generation_version",
+  "video_prompt", "video_generation_version", "video_brief", "video_reference_frame_approved",
 ]
 
 // video_url no entra en EDITABLE_FIELDS (igual que visual_url) a proposito: subir el video no cuenta
@@ -2289,6 +2302,8 @@ function Editor({
   const [aiVideoGenerating, setAiVideoGenerating] = useState(false)
   const [aiVideoError, setAiVideoError] = useState<string | null>(null)
   const [aiVideoHelpUrl, setAiVideoHelpUrl] = useState<string | null>(null)
+  const [videoFrameGenerating, setVideoFrameGenerating] = useState(false)
+  const [videoFrameError, setVideoFrameError] = useState<string | null>(null)
   const [showHistoriaText, setShowHistoriaText] = useState(false)
   const [slideGeneratingIndex, setSlideGeneratingIndex] = useState<number | null>(null)
   const [slideErrors, setSlideErrors] = useState<Record<number, string>>({})
@@ -2305,7 +2320,16 @@ function Editor({
   const videoPrompt = item.video_prompt?.trim() || fallbackVideoPrompt(item, videoGenerationVersion)
   const videoPromptIssues = getVeoPromptQualityIssues(videoPrompt, videoGenerationVersion)
   const videoNeedsProposal = !item.video_brief ||
-    item.video_brief.generation_version !== videoGenerationVersion || videoPromptIssues.length > 0
+    item.video_brief.generation_version !== videoGenerationVersion || videoPromptIssues.length > 0 ||
+    (videoGenerationVersion === "v2" && (!item.video_brief.reference_image_prompt || !item.video_brief.brand_scores))
+  const proposalBrandGateFailed = videoGenerationVersion === "v2" && Boolean(item.video_brief?.brand_scores &&
+    VIDEO_BRAND_BLOCKING_KEYS.some(key => (item.video_brief?.brand_scores?.[key] ?? 1) < VIDEO_SCORE_MIN))
+  const frameReview = item.video_reference_frame_review
+  const frameReady = videoGenerationVersion === "v1" || Boolean(
+    item.video_reference_frame_url && item.video_reference_frame_path && item.video_reference_frame_approved &&
+    frameReview?.approved && frameReview.critical_failures.length === 0 &&
+    VIDEO_BRAND_BLOCKING_KEYS.every(key => (frameReview?.scores[key] ?? 1) >= VIDEO_SCORE_MIN)
+  )
   const displayedVisualUrl = generatedVisual?.itemId === item.id ? generatedVisual.url : item.visual_url
   const isHistoria = item.format === "historia"
   const isCarrusel = item.format === "carrusel"
@@ -2648,6 +2672,7 @@ function Editor({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          itemId: item.id,
           category: item.category,
           topic: item.topic,
           objective: item.objective ?? "conversion",
@@ -2664,12 +2689,57 @@ function Editor({
         video_prompt: data.video_prompt,
         video_brief: data.brief,
         video_generation_version: videoGenerationVersion,
+        ...(videoGenerationVersion === "v2" ? {
+          video_reference_frame_url: "",
+          video_reference_frame_path: "",
+          video_reference_frame_approved: false,
+        } : {}),
       })
     } catch {
       setVideoDirectionError("No se pudo conectar con la IA para generar la propuesta.")
     } finally {
       setVideoDirectionGenerating(false)
     }
+  }
+
+  async function generateVideoFrame() {
+    const referencePrompt = item.video_brief?.reference_image_prompt
+    if (videoGenerationVersion !== "v2" || !referencePrompt) {
+      setVideoFrameError("Generá primero una propuesta visual V2.")
+      return
+    }
+    setVideoFrameGenerating(true)
+    setVideoFrameError(null)
+    try {
+      const response = await fetch("/api/content/video-frame", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ itemId: item.id, topic: item.topic, reference_image_prompt: referencePrompt }),
+      })
+      const data = await response.json()
+      if (!response.ok || data.error) {
+        setVideoFrameError(data.error ?? "El fotograma no superó la revisión automática.")
+        return
+      }
+      await onSave({
+        video_reference_frame_url: data.video_reference_frame_url,
+        video_reference_frame_path: data.video_reference_frame_path,
+        video_reference_frame_review: data.video_reference_frame_review,
+        video_reference_frame_approved: false,
+      })
+    } catch {
+      setVideoFrameError("No se pudo conectar con Gemini para generar y revisar el fotograma.")
+    } finally {
+      setVideoFrameGenerating(false)
+    }
+  }
+
+  async function setVideoFrameApproval(approved: boolean) {
+    if (approved && (!frameReview?.approved || frameReview.critical_failures.length > 0)) {
+      setVideoFrameError("El fotograma no puede aprobarse porque falló la revisión automática.")
+      return
+    }
+    await onSave({ video_reference_frame_approved: approved })
   }
 
   /**
@@ -2687,6 +2757,10 @@ function Editor({
           ? "La dirección visual es antigua o riesgosa. Regenerá la propuesta antes de gastar otro intento de video."
           : "Generá primero la propuesta de microinfografía. Así el video sale con dirección visual y texto listos para publicar."
       )
+      return
+    }
+    if (!frameReady) {
+      setAiVideoError("Generá y aprobá el fotograma inicial antes de crear el video V2.")
       return
     }
     if (
@@ -2729,7 +2803,7 @@ function Editor({
     if (version === videoGenerationVersion) return
     setVideoDirectionError(null)
     setAiVideoError(null)
-    await onSave({ video_generation_version: version })
+    await onSave({ video_generation_version: version, ...(version === "v2" ? { video_reference_frame_approved: false } : {}) })
   }
 
   async function regenerateImageDirection() {
@@ -2894,7 +2968,7 @@ function Editor({
                     </div>
                     <p className="text-[10px] text-violet-700/80">
                       {videoGenerationVersion === "v2"
-                        ? "V2 usa una sola toma documental, movimiento físico mínimo y exclusiones separadas para evitar personas, utilería clínica, recortes de papel y objetos deformados."
+                        ? "V2 crea primero un fotograma documental con personas y acciones creíbles, lo revisa y recién después lo anima con Veo sin reinventar la escena."
                         : "V1 conserva la microinfografía ilustrada que usaba el sistema antes del motor documental."}
                     </p>
                   </div>
@@ -2902,7 +2976,7 @@ function Editor({
                     {videoGenerationVersion === "v2" ? "Video documental (Veo + texto real)" : "Microinfografía animada original (Veo + texto real)"}
                   </p>
                   <p className="text-[11px] text-violet-700/80">
-                    Veo genera solo el fondo/animación (sin texto); el gancho, los mensajes y el CTA se
+                    Veo anima la escena (sin texto); el gancho, los mensajes y el CTA se
                     escriben aparte y se queman encima por edición real, para que salgan siempre bien
                     escritos.
                   </p>
@@ -2933,6 +3007,25 @@ function Editor({
                           </ul>
                         </div>
                         <p><span className="font-semibold text-gray-900">CTA (6,2-8,0s):</span> {item.video_brief.cta}</p>
+
+                        {videoGenerationVersion === "v2" && item.video_brief.reference_image_prompt && (
+                          <div className="space-y-1 border-t border-gray-100 pt-2">
+                            <p>
+                              <span className="font-semibold text-gray-900">Familia visual:</span> {item.video_brief.visual_family} · composición {item.video_brief.composition}
+                            </p>
+                            <Label className="text-[11px] text-gray-600">Dirección del fotograma inicial</Label>
+                            <Textarea
+                              rows={5}
+                              value={item.video_brief.reference_image_prompt}
+                              onChange={event => onChange({
+                                ...item,
+                                video_reference_frame_approved: false,
+                                video_brief: { ...item.video_brief!, reference_image_prompt: event.target.value },
+                              })}
+                              className="bg-gray-50 text-gray-900 text-[11px]"
+                            />
+                          </div>
+                        )}
 
                         <div className="space-y-2 border-t border-gray-100 pt-2">
                           <div className="space-y-1">
@@ -2968,14 +3061,84 @@ function Editor({
                             Generá una propuesta nueva antes de crear el video.
                           </p>
                         )}
+                        {videoGenerationVersion === "v2" && item.video_brief.brand_scores && (
+                          <div className="space-y-1 border-t border-gray-100 pt-2">
+                            <p className="font-semibold text-gray-900">Control de identidad visual V2</p>
+                            <div className="grid grid-cols-2 gap-1.5">
+                              {VIDEO_BRAND_SCORE_LABELS.map(([key, label]) => {
+                                const value = item.video_brief?.brand_scores?.[key] ?? 1
+                                const blocking = VIDEO_BRAND_BLOCKING_KEYS.includes(key)
+                                const ok = !blocking || value >= VIDEO_SCORE_MIN
+                                return <div key={key} className={`rounded px-2 py-1 text-[10px] font-medium ${ok ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700"}`}>{label}: {value}/5</div>
+                              })}
+                            </div>
+                            {proposalBrandGateFailed && <p className="font-medium text-red-700">La propuesta no supera los mínimos de identidad visual. Regenerala antes de crear el fotograma.</p>}
+                          </div>
+                        )}
                       </div>
                     )
                   })()}
 
+                  {videoGenerationVersion === "v2" && item.video_brief?.reference_image_prompt && (
+                    <div className="space-y-2 rounded-md border border-teal-200 bg-teal-50/70 p-2.5 text-[11px]">
+                      <div>
+                        <p className="font-semibold text-teal-900">1. Fotograma inicial controlado</p>
+                        <p className="text-teal-800">Se revisa automáticamente antes de guardarlo. Si detecta un estetoscopio sobre abdomen/panza, lo rechaza y regenera.</p>
+                      </div>
+                      {item.video_reference_frame_url && (
+                        <Image
+                          src={item.video_reference_frame_url}
+                          alt={`Fotograma inicial propuesto para ${item.topic}`}
+                          width={720}
+                          height={1280}
+                          unoptimized
+                          className="mx-auto max-h-96 w-auto rounded-md border border-teal-200 object-contain"
+                        />
+                      )}
+                      {frameReview && (
+                        <div className="space-y-1 rounded bg-white p-2">
+                          <p className={frameReview.approved ? "font-medium text-green-700" : "font-medium text-red-700"}>
+                            {frameReview.approved ? "Superó la revisión automática" : "Fotograma rechazado"}
+                          </p>
+                          <p className="text-gray-700">{frameReview.notes}</p>
+                          <div className="grid grid-cols-2 gap-1">
+                            {VIDEO_BRAND_SCORE_LABELS.map(([key, label]) => (
+                              <span key={key} className="rounded bg-gray-50 px-1.5 py-1 text-[9px] text-gray-700">{label}: {frameReview.scores[key]}/5</span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={generateVideoFrame}
+                        disabled={videoFrameGenerating || proposalBrandGateFailed}
+                        className="w-full gap-1.5"
+                      >
+                        {videoFrameGenerating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ImageIcon className="h-3.5 w-3.5" />}
+                        {videoFrameGenerating ? "Generando y revisando..." : item.video_reference_frame_url ? "Regenerar fotograma" : "Generar fotograma inicial"}
+                      </Button>
+                      {videoFrameError && <p className="rounded bg-red-50 p-2 text-red-700">{videoFrameError}</p>}
+                      {item.video_reference_frame_url && frameReview?.approved && (
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant={item.video_reference_frame_approved ? "default" : "outline"}
+                          onClick={() => setVideoFrameApproval(!item.video_reference_frame_approved)}
+                          className="w-full gap-1.5"
+                        >
+                          <Check className="h-3.5 w-3.5" />
+                          {item.video_reference_frame_approved ? "Fotograma aprobado para animar" : "Aprobar este fotograma"}
+                        </Button>
+                      )}
+                    </div>
+                  )}
+
                   <Button
                     type="button"
                     onClick={generateAiVideo}
-                    disabled={aiVideoGenerating || videoNeedsProposal || Boolean(item.video_brief && Object.values(item.video_brief.scores).some(v => v < VIDEO_SCORE_MIN))}
+                    disabled={aiVideoGenerating || videoNeedsProposal || proposalBrandGateFailed || !frameReady || Boolean(item.video_brief && Object.values(item.video_brief.scores).some(v => v < VIDEO_SCORE_MIN))}
                     className="w-full gap-2"
                   >
                     {aiVideoGenerating ? <Loader2 className="h-4 w-4 animate-spin" /> : <WandSparkles className="h-4 w-4" />}
@@ -2984,6 +3147,9 @@ function Editor({
                   <p className="text-[11px] text-violet-700/80">
                     Tiene costo real por intento ({videoGenerationVersion === "v2" ? "aprox. USD 3,20" : "aprox. USD 0,80"}), sin límite gratuito.
                   </p>
+                  {videoGenerationVersion === "v2" && !frameReady && !videoNeedsProposal && (
+                    <p className="rounded bg-amber-50 p-2 text-[11px] font-medium text-amber-800">Generá, revisá y aprobá el fotograma inicial para habilitar Veo.</p>
+                  )}
                   {videoNeedsProposal && (
                     <div className="rounded-md border border-amber-200 bg-amber-50 p-2 text-[11px] text-amber-800">
                       <p className="font-medium">

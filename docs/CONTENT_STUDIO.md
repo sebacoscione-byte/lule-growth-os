@@ -112,6 +112,11 @@ V2 envia las exclusiones en el parametro `negativePrompt` separado, como recomie
 mezclar una lista de prohibiciones dentro de la descripcion positiva. Entre las exclusiones estan texto,
 interfaces, personas, recortes de papel, vectores, CGI, objetos duplicados/deformados y movimiento
 antinatural. La UI y `/api/content/video` validan cada prompt contra el contrato de la version elegida
+antes de consumir un intento pago. V2 además usa un flujo image-to-video: genera primero un fotograma
+9:16 con identidad `editorial documentary healthcare photography`, lo compara con las últimas seis
+piezas, lo revisa con los ocho puntajes de marca y exige aprobación humana antes de enviarlo a Veo.
+El revisor rechaza y regenera automáticamente errores críticos; en particular, cualquier estetoscopio
+apoyado sobre abdomen/panza invalida el fotograma. V1 conserva el flujo ilustrado histórico sin este paso.
 antes de consumir el intento pago. Cambiar de version obliga a regenerar la propuesta.
 
 Ambos requests fijan `9:16`, `720p` y 8 segundos para coincidir con los tiempos del texto compuesto.

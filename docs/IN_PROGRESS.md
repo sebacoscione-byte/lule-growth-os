@@ -1,9 +1,20 @@
+# EN CURSO (2026-08-03) — identidad visual y fotograma controlado para Video V2
+
+- [x] Traducir el brief de identidad visual a reglas ejecutables de escena, personas, paleta, composición y diversidad.
+- [x] Separar V2 en propuesta → fotograma 9:16 → revisión automática → aprobación humana → image-to-video.
+- [x] Revisar las últimas seis piezas y bloquear puntajes bajos de relevancia, autenticidad, credibilidad, consistencia u originalidad.
+- [x] Rechazar y regenerar automáticamente un estetoscopio apoyado sobre abdomen/panza.
+- [x] Ejecutar lint, 102 suites/940 tests y build de producción.
+- [ ] Publicar por PR, verificar preview y mergear.
+
+---
+
 # HOTFIX EN CURSO (2026-08-03) — ampliar límite diario de videos
 
 - [x] Confirmar que producción usa el valor predeterminado y que solo se cuentan generaciones exitosas.
 - [x] Aumentar el límite diario compartido de V1/V2 de 3 a 10 y cubrirlo con una regresión.
 - [x] Ejecutar lint, 101 suites/937 tests y build de producción.
-- [ ] Publicar por PR, verificar preview y mergear.
+- [x] Publicado y mergeado como PR #201; producción verificada.
 
 ---
 
@@ -14,7 +25,7 @@
 - [x] Restaurar V1 ilustrado con Veo Fast y crear V2 documental con Veo Standard.
 - [x] Separar exclusiones en `negativePrompt`, limitar el clip a una escena/acción/cámara y bloquear artefactos comunes.
 - [x] Ejecutar lint, 101 suites/936 tests y build de producción.
-- [ ] Publicar por rama + PR, verificar preview y mergear.
+- [x] Publicado y mergeado como PR #200; producción verificada.
 
 ---
 

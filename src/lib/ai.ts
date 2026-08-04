@@ -6,12 +6,15 @@ import { EMERGENCY_REPLY, MEDICAL_BOUNDARY_REPLY, isEmergencyMessage, isMedicalB
 import { composeContentPlate } from "@/lib/content-plate"
 import {
   buildFallbackVideoPrompt,
+  buildFallbackVideoReferencePrompt,
   getVideoPromptRules,
+  getVeoRequestInstance,
   getVeoRequestParameters,
   isPublishableVeoPrompt,
+  VIDEO_REFERENCE_FRAME_RULES,
 } from "@/lib/video-prompt"
 import { z } from "zod"
-import type { ClassifyResult, ContentObjective, ContentSource, ContentVideoBrief, ContentVideoScores, VideoGenerationVersion, WhatsAppIntent } from "@/types"
+import type { ClassifyResult, ContentObjective, ContentSource, ContentVideoBrandScores, ContentVideoBrief, ContentVideoFrameReview, ContentVideoScores, VideoGenerationVersion, WhatsAppIntent } from "@/types"
 
 export type AiMode = "manual" | "gemini_api"
 
@@ -1132,6 +1135,105 @@ async function generatePhotoWithGemini(
   throw lastError
 }
 
+function clampBrandScore(value: unknown): number {
+  return typeof value === "number" ? Math.min(5, Math.max(1, Math.round(value))) : 1
+}
+
+const REQUIRED_VIDEO_BRAND_SCORE_KEYS: Array<keyof ContentVideoBrandScores> = [
+  "semanticRelevance", "firstSecondHook", "meaningfulMotion", "humanAuthenticity",
+  "medicalCredibility", "profileVisualConsistency", "originalityVersusRecentPosts", "artifactRisk",
+]
+
+function normalizeVideoBrandScores(raw: unknown): ContentVideoBrandScores {
+  const values = raw && typeof raw === "object" ? raw as Record<string, unknown> : {}
+  return Object.fromEntries(REQUIRED_VIDEO_BRAND_SCORE_KEYS.map(key => [key, clampBrandScore(values[key])])) as unknown as ContentVideoBrandScores
+}
+
+/** Genera solo el fotograma base de V2; el texto se agrega despues y Veo unicamente lo anima. */
+export async function generateVideoReferenceFrame(input: {
+  topic: string
+  reference_image_prompt: string
+}): Promise<{ mime_type: string; image_data: string }> {
+  const prompt = `${VIDEO_REFERENCE_FRAME_RULES}
+
+TOPIC CONTEXT (never render as text): ${input.topic}
+
+APPROVED CREATIVE DIRECTION:
+${input.reference_image_prompt}
+
+FINAL CHECK: vertical 9:16 editorial documentary healthcare photograph; one meaningful action; 25-35% quiet lateral safe area; zero visible text, letters, numbers, logos, watermarks or readable interfaces. If a stethoscope appears, its chestpiece must be on the chest/thorax for cardiac auscultation, never on abdomen, belly or stomach.`
+  const photo = await generatePhotoWithGemini(prompt, hashPrompt(prompt), "9:16")
+  return { mime_type: photo.mimeType, image_data: photo.buffer.toString("base64") }
+}
+
+/** Revisa el archivo realmente generado. Falla cerrada si no puede confirmar credibilidad visual. */
+export async function reviewVideoReferenceFrame(input: {
+  topic: string
+  mime_type: string
+  image_data: string
+  recent_visuals?: string[]
+}): Promise<ContentVideoFrameReview> {
+  const apiKey = process.env.GEMINI_API_KEY
+  if (!apiKey) throw new Error("GEMINI_API_KEY no esta configurada.")
+  const model = process.env.GEMINI_MODEL || "gemini-3.5-flash"
+  const prompt = `Actua como director de arte y revisor de credibilidad medica para el perfil argentino de la Dra. Lucia Chahin.
+Tema: ${input.topic}
+Ultimas piezas (para detectar repeticion): ${(input.recent_visuals ?? []).join(" | ") || "sin historial"}
+
+Revisa EL FOTOGRAMA ADJUNTO, no el prompt. La identidad requerida es editorial documentary healthcare photography: personas adultas argentinas/latinas naturales, luz lateral calida, contraste suave, saturacion baja/moderada, espacios habitados, paleta crema/petroleo/marino/turquesa apagado/terracota minima, una accion semanticamente relevante, 25-35% de aire editorial y nada de stock generico, lujo estadounidense, CGI, Canva, texto o interfaces inventadas.
+
+FALLA CRITICA AUTOMATICA: si un estetoscopio aparece apoyado en abdomen, panza, vientre o estomago, agrega exactamente "STETHOSCOPE_ON_ABDOMEN" a critical_failures. Para auscultacion cardiaca solo es creible sobre pecho/torax. Tambien son fallas criticas: anatomia/manos claramente deformadas, practica medica visualmente incorrecta, texto/logo generado o una medica ficticia mirando a camara.
+
+Puntua de 1 a 5: semanticRelevance, firstSecondHook, meaningfulMotion (potencial de una accion pequena util para animar), humanAuthenticity, medicalCredibility, profileVisualConsistency, originalityVersusRecentPosts y artifactRisk (5 = riesgo de artefactos muy bajo). Si la direccion correcta para turnos/sedes es grafica de marca y no contiene personas, humanAuthenticity evalua que no haya humanos falsos y puede ser 5. approved solo puede ser true si critical_failures esta vacio Y semanticRelevance, humanAuthenticity, medicalCredibility, profileVisualConsistency y originalityVersusRecentPosts son todos >=4.
+
+Devolve SOLO JSON: {"approved":boolean,"critical_failures":["codigo"],"notes":"explicacion breve en espanol","scores":{"semanticRelevance":1,"firstSecondHook":1,"meaningfulMotion":1,"humanAuthenticity":1,"medicalCredibility":1,"profileVisualConsistency":1,"originalityVersusRecentPosts":1,"artifactRisk":1}}`
+  const promptHash = hashPrompt(`${prompt}:${input.image_data.slice(0, 80)}`)
+  try {
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
+      body: JSON.stringify({
+        contents: [{ role: "user", parts: [
+          { text: prompt },
+          { inlineData: { mimeType: input.mime_type, data: input.image_data } },
+        ] }],
+        generationConfig: { responseMimeType: "application/json", temperature: 0, maxOutputTokens: 700 },
+      }),
+    })
+    const data = await response.json() as {
+      candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>
+      error?: { message?: string }
+    }
+    if (!response.ok) throw new Error(data.error?.message || `Gemini respondio con estado ${response.status}.`)
+    const text = data.candidates?.[0]?.content?.parts?.map(part => part.text ?? "").join("")
+    if (!text) throw new Error("Gemini no devolvio la revision del fotograma.")
+    const parsed = parseJson<Record<string, unknown>>(text)
+    const scores = normalizeVideoBrandScores(parsed.scores)
+    const criticalFailures = Array.isArray(parsed.critical_failures)
+      ? parsed.critical_failures.filter((value): value is string => typeof value === "string").slice(0, 8)
+      : ["FRAME_REVIEW_INCOMPLETE"]
+    const corePass = scores.semanticRelevance >= 4 && scores.humanAuthenticity >= 4 &&
+      scores.medicalCredibility >= 4 && scores.profileVisualConsistency >= 4 &&
+      scores.originalityVersusRecentPosts >= 4
+    const review: ContentVideoFrameReview = {
+      approved: criticalFailures.length === 0 && corePass && parsed.approved === true,
+      critical_failures: criticalFailures,
+      notes: typeof parsed.notes === "string" ? parsed.notes.slice(0, 800) : "Revision automatica sin notas.",
+      scores,
+    }
+    await logRequest("gemini", model, promptHash, "video_frame_review", true)
+    return review
+  } catch (error) {
+    await logRequest("gemini", model, promptHash, "video_frame_review", false, error instanceof Error ? error.message : String(error))
+    return {
+      approved: false,
+      critical_failures: ["FRAME_REVIEW_UNAVAILABLE"],
+      notes: "No se pudo verificar automaticamente la credibilidad del fotograma; se rechazo por seguridad.",
+      scores: normalizeVideoBrandScores({}),
+    }
+  }
+}
+
 /**
  * Respaldo opcional si Gemini falla (cupo diario agotado, error transitorio, etc.) -- mismo patron
  * que el fallback Gemini->Anthropic de generateText, aplicado ahora a la generacion de fotos (2026-07-30,
@@ -1324,13 +1426,14 @@ export async function generateVideoBrief(input: {
   topic: string
   objective: ContentObjective
   version?: VideoGenerationVersion
+  recent_visuals?: string[]
 }): Promise<{ hook: string; video_prompt: string; brief: ContentVideoBrief }> {
   if (getAiMode() === "manual") {
     throw new Error("Modo manual activo: la generación automática está deshabilitada.")
   }
   const version = input.version ?? "v2"
   const text = await generateText({
-    maxTokens: 1200,
+    maxTokens: version === "v2" ? 1800 : 1200,
     json: true,
     purpose: "video_brief",
     cacheSystem: true,
@@ -1339,6 +1442,12 @@ export async function generateVideoBrief(input: {
 ${getVideoPromptRules(version)}
 
 ${PATIENT_ACQUISITION_RULES}
+
+${version === "v2" ? `${VIDEO_REFERENCE_FRAME_RULES}
+
+V2 usa dos prompts separados. reference_image_prompt define la fotografía inicial completa. video_prompt NO vuelve a inventarla: solo indica una acción humana, un movimiento de cámara y movimiento ambiental mínimo, preservando la composición. Revisá las últimas seis piezas. Si la propuesta se parece a una reciente, cambiá por lo menos DOS de estos elementos: plano, ubicación, acción, edad, posición de la persona, elemento médico o luz.
+FALLA CRÍTICA: nunca propongas un estetoscopio sobre abdomen/panza/estómago. Para auscultación cardíaca debe estar sobre pecho/tórax.
+Además devolvé visual_family, composition, reference_image_prompt y brand_scores. No apruebes una propuesta si semanticRelevance, humanAuthenticity, medicalCredibility, profileVisualConsistency u originalityVersusRecentPosts es menor a 4.` : ""}
 
 Con todas las reglas de arriba, generá la propuesta completa de un reel tipo microinfografía médica
 animada de 8 segundos para la cuenta de Instagram de la Dra. Lucía Chahin (cardióloga), sobre la
@@ -1352,16 +1461,21 @@ Devolvé SOLO un JSON PLANO con esta forma exacta, sin ningún otro campo ni ani
   "cta": "texto del cierre/CTA en español (6,2-8,0s)",
   "postproduction_notes": "en español: elementos que deberían agregarse o ajustarse en postproducción",
   "validation_notes": "en español: qué debería validar puntualmente la Dra. Lucía antes de aprobar",
-  "scores": { "scroll_stop": 1-5, "clarity": 1-5, "utility": 1-5, "credibility": 1-5, "legibility": 1-5, "brand_consistency": 1-5 }
+  "scores": { "scroll_stop": 1-5, "clarity": 1-5, "utility": 1-5, "credibility": 1-5, "legibility": 1-5, "brand_consistency": 1-5 },
+  "visual_family": "DOCUMENTAL_HUMANO, CONTROL_PREVENCION, CONSULTA_ACOMPANAMIENTO, DETALLE_MEDICO_EDITORIAL o vacío para V1",
+  "composition": "A, B, C, D o vacío para V1",
+  "reference_image_prompt": "fotograma inicial V2 en inglés o vacío para V1",
+  "brand_scores": { "semanticRelevance": 1-5, "firstSecondHook": 1-5, "meaningfulMotion": 1-5, "humanAuthenticity": 1-5, "medicalCredibility": 1-5, "profileVisualConsistency": 1-5, "originalityVersusRecentPosts": 1-5, "artifactRisk": 1-5 }
 }`,
     messages: [{
       role: "user",
-      content: `Categoría: ${input.category}\nTema: ${input.topic}\n${OBJECTIVE_GUIDANCE[input.objective]}`,
+      content: `Categoría: ${input.category}\nTema: ${input.topic}\n${OBJECTIVE_GUIDANCE[input.objective]}\nÚltimas piezas visuales (máximo 6):\n${(input.recent_visuals ?? []).slice(0, 6).map((value, index) => `${index + 1}. ${value}`).join("\n") || "Sin piezas recientes."}`,
     }],
   })
   const parsed = parseJson<{
     hook?: unknown; video_prompt?: unknown; objective?: unknown; messages?: unknown; cta?: unknown
     postproduction_notes?: unknown; validation_notes?: unknown; scores?: unknown
+    visual_family?: unknown; composition?: unknown; reference_image_prompt?: unknown; brand_scores?: unknown
   }>(text)
 
   const messages = Array.isArray(parsed.messages)
@@ -1390,6 +1504,14 @@ Devolvé SOLO un JSON PLANO con esta forma exacta, sin ningún otro campo ni ani
     legibility: clampScore("legibility"),
     brand_consistency: clampScore("brand_consistency"),
   }
+  const visualFamilies = ["DOCUMENTAL_HUMANO", "CONTROL_PREVENCION", "CONSULTA_ACOMPANAMIENTO", "DETALLE_MEDICO_EDITORIAL"] as const
+  const compositions = ["A", "B", "C", "D"] as const
+  const referenceImagePrompt = version === "v2"
+    ? typeof parsed.reference_image_prompt === "string" && parsed.reference_image_prompt.trim()
+      ? parsed.reference_image_prompt.trim().slice(0, 2400)
+      : buildFallbackVideoReferencePrompt(input.topic)
+    : undefined
+  const brandScores = version === "v2" ? normalizeVideoBrandScores(parsed.brand_scores) : undefined
 
   return {
     hook: parsed.hook,
@@ -1402,6 +1524,14 @@ Devolvé SOLO un JSON PLANO con esta forma exacta, sin ningún otro campo ni ani
       postproduction_notes: typeof parsed.postproduction_notes === "string" ? parsed.postproduction_notes : "",
       validation_notes: typeof parsed.validation_notes === "string" ? parsed.validation_notes : "",
       scores,
+      ...(version === "v2" ? {
+        visual_family: visualFamilies.includes(parsed.visual_family as typeof visualFamilies[number])
+          ? parsed.visual_family as typeof visualFamilies[number] : "DOCUMENTAL_HUMANO" as const,
+        composition: compositions.includes(parsed.composition as typeof compositions[number])
+          ? parsed.composition as typeof compositions[number] : "A" as const,
+        reference_image_prompt: referenceImagePrompt,
+        brand_scores: brandScores,
+      } : {}),
     },
   }
 }
@@ -1434,6 +1564,7 @@ export function getContentVideoModel(version: VideoGenerationVersion): string {
 export async function generateContentVideo(input: {
   video_prompt: string
   version?: VideoGenerationVersion
+  reference_image?: { mime_type: string; image_data: string }
 }): Promise<{ mime_type: string; video_data: string }> {
   if (getAiMode() === "manual") {
     throw new Error("Modo manual activo: la generación automática está deshabilitada.")
@@ -1448,7 +1579,10 @@ export async function generateContentVideo(input: {
 
   const version = input.version ?? "v2"
   const model = getContentVideoModel(version)
-  const promptHash = hashPrompt(`${version}:${input.video_prompt}`)
+  if (version === "v2" && !input.reference_image) {
+    throw new Error("V2 requiere un fotograma inicial aprobado.")
+  }
+  const promptHash = hashPrompt(`${version}:${input.video_prompt}:${input.reference_image?.image_data.slice(0, 80) ?? "text-only"}`)
   const base = "https://generativelanguage.googleapis.com/v1beta"
 
   try {
@@ -1456,7 +1590,7 @@ export async function generateContentVideo(input: {
       method: "POST",
       headers: { "x-goog-api-key": apiKey, "Content-Type": "application/json" },
       body: JSON.stringify({
-        instances: [{ prompt: input.video_prompt }],
+        instances: [getVeoRequestInstance(input.video_prompt, input.reference_image)],
         parameters: getVeoRequestParameters(version),
       }),
     })
