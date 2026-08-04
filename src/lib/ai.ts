@@ -1144,6 +1144,26 @@ const REQUIRED_VIDEO_BRAND_SCORE_KEYS: Array<keyof ContentVideoBrandScores> = [
   "medicalCredibility", "profileVisualConsistency", "originalityVersusRecentPosts", "artifactRisk",
 ]
 
+const VIDEO_FRAME_REVIEW_MAX_ATTEMPTS = 2
+const VIDEO_FRAME_REVIEW_JSON_SCHEMA = {
+  type: "object",
+  properties: {
+    approved: { type: "boolean" },
+    critical_failures: { type: "array", items: { type: "string" }, maxItems: 8 },
+    notes: { type: "string" },
+    scores: {
+      type: "object",
+      properties: Object.fromEntries(REQUIRED_VIDEO_BRAND_SCORE_KEYS.map(key => [key, {
+        type: "integer", minimum: 1, maximum: 5,
+      }])),
+      required: REQUIRED_VIDEO_BRAND_SCORE_KEYS,
+      additionalProperties: false,
+    },
+  },
+  required: ["approved", "critical_failures", "notes", "scores"],
+  additionalProperties: false,
+} as const
+
 function normalizeVideoBrandScores(raw: unknown): ContentVideoBrandScores {
   const values = raw && typeof raw === "object" ? raw as Record<string, unknown> : {}
   return Object.fromEntries(REQUIRED_VIDEO_BRAND_SCORE_KEYS.map(key => [key, clampBrandScore(values[key])])) as unknown as ContentVideoBrandScores
@@ -1172,6 +1192,7 @@ export async function reviewVideoReferenceFrame(input: {
   mime_type: string
   image_data: string
   recent_visuals?: string[]
+  review_attempt?: number
 }): Promise<ContentVideoFrameReview> {
   const apiKey = process.env.GEMINI_API_KEY
   if (!apiKey) throw new Error("GEMINI_API_KEY no esta configurada.")
@@ -1197,7 +1218,13 @@ Devolve SOLO JSON: {"approved":boolean,"critical_failures":["codigo"],"notes":"e
           { text: prompt },
           { inlineData: { mimeType: input.mime_type, data: input.image_data } },
         ] }],
-        generationConfig: { responseMimeType: "application/json", temperature: 0, maxOutputTokens: 700 },
+        generationConfig: {
+          responseMimeType: "application/json",
+          responseJsonSchema: VIDEO_FRAME_REVIEW_JSON_SCHEMA,
+          thinkingConfig: { thinkingBudget: 0 },
+          temperature: 0,
+          maxOutputTokens: 1100,
+        },
       }),
     })
     const data = await response.json() as {
@@ -1224,7 +1251,12 @@ Devolve SOLO JSON: {"approved":boolean,"critical_failures":["codigo"],"notes":"e
     await logRequest("gemini", model, promptHash, "video_frame_review", true)
     return review
   } catch (error) {
+    const attempt = input.review_attempt ?? 1
+    if (attempt < VIDEO_FRAME_REVIEW_MAX_ATTEMPTS) {
+      return reviewVideoReferenceFrame({ ...input, review_attempt: attempt + 1 })
+    }
     await logRequest("gemini", model, promptHash, "video_frame_review", false, error instanceof Error ? error.message : String(error))
+    console.error("[ai/video-frame-review]", error instanceof Error ? error.message : String(error))
     return {
       approved: false,
       critical_failures: ["FRAME_REVIEW_UNAVAILABLE"],

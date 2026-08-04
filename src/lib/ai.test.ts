@@ -8,6 +8,7 @@ import {
   generateReply,
   getContentVideoModel,
   getPublicAiError,
+  reviewVideoReferenceFrame,
   stripMarkdownArtifacts,
 } from "@/lib/ai"
 import { EMERGENCY_REPLY, MEDICAL_BOUNDARY_REPLY } from "@/lib/medical-safety"
@@ -48,6 +49,86 @@ describe("selección de modelo de video", () => {
 describe("límite diario de generación de video", () => {
   it("permite hasta 10 videos exitosos por día cuando no hay override", () => {
     expect(DEFAULT_DAILY_VIDEO_GENERATION_LIMIT).toBe(10)
+  })
+})
+
+describe("revisión automática del fotograma V2", () => {
+  const originalGeminiKey = process.env.GEMINI_API_KEY
+  const originalGeminiModel = process.env.GEMINI_MODEL
+  let fetchSpy: jest.SpiedFunction<typeof fetch>
+
+  const validReview = JSON.stringify({
+    approved: true,
+    critical_failures: [],
+    notes: "Fotograma creíble",
+    scores: {
+      semanticRelevance: 5,
+      firstSecondHook: 4,
+      meaningfulMotion: 4,
+      humanAuthenticity: 5,
+      medicalCredibility: 5,
+      profileVisualConsistency: 5,
+      originalityVersusRecentPosts: 4,
+      artifactRisk: 5,
+    },
+  })
+
+  function reviewResponse(text: string): Response {
+    return {
+      ok: true,
+      status: 200,
+      json: async () => ({ candidates: [{ content: { parts: [{ text }] } }] }),
+    } as unknown as Response
+  }
+
+  beforeEach(() => {
+    process.env.GEMINI_API_KEY = "test-key"
+    process.env.GEMINI_MODEL = "gemini-3.5-flash"
+  })
+
+  afterEach(() => {
+    fetchSpy.mockRestore()
+    if (originalGeminiKey === undefined) delete process.env.GEMINI_API_KEY
+    else process.env.GEMINI_API_KEY = originalGeminiKey
+    if (originalGeminiModel === undefined) delete process.env.GEMINI_MODEL
+    else process.env.GEMINI_MODEL = originalGeminiModel
+  })
+
+  it("solicita JSON estructurado y limita el thinking del revisor multimodal", async () => {
+    fetchSpy = jest.spyOn(global, "fetch").mockResolvedValue(reviewResponse(validReview))
+
+    const review = await reviewVideoReferenceFrame({
+      topic: "Control cardiovascular",
+      mime_type: "image/jpeg",
+      image_data: "aW1hZ2U=",
+    })
+
+    expect(review.approved).toBe(true)
+    const requestBody = JSON.parse(String(fetchSpy.mock.calls[0][1]?.body))
+    expect(requestBody.generationConfig).toEqual(expect.objectContaining({
+      responseMimeType: "application/json",
+      responseJsonSchema: expect.objectContaining({ type: "object" }),
+      thinkingConfig: { thinkingBudget: 0 },
+      maxOutputTokens: 1100,
+    }))
+  })
+
+  it("reintenta la revisión sobre la misma imagen cuando la primera respuesta es inválida", async () => {
+    fetchSpy = jest.spyOn(global, "fetch")
+      .mockResolvedValueOnce(reviewResponse("{\"approved\":"))
+      .mockResolvedValueOnce(reviewResponse(validReview))
+
+    const review = await reviewVideoReferenceFrame({
+      topic: "Control cardiovascular",
+      mime_type: "image/jpeg",
+      image_data: "aW1hZ2U=",
+    })
+
+    expect(review.approved).toBe(true)
+    expect(fetchSpy).toHaveBeenCalledTimes(2)
+    const firstBody = JSON.parse(String(fetchSpy.mock.calls[0][1]?.body))
+    const secondBody = JSON.parse(String(fetchSpy.mock.calls[1][1]?.body))
+    expect(secondBody.contents[0].parts[1]).toEqual(firstBody.contents[0].parts[1])
   })
 })
 

@@ -125,9 +125,14 @@ consumir el intento de video; por eso la UI la presenta como una opción de meno
 Si V2 Controlada rechaza sus tres fotogramas, la UI muestra el motivo concreto de la última revisión
 (notas, fallas críticas y puntajes bloqueantes) y ofrece cambiar en un clic a V2 Directa. Ese cambio
 regenera únicamente el prompt de texto y no vuelve a consumir generaciones de imagen.
-antes de consumir el intento pago. Cambiar de version obliga a regenerar la propuesta.
+La revisión solicita JSON estructurado a Gemini y reintenta sobre el mismo archivo. Si el revisor está
+temporalmente indisponible, el servidor detiene el flujo después de la primera imagen y no genera otras
+dos variantes innecesarias. Cambiar de versión obliga a regenerar la propuesta antes de consumir video.
 
 Ambos requests fijan `9:16`, `720p` y 8 segundos para coincidir con los tiempos del texto compuesto.
+Por contrato de Veo 3.1, V2 Controlada (image-to-video) envía `personGeneration: allow_adult`; V2 Directa
+(text-to-video) envía `personGeneration: allow_all`, aunque el prompt positivo mantiene siempre sujetos
+adultos. Enviar `allow_adult` a text-to-video provoca un rechazo inmediato del proveedor.
 El límite operativo predeterminado es de 10 videos exitosos por día, compartido entre V1 y V2; puede
 ajustarse mediante `DAILY_VIDEO_GENERATION_LIMIT` sin cambiar código. Los intentos fallidos no consumen
 ese cupo interno, aunque el proveedor puede aplicar sus propios límites.

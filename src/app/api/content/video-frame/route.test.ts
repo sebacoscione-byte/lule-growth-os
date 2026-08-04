@@ -63,4 +63,24 @@ describe("POST /api/content/video-frame", () => {
     expect(getServiceDb).not.toHaveBeenCalled()
     expect(await response.json()).toEqual(expect.objectContaining({ code: "VIDEO_FRAME_REJECTED" }))
   })
+
+  it("no genera tres imágenes cuando falla técnicamente el revisor", async () => {
+    ;(reviewVideoReferenceFrame as jest.Mock).mockResolvedValue({
+      approved: false,
+      critical_failures: ["FRAME_REVIEW_UNAVAILABLE"],
+      notes: "Revisión no disponible",
+      scores: Object.fromEntries(Object.keys(scores).map(key => [key, 1])),
+    })
+
+    const response = await POST(request())
+
+    expect(response.status).toBe(503)
+    expect(generateVideoReferenceFrame).toHaveBeenCalledTimes(1)
+    expect(reviewVideoReferenceFrame).toHaveBeenCalledTimes(1)
+    expect(getServiceDb).not.toHaveBeenCalled()
+    expect(await response.json()).toEqual(expect.objectContaining({
+      code: "VIDEO_FRAME_REVIEW_UNAVAILABLE",
+      error: expect.stringMatching(/evitar costos innecesarios/i),
+    }))
+  })
 })

@@ -58,13 +58,16 @@ describe("versiones del prompt de Veo", () => {
     ]))
   })
 
-  it("envía imagen-a-video con adultos y exclusiones médicas solo en V2", () => {
+  it("usa el valor de personGeneration admitido por cada modalidad de Veo V2", () => {
     expect(getVeoRequestParameters("v1")).toEqual({ aspectRatio: "9:16", resolution: "720p", durationSeconds: 8 })
     expect(getVeoRequestParameters("v2")).toEqual(expect.objectContaining({
       aspectRatio: "9:16", resolution: "720p", durationSeconds: 8, personGeneration: "allow_adult",
       negativePrompt: VEO_V2_NEGATIVE_PROMPT,
     }))
-    expect(getVeoRequestParameters("v2_direct")).toEqual(getVeoRequestParameters("v2"))
+    expect(getVeoRequestParameters("v2_direct")).toEqual(expect.objectContaining({
+      aspectRatio: "9:16", resolution: "720p", durationSeconds: 8, personGeneration: "allow_all",
+      negativePrompt: VEO_V2_NEGATIVE_PROMPT,
+    }))
     expect(VEO_V2_NEGATIVE_PROMPT).toMatch(/stethoscope on belly/i)
     expect(VEO_V2_NEGATIVE_PROMPT).toMatch(/extra fingers/i)
     expect(VEO_V2_NEGATIVE_PROMPT).not.toMatch(/human figures|patients/i)

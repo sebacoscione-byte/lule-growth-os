@@ -48,6 +48,13 @@ export async function POST(request: Request) {
         recent_visuals: recentVisuals,
       })
       lastReview = review
+      if (review.critical_failures.includes("FRAME_REVIEW_UNAVAILABLE")) {
+        console.warn("[content/video-frame] revisor temporalmente no disponible", { attempt })
+        return NextResponse.json({
+          code: "VIDEO_FRAME_REVIEW_UNAVAILABLE",
+          error: "El fotograma se generó, pero la revisión automática no respondió. No generamos más variantes para evitar costos innecesarios. Probá nuevamente o usá V2 Directa.",
+        }, { status: 503 })
+      }
       if (!review.approved) {
         direction = `${body.reference_image_prompt.slice(0, 1700)}\n\nCORRECTION AFTER REJECTED FRAME: ${review.notes}. Critical failures: ${review.critical_failures.join(", ") || "none"}. Produce a substantially different, medically credible composition. If a stethoscope is visible, place its chestpiece on the chest/thorax only, never abdomen, belly or stomach.`
         continue

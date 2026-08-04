@@ -1,10 +1,21 @@
-# HOTFIX EN CURSO (2026-08-03) — rechazo opaco de fotogramas V2
+# HOTFIX EN CURSO (2026-08-03) — revisión de fotogramas y request V2 Directa
+
+- [x] Confirmar en producción `FRAME_REVIEW_UNAVAILABLE` y el rechazo de `allow_adult` en text-to-video.
+- [x] Adaptar `personGeneration` por modalidad: `allow_adult` para V2 Controlada y `allow_all` para V2 Directa.
+- [x] Estructurar el JSON del revisor, limitar thinking y reintentar sobre la misma imagen.
+- [x] Evitar generar tres variantes cuando el revisor está temporalmente indisponible.
+- [x] Ejecutar lint, 102 suites/946 tests y build de producción.
+- [ ] Publicar por PR, verificar preview y producción.
+
+---
+
+# CERRADO (2026-08-03) — rechazo opaco de fotogramas V2
 
 - [x] Confirmar en logs dos respuestas 422 del revisor visual, sin error de proveedor ni cuota.
 - [x] Mostrar notas, fallas críticas y puntajes bajos devueltos por la revisión.
 - [x] Ofrecer cambio inmediato a V2 Directa y regenerar su prompt sin crear más imágenes.
 - [x] Ejecutar lint, 102 suites/943 tests y build de producción.
-- [ ] Publicar por PR, verificar preview y mergear.
+- [x] Publicado y mergeado como PR #205; CI, E2E y producción verificados.
 
 ---
 
