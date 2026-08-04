@@ -1,11 +1,11 @@
-# EN CURSO (2026-08-03) — identidad visual y fotograma controlado para Video V2
+# CERRADO (2026-08-03) — identidad visual y fotograma controlado para Video V2
 
 - [x] Traducir el brief de identidad visual a reglas ejecutables de escena, personas, paleta, composición y diversidad.
 - [x] Separar V2 en propuesta → fotograma 9:16 → revisión automática → aprobación humana → image-to-video.
 - [x] Revisar las últimas seis piezas y bloquear puntajes bajos de relevancia, autenticidad, credibilidad, consistencia u originalidad.
 - [x] Rechazar y regenerar automáticamente un estetoscopio apoyado sobre abdomen/panza.
 - [x] Ejecutar lint, 102 suites/940 tests y build de producción.
-- [ ] Publicar por PR, verificar preview y mergear.
+- [x] Publicado y mergeado como PR #202; CI, E2E y producción verificados.
 
 ---
 
