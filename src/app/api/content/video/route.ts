@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server"
 import { getServiceDb } from "@/lib/supabase/service"
 import { authorizeStaff } from "@/lib/staff-authz"
 import { getVeoPromptQualityIssues } from "@/lib/video-prompt"
+import { readContentItems } from "@/lib/content-pipeline"
 import type { VideoGenerationVersion } from "@/types"
 
 const CONTENT_ROLES = ["owner", "doctor"] as const
@@ -51,7 +52,29 @@ export async function POST(request: Request) {
       }, { status: 400 })
     }
 
-    const video = await generateContentVideo({ video_prompt: videoPrompt, version })
+    const service = getServiceDb()
+    let referenceImage: { mime_type: string; image_data: string } | undefined
+    if (version === "v2") {
+      const storedItem = (await readContentItems(supabase)).find(item => item.id === itemId)
+      const review = storedItem?.video_reference_frame_review
+      const coreScores = review?.scores
+      const corePass = Boolean(coreScores && coreScores.semanticRelevance >= 4 && coreScores.humanAuthenticity >= 4 &&
+        coreScores.medicalCredibility >= 4 && coreScores.profileVisualConsistency >= 4 &&
+        coreScores.originalityVersusRecentPosts >= 4)
+      if (!storedItem?.video_reference_frame_path || storedItem.video_reference_frame_approved !== true ||
+        review?.approved !== true || review.critical_failures.length > 0 || !corePass) {
+        return NextResponse.json({
+          code: "VIDEO_FRAME_APPROVAL_REQUIRED",
+          error: "V2 necesita un fotograma inicial aprobado que haya superado la revision visual y medica.",
+        }, { status: 400 })
+      }
+      const { data, error } = await service.storage.from("content-media").download(storedItem.video_reference_frame_path)
+      if (error || !data) throw new Error(`No se pudo recuperar el fotograma aprobado${error?.message ? ` (${error.message})` : ""}.`)
+      const mimeType = data.type === "image/png" ? "image/png" : "image/jpeg"
+      referenceImage = { mime_type: mimeType, image_data: Buffer.from(await data.arrayBuffer()).toString("base64") }
+    }
+
+    const video = await generateContentVideo({ video_prompt: videoPrompt, version, ...(referenceImage ? { reference_image: referenceImage } : {}) })
     let buffer: Buffer = Buffer.from(video.video_data, "base64")
 
     // El brief se compone sobre el fondo en la misma llamada: un solo click, un video final.
@@ -76,7 +99,6 @@ export async function POST(request: Request) {
     // Persistimos de una en Storage (service role, mismo patron que /api/content/visual): el video de
     // Google solo esta disponible 48hs en su propia URL, y nunca queremos que el navegador reciba el
     // archivo entero en la respuesta (podria pesar varios MB).
-    const service = getServiceDb()
     const safeItemId = itemId.replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 100) || "sin-id"
     const path = `${safeItemId}-ai-${Date.now()}.mp4`
     const { error: uploadError } = await service.storage

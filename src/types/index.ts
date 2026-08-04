@@ -172,6 +172,24 @@ export interface ContentVideoScores {
   brand_consistency: number
 }
 
+export interface ContentVideoBrandScores {
+  semanticRelevance: number
+  firstSecondHook: number
+  meaningfulMotion: number
+  humanAuthenticity: number
+  medicalCredibility: number
+  profileVisualConsistency: number
+  originalityVersusRecentPosts: number
+  artifactRisk: number
+}
+
+export interface ContentVideoFrameReview {
+  approved: boolean
+  critical_failures: string[]
+  notes: string
+  scores: ContentVideoBrandScores
+}
+
 /** Motor visual del reel. V1 conserva la microinfografía ilustrada original; V2 usa video
  * documental y Veo Standard con controles específicos contra artefactos generativos. */
 export type VideoGenerationVersion = "v1" | "v2"
@@ -191,6 +209,11 @@ export interface ContentVideoBrief {
   postproduction_notes: string
   validation_notes: string
   scores: ContentVideoScores
+  /** Campos V2. Las propuestas V1 e historicas no los tienen. */
+  visual_family?: "DOCUMENTAL_HUMANO" | "CONTROL_PREVENCION" | "CONSULTA_ACOMPANAMIENTO" | "DETALLE_MEDICO_EDITORIAL"
+  composition?: "A" | "B" | "C" | "D"
+  reference_image_prompt?: string
+  brand_scores?: ContentVideoBrandScores
 }
 
 export interface ContentItem {
@@ -231,6 +254,12 @@ export interface ContentItem {
   video_generation_version?: VideoGenerationVersion
   /** Propuesta estructurada (microinfografia animada) generada junto con video_prompt -- ver ContentVideoBrief. */
   video_brief?: ContentVideoBrief
+  /** V2: primer fotograma generado y revisado antes de consumir un intento pago de Veo. */
+  video_reference_frame_url?: string
+  video_reference_frame_path?: string
+  video_reference_frame_review?: ContentVideoFrameReview
+  /** Aprobacion humana explicita, separada de la revision automatica. */
+  video_reference_frame_approved?: boolean
   /** Reel de prueba (Meta "Trial Reels"): se publica solo para gente que no te sigue -- tus seguidores
    * no lo ven en su feed/pestaña Reels a menos que decidas "graduarlo" despues de ver como funciono.
    * Requiere que la cuenta ya haya cruzado el umbral de seguidores que exige Meta para esta funcion

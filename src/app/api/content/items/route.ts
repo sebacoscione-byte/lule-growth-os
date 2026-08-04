@@ -132,7 +132,8 @@ export async function PATCH(request: NextRequest) {
     if ((body.google_text?.length ?? 0) > 1500 || (body.visual_headline?.length ?? 0) > 90 ||
       (body.visual_subtitle?.length ?? 0) > 90 || (body.image_prompt?.length ?? 0) > 2400 ||
       (body.image_alt_text?.length ?? 0) > 180 || (body.video_url?.length ?? 0) > 500 ||
-      (body.video_prompt?.length ?? 0) > 2400) {
+      (body.video_prompt?.length ?? 0) > 2400 || (body.video_reference_frame_url?.length ?? 0) > 500 ||
+      (body.video_reference_frame_path?.length ?? 0) > 300) {
       return NextResponse.json({ error: "Uno o mas campos superan el limite permitido" }, { status: 400 })
     }
     if (body.slides && (!Array.isArray(body.slides) || body.slides.some(slide =>
@@ -149,6 +150,12 @@ export async function PATCH(request: NextRequest) {
       const validScores = typeof brief?.scores === "object" && brief.scores !== null &&
         scoreKeys.every(key => typeof brief.scores[key as keyof typeof brief.scores] === "number" &&
           brief.scores[key as keyof typeof brief.scores] >= 1 && brief.scores[key as keyof typeof brief.scores] <= 5)
+      const brandScoreKeys = ["semanticRelevance", "firstSecondHook", "meaningfulMotion", "humanAuthenticity",
+        "medicalCredibility", "profileVisualConsistency", "originalityVersusRecentPosts", "artifactRisk"]
+      const brandScores = brief?.brand_scores as unknown as Record<string, unknown> | undefined
+      const validBrandScores = brief?.generation_version !== "v2" ||
+        (typeof brandScores === "object" && brandScores !== null &&
+          brandScoreKeys.every(key => typeof brandScores[key] === "number" && (brandScores[key] as number) >= 1 && (brandScores[key] as number) <= 5))
       const validBrief = brief !== null && typeof brief === "object" &&
         (brief.generation_version === undefined || ["v1", "v2"].includes(brief.generation_version)) &&
         typeof brief.objective === "string" && brief.objective.length <= 300 &&
@@ -157,8 +164,26 @@ export async function PATCH(request: NextRequest) {
         typeof brief.cta === "string" && brief.cta.length <= 120 &&
         typeof brief.postproduction_notes === "string" && brief.postproduction_notes.length <= 1000 &&
         typeof brief.validation_notes === "string" && brief.validation_notes.length <= 1000 &&
-        validScores
+        validScores && validBrandScores &&
+        (brief.generation_version !== "v2" ||
+          (["DOCUMENTAL_HUMANO", "CONTROL_PREVENCION", "CONSULTA_ACOMPANAMIENTO", "DETALLE_MEDICO_EDITORIAL"].includes(brief.visual_family ?? "") &&
+            ["A", "B", "C", "D"].includes(brief.composition ?? "") && typeof brief.reference_image_prompt === "string" &&
+            brief.reference_image_prompt.length > 0 && brief.reference_image_prompt.length <= 2400))
       if (!validBrief) return NextResponse.json({ error: "Propuesta de video invalida" }, { status: 400 })
+    }
+    if (body.video_reference_frame_approved !== undefined && typeof body.video_reference_frame_approved !== "boolean") {
+      return NextResponse.json({ error: "Aprobacion de fotograma invalida" }, { status: 400 })
+    }
+    if (body.video_reference_frame_review !== undefined) {
+      const review = body.video_reference_frame_review
+      const keys = ["semanticRelevance", "firstSecondHook", "meaningfulMotion", "humanAuthenticity",
+        "medicalCredibility", "profileVisualConsistency", "originalityVersusRecentPosts", "artifactRisk"]
+      const reviewScores = review?.scores as unknown as Record<string, unknown> | undefined
+      const valid = review && typeof review === "object" && typeof review.approved === "boolean" &&
+        Array.isArray(review.critical_failures) && review.critical_failures.every((value: unknown) => typeof value === "string") &&
+        typeof review.notes === "string" && typeof reviewScores === "object" && reviewScores !== null &&
+        keys.every(key => typeof reviewScores[key] === "number" && (reviewScores[key] as number) >= 1 && (reviewScores[key] as number) <= 5)
+      if (!valid) return NextResponse.json({ error: "Revision de fotograma invalida" }, { status: 400 })
     }
     if (body.auto_publish_result !== undefined) {
       const validKeys = ["instagram", "google_business"]
@@ -194,6 +219,10 @@ export async function PATCH(request: NextRequest) {
       "video_prompt",
       "video_generation_version",
       "video_brief",
+      "video_reference_frame_url",
+      "video_reference_frame_path",
+      "video_reference_frame_review",
+      "video_reference_frame_approved",
       "auto_publish_result",
       "archived_from_status",
       "repeat_interval_days",
@@ -212,7 +241,7 @@ export async function PATCH(request: NextRequest) {
     // es config de cronograma, no contenido -- cambiarla tampoco debe tirar la pieza de vuelta a borrador.
     // trial_reel es config de distribucion en Instagram (a quien se le muestra), no contenido en si.
     // manual_publish_note es metadata de auditoria (se escribe junto con status: "published"), no contenido.
-    const nonContentFields = new Set(["status", "visual_url", "video_url", "auto_publish_result", "archived_from_status", "repeat_interval_days", "repeat_limit", "trial_reel", "manual_publish_note"])
+    const nonContentFields = new Set(["status", "visual_url", "video_url", "video_reference_frame_url", "video_reference_frame_path", "video_reference_frame_review", "video_reference_frame_approved", "auto_publish_result", "archived_from_status", "repeat_interval_days", "repeat_limit", "trial_reel", "manual_publish_note"])
     const hasContentChanges = editableFields.some(field => !nonContentFields.has(field) && body[field] !== undefined)
     const resetApproval = hasContentChanges && !body.status && ["approved", "published"].includes(current.status)
     // Al re-activar la repeticion (off -> on), arrancar el contador de cero para que el limite cuente
