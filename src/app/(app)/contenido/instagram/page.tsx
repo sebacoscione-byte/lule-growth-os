@@ -2665,7 +2665,7 @@ function Editor({
    * notas de postproducción/validación y la autoevaluación 1-5) -- /api/content/video-brief, ver
    * generateVideoBrief() en ai.ts. No genera ningún video todavía, solo texto (rápido, sin costo real).
    */
-  async function generateVideoBriefProposal() {
+  async function generateVideoBriefProposal(targetVersion: VideoGenerationVersion = videoGenerationVersion) {
     setVideoDirectionGenerating(true)
     setVideoDirectionError(null)
     try {
@@ -2677,7 +2677,7 @@ function Editor({
           category: item.category,
           topic: item.topic,
           objective: item.objective ?? "conversion",
-          version: videoGenerationVersion,
+          version: targetVersion,
         }),
       })
       const data = await response.json()
@@ -2689,8 +2689,8 @@ function Editor({
         hook: data.hook,
         video_prompt: data.video_prompt,
         video_brief: data.brief,
-        video_generation_version: videoGenerationVersion,
-        ...(videoGenerationVersion === "v2" ? {
+        video_generation_version: targetVersion,
+        ...(targetVersion === "v2" ? {
           video_reference_frame_url: "",
           video_reference_frame_path: "",
           video_reference_frame_approved: false,
@@ -2719,7 +2719,19 @@ function Editor({
       })
       const data = await response.json()
       if (!response.ok || data.error) {
-        setVideoFrameError(data.error ?? "El fotograma no superó la revisión automática.")
+        const review = data.review && typeof data.review === "object" ? data.review : null
+        const lowScores = review?.scores
+          ? VIDEO_BRAND_SCORE_LABELS
+            .filter(([key]) => VIDEO_BRAND_BLOCKING_KEYS.includes(key) && Number(review.scores[key]) < VIDEO_SCORE_MIN)
+            .map(([key, label]) => `${label} ${review.scores[key]}/5`)
+          : []
+        const details = [
+          typeof review?.notes === "string" ? review.notes : "",
+          Array.isArray(review?.critical_failures) && review.critical_failures.length > 0
+            ? `Fallas críticas: ${review.critical_failures.join(", ")}.` : "",
+          lowScores.length > 0 ? `Puntajes bajos: ${lowScores.join(", ")}.` : "",
+        ].filter(Boolean).join(" ")
+        setVideoFrameError(`${data.error ?? "El fotograma no superó la revisión automática."}${details ? ` ${details}` : ""}`)
         return
       }
       await onSave({
@@ -2733,6 +2745,12 @@ function Editor({
     } finally {
       setVideoFrameGenerating(false)
     }
+  }
+
+  async function switchToDirectVideo() {
+    setVideoFrameError(null)
+    setAiVideoError(null)
+    await generateVideoBriefProposal("v2_direct")
   }
 
   async function setVideoFrameApproval(approved: boolean) {
@@ -2999,7 +3017,7 @@ function Editor({
                     type="button"
                     variant="outline"
                     size="sm"
-                    onClick={generateVideoBriefProposal}
+                    onClick={() => generateVideoBriefProposal()}
                     disabled={videoDirectionGenerating}
                     className="w-full gap-1.5"
                   >
@@ -3134,7 +3152,21 @@ function Editor({
                         {videoFrameGenerating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ImageIcon className="h-3.5 w-3.5" />}
                         {videoFrameGenerating ? "Generando y revisando..." : item.video_reference_frame_url ? "Regenerar fotograma" : "Generar fotograma inicial"}
                       </Button>
-                      {videoFrameError && <p className="rounded bg-red-50 p-2 text-red-700">{videoFrameError}</p>}
+                      {videoFrameError && (
+                        <div className="space-y-2 rounded bg-red-50 p-2 text-red-700">
+                          <p>{videoFrameError}</p>
+                          <Button
+                            type="button"
+                            size="sm"
+                            onClick={switchToDirectVideo}
+                            disabled={videoDirectionGenerating || aiVideoGenerating}
+                            className="w-full gap-1.5"
+                          >
+                            {videoDirectionGenerating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <WandSparkles className="h-3.5 w-3.5" />}
+                            Usar V2 Directa sin generar más imágenes
+                          </Button>
+                        </div>
+                      )}
                       {item.video_reference_frame_url && frameReview?.approved && (
                         <Button
                           type="button"

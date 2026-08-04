@@ -122,6 +122,9 @@ El editor ofrece además **V2 Directa**: Veo Standard inventa la escena completa
 se genera ni cobra un fotograma inicial. Conserva la identidad documental, el control contra repetición,
 los puntajes de marca y el negative prompt, pero no puede verificar visualmente la escena antes de
 consumir el intento de video; por eso la UI la presenta como una opción de menor control previo.
+Si V2 Controlada rechaza sus tres fotogramas, la UI muestra el motivo concreto de la última revisión
+(notas, fallas críticas y puntajes bloqueantes) y ofrece cambiar en un clic a V2 Directa. Ese cambio
+regenera únicamente el prompt de texto y no vuelve a consumir generaciones de imagen.
 antes de consumir el intento pago. Cambiar de version obliga a regenerar la propuesta.
 
 Ambos requests fijan `9:16`, `720p` y 8 segundos para coincidir con los tiempos del texto compuesto.

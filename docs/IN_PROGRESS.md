@@ -1,10 +1,20 @@
-# EN CURSO (2026-08-03) — Video V2 Directa sin fotograma
+# HOTFIX EN CURSO (2026-08-03) — rechazo opaco de fotogramas V2
+
+- [x] Confirmar en logs dos respuestas 422 del revisor visual, sin error de proveedor ni cuota.
+- [x] Mostrar notas, fallas críticas y puntajes bajos devueltos por la revisión.
+- [x] Ofrecer cambio inmediato a V2 Directa y regenerar su prompt sin crear más imágenes.
+- [x] Ejecutar lint, 102 suites/943 tests y build de producción.
+- [ ] Publicar por PR, verificar preview y mergear.
+
+---
+
+# CERRADO (2026-08-03) — Video V2 Directa sin fotograma
 
 - [x] Agregar un tercer motor V2 Directa, totalmente text-to-video y sin generación de imagen inicial.
 - [x] Mantener V1 ilustrada y V2 Controlada sin cambios de comportamiento.
 - [x] Aplicar identidad documental, historial de seis piezas, puntajes de marca y negative prompt también a V2 Directa.
 - [x] Ejecutar lint, 102 suites/943 tests y build de producción.
-- [ ] Publicar por PR, verificar preview y mergear.
+- [x] Publicado y mergeado como PR #204; CI, E2E y producción verificados.
 
 ---
 
