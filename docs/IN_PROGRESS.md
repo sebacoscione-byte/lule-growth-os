@@ -1,3 +1,13 @@
+# EN CURSO (2026-08-03) — Video V2 Directa sin fotograma
+
+- [x] Agregar un tercer motor V2 Directa, totalmente text-to-video y sin generación de imagen inicial.
+- [x] Mantener V1 ilustrada y V2 Controlada sin cambios de comportamiento.
+- [x] Aplicar identidad documental, historial de seis piezas, puntajes de marca y negative prompt también a V2 Directa.
+- [x] Ejecutar lint, 102 suites/943 tests y build de producción.
+- [ ] Publicar por PR, verificar preview y mergear.
+
+---
+
 # CERRADO (2026-08-03) — identidad visual y fotograma controlado para Video V2
 
 - [x] Traducir el brief de identidad visual a reglas ejecutables de escena, personas, paleta, composición y diversidad.

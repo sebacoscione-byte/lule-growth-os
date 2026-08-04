@@ -19,9 +19,9 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Faltan datos para proponer el video." }, { status: 400 })
     }
     const objective = OBJECTIVES.includes(body.objective as ContentObjective) ? (body.objective as ContentObjective) : "conversion"
-    const version: VideoGenerationVersion = body.version === "v1" ? "v1" : "v2"
+    const version: VideoGenerationVersion = body.version === "v1" || body.version === "v2_direct" ? body.version : "v2"
     const itemId = typeof body.itemId === "string" ? body.itemId : ""
-    const recentVisuals = version === "v2"
+    const recentVisuals = version !== "v1"
       ? (await readContentItems(supabase).catch(() => []))
         .filter(item => item.id !== itemId && item.format === "reel")
         .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())

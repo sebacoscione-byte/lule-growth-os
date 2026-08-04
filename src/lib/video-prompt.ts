@@ -3,6 +3,7 @@ import type { VideoGenerationVersion } from "@/types"
 const V1_REQUIRED_STYLE_PATTERN = /(?:motion graphic|illustration|flat|semi-flat)/i
 const V2_CAMERA_PATTERN = /(?:locked camera|locked tripod|slow controlled push-in|slow lateral slider|gentle handheld drift)/i
 const V2_REQUIRED_SECTIONS = ["Human action:", "Camera motion:", "Environment motion:", "Continuity:", "Audio:"]
+const V2_DIRECT_REQUIRED_SECTIONS = ["Subject and setting:", "Human action:", "Camera and composition:", "Light and palette:", "Continuity:", "Audio:"]
 
 const COMMON_VEO_PARAMETERS = {
   aspectRatio: "9:16",
@@ -24,7 +25,7 @@ export const VEO_V2_NEGATIVE_PROMPT = [
 ].join(", ")
 
 export function getVeoRequestParameters(version: VideoGenerationVersion) {
-  return version === "v2"
+  return version === "v2" || version === "v2_direct"
     ? { ...COMMON_VEO_PARAMETERS, personGeneration: "allow_adult", negativePrompt: VEO_V2_NEGATIVE_PROMPT }
     : COMMON_VEO_PARAMETERS
 }
@@ -90,10 +91,28 @@ DIRECCION V2 IMAGE-TO-VIDEO PARA VEO:
 - El prompt positivo describe lo que sucede; las exclusiones se envian aparte como negativePrompt.
 - Nunca pedir texto, logos, interfaces, multiples escenas, transiciones, gestos teatrales ni una persona mirando a camara.`
 
+/** V2 Directa conserva la identidad, pero Veo inventa la escena completa desde texto. */
+export const VIDEO_PROMPT_RULES_V2_DIRECT = `${VIDEO_VISUAL_IDENTITY_RULES}
+
+DIRECCION V2 DIRECTA TEXT-TO-VIDEO PARA VEO:
+- Inclui "video_prompt" en ingles y empezá exactamente con "An 8-second vertical 9:16 editorial documentary healthcare video."
+- Veo debe resolver UNA sola toma continua. No uses montaje, secuencia, transiciones ni cambio de lugar.
+- Usa exactamente estas secciones: "Subject and setting:", "Human action:", "Camera and composition:", "Light and palette:", "Continuity:", "Audio:".
+- Subject and setting: una persona adulta argentina/latina realista o una gráfica editorial de marca cuando el tema sea turnos/sedes. Define edad aproximada, ropa cotidiana, ubicación concreta y un único elemento médico correcto si aporta significado.
+- Human action: una sola acción pequeña, natural y directamente conectada con el tema. La acción humana debe ser el movimiento principal; nunca cortinas, vapor, hojas o luz como recurso central.
+- Camera and composition: un único encuadre a altura humana y un solo movimiento como máximo: locked camera, locked tripod, slow controlled push-in, slow lateral slider o gentle handheld drift. Reserva 25-35% lateral para texto real agregado después.
+- Light and palette: luz natural lateral cálida, contraste suave, saturación moderada/baja, crema cálido, petróleo oscuro, marino, turquesa apagado y un acento terracota mínimo.
+- Continuity: anatomía, rostro, manos, ropa y objetos permanecen consistentes; nada aparece, desaparece, se duplica, flota o se transforma.
+- Audio: ambiente real suave, sin diálogo, narración ni palabras.
+- Nunca inventar el rostro de la Dra. Lucía. Nunca una médica ficticia mirando o hablando a cámara. Cero texto, letras, números, logos, marcas de agua o interfaces legibles.
+- FALLA CRÍTICA PREVENTIVA: si aparece estetoscopio en auscultación cardíaca, describí explícitamente el cabezal sobre pecho/tórax; nunca abdomen, panza o estómago.
+- Evita estética stock, publicidad prepaga, clínica estadounidense de lujo, pose perfecta, piel plástica, CGI, Canva, anatomía estilizada y utilería médica decorativa.`
+
 export const PUBLISHABLE_VIDEO_PROMPT_RULES = VIDEO_PROMPT_RULES_V2
 
 export function getVideoPromptRules(version: VideoGenerationVersion): string {
-  return version === "v1" ? VIDEO_PROMPT_RULES_V1 : VIDEO_PROMPT_RULES_V2
+  if (version === "v1") return VIDEO_PROMPT_RULES_V1
+  return version === "v2_direct" ? VIDEO_PROMPT_RULES_V2_DIRECT : VIDEO_PROMPT_RULES_V2
 }
 
 function normalizedTopic(topic: string): string {
@@ -113,6 +132,12 @@ export function buildFallbackVideoPrompt(topic: string, version: VideoGeneration
   if (version === "v1") {
     return `An 8-second vertical 9:16 clean medical motion graphic about ${safeTopic}. A single simplified deep-blue heart symbol sits on a light warm background, connected to one muted teal circular path and a small burgundy marker. One dot follows the path once while the heart gives one restrained pulse, then the shapes settle smoothly. Flat or semi-flat illustration, clean edges, simple composition and generous low-detail space for editorial overlays. Clean modern medical motion graphic / illustration style, light background, no on-screen text, logos or watermark, ambient sound only, no dialogue, no voiceover.`
   }
+  if (version === "v2_direct") {
+    if (/(?:turno|lanus|lanús|lomas|britanico|británico|cimel|sede|ubicacion|ubicación)/i.test(safeTopic)) {
+      return `An 8-second vertical 9:16 editorial documentary healthcare video. Subject and setting: a tactile warm-cream editorial brand graphic about ${safeTopic}, with one restrained dark-petrol route, a muted turquoise appointment marker and a tiny soft-terracotta accent; no invented clinic, doctor, patient or building. Human action: no human is introduced; the existing route marker completes one subtle purposeful movement along its path. Camera and composition: locked camera, graphic grouped across two thirds of the frame with a quiet 25-35 percent lateral safe area. Light and palette: soft natural lateral light over real paper texture, warm cream, dark petrol, muted turquoise and minimal terracotta, moderate-low saturation. Continuity: every shape keeps its exact form, count and position except for the single route-marker movement; nothing appears, disappears or transforms. Audio: very soft paper movement and room tone only, without dialogue, narration or spoken words.`
+    }
+    return `An 8-second vertical 9:16 editorial documentary healthcare video. Subject and setting: a realistic adult Latina patient in everyday clothing performs one concrete preventive action directly connected to ${safeTopic}, in a warm inhabited Argentine home or credible consultation setting, identity partial and never addressing camera. Human action: she completes one small natural movement central to the topic, with realistic breathing, hands and restrained expression. Camera and composition: slow controlled push-in at human eye level with a normal 50 mm perspective, one continuous shot, subject across two thirds and a quiet 25-35 percent lateral safe area. Light and palette: warm lateral window light, soft contrast, moderate-low saturation, warm cream, dark petrol, navy, muted turquoise and a tiny terracotta accent, natural skin and material texture. Continuity: preserve exact anatomy, face, hands, clothing and object placement throughout; everything remains grounded, singular and unchanged. Audio: faint authentic room tone only, without dialogue, narration or spoken words.`
+  }
   if (/(?:turno|lanus|lanús|lomas|britanico|británico|cimel|sede|ubicacion|ubicación)/i.test(safeTopic)) {
     return "Animate the approved 9:16 first frame for 8 seconds. Human action: no human figure is introduced; the approved branded route marker completes one subtle, purposeful movement along its existing path. Camera motion: locked camera. Environment motion: a barely perceptible natural paper shadow shift adds depth without becoming the main action. Continuity: preserve the exact tactile graphic, shapes, composition, warm cream, dark petrol, muted turquoise and soft terracotta palette of the first frame; no new symbol appears and every element keeps its form. Audio: very soft natural paper movement and room tone only, without dialogue, narration or spoken words."
   }
@@ -126,6 +151,16 @@ export function getVeoPromptQualityIssues(prompt: string, version: VideoGenerati
     if (value.length < 160) issues.push("la direccion visual V1 es demasiado breve para controlar el resultado")
     if (!/8-second/i.test(value) || !/9:16/i.test(value)) issues.push("no define el clip V1 vertical de 8 segundos")
     if (!V1_REQUIRED_STYLE_PATTERN.test(value)) issues.push("no conserva el estilo ilustrado clasico de V1")
+    return issues
+  }
+  if (version === "v2_direct") {
+    if (value.length < 520) issues.push("la dirección V2 Directa es demasiado breve para controlar una escena inventada por Veo")
+    if (!/^An 8-second vertical 9:16 editorial documentary healthcare video\./i.test(value)) issues.push("no usa el contrato documental de V2 Directa")
+    for (const section of V2_DIRECT_REQUIRED_SECTIONS) if (!value.includes(section)) issues.push(`falta la sección V2 Directa ${section.replace(":", "")}`)
+    if (!V2_CAMERA_PATTERN.test(value)) issues.push("no limita la cámara a un único movimiento fiable")
+    if (!/(?:25-35|25 to 35) percent/i.test(value)) issues.push("no reserva el área editorial de texto")
+    if (!/(?:continuity|preserve|keeps? (?:its|their) exact)/i.test(value)) issues.push("no controla la continuidad de anatomía y objetos")
+    if (/(?:multiple scenes|montage|cut to|transition to|3d render|cgi|hologram)/i.test(value)) issues.push("pide montaje o una estética sintética incompatible con V2 Directa")
     return issues
   }
   if (value.length < 360) issues.push("la animacion V2 es demasiado breve para preservar el fotograma")

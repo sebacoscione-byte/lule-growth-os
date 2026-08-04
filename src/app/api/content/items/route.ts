@@ -114,7 +114,7 @@ export async function PATCH(request: NextRequest) {
     if (body.visual_generation_version && !["v1", "v2"].includes(body.visual_generation_version)) {
       return NextResponse.json({ error: "Motor de generacion invalido" }, { status: 400 })
     }
-    if (body.video_generation_version && !["v1", "v2"].includes(body.video_generation_version)) {
+    if (body.video_generation_version && !["v1", "v2", "v2_direct"].includes(body.video_generation_version)) {
       return NextResponse.json({ error: "Motor de video invalido" }, { status: 400 })
     }
     if (body.format && !["reel", "historia", "carrusel", "post"].includes(body.format)) {
@@ -153,11 +153,11 @@ export async function PATCH(request: NextRequest) {
       const brandScoreKeys = ["semanticRelevance", "firstSecondHook", "meaningfulMotion", "humanAuthenticity",
         "medicalCredibility", "profileVisualConsistency", "originalityVersusRecentPosts", "artifactRisk"]
       const brandScores = brief?.brand_scores as unknown as Record<string, unknown> | undefined
-      const validBrandScores = brief?.generation_version !== "v2" ||
+      const validBrandScores = brief?.generation_version === undefined || brief.generation_version === "v1" ||
         (typeof brandScores === "object" && brandScores !== null &&
           brandScoreKeys.every(key => typeof brandScores[key] === "number" && (brandScores[key] as number) >= 1 && (brandScores[key] as number) <= 5))
       const validBrief = brief !== null && typeof brief === "object" &&
-        (brief.generation_version === undefined || ["v1", "v2"].includes(brief.generation_version)) &&
+        (brief.generation_version === undefined || ["v1", "v2", "v2_direct"].includes(brief.generation_version)) &&
         typeof brief.objective === "string" && brief.objective.length <= 300 &&
         Array.isArray(brief.messages) && brief.messages.length >= 1 && brief.messages.length <= 3 &&
         brief.messages.every((m: unknown) => typeof m === "string" && m.length <= 200) &&
@@ -165,10 +165,11 @@ export async function PATCH(request: NextRequest) {
         typeof brief.postproduction_notes === "string" && brief.postproduction_notes.length <= 1000 &&
         typeof brief.validation_notes === "string" && brief.validation_notes.length <= 1000 &&
         validScores && validBrandScores &&
-        (brief.generation_version !== "v2" ||
+        (!["v2", "v2_direct"].includes(brief.generation_version ?? "") ||
           (["DOCUMENTAL_HUMANO", "CONTROL_PREVENCION", "CONSULTA_ACOMPANAMIENTO", "DETALLE_MEDICO_EDITORIAL"].includes(brief.visual_family ?? "") &&
-            ["A", "B", "C", "D"].includes(brief.composition ?? "") && typeof brief.reference_image_prompt === "string" &&
-            brief.reference_image_prompt.length > 0 && brief.reference_image_prompt.length <= 2400))
+            ["A", "B", "C", "D"].includes(brief.composition ?? "") &&
+            (brief.generation_version !== "v2" || (typeof brief.reference_image_prompt === "string" &&
+              brief.reference_image_prompt.length > 0 && brief.reference_image_prompt.length <= 2400))))
       if (!validBrief) return NextResponse.json({ error: "Propuesta de video invalida" }, { status: 400 })
     }
     if (body.video_reference_frame_approved !== undefined && typeof body.video_reference_frame_approved !== "boolean") {

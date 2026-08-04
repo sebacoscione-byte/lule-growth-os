@@ -40,4 +40,9 @@ describe("POST /api/content/video-brief", () => {
 
     expect(generateVideoBrief).toHaveBeenCalledWith(expect.objectContaining({ version: "v2" }))
   })
+
+  it("conserva V2 Directa cuando está elegida", async () => {
+    await POST(request("v2_direct"))
+    expect(generateVideoBrief).toHaveBeenCalledWith(expect.objectContaining({ version: "v2_direct" }))
+  })
 })
