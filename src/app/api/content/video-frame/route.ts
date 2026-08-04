@@ -72,6 +72,11 @@ export async function POST(request: Request) {
       })
     }
 
+    console.warn("[content/video-frame] fotogramas rechazados", {
+      attempts: MAX_FRAME_ATTEMPTS,
+      critical_failures: lastReview?.critical_failures ?? [],
+      scores: lastReview?.scores ?? null,
+    })
     return NextResponse.json({
       code: "VIDEO_FRAME_REJECTED",
       error: "Los fotogramas no superaron la revision de autenticidad y credibilidad medica. No se habilito la generacion del video.",
