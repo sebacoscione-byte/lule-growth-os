@@ -1,4 +1,5 @@
 import {
+  DEFAULT_DAILY_VIDEO_GENERATION_LIMIT,
   buildContentPlanPrompt,
   classifyMessage,
   generateContentPlan,
@@ -41,6 +42,12 @@ describe("selección de modelo de video", () => {
 
     expect(getContentVideoModel("v1")).toBe("veo-legacy-fast")
     expect(getContentVideoModel("v2")).toBe("veo-3.1-generate-preview")
+  })
+})
+
+describe("límite diario de generación de video", () => {
+  it("permite hasta 10 videos exitosos por día cuando no hay override", () => {
+    expect(DEFAULT_DAILY_VIDEO_GENERATION_LIMIT).toBe(10)
   })
 })
 

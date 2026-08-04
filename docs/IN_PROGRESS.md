@@ -1,3 +1,12 @@
+# HOTFIX EN CURSO (2026-08-03) — ampliar límite diario de videos
+
+- [x] Confirmar que producción usa el valor predeterminado y que solo se cuentan generaciones exitosas.
+- [x] Aumentar el límite diario compartido de V1/V2 de 3 a 10 y cubrirlo con una regresión.
+- [x] Ejecutar lint, 101 suites/937 tests y build de producción.
+- [ ] Publicar por PR, verificar preview y mergear.
+
+---
+
 # EN CURSO (2026-08-03) — separar V1/V2 y mejorar videos publicables
 
 - [x] Reconstruir el motor previo y confirmar que el paper-cut actual está impuesto por el prompt.

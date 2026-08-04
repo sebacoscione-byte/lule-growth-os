@@ -115,6 +115,9 @@ antinatural. La UI y `/api/content/video` validan cada prompt contra el contrato
 antes de consumir el intento pago. Cambiar de version obliga a regenerar la propuesta.
 
 Ambos requests fijan `9:16`, `720p` y 8 segundos para coincidir con los tiempos del texto compuesto.
+El límite operativo predeterminado es de 10 videos exitosos por día, compartido entre V1 y V2; puede
+ajustarse mediante `DAILY_VIDEO_GENERATION_LIMIT` sin cambiar código. Los intentos fallidos no consumen
+ese cupo interno, aunque el proveedor puede aplicar sus propios límites.
 
 ## Canales
 

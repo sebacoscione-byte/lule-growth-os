@@ -1410,6 +1410,7 @@ const VEO_POLL_INTERVAL_MS = 10_000
 // Deja margen debajo del maxDuration (280s) de /api/content/video: el pedido inicial + la descarga
 // final tambien consumen tiempo dentro de esa misma funcion serverless.
 const VEO_POLL_TIMEOUT_MS = 260_000
+export const DEFAULT_DAILY_VIDEO_GENERATION_LIMIT = 10
 
 /** V1 conserva Veo Fast; V2 prioriza consistencia y control con Veo Standard. Los overrides son
  * separados para que una variable histórica de V1 no degrade silenciosamente la calidad de V2. */
@@ -1440,7 +1441,7 @@ export async function generateContentVideo(input: {
   const apiKey = process.env.GEMINI_API_KEY
   if (!apiKey) throw new Error("GEMINI_API_KEY no esta configurada.")
 
-  const dailyLimit = Number(process.env.DAILY_VIDEO_GENERATION_LIMIT ?? 3)
+  const dailyLimit = Number(process.env.DAILY_VIDEO_GENERATION_LIMIT ?? DEFAULT_DAILY_VIDEO_GENERATION_LIMIT)
   if (await getDailyRequestCount("content_video") >= dailyLimit) {
     throw new Error(`DAILY_VIDEO_LIMIT_EXCEEDED:${dailyLimit}`)
   }
