@@ -2321,11 +2321,12 @@ function Editor({
   const videoPromptIssues = getVeoPromptQualityIssues(videoPrompt, videoGenerationVersion)
   const videoNeedsProposal = !item.video_brief ||
     item.video_brief.generation_version !== videoGenerationVersion || videoPromptIssues.length > 0 ||
-    (videoGenerationVersion === "v2" && (!item.video_brief.reference_image_prompt || !item.video_brief.brand_scores))
-  const proposalBrandGateFailed = videoGenerationVersion === "v2" && Boolean(item.video_brief?.brand_scores &&
+    (videoGenerationVersion === "v2" && !item.video_brief.reference_image_prompt) ||
+    (videoGenerationVersion !== "v1" && !item.video_brief.brand_scores)
+  const proposalBrandGateFailed = videoGenerationVersion !== "v1" && Boolean(item.video_brief?.brand_scores &&
     VIDEO_BRAND_BLOCKING_KEYS.some(key => (item.video_brief?.brand_scores?.[key] ?? 1) < VIDEO_SCORE_MIN))
   const frameReview = item.video_reference_frame_review
-  const frameReady = videoGenerationVersion === "v1" || Boolean(
+  const frameReady = videoGenerationVersion !== "v2" || Boolean(
     item.video_reference_frame_url && item.video_reference_frame_path && item.video_reference_frame_approved &&
     frameReview?.approved && frameReview.critical_failures.length === 0 &&
     VIDEO_BRAND_BLOCKING_KEYS.every(key => (frameReview?.scores[key] ?? 1) >= VIDEO_SCORE_MIN)
@@ -2942,7 +2943,18 @@ function Editor({
                 <div className="space-y-2 rounded-md border border-violet-200 bg-violet-50/60 p-2.5">
                   <div className="space-y-1.5">
                     <p className="text-[11px] font-semibold uppercase tracking-wide text-violet-700">Motor de generación de video</p>
-                    <div className="grid grid-cols-2 gap-2">
+                    <div className="grid grid-cols-3 gap-2">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant={videoGenerationVersion === "v2_direct" ? "default" : "outline"}
+                        onClick={() => selectVideoGenerationVersion("v2_direct")}
+                        disabled={videoDirectionGenerating || aiVideoGenerating}
+                        className="h-auto min-h-10 flex-col gap-0.5 py-1.5"
+                      >
+                        <span>Directa (V2)</span>
+                        <span className="text-[9px] font-normal opacity-80">Veo Standard · sin fotograma</span>
+                      </Button>
                       <Button
                         type="button"
                         size="sm"
@@ -2951,8 +2963,8 @@ function Editor({
                         disabled={videoDirectionGenerating || aiVideoGenerating}
                         className="h-auto min-h-10 flex-col gap-0.5 py-1.5"
                       >
-                        <span>Calidad (V2)</span>
-                        <span className="text-[9px] font-normal opacity-80">Veo Standard · documental</span>
+                        <span>Controlada (V2)</span>
+                        <span className="text-[9px] font-normal opacity-80">Veo Standard · con fotograma</span>
                       </Button>
                       <Button
                         type="button"
@@ -2968,12 +2980,15 @@ function Editor({
                     </div>
                     <p className="text-[10px] text-violet-700/80">
                       {videoGenerationVersion === "v2"
-                        ? "V2 crea primero un fotograma documental con personas y acciones creíbles, lo revisa y recién después lo anima con Veo sin reinventar la escena."
-                        : "V1 conserva la microinfografía ilustrada que usaba el sistema antes del motor documental."}
+                        ? "V2 Controlada crea y revisa un fotograma antes de animarlo; ofrece la mayor consistencia, pero suma el costo de imagen."
+                        : videoGenerationVersion === "v2_direct"
+                          ? "V2 Directa genera toda la escena y el movimiento con Veo desde texto. No paga fotograma, aunque tiene menos control visual previo."
+                          : "V1 conserva la microinfografía ilustrada que usaba el sistema antes del motor documental."}
                     </p>
                   </div>
                   <p className="text-[11px] font-semibold uppercase tracking-wide text-violet-700">
-                    {videoGenerationVersion === "v2" ? "Video documental (Veo + texto real)" : "Microinfografía animada original (Veo + texto real)"}
+                    {videoGenerationVersion === "v1" ? "Microinfografía animada original (Veo + texto real)" :
+                      videoGenerationVersion === "v2_direct" ? "Video documental directo (texto → Veo)" : "Video documental controlado (fotograma → Veo)"}
                   </p>
                   <p className="text-[11px] text-violet-700/80">
                     Veo anima la escena (sin texto); el gancho, los mensajes y el CTA se
@@ -3061,7 +3076,7 @@ function Editor({
                             Generá una propuesta nueva antes de crear el video.
                           </p>
                         )}
-                        {videoGenerationVersion === "v2" && item.video_brief.brand_scores && (
+                        {videoGenerationVersion !== "v1" && item.video_brief.brand_scores && (
                           <div className="space-y-1 border-t border-gray-100 pt-2">
                             <p className="font-semibold text-gray-900">Control de identidad visual V2</p>
                             <div className="grid grid-cols-2 gap-1.5">
@@ -3072,7 +3087,7 @@ function Editor({
                                 return <div key={key} className={`rounded px-2 py-1 text-[10px] font-medium ${ok ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700"}`}>{label}: {value}/5</div>
                               })}
                             </div>
-                            {proposalBrandGateFailed && <p className="font-medium text-red-700">La propuesta no supera los mínimos de identidad visual. Regenerala antes de crear el fotograma.</p>}
+                            {proposalBrandGateFailed && <p className="font-medium text-red-700">La propuesta no supera los mínimos de identidad visual. Regenerala antes de crear {videoGenerationVersion === "v2" ? "el fotograma" : "el video"}.</p>}
                           </div>
                         )}
                       </div>
@@ -3145,8 +3160,11 @@ function Editor({
                     {aiVideoGenerating ? "Generando... puede tardar unos minutos" : item.video_url ? "Regenerar video con IA" : "Generar video con IA"}
                   </Button>
                   <p className="text-[11px] text-violet-700/80">
-                    Tiene costo real por intento ({videoGenerationVersion === "v2" ? "aprox. USD 3,20" : "aprox. USD 0,80"}), sin límite gratuito.
+                    Tiene costo real por intento ({videoGenerationVersion === "v1" ? "aprox. USD 0,80" : "aprox. USD 3,20"}), sin límite gratuito.
                   </p>
+                  {videoGenerationVersion === "v2_direct" && (
+                    <p className="rounded bg-blue-50 p-2 text-[11px] text-blue-800">No genera ni cobra un fotograma inicial: toda la escena viene directamente de la IA de video.</p>
+                  )}
                   {videoGenerationVersion === "v2" && !frameReady && !videoNeedsProposal && (
                     <p className="rounded bg-amber-50 p-2 text-[11px] font-medium text-amber-800">Generá, revisá y aprobá el fotograma inicial para habilitar Veo.</p>
                   )}

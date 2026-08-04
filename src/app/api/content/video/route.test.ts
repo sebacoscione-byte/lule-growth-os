@@ -127,6 +127,22 @@ describe("POST /api/content/video", () => {
     expect(generateContentVideo).toHaveBeenCalledWith({ video_prompt: videoPrompt, version: "v1" })
   })
 
+  it("genera V2 Directa sin crear ni descargar un fotograma", async () => {
+    const videoPrompt = buildFallbackVideoPrompt("Cardio-oncología", "v2_direct")
+    const response = await POST(request({
+      itemId: "draft-1",
+      video_prompt: videoPrompt,
+      version: "v2_direct",
+      hook: "Acompañar también es cuidar",
+      messages: ["Control cardiovascular durante el tratamiento"],
+      cta: "Conocé más",
+    }))
+
+    expect(response.status).toBe(200)
+    expect(generateContentVideo).toHaveBeenCalledWith({ video_prompt: videoPrompt, version: "v2_direct" })
+    expect(readContentItems).not.toHaveBeenCalled()
+  })
+
   it("bloquea V2 si el fotograma no fue aprobado", async () => {
     ;(readContentItems as jest.Mock).mockResolvedValue([{ id: "draft-1", video_reference_frame_approved: false }])
     const response = await POST(request({

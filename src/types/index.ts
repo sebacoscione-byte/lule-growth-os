@@ -192,7 +192,7 @@ export interface ContentVideoFrameReview {
 
 /** Motor visual del reel. V1 conserva la microinfografía ilustrada original; V2 usa video
  * documental y Veo Standard con controles específicos contra artefactos generativos. */
-export type VideoGenerationVersion = "v1" | "v2"
+export type VideoGenerationVersion = "v1" | "v2" | "v2_direct"
 
 /** Propuesta estructurada de un reel tipo "microinfografia medica animada" (2026-07-23, reemplaza el
  * criterio anterior de B-roll cinematografico). item.hook es el gancho (0,0-1,2s, reusa el mismo
@@ -250,7 +250,8 @@ export interface ContentItem {
   /** Direccion de video (en ingles) para generar el video con IA -- solo se usa para el camino "Generar con IA", no para subir un video propio. */
   video_prompt?: string
   /** "v1": microinfografía ilustrada clásica con Veo Fast. "v2" (default): toma documental
-   * realista con Veo Standard y negative prompt separado. */
+   * controlada desde un fotograma aprobado. "v2_direct": toma documental text-to-video, sin costo
+   * de generar el fotograma inicial. */
   video_generation_version?: VideoGenerationVersion
   /** Propuesta estructurada (microinfografia animada) generada junto con video_prompt -- ver ContentVideoBrief. */
   video_brief?: ContentVideoBrief

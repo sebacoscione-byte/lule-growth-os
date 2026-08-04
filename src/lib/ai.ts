@@ -1433,7 +1433,7 @@ export async function generateVideoBrief(input: {
   }
   const version = input.version ?? "v2"
   const text = await generateText({
-    maxTokens: version === "v2" ? 1800 : 1200,
+    maxTokens: version === "v1" ? 1200 : 1800,
     json: true,
     purpose: "video_brief",
     cacheSystem: true,
@@ -1447,7 +1447,7 @@ ${version === "v2" ? `${VIDEO_REFERENCE_FRAME_RULES}
 
 V2 usa dos prompts separados. reference_image_prompt define la fotografía inicial completa. video_prompt NO vuelve a inventarla: solo indica una acción humana, un movimiento de cámara y movimiento ambiental mínimo, preservando la composición. Revisá las últimas seis piezas. Si la propuesta se parece a una reciente, cambiá por lo menos DOS de estos elementos: plano, ubicación, acción, edad, posición de la persona, elemento médico o luz.
 FALLA CRÍTICA: nunca propongas un estetoscopio sobre abdomen/panza/estómago. Para auscultación cardíaca debe estar sobre pecho/tórax.
-Además devolvé visual_family, composition, reference_image_prompt y brand_scores. No apruebes una propuesta si semanticRelevance, humanAuthenticity, medicalCredibility, profileVisualConsistency u originalityVersusRecentPosts es menor a 4.` : ""}
+Además devolvé visual_family, composition, reference_image_prompt y brand_scores. No apruebes una propuesta si semanticRelevance, humanAuthenticity, medicalCredibility, profileVisualConsistency u originalityVersusRecentPosts es menor a 4.` : version === "v2_direct" ? `V2 Directa no genera ni usa un fotograma inicial. El video_prompt debe describir toda la escena y el movimiento en una sola toma siguiendo el contrato text-to-video. Revisá las últimas seis piezas y, si se parece a una reciente, cambiá al menos DOS de estos elementos: plano, ubicación, acción, edad, posición de la persona, elemento médico o luz. Devolvé visual_family, composition y brand_scores; reference_image_prompt debe ser una cadena vacía. No apruebes una propuesta si semanticRelevance, humanAuthenticity, medicalCredibility, profileVisualConsistency u originalityVersusRecentPosts es menor a 4. La regla del estetoscopio sobre abdomen/panza debe quedar prevenida explícitamente en cualquier escena de auscultación.` : ""}
 
 Con todas las reglas de arriba, generá la propuesta completa de un reel tipo microinfografía médica
 animada de 8 segundos para la cuenta de Instagram de la Dra. Lucía Chahin (cardióloga), sobre la
@@ -1464,7 +1464,7 @@ Devolvé SOLO un JSON PLANO con esta forma exacta, sin ningún otro campo ni ani
   "scores": { "scroll_stop": 1-5, "clarity": 1-5, "utility": 1-5, "credibility": 1-5, "legibility": 1-5, "brand_consistency": 1-5 },
   "visual_family": "DOCUMENTAL_HUMANO, CONTROL_PREVENCION, CONSULTA_ACOMPANAMIENTO, DETALLE_MEDICO_EDITORIAL o vacío para V1",
   "composition": "A, B, C, D o vacío para V1",
-  "reference_image_prompt": "fotograma inicial V2 en inglés o vacío para V1",
+  "reference_image_prompt": "fotograma inicial para V2 controlada; cadena vacía para V1 o V2 Directa",
   "brand_scores": { "semanticRelevance": 1-5, "firstSecondHook": 1-5, "meaningfulMotion": 1-5, "humanAuthenticity": 1-5, "medicalCredibility": 1-5, "profileVisualConsistency": 1-5, "originalityVersusRecentPosts": 1-5, "artifactRisk": 1-5 }
 }`,
     messages: [{
@@ -1511,7 +1511,7 @@ Devolvé SOLO un JSON PLANO con esta forma exacta, sin ningún otro campo ni ani
       ? parsed.reference_image_prompt.trim().slice(0, 2400)
       : buildFallbackVideoReferencePrompt(input.topic)
     : undefined
-  const brandScores = version === "v2" ? normalizeVideoBrandScores(parsed.brand_scores) : undefined
+  const brandScores = version !== "v1" ? normalizeVideoBrandScores(parsed.brand_scores) : undefined
 
   return {
     hook: parsed.hook,
@@ -1524,12 +1524,12 @@ Devolvé SOLO un JSON PLANO con esta forma exacta, sin ningún otro campo ni ani
       postproduction_notes: typeof parsed.postproduction_notes === "string" ? parsed.postproduction_notes : "",
       validation_notes: typeof parsed.validation_notes === "string" ? parsed.validation_notes : "",
       scores,
-      ...(version === "v2" ? {
+      ...(version !== "v1" ? {
         visual_family: visualFamilies.includes(parsed.visual_family as typeof visualFamilies[number])
           ? parsed.visual_family as typeof visualFamilies[number] : "DOCUMENTAL_HUMANO" as const,
         composition: compositions.includes(parsed.composition as typeof compositions[number])
           ? parsed.composition as typeof compositions[number] : "A" as const,
-        reference_image_prompt: referenceImagePrompt,
+        ...(version === "v2" ? { reference_image_prompt: referenceImagePrompt } : {}),
         brand_scores: brandScores,
       } : {}),
     },
@@ -1542,7 +1542,7 @@ const VEO_POLL_INTERVAL_MS = 10_000
 const VEO_POLL_TIMEOUT_MS = 260_000
 export const DEFAULT_DAILY_VIDEO_GENERATION_LIMIT = 10
 
-/** V1 conserva Veo Fast; V2 prioriza consistencia y control con Veo Standard. Los overrides son
+/** V1 conserva Veo Fast; ambas variantes V2 usan Veo Standard. Los overrides son
  * separados para que una variable histórica de V1 no degrade silenciosamente la calidad de V2. */
 export function getContentVideoModel(version: VideoGenerationVersion): string {
   if (version === "v1") {

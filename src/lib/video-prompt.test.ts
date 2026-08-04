@@ -37,6 +37,20 @@ describe("versiones del prompt de Veo", () => {
     expect(prompt).toMatch(/never on abdomen, belly or stomach/i)
   })
 
+  it("V2 Directa describe toda la escena sin fotograma inicial", () => {
+    const prompt = buildFallbackVideoPrompt("Cardio-oncología", "v2_direct")
+    expect(prompt).toMatch(/^An 8-second vertical 9:16 editorial documentary healthcare video\./)
+    expect(prompt).toContain("Subject and setting:")
+    expect(prompt).toContain("Human action:")
+    expect(prompt).toContain("Camera and composition:")
+    expect(prompt).toContain("Light and palette:")
+    expect(prompt).toContain("Continuity:")
+    expect(prompt).toContain("Audio:")
+    expect(prompt).not.toMatch(/approved (?:first )?frame/i)
+    expect(getVeoPromptQualityIssues(prompt, "v2_direct")).toEqual([])
+    expect(isPublishableVeoPrompt(prompt, "v2_direct")).toBe(true)
+  })
+
   it("V2 rechaza el contrato anterior de texto-a-video", () => {
     const old = "An 8-second vertical 9:16 natural documentary video. Subject and setting: a closed notebook. Physical motion: a curtain moves. Camera and composition: locked tripod. Natural light and finish: warm light. Ambient sound: room tone."
     expect(getVeoPromptQualityIssues(old, "v2")).toEqual(expect.arrayContaining([
@@ -50,6 +64,7 @@ describe("versiones del prompt de Veo", () => {
       aspectRatio: "9:16", resolution: "720p", durationSeconds: 8, personGeneration: "allow_adult",
       negativePrompt: VEO_V2_NEGATIVE_PROMPT,
     }))
+    expect(getVeoRequestParameters("v2_direct")).toEqual(getVeoRequestParameters("v2"))
     expect(VEO_V2_NEGATIVE_PROMPT).toMatch(/stethoscope on belly/i)
     expect(VEO_V2_NEGATIVE_PROMPT).toMatch(/extra fingers/i)
     expect(VEO_V2_NEGATIVE_PROMPT).not.toMatch(/human figures|patients/i)

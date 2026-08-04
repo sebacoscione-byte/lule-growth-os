@@ -117,6 +117,11 @@ antes de consumir un intento pago. V2 además usa un flujo image-to-video: gener
 piezas, lo revisa con los ocho puntajes de marca y exige aprobación humana antes de enviarlo a Veo.
 El revisor rechaza y regenera automáticamente errores críticos; en particular, cualquier estetoscopio
 apoyado sobre abdomen/panza invalida el fotograma. V1 conserva el flujo ilustrado histórico sin este paso.
+
+El editor ofrece además **V2 Directa**: Veo Standard inventa la escena completa desde el prompt y no
+se genera ni cobra un fotograma inicial. Conserva la identidad documental, el control contra repetición,
+los puntajes de marca y el negative prompt, pero no puede verificar visualmente la escena antes de
+consumir el intento de video; por eso la UI la presenta como una opción de menor control previo.
 antes de consumir el intento pago. Cambiar de version obliga a regenerar la propuesta.
 
 Ambos requests fijan `9:16`, `720p` y 8 segundos para coincidir con los tiempos del texto compuesto.

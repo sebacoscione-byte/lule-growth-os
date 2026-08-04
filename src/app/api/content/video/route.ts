@@ -27,7 +27,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Falta la dirección de video para generar el clip." }, { status: 400 })
     }
     const itemId = typeof body.itemId === "string" && body.itemId ? body.itemId : "sin-id"
-    const version: VideoGenerationVersion = body.version === "v1" ? "v1" : "v2"
+    const version: VideoGenerationVersion = body.version === "v1" || body.version === "v2_direct" ? body.version : "v2"
     const videoPrompt = (body.video_prompt as string).slice(0, 2400)
     const promptIssues = getVeoPromptQualityIssues(videoPrompt, version)
     if (promptIssues.length > 0) {
