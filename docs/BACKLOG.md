@@ -1881,6 +1881,31 @@ de poder ocurrir para piezas nuevas.
 
 **La placa ya publicada con el typo fue corregida por Seba a mano (2026-07-30)** — la regeneró y la
 resubió manualmente a Instagram. No quedó ningún pendiente sobre esa pieza puntual.
+
+### [BACKLOG] Cola de "historias" y "carruseles" aprobados en 0 (2026-08-05)
+`content_pipeline:` el cronograma de auto-publicación (post/historia/carrusel/reel) ya está activado y
+alineado con la cadencia recomendada por el análisis de insights de agosto (verificado en vivo contra
+producción). Pero al mismo momento, la cola de piezas **aprobadas** tenía: post=2, reel=1, carrusel=0,
+historia=0 — y solo 1 borrador sin generar en todo el pipeline. Aunque el cron de carrusel/historia
+dispare en el día/horario correcto, no publica nada real hasta que haya piezas nuevas generadas y
+aprobadas. Seba no confirmó todavía si quiere que se genere contenido nuevo para reponer la cola.
+
+### [BUG] Sin diagnosticar — 3 historias con texto idéntico publicadas 11s aparte (2026-07-31)
+`content_pipeline`, items `6c7d370b-9a84-400e-b5ed-15691c6b7eb6`, `44d58e42-6a36-48cb-b698-e174bf52638e`,
+`a326745e-c403-4aff-8e65-08184fd9866a` — 3 historias con el mismo `hook`/`caption` palabra por palabra
+("¿Sos de los que postergan el turno al médico porque no sabés si tu cobertura te cubre la consulta?"),
+mismo `category`/`goal`, publicadas a Instagram con **11-22 segundos de diferencia** el 31/7 a las
+10:37:21, 10:37:32 y 10:37:43 UTC. Confirmado que son 3 posts reales distintos (media_id de Meta
+distinto cada uno: `17875751109687204`, `18088394294394414`, `18089898524541401` — no es un glitch de
+la base) — o sea que 3 historias idénticas seguidas les llegaron a los seguidores ese día. No se
+diagnosticó la causa raíz (¿se generó el mismo contenido 3 veces vía "Generar propuesta" y las 3 se
+aprobaron y quedaron en cola juntas? ¿`items_per_run` de historia estaba en 3 ese día, coincidiendo con
+3 piezas casi idénticas por casualidad de contenido?) ni si haría falta un chequeo de duplicado más
+fuerte que el actual `findRecentDuplicateTopic` (que ya existe pero es solo un aviso no bloqueante,
+ver `content-pipeline.ts`). Encontrado investigando un reporte de Seba sobre "historias que se repiten"
+que en realidad resultó ser otra cosa (ver [[project_instagram_content_studio_verification_2026_08_05]]
+en memoria) — este hallazgo quedó sin cerrar.
+
 # Instagram — optimización basada en insights reales (agosto 2026)
 
 - [x] PR 1: separar mantenimiento, historias y feed; usar ventanas ART explícitas; migrar la
