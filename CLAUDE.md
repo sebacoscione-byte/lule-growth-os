@@ -1648,14 +1648,12 @@ A pedido explícito de Seba (más probable de notarse al toque que un email), la
 real de `escalateToHuman()` (ver Ola 4 en `docs/BACKLOG.md`) manda **además** un WhatsApp propio,
 sin reemplazar el email — si Meta rechaza el template o vos todavía no lo aprobaste, el email sigue
 funcionando exactamente igual que antes.
-1. El template **`alerta_interna_derivacion`** debe volver a aprobarse en WhatsApp Manager después de
+1. [x] El template **`alerta_interna_derivacion`** fue reaprobado por Meta el 17/07 después de
    aplicar `20260715_whatsapp_phase0a_safety.sql`. El texto vigente es genérico y usa una sola
-   variable (`CASO-XXXXXXXX`); no envía nombre, motivo ni contenido del paciente. Su estado local
-   actual es `pendiente_meta` hasta esa reaprobación.
-2. Una vez que Meta lo apruebe, marcalo "Aprobado" en `Configuración → Templates de WhatsApp` (igual
-   que el resto).
+   variable (`CASO-XXXXXXXX`); no envía nombre, motivo ni contenido del paciente.
+2. [x] Quedó marcado "Aprobado" en `Configuración → Templates de WhatsApp`.
 3. [x] `ALERT_WHATSAPP_TO` ya está cargado como variable sensible de Producción, en formato wa.me.
-4. Mientras el template no esté aprobado, no se manda la alerta por WhatsApp — fail-open, no rompe
+4. Si el template deja de estar aprobado o Meta rechaza el envío, el canal sigue fail-open: no rompe
    ni afecta la alerta por email.
 5. **Tiene costo real por mensaje** (a diferencia del email): es un mensaje de negocio iniciado
    fuera de cualquier ventana de conversación, así que siempre usa template y siempre es facturable

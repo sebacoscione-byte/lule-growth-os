@@ -1,4 +1,14 @@
-# EN CURSO (2026-08-04) — atribución y aprendizaje de Instagram
+# EN CURSO (2026-08-05) — rescate del guardrail visual de instrumentos médicos
+
+- [x] Rescatar los cambios locales de la rama ya mergeada sin arrastrar commits viejos.
+- [x] Integrar la ubicación anatómica en la arquitectura V1/V2 vigente y cubrirla con tests.
+- [x] Revisar y actualizar backlog, estado legal/privacidad y documentación operativa.
+- [x] Ejecutar lint, 107 suites/987 tests y build limpio desde cero.
+- [x] Publicado y mergeado como PR #210; CI, E2E público y preview de Vercel verificados.
+
+---
+
+# CERRADO (2026-08-05) — atribución y aprendizaje de Instagram
 
 - [x] Auditar el join actual y confirmar el conflicto entre pieza (`utm_content`) y código de sede.
 - [x] Separar pieza, referencia y sede manteniendo compatibilidad con el escritor actual de WhatsApp.
@@ -8,7 +18,7 @@
 - [x] Hacer las recomendaciones aprobables/descartables sin cambiar el cronograma automáticamente.
 - [x] Validar y aplicar en producción la migración aditiva con rollback transaccional.
 - [x] Completar documentación; 107 suites/986 tests, lint, build, 6 E2E autenticados y QA visual sin errores.
-- [ ] Publicar por PR, verificar CI/preview y mergear.
+- [x] Publicado y mergeado como PR #209; CI, E2E y preview/producción de Vercel verificados.
 
 ---
 

@@ -1,5 +1,5 @@
 # Backlog — Lule Growth OS
-**Actualizado:** 2026-08-03 | **Basado en:** PRD Estrategia de Captación v2.1
+**Actualizado:** 2026-08-05 | **Basado en:** PRD Estrategia de Captación v2.1
 
 ---
 
@@ -12,6 +12,16 @@ una sola toma documental, un sujeto físico simple, movimiento mínimo y cámara
 exclusiones de texto, personas, anatomía, recortes de papel, CGI y artefactos se envían por separado en
 `negativePrompt`, siguiendo la guía oficial vigente de Google. El selector y la propuesta quedan
 versionados por pieza para impedir mezclar un prompt V1 con una generación V2.
+
+### [BUG] ✅ Resuelto (2026-08-05): instrumentos médicos en ubicaciones anatómicas incorrectas
+
+Un reel histórico mostró un estetoscopio sobre el abdomen en vez del pecho. El control vigente ya
+rechazaba ese caso en V2, pero la corrección local anterior a la separación V1/V2 nunca se había
+publicado y también contemplaba el manguito de presión. La regla se integró en la arquitectura actual:
+V1 exige estetoscopio sobre pecho/tórax y manguito sobre el brazo; V2 aplica la misma ubicación real
+en su identidad visual y agrega ambas desviaciones al `negativePrompt`. Los tests verifican que estas
+restricciones no se pierdan. No se generó un video pago para esta corrección; el fotograma V2 mantiene
+además su revisión automática previa a animar.
 
 ---
 
@@ -1880,7 +1890,8 @@ resubió manualmente a Instagram. No quedó ningún pendiente sobre esa pieza pu
       argentino; faltantes/rechazos quedan `null`; la Biblioteca muestra la evolución plegable con
       tolerancia ±18 h. La migración `20260804_instagram_media_insight_snapshots.sql` fue validada con
       rollback y aplicada atómicamente en producción. Detalle en `docs/INSTAGRAM_INSIGHTS.md`.
-- [ ] PR 3: unir contenido, UTM, eventos, conversaciones y leads; agregar comparaciones por formato,
-      día/hora/objetivo y recomendaciones con umbral mínimo de muestra y aprobación manual.
+- [x] PR 3: unir contenido, UTM, eventos, conversaciones y leads; agregar comparaciones por formato,
+      día/hora/objetivo y recomendaciones con umbral mínimo de muestra y aprobación manual. Publicado
+      y mergeado como PR #209; migraciones aditivas aplicadas y producción verificada.
 
 ---

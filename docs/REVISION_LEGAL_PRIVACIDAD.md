@@ -152,9 +152,9 @@ producto que hay que diseñar aparte — no algo para resolver solo en el texto 
 3. Sacar el aviso de "borrador" de la página una vez confirmado.
 4. Si corresponde, cargar `https://draluciachahin.ar/privacidad` como Privacy Policy URL en el
    Meta Developer Console (solo urgente si se saca la app de Instagram del modo desarrollo).
-5. Reaprobar en Meta `alerta_interna_derivacion`: la versión endurecida es genérica, usa una sola
-   variable con un ID opaco de caso y no incluye nombre, teléfono, síntoma ni motivo. La migración
-   la deja en borrador hasta completar esa aprobación.
+5. ~~Reaprobar en Meta `alerta_interna_derivacion`~~ **Resuelto (2026-07-17)**: Meta aprobó la
+   versión endurecida (genérica, una sola variable con un ID opaco de caso, sin nombre, teléfono,
+   síntoma ni motivo). Ya está marcada "Aprobado" en Configuración → Templates de WhatsApp.
 
 ## 10. Estado técnico productivo (para no confundir despliegue con aprobación legal)
 
@@ -177,9 +177,30 @@ policy → privacy, correspondiente a:
 El smoke público y el rechazo esperado del webhook ante una solicitud inválida también fueron
 aprobados. El worker frecuente ya está activo con un único job `lule-whatsapp-worker-every-minute`
 de `pg_cron` (`* * * * *`), `pg_net` y secretos cifrados en Supabase Vault; la llamada manual
-autenticada respondió 200 con la cola vacía. Siguen pendientes únicamente los gates externos:
-staging para carreras concurrentes/restauración, roles en `app_metadata` y enrolamiento MFA,
-evidencia de verificación para las tres sedes, reaprobación del template interno de Meta y esta
-revisión legal. La versión Graph v25.0 y su preflight read-only ya están configurados.
-Ninguno cambia que el esquema y el código ya están activos; tampoco reemplazan la validación
-jurídica de consentimiento y retenciones.
+autenticada respondió 200 con la cola vacía. La versión Graph v25.0 y su preflight read-only ya
+están configurados.
+
+**Actualizado 2026-08-05** — de los gates externos que quedaban abiertos cuando se escribió este
+documento (16/07), ya se resolvieron: roles en `app_metadata` y enrolamiento MFA de `owner`/`doctor`
+(activo desde el 16/07), evidencia de verificación de las tres sedes (CIMEL Lanús, Hospital
+Británico, Swiss Medical Lomas, todas activas), y la reaprobación del template interno de Meta (ver
+punto 9, ítem 5). **Siguen pendientes solo**: staging para carreras concurrentes/restauración de la
+base (pausado a propósito, atado a la decisión de pagar Supabase Pro — su branching resolvería esto
+sin mantener un proyecto de staging aparte) y **esta revisión legal**, que sigue siendo el único
+gate que falta para sacar el aviso de "borrador" de `/privacidad`.
+
+**Verificación de vigencia (2026-08-05)**: se revisó todo lo implementado entre el 17/07 y hoy contra
+el contenido de este documento y el texto de `/privacidad`. Ninguno de esos cambios agregó una
+categoría nueva de dato personal, un tercero nuevo que procese datos de pacientes, ni modificó un
+plazo de retención — son herramientas de marketing/administración interna (generación de contenido
+de Instagram con Gemini/Veo y, desde el 30/07, un respaldo opcional con OpenAI si Gemini falla;
+insights y automatizaciones del Estudio de contenido; atribución de contenido mediante eventos
+agregados y una sesión anónima sin teléfono, nombre ni texto de mensajes; pausa manual del bot;
+alertas internas por email/WhatsApp ante una derivación) que no agregan datos clínicos ni cambian lo
+que este documento o `/privacidad` describen. El texto de consentimiento citado en el punto 6 se verificó contra
+`src/lib/whatsapp-consent.ts` y sigue siendo exactamente el mismo, palabra por palabra. **Conclusión:
+tanto este documento como el texto de `/privacidad` siguen vigentes tal como están — no hace falta
+actualizar nada más antes de mandárselo al abogado.**
+
+Ninguno de estos puntos cambia que el esquema y el código ya están activos; tampoco reemplazan la
+validación jurídica de consentimiento y retenciones.

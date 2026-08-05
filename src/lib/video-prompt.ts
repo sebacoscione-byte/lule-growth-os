@@ -15,6 +15,7 @@ const COMMON_VEO_PARAMETERS = {
 export const VEO_V2_NEGATIVE_PROMPT = [
   "on-screen text", "letters", "numbers", "captions", "logos", "watermarks", "phone interface",
   "incorrect stethoscope placement on abdomen", "stethoscope on belly", "stethoscope on stomach",
+  "upper-arm blood pressure cuff placed on wrist", "medical instrument placed on the wrong body area",
   "distorted anatomy", "extra fingers", "missing fingers", "fused hands", "duplicated limbs", "asymmetric eyes",
   "plastic skin", "beauty retouching", "glamorous makeup", "fashion advertising", "posed stock photography",
   "fictional doctor addressing camera", "luxury clinic", "American hospital aesthetic", "cold fluorescent light",
@@ -55,6 +56,7 @@ export const VIDEO_PROMPT_RULES_V1 = `DIRECCION DE VIDEO PARA VEO (fondo animado
 - Describe UN SOLO plano continuo de 4 a 8 segundos. El texto se agrega despues por edicion, nunca lo genera Veo.
 - Usa una ilustracion o motion graphic medico simple y moderno que refuerce el tema puntual y deje respirar el texto.
 - Evita consultorios vacios, estetoscopios decorativos, maquinas ficticias, personas hablando a camara, interfaces inventadas, futurismo, hologramas, neon, anatomia deformada y publicidad de clinica de lujo.
+- Si aparece un instrumento medico sobre el cuerpo, ubicalo segun su uso real: estetoscopio para auscultacion cardiaca sobre pecho/torax, nunca abdomen; manguito de presion sobre el brazo por encima del codo, nunca la muneca salvo que el tema sea un tensiometro de muneca.
 - Fondo claro; paleta sobria de azul profundo, verde azulado o neutros calidos; nunca rosa dominante.
 - Sonido ambiente solamente, sin dialogo, voz en off ni movimiento de labios.
 - Sin texto, subtitulos, logos, marcas de agua, numeros, telefono, app, barra de estado o marco de dispositivo.
@@ -72,6 +74,7 @@ export const VIDEO_VISUAL_IDENTITY_RULES = `IDENTIDAD VISUAL OBLIGATORIA DE V2:
 - Sintomas: reaccion corporal cotidiana y sutil, sin dolor intenso. Prevencion: control concreto. Hipertension: medicion correcta de presion o registro del resultado. Colesterol: conversacion medica, revision de habitos o preparacion realista de alimentos, nunca ensalada perfecta de stock. Palpitaciones: pausa, respiracion o percepcion del latido, sin dolor intenso. Ecocardiograma: preparacion realista, transductor sobre torax/pecho, camilla y equipo correcto, sin interfaces inventadas. Cardio-oncologia: acompanamiento, conversacion o monitoreo cardiovascular de una paciente en tratamiento, no un corazon o cinta aislados. Turnos/sedes: usar grafica de marca o fotos reales de la doctora/sede; no inventar una escena medica.
 - Objetos genericos como agenda, taza, anteojos o plantas no pueden ser el centro si una accion humana no les da significado. Es inaceptable agenda cerrada + anteojos + cortina moviendose.
 - FALLA CRITICA: un estetoscopio apoyado en abdomen, panza o estomago invalida el fotograma y obliga a regenerar. Cuando se represente auscultacion cardiaca, el cabezal debe estar sobre el torax/pecho.
+- Todo instrumento medico apoyado sobre una persona debe estar en el area corporal correspondiente a su uso real. Un manguito de presion de brazo va por encima del codo; no debe aparecer en la muneca salvo que la pieza trate especificamente sobre un tensiometro de muneca.
 - Evitar estetica stock generica, anuncio prepago, clinica estadounidense de lujo, Pinterest animado, Canva o una escena intercambiable con cualquier profesional.`
 
 export const VIDEO_REFERENCE_FRAME_RULES = `${VIDEO_VISUAL_IDENTITY_RULES}
