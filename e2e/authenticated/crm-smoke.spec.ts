@@ -30,6 +30,17 @@ test("un usuario autorizado puede entrar al dashboard", async () => {
   await expect(page.getByRole("heading", { name: "Dashboard", level: 1 })).toBeVisible()
 })
 
+test("la planificación reproduce agenda e ingresos del organigrama", async () => {
+  await page.goto("/planificacion")
+
+  await expect(page.getByRole("heading", { name: "Agenda e ingresos", level: 1 })).toBeVisible()
+  await expect(page.getByText("$ 5.564.050", { exact: true }).first()).toBeVisible()
+  await page.getByRole("tab", { name: "Por institución" }).click()
+  await expect(page.getByRole("cell", { name: "CIMEL", exact: true }).first()).toBeVisible()
+  await page.getByRole("tab", { name: "Proyección mensual" }).click()
+  await expect(page.getByText("$ 5.795.000", { exact: true }).first()).toBeVisible()
+})
+
 test("el cronograma editorial muestra ventanas reales en horario argentino", async () => {
   await page.goto("/contenido/instagram")
   await page.getByRole("tab", { name: "Biblioteca" }).click()

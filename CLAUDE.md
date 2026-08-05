@@ -1776,6 +1776,18 @@ métricas del dashboard). Para agregar una regla nueva: escribir una función pu
 testearla ahí, y sumarla al `Promise.all`/`buildGrowthRecommendations` en el dashboard si necesita un
 dato que hoy no se fetchea.
 
+## Agenda e ingresos (2026-08-05)
+
+`/planificacion` muestra la semana profesional en 46 franjas de 15 minutos, el resumen de carga e
+ingresos por institución y la proyección calendario septiembre–diciembre de 2026. El modelo fue
+trasladado desde las hojas `Horario 15 min` e `Ingresos por institución` del Sheet
+**ORGANIGRAMA POST FELLOW**. Los valores no se sincronizan en vivo: horario, aranceles y feriados
+se mantienen en `src/lib/practice-planning.ts`, con resultados de referencia cubiertos por
+`practice-planning.test.ts`. Alcance, supuestos y totales: `docs/AGENDA_INGRESOS.md`.
+
+La pantalla es informativa y operativa. No reserva turnos, no confirma disponibilidad y no usa
+datos de pacientes ni cobros reales.
+
 ## Tests
 
 El proyecto usa **Jest** (`npm test`) para lógica pura sin UI: pricing, ventana de 24h, intents,
