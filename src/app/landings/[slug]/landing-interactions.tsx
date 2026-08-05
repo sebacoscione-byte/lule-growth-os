@@ -4,6 +4,7 @@ import { useState, useEffect } from "react"
 import { MapPin, Clock, ChevronDown, ChevronUp, Phone, Map, MessageCircle, CalendarCheck } from "lucide-react"
 import { buildWhatsAppUrl } from "@/lib/public-landings"
 import { trackLandingEvent } from "@/lib/landing-track"
+import { withContentAttribution } from "@/lib/landing-referral-codes"
 
 export interface SedeAction {
   key: string
@@ -48,9 +49,10 @@ interface CtaCardProps {
   onToggle: () => void
   onEngage: () => void
   onClickAction: (action: CtaClickAction) => void
+  contentItemId?: string
 }
 
-function CtaCard({ sede, expanded, onToggle, onEngage, onClickAction }: CtaCardProps) {
+function CtaCard({ sede, expanded, onToggle, onEngage, onClickAction, contentItemId }: CtaCardProps) {
   const palette = {
     blue: {
       border: "border-blue-200",
@@ -75,7 +77,10 @@ function CtaCard({ sede, expanded, onToggle, onEngage, onClickAction }: CtaCardP
     },
   }[sede.color]
 
-  const whatsappUrl = buildWhatsAppUrl(sede.whatsappMessage, sede.whatsapp)
+  const whatsappUrl = buildWhatsAppUrl(
+    withContentAttribution(sede.whatsappMessage, contentItemId),
+    sede.whatsapp,
+  )
   const phoneHref = sede.phone ? `tel:${sede.phone.replace(/[\s-]/g, "")}` : null
 
   return (
@@ -219,6 +224,7 @@ export function LandingInteractions({
             onToggle={() => setExpandedKey(prev => prev === sede.key ? null : sede.key)}
             onEngage={() => engage(sede.key)}
             onClickAction={action => trackClick(sede.key, action)}
+            contentItemId={utms.utm_content}
           />
         ))}
       </div>

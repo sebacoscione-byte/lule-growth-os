@@ -54,3 +54,6 @@ Para rollback de código, revertir el PR mantiene la tabla sin consumidores y no
 colas ni los últimos insights guardados en `app_config`. No borrar la tabla durante un rollback: es
 datos históricos recuperables. Si hiciera falta desactivar la captura sin revertir todo, quitar solo
 la llamada a `snapshotContentInsights` de `daily-maintenance` y desplegar por PR.
+
+La unión de estos snapshots con clics, WhatsApp y leads se documenta en
+[`INSTAGRAM_ATTRIBUTION.md`](./INSTAGRAM_ATTRIBUTION.md).

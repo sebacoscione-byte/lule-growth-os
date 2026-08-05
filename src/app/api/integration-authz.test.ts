@@ -32,6 +32,7 @@ describe("autorización de integraciones y contenido", () => {
     "src/app/api/instagram-business/status/route.ts",
     "src/app/api/checklist/route.ts",
     "src/app/api/content/items/route.ts",
+    "src/app/api/content/performance/route.ts",
     "src/app/api/content/reorder/route.ts",
   ]
 

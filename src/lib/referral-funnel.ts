@@ -8,7 +8,9 @@ export interface ReferralEventAggregate {
 }
 
 export interface ReferralLeadAggregate {
-  utm_content: string
+  referral_code?: string | null
+  /** Compatibilidad con filas anteriores a la separación pieza/código. */
+  utm_content?: string | null
   confirmed_booked: boolean
 }
 
@@ -65,7 +67,8 @@ export function buildReferralLandingFunnels(
 
   const leadsByCode = new Map<string, { total: number; confirmed: number }>()
   for (const lead of leads) {
-    const code = lead.utm_content.toUpperCase()
+    const code = (lead.referral_code ?? lead.utm_content)?.toUpperCase()
+    if (!code) continue
     const current = leadsByCode.get(code) ?? { total: 0, confirmed: 0 }
     current.total += 1
     if (lead.confirmed_booked) current.confirmed += 1

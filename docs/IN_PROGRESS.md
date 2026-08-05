@@ -1,4 +1,18 @@
-# EN CURSO (2026-08-04) — historial de rendimiento de Instagram
+# EN CURSO (2026-08-04) — atribución y aprendizaje de Instagram
+
+- [x] Auditar el join actual y confirmar el conflicto entre pieza (`utm_content`) y código de sede.
+- [x] Separar pieza, referencia y sede manteniendo compatibilidad con el escritor actual de WhatsApp.
+- [x] Agregar el embudo agregado visita → clic → conversación → lead → turno confirmado.
+- [x] Crear el panel filtrable y comparativas 24 h/72 h/7 días por franja.
+- [x] Limitar recomendaciones a formato/objetivo equivalentes y ≥3 piezas por cada franja.
+- [x] Hacer las recomendaciones aprobables/descartables sin cambiar el cronograma automáticamente.
+- [x] Validar y aplicar en producción la migración aditiva con rollback transaccional.
+- [x] Completar documentación; 107 suites/986 tests, lint, build, 6 E2E autenticados y QA visual sin errores.
+- [ ] Publicar por PR, verificar CI/preview y mergear.
+
+---
+
+# CERRADO (2026-08-04) — historial de rendimiento de Instagram
 
 - [x] Cerrar el cronograma editorial del PR #207 y aplicar la cadencia recomendada en producción.
 - [x] Auditar la captura actual y probar las métricas realmente expuestas por la cuenta conectada.
@@ -6,7 +20,7 @@
 - [x] Capturar métricas disponibles sin convertir ausencias o rechazos de Meta en ceros.
 - [x] Mostrar comparables de 24 h, 72 h y 7 días en la biblioteca de contenido.
 - [x] Documentar; ejecutar lint, 105 suites/971 tests y build; validar visualmente y pasar 5 E2E autenticados con datos reales.
-- [ ] Publicar por rama + PR, verificar CI/preview y mergear.
+- [x] Publicado y mergeado como PR #208; CI, E2E y preview de Vercel verificados.
 
 ---
 

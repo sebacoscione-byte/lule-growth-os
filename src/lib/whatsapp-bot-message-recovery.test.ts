@@ -78,6 +78,9 @@ function baseSession(overrides: Record<string, unknown> = {}) {
     ctwa_clid: null,
     messages_sent_count: 0,
     referral_code: null,
+    content_item_id: null,
+    content_origin_location_key: null,
+    content_attributed_at: null,
     bot_paused: false,
     updated_at: new Date().toISOString(),
     ...overrides,
@@ -118,7 +121,7 @@ function mockDb(session: ReturnType<typeof baseSession>) {
     throw new Error(`tabla inesperada en el mock: ${table}`)
   })
   const rpc = jest.fn().mockImplementation((name: string) => {
-    if (name === "upsert_whatsapp_intake_lead" || name === "ensure_whatsapp_lead") {
+    if (name === "upsert_whatsapp_intake_lead_v2" || name === "ensure_whatsapp_lead") {
       return Promise.resolve({ data: session.lead_id ?? NEW_LEAD_ID, error: null })
     }
     throw new Error(`rpc inesperada en el mock: ${name}`)
@@ -140,7 +143,7 @@ describe("recuperación del mensaje que crea el lead", () => {
 
     await handleIncomingMessage({ phone: PHONE, text: texto, waMessageId: "wamid.intake-normal" })
 
-    expect(rpc).toHaveBeenCalledWith("upsert_whatsapp_intake_lead", expect.objectContaining({
+    expect(rpc).toHaveBeenCalledWith("upsert_whatsapp_intake_lead_v2", expect.objectContaining({
       p_phone: PHONE,
       p_raw_message: texto,
       p_wa_message_id: "wamid.intake-normal",
@@ -155,7 +158,7 @@ describe("recuperación del mensaje que crea el lead", () => {
     await handleIncomingMessage({ phone: PHONE, text: "tengo OSDE" })
 
     expect(messagesBuilder.insert).not.toHaveBeenCalled()
-    expect(rpc).toHaveBeenCalledWith("upsert_whatsapp_intake_lead", expect.any(Object))
+    expect(rpc).toHaveBeenCalledWith("upsert_whatsapp_intake_lead_v2", expect.any(Object))
   })
 
   it("un retry del mismo wa_message_id recupera el mensaje con upsert idempotente", async () => {
@@ -165,7 +168,7 @@ describe("recuperación del mensaje que crea el lead", () => {
 
     await handleIncomingMessage({ phone: PHONE, text: texto, waMessageId: "wamid.intake-1" })
 
-    expect(rpc).toHaveBeenCalledWith("upsert_whatsapp_intake_lead", expect.objectContaining({
+    expect(rpc).toHaveBeenCalledWith("upsert_whatsapp_intake_lead_v2", expect.objectContaining({
       p_raw_message: texto,
       p_wa_message_id: "wamid.intake-1",
     }))

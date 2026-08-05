@@ -10,6 +10,7 @@ import {
 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { TrackedProfileLink } from "@/components/tracked-profile-link"
+import { ContentPerformanceDashboard } from "@/components/content-performance-dashboard"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -1704,6 +1705,7 @@ export default function ContentStudioPage() {
         <TabsList>
           <TabsTrigger value="crear">{IS_MANUAL_MODE ? "Preparar prompt" : "Crear con IA"}</TabsTrigger>
           <TabsTrigger value="biblioteca">Biblioteca</TabsTrigger>
+          <TabsTrigger value="rendimiento">Rendimiento</TabsTrigger>
           <TabsTrigger value="fijados">Bio y Fijados</TabsTrigger>
         </TabsList>
 
@@ -1989,6 +1991,10 @@ export default function ContentStudioPage() {
 
         <TabsContent value="fijados" className="mt-4">
           <BioYFijadosTab />
+        </TabsContent>
+
+        <TabsContent value="rendimiento" className="mt-4">
+          <ContentPerformanceDashboard />
         </TabsContent>
 
         <TabsContent value="biblioteca" className="mt-4">

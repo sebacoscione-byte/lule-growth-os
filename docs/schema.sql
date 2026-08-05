@@ -66,6 +66,9 @@ create table if not exists leads (
   utm_medium text,
   utm_campaign text,
   utm_content text,
+  referral_code text,
+  content_origin_location_key text
+    check (content_origin_location_key is null or content_origin_location_key in ('cimel','swiss','britanico')),
   origin_url text,
   landing_page text,
   clicked_cimel_cta boolean not null default false,
@@ -262,6 +265,28 @@ create table if not exists instagram_media_insight_snapshots (
   updated_at timestamptz not null default now()
 );
 
+create table if not exists instagram_strategy_recommendations (
+  recommendation_key text primary key,
+  status text not null default 'pending'
+    check (status in ('pending', 'approved', 'dismissed')),
+  summary text not null,
+  evidence jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  reviewed_at timestamptz
+);
+
+create table if not exists instagram_content_conversations (
+  id uuid default uuid_generate_v4() primary key,
+  whatsapp_session_id uuid not null references whatsapp_sessions(id) on delete cascade,
+  content_item_id text not null,
+  referral_code text,
+  location_key text check (location_key is null or location_key in ('cimel','swiss','britanico')),
+  attributed_at timestamptz not null,
+  created_at timestamptz not null default now(),
+  unique (whatsapp_session_id, content_item_id)
+);
+
 create table if not exists google_business_snapshots (
   id uuid default uuid_generate_v4() primary key,
   captured_on date not null,
@@ -282,6 +307,8 @@ create table if not exists google_business_snapshots (
 -- WHATSAPP COST TRACKING (ver supabase/migrations/20260704_whatsapp_cost_tracking.sql
 -- para el detalle de por qué cost_amount queda null en varias filas)
 -- ============================================================
+-- `whatsapp_sessions` se crea en su migración histórica. La atribución de contenido agrega:
+-- content_item_id text, content_origin_location_key text y content_attributed_at timestamptz.
 create table if not exists whatsapp_pricing_rules (
   id uuid default uuid_generate_v4() primary key,
   country_code text not null,

@@ -14,6 +14,18 @@
 
 El brief queda listo cuando tiene categoria. Si el tema o enfoque queda vacio, la IA elige de forma autonoma el angulo mas atractivo, util y concreto dentro de esa categoria. La biblioteca permite buscar por tema, categoria o hook y filtrar por estado y formato.
 
+## Rendimiento y atribución
+
+La pestaña **Rendimiento** cruza cada pieza con sus snapshots de 24 h, 72 h y 7 días y con las etapas
+comprobables del embudo. Tiene filtros por período, formato, día, franja horaria argentina, categoría,
+objetivo, sede y pieza. Un clic a WhatsApp no se muestra como conversación: la conversación sólo
+existe si el mensaje llegó al bot; un lead y un turno confirmado requieren sus registros reales.
+
+Las recomendaciones comparan únicamente piezas del mismo formato y objetivo. Se exige un mínimo de
+tres piezas en cada franja comparada y una diferencia de al menos 10%. Aprobar o descartar deja una
+decisión auditable; nunca modifica `auto_publish_settings`. Detalle técnico y limitaciones en
+`docs/INSTAGRAM_ATTRIBUTION.md`.
+
 ## Fuentes
 
 La busqueda usa Europe PMC y prioriza revisiones y metaanalisis publicados desde 2024 hasta la fecha actual. La fuente elegida queda guardada con el borrador y visible durante la revision.

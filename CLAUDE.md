@@ -1,6 +1,15 @@
 # Lule Growth OS — Contexto para Claude
 
 ## Estado actual
+- 2026-08-04 (atribución y aprendizaje de Instagram): el enlace de una pieza conserva ahora dos
+  dimensiones separadas en el mensaje prellenado del bot: `Contenido: <itemId>` y el `Ref:` de
+  landing/sede. `whatsapp_sessions.content_item_id` permite comprobar una conversación aun antes de
+  crear un lead; el lead guarda la pieza en `utm_content` y el código en `referral_code`. WhatsApp de
+  terceros que no llegan al webhook sólo cuentan como clic. La pestaña Rendimiento compara alcance,
+  guardados, compartidos, perfil, clics, conversaciones, leads y turnos con filtros de período,
+  formato, día/hora, categoría, objetivo, sede y pieza. Recomendaciones sólo comparan el mismo
+  formato/objetivo con ≥3 piezas por franja; aprobarlas no toca el cronograma. Migración aplicada en
+  producción; operación y rollback en `docs/INSTAGRAM_ATTRIBUTION.md`.
 - 2026-08-04 (historial de rendimiento de Instagram): `daily-maintenance` conserva snapshots
   idempotentes por `instagram_media_id` y día argentino en `instagram_media_insight_snapshots`.
   Las publicaciones nuevas registran `published_at` real; una migración ya aplicada en producción

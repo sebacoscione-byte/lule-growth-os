@@ -75,6 +75,12 @@ interface WhatsAppSession {
   /** GROWTH-01: código detectado en el primer mensaje (ej. "LAN-CARD-01") — se aplica al lead
    * recién cuando se crea, en upsertLeadFromIntake. */
   referral_code: string | null
+  /** Identificador opaco de la pieza detectado en el mensaje prellenado. */
+  content_item_id: string | null
+  /** Sede del CTA de origen, no necesariamente la sede elegida finalmente. */
+  content_origin_location_key: string | null
+  /** Instante del primer mensaje atribuible a la pieza; no cambia con mensajes posteriores. */
+  content_attributed_at: string | null
   /** El equipo tomó la conversación a mano desde el Inbox — el bot deja de responder hasta que
    * alguien lo reactive (ver /api/whatsapp/bot-pause). No afecta guardrails de emergencia/opt-out,
    * que se chequean antes de este flag. */
@@ -195,19 +201,19 @@ async function upsertLeadFromIntake(
     throw new Error("No se puede registrar el intake sin consentimiento administrativo explícito.")
   }
 
-  // GROWTH-01: si el primer mensaje traía un código de referencia real (ver
-  // landing-referral-codes.ts), atribuye el lead a la landing/sede exacta que lo generó. Si el
-  // paciente borró o nunca tuvo un código (mensaje orgánico), utm_content/landing_page quedan
-  // null -- el embudo del dashboard los muestra como "sin atribuir", no hace falta un valor
-  // literal "unknown".
+  // La pieza y la sede de origen son dimensiones distintas. `utm_content` queda reservado para la
+  // pieza; el código visible y la sede del CTA se conservan por separado. Los null representan una
+  // atribución que no pudo comprobarse, nunca una conversación inferida desde un clic.
   const referralInfo = session.referral_code ? findReferralCodeInfo(session.referral_code) : null
-  const { data, error } = await getDb().rpc("upsert_whatsapp_intake_lead", {
+  const { data, error } = await getDb().rpc("upsert_whatsapp_intake_lead_v2", {
     p_phone: session.phone,
     p_name: waName ?? session.wa_name ?? null,
     p_requested_service: extraction.motivo ? REQUESTED_SERVICE_BY_MOTIVO[extraction.motivo] : null,
     p_general_reason: extraction.motivo ? GENERAL_REASON_BY_MOTIVO[extraction.motivo] : null,
     p_insurance: extraction.obraSocial ?? null,
-    p_utm_content: referralInfo?.code ?? null,
+    p_utm_content: session.content_item_id ?? null,
+    p_referral_code: referralInfo?.code ?? null,
+    p_content_origin_location_key: session.content_origin_location_key ?? null,
     p_landing_page: referralInfo?.landingSlug ?? null,
     p_raw_message: rawMessage.trim() || null,
     p_wa_message_id: waMessageId ?? null,
@@ -958,16 +964,25 @@ export async function handleIncomingMessage(params: {
       // GROWTH-01: el primer mensaje (el prellenado por la landing) puede traer "Ref: LAN-CARD-01"
       // al final -- se guarda en la sesión ahora porque el lead recién se crea más adelante, en
       // "intake_pendiente" (ver upsertLeadFromIntake).
-      const referralCode = messageType === "text" ? extractReferralCode(text).code : null
+      const attribution = messageType === "text"
+        ? extractReferralCode(text)
+        : { code: null, contentItemId: null }
+      const referralInfo = attribution.code ? findReferralCodeInfo(attribution.code) : null
+      const attributionFields = {
+        referral_code: referralInfo ? attribution.code : null,
+        content_item_id: referralInfo ? attribution.contentItemId : null,
+        content_origin_location_key: referralInfo?.locationKey ?? null,
+        content_attributed_at: referralInfo && attribution.contentItemId ? new Date().toISOString() : null,
+      }
 
       if (consented) {
         await sendText(phone, `${intro}\n\n${await buildIntakeQuestions(settings.cost_saving_mode)}`, { ...ctx, flowIntent: "pedir_turno" })
-        await updateSession(phone, { state: "intake_pendiente", wa_name: waName ?? null, referral_code: referralCode })
+        await updateSession(phone, { state: "intake_pendiente", wa_name: waName ?? null, ...attributionFields })
       } else {
         await sendButtons(phone, `${intro}\n\n${CONSENT_TEXT}`, CONSENT_BUTTONS, { ...ctx, flowIntent: "consent_request" })
         // El nombre de perfil no es necesario para pedir consentimiento y no se conserva antes de
         // una aceptación. El código de campaña es un enum conocido, no una copia del mensaje.
-        await updateSession(phone, { state: "esperando_consentimiento", wa_name: null, referral_code: referralCode })
+        await updateSession(phone, { state: "esperando_consentimiento", wa_name: null, ...attributionFields })
       }
       return
     }

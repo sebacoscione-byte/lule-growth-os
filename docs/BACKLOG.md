@@ -1701,21 +1701,14 @@ hoy al hero de landings, reutilizable en concepto).
    con tests), aviso no bloqueante en el brief si ya se generó algo con la misma categoría (o el mismo
    hook) en los últimos 30 días.
 
-**Descartado por hallazgo nuevo al implementar (2026-07-11): funnel de atribución completo por pieza**
-La idea original era unir `utm_content` de `landing_events` (ya agregado por pieza) con `utm_content` de
-`leads` para mostrar leads/turnos confirmados por pieza, no solo visitas/clicks. Al revisar el código se
-confirmó que **`leads.utm_content` nunca se completa hoy con un valor real**: el único escritor,
-`/api/public/lead`, no tiene ningún llamador — el formulario público que lo invocaba se sacó de la
-landing el 2026-07-04 (ver [DECISIÓN] "Revertido" en Etapa 2 de este mismo archivo), y el bot de
-WhatsApp tampoco propaga `utm_content` a los leads que crea (su `referral`/`ctwa_clid` es para
-clasificar pricing de Meta, no para atribuir a una pieza de contenido). Construir ese join hoy mostraría
-"0 leads" en todas las piezas para siempre — no porque el contenido no convierta, sino porque no hay
-ningún canal real conectando ambos datos. Es el mismo tipo de problema que ya llevó a revertir el
-formulario de leads en su momento ("mostrar algo sin que funcione de verdad es peor que no tenerlo").
-No se construyó nada — sigue mostrándose solo visitas/interacciones agregadas de landing (dato real, sin
-cambios). Para retomarlo hace falta antes reactivar algún canal real que estampe `utm_content` en un
-`lead` (reabrir el formulario público, o propagar el `utm_content` de la landing al bot de WhatsApp
-cuando el visitante entra por el link de "Consultar por WhatsApp").
+**Retomado y resuelto (2026-08-04): funnel de atribución completo por pieza.** El descarte del
+2026-07-11 era correcto con la instrumentación de ese momento: no existía una unión real entre el
+link de contenido y una conversación. Ahora el mensaje prellenado conserva dos identificadores
+opacos: `Contenido: <itemId>` y el `Ref:` de landing/sede. La sesión prueba la conversación; el lead
+guarda la pieza en `utm_content` y el código en `referral_code`, sin confundir un clic con una
+conversión. La pestaña Rendimiento agrega filtros y el embudo visita → clic → conversación → lead →
+turno confirmado. Las recomendaciones exigen ≥3 piezas del mismo formato/objetivo por cada franja,
+se aprueban manualmente y nunca cambian el cronograma. Ver `docs/INSTAGRAM_ATTRIBUTION.md`.
 
 **Dudoso, requiere decisión explícita antes de construir**:
 - Variantes A/B de hook/portada por pieza — duplica generación y carga de revisión; el proyecto ya

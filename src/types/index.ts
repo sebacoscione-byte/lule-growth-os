@@ -83,6 +83,10 @@ export interface Lead {
   utm_medium: string | null
   utm_campaign: string | null
   utm_content: string | null
+  /** Código visible del CTA/landing; separado de utm_content, que identifica la pieza. */
+  referral_code?: string | null
+  /** Sede del CTA que originó la conversación, si el bot pudo comprobarla. */
+  content_origin_location_key?: "cimel" | "swiss" | "britanico" | null
   origin_url: string | null
   landing_page: string | null
   clicked_cimel_cta: boolean

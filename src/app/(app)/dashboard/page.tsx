@@ -232,8 +232,8 @@ async function getReferralFunnel(
     const since = new Date(Date.now() - period * 24 * 60 * 60 * 1000).toISOString()
     const { data: leadsData, error: leadsError } = await supabase
       .from("leads")
-      .select("utm_content, confirmed_booked")
-      .not("utm_content", "is", null)
+      .select("referral_code, utm_content, confirmed_booked")
+      .or("referral_code.not.is.null,utm_content.not.is.null")
       .gte("created_at", since)
     if (leadsError) throw leadsError
 
