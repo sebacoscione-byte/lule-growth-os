@@ -4,7 +4,7 @@
 - [x] Integrar la ubicación anatómica en la arquitectura V1/V2 vigente y cubrirla con tests.
 - [x] Revisar y actualizar backlog, estado legal/privacidad y documentación operativa.
 - [x] Ejecutar lint, 107 suites/987 tests y build limpio desde cero.
-- [ ] Publicar por PR, verificar CI/preview y mergear.
+- [x] Publicado y mergeado como PR #210; CI, E2E público y preview de Vercel verificados.
 
 ---
 
