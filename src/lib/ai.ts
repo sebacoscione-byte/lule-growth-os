@@ -73,6 +73,24 @@ function getProviderOrder(): AiProvider[] {
   return process.env.GEMINI_API_KEY ? ["gemini", "anthropic"] : ["anthropic", "gemini"]
 }
 
+// 2026-08-05, a pedido explicito de Seba ("priorizá Gemini porque a Anthropic no le cargué
+// crédito"): mientras la cuenta de respaldo de Anthropic siga sin saldo (ver
+// project_ai_fallback_providers_unfunded en memoria), cualquier llamada que le toque a Gemini un
+// error TRANSITORIO (no solo el truncamiento de JSON ya cubierto desde 2026-08-01) vale la pena
+// reintentarla una vez mas con el MISMO proveedor antes de gastar una llamada garantizada a fallar
+// contra el respaldo. Un error PERMANENTE (billing, API key invalida, cupo agotado, modelo
+// inexistente) va a fallar identico en el reintento -- esos siguen saltando directo al siguiente
+// proveedor sin gastar el intento extra, igual que antes.
+function isPermanentProviderError(error: unknown): boolean {
+  const message = (error instanceof Error ? error.message : String(error)).toLowerCase()
+  return (
+    message.includes("credit balance") || message.includes("billing") || message.includes("insufficient") ||
+    message.includes("api_key") || message.includes("api key") || message.includes("authentication") ||
+    message.includes("quota") || message.includes("resource_exhausted") || message.includes("rate limit") ||
+    (message.includes("not found") && message.includes("model"))
+  )
+}
+
 export function getAiConfiguration() {
   const requested = getRequestedProvider()
   const mode = getAiMode()
@@ -563,22 +581,19 @@ async function generateText(options: GenerateOptions): Promise<string> {
 
   const errors: unknown[] = []
   const providerOrder = options.provider ? [options.provider] : getProviderOrder()
-  // Un proveedor en modo JSON puede devolver texto no vacio pero truncado/invalido (visto en vivo
-  // con Gemini: finishReason "STOP" y candidatesTokenCount muy por debajo de maxOutputTokens, pero
-  // el JSON corta a mitad de un string sin cerrar comillas/llaves) -- confirmado 2026-08-01 que es
-  // intermitente e independiente del prompt: el mismo pedido repetido varias veces seguidas a veces
-  // sale bien y a veces no. Antes de saltar al siguiente proveedor (o de darse por vencido, si es el
-  // unico configurado), vale la pena reintentar una vez MAS con el MISMO proveedor -- mas rapido y
-  // sin depender de que haya un respaldo con saldo disponible, y en la practica alcanza para que la
-  // mayoria de los truncamientos se resuelvan solos. Solo aplica al truncamiento de JSON -- un error
-  // de API key invalida, cupo agotado, etc. va a fallar identico en el reintento, asi que esos casos
-  // saltan directo al proximo proveedor sin gastar el reintento.
-  const JSON_TRUNCATION_RETRIES = 1
+  // Reintento con el MISMO proveedor antes de pasar al siguiente (o de rendirse, si es el unico
+  // configurado) -- originalmente pensado solo para el truncamiento de JSON de Gemini (confirmado
+  // 2026-08-01 que es intermitente e independiente del prompt: el mismo pedido repetido varias veces
+  // seguidas a veces sale bien y a veces no), generalizado 2026-08-05 a cualquier error TRANSITORIO
+  // (ver isPermanentProviderError) a pedido de Seba para priorizar Gemini mientras el respaldo de
+  // Anthropic siga sin saldo cargado -- gastar el reintento en Gemini es estrictamente mejor que
+  // saltar directo a una llamada a Anthropic que hoy va a fallar siempre por billing.
+  const PROVIDER_RETRIES = 1
   providerLoop: for (const provider of providerOrder) {
     const model = provider === "gemini"
       ? (process.env.GEMINI_MODEL ?? "gemini-3.5-flash")
       : (process.env.ANTHROPIC_MODEL ?? "claude-sonnet-4-6")
-    for (let attempt = 0; attempt <= JSON_TRUNCATION_RETRIES; attempt++) {
+    for (let attempt = 0; attempt <= PROVIDER_RETRIES; attempt++) {
       try {
         const text = provider === "gemini"
           ? await generateWithGemini(options)
@@ -611,8 +626,7 @@ async function generateText(options: GenerateOptions): Promise<string> {
           false,
           cacheMode === "none" ? "patient_context_request_failed" : (error instanceof Error ? error.message : String(error))
         )
-        const isJsonTruncation = Boolean(options.json) && error instanceof Error && error.message.includes("JSON incompleta o invalida")
-        if (isJsonTruncation && attempt < JSON_TRUNCATION_RETRIES) continue // reintenta el mismo proveedor
+        if (attempt < PROVIDER_RETRIES && !isPermanentProviderError(error)) continue // reintenta el mismo proveedor
         if (options.provider || getRequestedProvider() !== "auto") break providerLoop
         continue providerLoop // agota este proveedor, pasa al siguiente (modo auto)
       }

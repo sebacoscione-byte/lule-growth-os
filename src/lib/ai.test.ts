@@ -372,6 +372,36 @@ describe("generateText valida JSON antes de dar por exitosa la respuesta (bug re
     expect(fetchSpy).toHaveBeenCalledTimes(1)
   })
 
+  // 2026-08-05, a pedido explicito de Seba ("priorizá Gemini porque a Anthropic no le cargué
+  // crédito"): antes, solo el truncamiento de JSON reintentaba el mismo proveedor -- cualquier OTRO
+  // error transitorio (ej. un 5xx puntual, network blip) saltaba directo al fallback de Anthropic,
+  // que hoy siempre falla por falta de saldo. Generalizado para que cualquier error que no sea
+  // claramente permanente (billing/API key/cupo/modelo inexistente) tambien reintente Gemini una vez
+  // mas antes de gastar una llamada garantizada a fallar contra el respaldo.
+  it("un error transitorio que NO es de truncamiento (ej. 5xx puntual) SI reintenta el mismo proveedor", async () => {
+    let callCount = 0
+    fetchSpy = jest.spyOn(global, "fetch").mockImplementation(async () => {
+      callCount += 1
+      if (callCount === 1) {
+        return { ok: false, status: 503, json: async () => ({ error: { message: "Service Unavailable" } }) } as unknown as Response
+      }
+      return geminiHttpResponse(JSON.stringify(validPlan))
+    })
+    const result = await generateContentPlan(planInput)
+    expect(result.hook).toBe("hook")
+    expect(callCount).toBe(2)
+  })
+
+  it("un error PERMANENTE (ej. cupo agotado) NO reintenta, para no perder tiempo con un fallo garantizado", async () => {
+    fetchSpy = jest.spyOn(global, "fetch").mockResolvedValue({
+      ok: false,
+      status: 429,
+      json: async () => ({ error: { message: "Resource has been exhausted (e.g. check quota)." } }),
+    } as unknown as Response)
+    await expect(generateContentPlan(planInput)).rejects.toThrow(/resource has been exhausted/i)
+    expect(fetchSpy).toHaveBeenCalledTimes(1)
+  })
+
   // Caso cerrado 2026-07-20 (ver docs/BACKLOG.md): se habia reportado que el fallback a Anthropic no
   // se disparaba en un caso real -- confirmado que la causa era un AI_PROVIDER viejo en memoria de un
   // npm run dev ya corriendo (no recarga .env.local en caliente), no un bug de logica. Este test fija
