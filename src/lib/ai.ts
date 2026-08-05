@@ -1691,6 +1691,74 @@ Devolvé solo el texto alternativo, sin comillas ni explicaciones.`,
 }
 
 /**
+ * Propone categorias nuevas para el generador automatico de borradores (content-auto-draft.ts), a
+ * pedido explicito de Seba (2026-08-05): no alcanza con rotar por antiguedad entre una lista fija de
+ * categorias -- tambien tiene que poder pensar categorias genuinamente nuevas, mirando que quedo
+ * cubierto (o hace mucho no se toca) en lo ya publicado/aprobado/en borrador. A proposito NO considera
+ * rendimiento (Seba lo pidio explicitamente afuera de esto por ahora) y nunca es la unica fuente de
+ * categoria: si esta llamada falla (ver project_ai_fallback_providers_unfunded en memoria), el caller
+ * cae a la rotacion deterministica anterior sin frenar la generacion.
+ */
+export async function proposeAutoDraftCategories(input: {
+  count: number
+  established_categories: string[]
+  recent_history: Array<{ category: string; topic: string; status: string; days_ago: number }>
+}): Promise<string[]> {
+  if (getAiMode() === "manual") {
+    throw new Error("Modo manual activo: la generación automática está deshabilitada.")
+  }
+  const historyLines = input.recent_history.length > 0
+    ? input.recent_history
+        .map(item => `- "${item.category}" (${item.status}, hace ${item.days_ago} ${item.days_ago === 1 ? "día" : "días"}): ${item.topic}`)
+        .join("\n")
+    : "Sin piezas recientes registradas."
+
+  const text = await generateText({
+    maxTokens: 500,
+    json: true,
+    purpose: "auto_draft_category",
+    cacheSystem: true,
+    system: `Sos la Dra. Lucía Chahin, cardióloga (CIMEL Lanús martes, Hospital Británico miércoles, Swiss Medical Lomas viernes; servicios reales: consulta cardiológica y ecocardiograma), pensando qué temas conviene cubrir a continuación en el contenido de Instagram/Google Business de tu consultorio.
+
+Te van a pasar la lista de categorías ya establecidas en la cuenta y el historial reciente de piezas
+(publicadas, aprobadas o en borrador, con hace cuántos días se creó cada una). Tu tarea es proponer N
+categorías distintas para las próximas piezas, combinando dos criterios:
+1) Categorías YA establecidas que hace mucho tiempo que no se tocan (o nunca se tocaron).
+2) Categorías NUEVAS que no estén en la lista establecida, pero sean un tema real y valioso dentro de
+   cardiología / prevención cardiovascular / la práctica real de esta doctora (nunca otra
+   especialidad médica, nunca un servicio que ella no ofrezca) y que el historial no cubra todavía.
+
+No consideres métricas de rendimiento — no las tenés disponibles para esta decisión, guiate solo por
+qué tan reciente y qué tan cubierto está cada tema en el historial.
+No repitas ninguna categoría entre las que propongas, y no propongas ninguna que ya aparezca en el
+historial de los últimos 15 días.
+Devolvé SOLO un JSON con esta forma exacta: { "categories": ["...", ...] } — nombres de categoría en
+español, breves (2-6 palabras), sin numerar ni viñetas, sin explicación adicional.`,
+    messages: [{
+      role: "user",
+      content: `Categorías establecidas: ${input.established_categories.join(", ")}\n\nHistorial reciente (más reciente primero):\n${historyLines}\n\nProponé ${input.count} categoría${input.count === 1 ? "" : "s"}.`,
+    }],
+  })
+  const parsed = parseJson<{ categories?: unknown }>(text)
+  if (!Array.isArray(parsed.categories) || parsed.categories.length === 0) {
+    throw new Error("La IA devolvió una respuesta incompleta para las categorías propuestas.")
+  }
+  const raw = parsed.categories
+    .filter((value): value is string => typeof value === "string" && value.trim().length > 0)
+    .map(value => value.trim().slice(0, 160))
+  const seen = new Set<string>()
+  const deduped: string[] = []
+  for (const category of raw) {
+    const key = category.toLocaleLowerCase("es")
+    if (seen.has(key)) continue
+    seen.add(key)
+    deduped.push(category)
+  }
+  if (deduped.length === 0) throw new Error("La IA no propuso ninguna categoría válida.")
+  return deduped
+}
+
+/**
  * Pide una direccion visual nueva (image_prompt + image_alt_text) para una pieza ya existente, sin
  * tocar hook/caption/hashtags. Reusa las mismas IMAGE_PROMPT_RULES (incluida la regla de que un objeto
  * como metafora tiene que evocar el tema de inmediato) — sirve para descartar un concepto que no

@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
-import { generateContentPlan, getAiMode, getPublicAiError } from "@/lib/ai"
+import { generateContentPlan, getAiMode, getPublicAiError, proposeAutoDraftCategories } from "@/lib/ai"
 import {
   buildDraftContentItem,
   listKnownCategories,
@@ -21,6 +21,10 @@ const OBJECTIVES: ContentObjective[] = ["conversion", "educacion", "confianza", 
 // un deficit grande se repone gradualmente en varios dias en vez de generar todo de una vez.
 const MAX_DRAFTS_PER_FORMAT_PER_RUN = 3
 const MAX_DRAFTS_PER_RUN = 6
+// Cuantas piezas recientes le mostramos a la IA de propuesta de categorias como contexto de "que ya
+// esta cubierto" -- alcanza de sobra para ver que categorias se repiten o quedaron sin tocar, sin
+// inflar el prompt con todo el historico.
+const RECENT_HISTORY_LIMIT = 20
 
 function lastUsedAt(items: ContentItem[], matches: (item: ContentItem) => boolean): number {
   const relevant = items.filter(item => item.status !== "archived" && matches(item))
@@ -50,26 +54,26 @@ export interface PlannedDraft {
   objective: ContentObjective
 }
 
+export interface PlannedSlot {
+  format: AutoPublishFormat
+}
+
 /**
  * Pura, sin I/O: cuantos borradores nuevos hace falta generar por formato para sostener una semana
  * de cronograma (dias programados x piezas por corrida) sin pisar lo que ya espera revision
  * (borrador o aprobado) -- a pedido de Seba (2026-08-05, ver docs/BACKLOG.md "Cola de historias y
- * carruseles aprobados en 0"). Nunca elige "reel" (ver AUTO_DRAFT_FORMATS). Categoria y objetivo se
- * eligen por "hace mas tiempo que no se usa" para mantener variedad, y una categoria nunca se repite
- * dentro de la misma corrida -- mismo criterio que hubiera evitado el bug de 3 historias casi
- * identicas publicadas 11s aparte el 2026-07-31 (ver BACKLOG), aunque esa causa raiz puntual nunca
- * se confirmo del todo.
+ * carruseles aprobados en 0"). Nunca elige "reel" (ver AUTO_DRAFT_FORMATS). Solo decide CUANTAS
+ * piezas hacen falta por formato -- QUE categoria/objetivo les toca se resuelve aparte en
+ * `buildAutoDraftPlan` (necesita llamar a la IA, no puede ser pura).
  */
-export function planAutoDrafts(
+export function planAutoDraftSlots(
   items: ContentItem[],
   autoPublishSettings: AutoPublishSettings
-): PlannedDraft[] {
-  const plan: PlannedDraft[] = []
-  const categoryPool = listKnownCategories(items)
-  const usedCategoriesThisRun = new Set<string>()
+): PlannedSlot[] {
+  const slots: PlannedSlot[] = []
 
   for (const format of AUTO_DRAFT_FORMATS) {
-    if (plan.length >= MAX_DRAFTS_PER_RUN) break
+    if (slots.length >= MAX_DRAFTS_PER_RUN) break
     const track = autoPublishSettings[format]
     if (!track.enabled || track.schedule_slots.length === 0) continue
 
@@ -80,29 +84,103 @@ export function planAutoDrafts(
     const deficit = weeklyNeed - currentSupply
     if (deficit <= 0) continue
 
-    const toGenerate = Math.min(deficit, MAX_DRAFTS_PER_FORMAT_PER_RUN, MAX_DRAFTS_PER_RUN - plan.length)
-    for (let i = 0; i < toGenerate; i++) {
-      const category = pickLeastRecentlyUsed(
-        categoryPool,
-        items,
-        (item, candidate) => item.category.trim().toLocaleLowerCase("es") === candidate.toLocaleLowerCase("es"),
-        usedCategoriesThisRun
-      )
-      if (!category) break
-      usedCategoriesThisRun.add(category)
+    const toGenerate = Math.min(deficit, MAX_DRAFTS_PER_FORMAT_PER_RUN, MAX_DRAFTS_PER_RUN - slots.length)
+    for (let i = 0; i < toGenerate; i++) slots.push({ format })
+  }
+  return slots
+}
 
-      const formatItems = items.filter(item => item.format === format)
-      const objective = pickLeastRecentlyUsed(
-        OBJECTIVES,
-        formatItems,
-        (item, candidate) => (item.objective ?? "conversion") === candidate,
-        new Set<ContentObjective>()
-      ) ?? "educacion"
+/** Pura, sin I/O: contexto de "que ya esta cubierto" para que la IA de propuesta de categorias pueda
+ * distinguir un tema recien tocado de uno que hace mucho no se sube (o nunca se subio). Incluye
+ * borrador/aprobada/publicada (nunca archivada, esa ya no cuenta como "vigente"), mas reciente
+ * primero. */
+export function buildRecentHistoryContext(
+  items: ContentItem[],
+  now: Date,
+  limit: number = RECENT_HISTORY_LIMIT
+): Array<{ category: string; topic: string; status: string; days_ago: number }> {
+  return items
+    .filter(item => item.status !== "archived")
+    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+    .slice(0, limit)
+    .map(item => ({
+      category: item.category,
+      topic: item.topic,
+      status: item.status,
+      days_ago: Math.max(0, Math.floor((now.getTime() - new Date(item.created_at).getTime()) / 86_400_000)),
+    }))
+}
 
-      plan.push({ format, category, objective })
+/** Pura, sin I/O: el mecanismo anterior a la propuesta por IA (rotacion por "hace mas tiempo que no
+ * se usa" entre las categorias ya conocidas) -- se conserva como respaldo determinístico si
+ * `proposeAutoDraftCategories` falla (ver project_ai_fallback_providers_unfunded en memoria), para
+ * que un problema de facturación de la IA no frene la reposición de la cola por completo. */
+export function pickCategoriesDeterministically(items: ContentItem[], count: number): string[] {
+  const categoryPool = listKnownCategories(items)
+  const usedThisRun = new Set<string>()
+  const picked: string[] = []
+  for (let i = 0; i < count; i++) {
+    const category = pickLeastRecentlyUsed(
+      categoryPool,
+      items,
+      (item, candidate) => item.category.trim().toLocaleLowerCase("es") === candidate.toLocaleLowerCase("es"),
+      usedThisRun
+    )
+    if (!category) break
+    usedThisRun.add(category)
+    picked.push(category)
+  }
+  return picked
+}
+
+/**
+ * Arma el plan completo (formato + categoría + objetivo) para la corrida: cuántas piezas por formato
+ * (`planAutoDraftSlots`, pura) y qué categoría le toca a cada una. La categoría se le pide a la IA
+ * (`proposeAutoDraftCategories`, a pedido explícito de Seba 2026-08-05: no solo rotar por antigüedad
+ * entre una lista fija, también pensar categorías genuinamente nuevas mirando qué quedó cubierto o
+ * hace mucho no se toca) — si esa llamada falla o devuelve menos de lo pedido, se completa con el
+ * método determinístico anterior (`pickCategoriesDeterministically`) sin frenar la corrida.
+ */
+export async function buildAutoDraftPlan(
+  items: ContentItem[],
+  autoPublishSettings: AutoPublishSettings,
+  now: Date
+): Promise<PlannedDraft[]> {
+  const slots = planAutoDraftSlots(items, autoPublishSettings)
+  if (slots.length === 0) return []
+
+  let categories: string[] = []
+  try {
+    categories = await proposeAutoDraftCategories({
+      count: slots.length,
+      established_categories: listKnownCategories(items),
+      recent_history: buildRecentHistoryContext(items, now),
+    })
+  } catch {
+    categories = []
+  }
+
+  if (categories.length < slots.length) {
+    const seen = new Set(categories.map(category => category.toLocaleLowerCase("es")))
+    for (const fallback of pickCategoriesDeterministically(items, slots.length)) {
+      if (categories.length >= slots.length) break
+      const key = fallback.toLocaleLowerCase("es")
+      if (seen.has(key)) continue
+      seen.add(key)
+      categories.push(fallback)
     }
   }
-  return plan
+
+  return slots.slice(0, categories.length).map((slot, index) => {
+    const formatItems = items.filter(item => item.format === slot.format)
+    const objective = pickLeastRecentlyUsed(
+      OBJECTIVES,
+      formatItems,
+      (item, candidate) => (item.objective ?? "conversion") === candidate,
+      new Set<ContentObjective>()
+    ) ?? "educacion"
+    return { format: slot.format, category: categories[index], objective }
+  })
 }
 
 export interface AutoDraftGenerationResult {
@@ -131,7 +209,7 @@ export async function runAutoDraftGeneration(
     readContentItems(supabase),
     readAutoPublishSettings(supabase),
   ])
-  const plan = planAutoDrafts(items, autoPublishSettings)
+  const plan = await buildAutoDraftPlan(items, autoPublishSettings, now)
   if (plan.length === 0) return { skipped: false, planned: 0, generated: 0 }
 
   const newItems: ContentItem[] = []
