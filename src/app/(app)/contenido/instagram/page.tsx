@@ -851,11 +851,15 @@ function AutoPublishTrackCard({
       </div>
       {weekdayLabel && <p className="text-xs text-gray-500">{weekdayLabel}</p>}
       <p className="text-xs text-gray-500">{queueText}</p>
-      {scheduled && (
+      {scheduled ? (
         <p className="text-xs font-medium text-blue-700">
           Programado para arrancar el {new Date(track.starts_at as string).toLocaleString("es-AR", { timeZone: track.timezone })} — hasta esa fecha no publica nada, aunque esté activada.
         </p>
-      )}
+      ) : track.starts_at ? (
+        <p className="text-xs text-gray-500">
+          Arrancó el {new Date(track.starts_at as string).toLocaleDateString("es-AR", { timeZone: track.timezone })} — esa fecha ya pasó, así que no restringe nada. La hora que ves ahí no es la de publicación: la hora real es la ventana de arriba ({describeWindow(track)}).
+        </p>
+      ) : null}
       {lastRun && <p className="text-xs text-gray-500">{lastRun}</p>}
     </div>
   )
