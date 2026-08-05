@@ -21,19 +21,13 @@ import { Textarea } from "@/components/ui/textarea"
 import { createClient as createBrowserSupabaseClient } from "@/lib/supabase/client"
 import { parseAiJson } from "@/lib/parse-ai-json"
 import { truncateForImagePlate } from "@/lib/content-text"
-import { AUTO_PUBLISH_TIMEZONE, AUTO_PUBLISH_WINDOW_BY_FORMAT, canStillPublishToday, DEFAULT_AUTO_PUBLISH_SETTINGS, estimateAutoPublishDrainDays, estimateAutoPublishDateForPosition, estimateRepeatEndDate, findRecentDuplicateTopic, getScheduledDays, getZonedScheduleParts, pickNextPublishableItems, isReorderableInQueue, normalizeAutoPublishSettings, reorderableQueuePositions } from "@/lib/content-pipeline"
+import { AUTO_PUBLISH_TIMEZONE, AUTO_PUBLISH_WINDOW_BY_FORMAT, buildDraftContentItem, canStillPublishToday, DEFAULT_AUTO_PUBLISH_SETTINGS, estimateAutoPublishDrainDays, estimateAutoPublishDateForPosition, estimateRepeatEndDate, findRecentDuplicateTopic, getScheduledDays, getZonedScheduleParts, listKnownCategories, pickNextPublishableItems, isReorderableInQueue, normalizeAutoPublishSettings, reorderableQueuePositions } from "@/lib/content-pipeline"
+import type { GeneratedContentPlan } from "@/lib/content-pipeline"
 import { buildFallbackVideoPrompt, getVeoPromptQualityIssues } from "@/lib/video-prompt"
 import type { AutoPublishSettings, AutoPublishTrackSettings, ContentInstagramInsights, ContentItem, ContentObjective, ContentSlide, ContentSource, ContentStatus, ContentVideoBrandScores, ContentVideoScores, InstagramInsightWindow, InstagramMediaInsightSnapshot, VideoGenerationVersion } from "@/types"
 import { CONTENT_OBJECTIVE_GOALS, CONTENT_OBJECTIVE_LABELS, WEEKDAY_OPTIONS } from "@/types"
 
 const IS_MANUAL_MODE = process.env.NEXT_PUBLIC_AI_MODE !== "gemini_api"
-
-const CATEGORIES = [
-  "Consulta cardiologica", "Ecocardiograma", "Estudios cardiologicos", "Presion arterial", "Colesterol",
-  "Palpitaciones", "Sintomas de alarma", "Mitos y errores frecuentes", "Cardiologia femenina",
-  "Corazon y metabolismo", "Chequeo cardiovascular", "Habitos y adherencia", "Factores de riesgo",
-  "Atencion en Lanus", "Atencion en Lomas", "Atencion en Hospital Britanico", "Como pedir turno",
-]
 
 const OBJECTIVES: { value: ContentObjective; label: string }[] = [
   { value: "conversion", label: CONTENT_OBJECTIVE_LABELS.conversion },
@@ -105,11 +99,6 @@ const EDITABLE_FIELDS: Array<keyof ContentItem> = [
 
 function editableContent(item: ContentItem) {
   return Object.fromEntries(EDITABLE_FIELDS.map(field => [field, item[field]])) as Partial<ContentItem>
-}
-
-function capHashtags(raw: string, max = 5): string {
-  const tags = raw.match(/#[\p{L}0-9_]+/gu) ?? []
-  return tags.slice(0, max).join(" ")
 }
 
 function daysAgo(isoDate: string): string {
@@ -1198,12 +1187,18 @@ export default function ContentStudioPage() {
     })
   }, [items, libraryFormat, libraryQuery, libraryStatus, queueInfo, repeatInfo])
 
+  // Las categorías que Seba escribe a mano (no están en CONTENT_CATEGORIES) no se guardaban en
+  // ningún lado -- la próxima vez que abría el formulario, tenía que volver a tipearlas de cero.
+  // listKnownCategories (content-pipeline.ts) las suma desde las piezas ya existentes, sin tabla
+  // ni endpoint nuevo -- la misma función la usa content-auto-draft.ts para elegir qué generar.
+  const knownCategories = useMemo(() => listKnownCategories(items), [items])
+
   const filteredCategories = useMemo(() => {
     const query = category.trim().toLocaleLowerCase("es")
     return query
-      ? CATEGORIES.filter(value => value.toLocaleLowerCase("es").includes(query))
-      : CATEGORIES
-  }, [category])
+      ? knownCategories.filter(value => value.toLocaleLowerCase("es").includes(query))
+      : knownCategories
+  }, [category, knownCategories])
 
   // Aviso no bloqueante: si ya se aprobo o publico algo con la misma categoria (o el mismo hook) en
   // los ultimos 15 dias, mostrarlo antes de generar para evitar repetir el mismo angulo sin querer.
@@ -1319,57 +1314,14 @@ export default function ContentStudioPage() {
   }
 
   async function saveGeneratedItem(generated: Record<string, unknown>) {
-    const now = new Date().toISOString()
-    const generatedText = (field: string) => typeof generated[field] === "string"
-      ? (generated[field] as string).trim()
-      : ""
-    const inferredTopic =
-      topic.trim() ||
-      generatedText("topic") ||
-      generatedText("visual_headline") ||
-      generatedText("hook") ||
-      category.trim() ||
-      "Contenido generado"
-    const inferredCategory =
-      category.trim() ||
-      generatedText("category") ||
-      "Contenido generado"
-    const rawSlides = generated.slides
-    const slides = Array.isArray(rawSlides)
-      ? (rawSlides as Array<Record<string, unknown>>)
-          .filter(s => typeof s.headline === "string" && typeof s.text === "string")
-          .map(s => ({
-            headline: (s.headline as string).slice(0, 60),
-            text: (s.text as string).slice(0, 300),
-            image_prompt: typeof s.image_prompt === "string" ? s.image_prompt.slice(0, 2400) : undefined,
-          }))
-      : undefined
-    const item: ContentItem = {
-      id: crypto.randomUUID(),
-      topic: inferredTopic.slice(0, 200),
-      category: inferredCategory.slice(0, 160),
+    const item = buildDraftContentItem({
+      generated: generated as unknown as GeneratedContentPlan,
+      topic,
+      category,
       format,
-      goal: CONTENT_OBJECTIVE_GOALS[objective],
       objective,
-      status: "draft",
-      channels: ["instagram"],
       source: selectedSource,
-      created_at: now,
-      updated_at: now,
-      approved_at: null,
-      hook: generated.hook as string,
-      caption: generated.caption as string,
-      google_text: (generated.google_text as string).slice(0, 1500),
-      hashtags: capHashtags(generated.hashtags as string),
-      visual_headline: (generated.visual_headline as string).slice(0, 90),
-      visual_subtitle: (generated.visual_subtitle as string).slice(0, 90),
-      visual_style: (["rose", "blue", "teal"].includes(generated.visual_style as string)
-        ? generated.visual_style
-        : "blue") as "rose" | "blue" | "teal",
-      image_prompt: (generated.image_prompt as string | undefined)?.slice(0, 2400),
-      image_alt_text: (generated.image_alt_text as string | undefined)?.slice(0, 180),
-      slides: slides && slides.length > 0 ? slides : undefined,
-    }
+    })
 
     const saved = await fetch("/api/content/items", {
       method: "POST",
@@ -1813,7 +1765,7 @@ export default function ContentStudioPage() {
                     aria-invalid={Boolean(briefErrors.topic)}
                   />
                   {briefErrors.topic && <p className="text-xs font-medium text-red-600">{briefErrors.topic}</p>}
-                  <p className="text-xs text-gray-500">Si lo dejás vacío, la IA elegirá el enfoque más atractivo y útil dentro de la categoría.</p>
+                  <p className="text-xs text-gray-500">Escribí acá el ángulo que querés que tome la publicación (ej. un mensaje, una pregunta a responder, hacia qué sede o servicio dirigirla) — la IA arma el contenido siguiendo exactamente eso. Si lo dejás vacío, elige sola el enfoque más atractivo y útil dentro de la categoría.</p>
                 </div>
                 <div className="space-y-1.5">
                   <Label className="text-gray-900">Objetivo</Label>

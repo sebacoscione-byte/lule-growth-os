@@ -9,6 +9,16 @@ import { drainWhatsAppInboundQueue, getWhatsAppQueueHealth } from "@/lib/whatsap
 import { snapshotInstagramFollowers } from "@/lib/instagram-followers"
 
 export async function runDailyMaintenance(supabase: SupabaseClient, now: Date) {
+  // Los snapshots diarios (Instagram/Google) van primero y a proposito: son rapidos (unos pocos
+  // segundos entre los tres) y, a diferencia del resto de esta funcion, no tienen ningun otro
+  // mecanismo que los reintente si esta corrida se corta a mitad de camino por el limite de
+  // duracion de la funcion (maxDuration) -- si el corte llega a pasar, que sea durante el drenaje
+  // de la cola de WhatsApp de mas abajo, que sí tiene un respaldo real (el worker de pg_cron cada
+  // minuto ya la drena en vivo; esta corrida diaria es solo una red de seguridad adicional).
+  const instagramFollowers = await snapshotInstagramFollowers(supabase, now)
+  const contentInsights = await snapshotContentInsights(supabase, now)
+  const googleBusinessMetrics = await snapshotGoogleBusinessMetrics(supabase, now)
+
   let whatsappQueue = { claimed: 0, processed: 0, retried: 0, deadLettered: 0 }
   let whatsappQueueError = false
   try {
@@ -28,9 +38,6 @@ export async function runDailyMaintenance(supabase: SupabaseClient, now: Date) {
   const whatsappMetaPreflight = await checkWhatsAppCloudApiConfiguration()
   const whatsappFollowup = await runWhatsAppFollowup(supabase, now)
   const handoffReminder = await runHandoffReminderCheck(now)
-  const instagramFollowers = await snapshotInstagramFollowers(supabase, now)
-  const contentInsights = await snapshotContentInsights(supabase, now)
-  const googleBusinessMetrics = await snapshotGoogleBusinessMetrics(supabase, now)
 
   const failures: string[] = []
   const realWhatsappErrors = whatsappFollowup.errors.filter(error => !error.includes("todavía no está aprobado"))

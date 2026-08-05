@@ -1,6 +1,53 @@
 # Lule Growth OS — Contexto para Claude
 
 ## Estado actual
+- 2026-08-05 (feedback de Seba sobre el Estudio de contenido, 4 puntos + generación automática de
+  borradores): (1) las categorías escritas a mano en "Generar contenido" (fuera de la lista
+  predefinida) no se guardaban en ningún lado — se perdían al reabrir el formulario. Fix: nueva
+  `listKnownCategories()` (`content-pipeline.ts`) suma cualquier `category` ya usada en piezas
+  existentes a la lista predefinida `CONTENT_CATEGORIES` (antes un const local de la página), sin
+  tabla ni endpoint nuevo. (2) Seba preguntó si "Tema o enfoque" podía usarse para dirigir el ángulo
+  de la publicación — ya lo hacía (`buildContentPlanPrompt`/`generateContentPlan` lo pasan como
+  "Tema o enfoque sugerido"), pero el texto de ayuda no lo explicitaba; reescrito para dejarlo
+  explícito. (3) **bug real**: la pestaña Rendimiento no mostraba datos. Diagnosticado corriendo la
+  función real `snapshotContentInsights` contra producción (no un script ad hoc — la misma función
+  que usa el cron): de 12 piezas publicadas con `instagram_media_id`, solo 1 tenía snapshot en
+  `instagram_media_insight_snapshots`, y la función completa las 12 en ~8s corriendo sola. En
+  `daily-maintenance`, esa función corría **después** de drenar la cola de WhatsApp (presupuesto de
+  hasta 120s) — la corrida real se corta por `maxDuration` antes de llegar a la mayoría de las
+  piezas, sin loguear ningún error (un corte de plataforma no pasa por ningún `catch`). Se reordenó
+  `runDailyMaintenance` para que los snapshots diarios (Instagram followers/content insights/Google
+  Business, todos rápidos) corran primero, y el drenaje de la cola de WhatsApp (que además ya tiene
+  su propio worker en vivo cada minuto vía pg_cron — esto es solo un respaldo) quede al final.
+  Backfill puntual aplicado en producción corriendo la función real: la tabla pasó de 1 a 13 filas.
+  (4) Seba pidió explícitamente "generación automática completa" de borradores — confirma y
+  resuelve el pendiente `[BACKLOG] Cola de historias y carruseles aprobados en 0 (2026-08-05)`.
+  Nuevo `src/lib/content-auto-draft.ts` (`planAutoDrafts`/`runAutoDraftGeneration`, con tests):
+  compara, por cada track activo de auto-publicación (**solo post/historia/carrusel — nunca reel**,
+  ver más abajo), cuántas piezas por semana necesita el cronograma (`schedule_slots.length ×
+  items_per_run`) contra cuántas ya esperan revisión (borrador o aprobada); si falta, genera nuevos
+  borradores con `generateContentPlan()` (mismo pipeline que "Generar propuesta completa" manual,
+  vía `buildDraftContentItem()`, extraída de la página para no duplicar esa lógica) eligiendo
+  categoría y objetivo por "hace más tiempo que no se usa" (nunca repite categoría dentro de la
+  misma corrida, para variar el contenido) — quedan como **Borrador en Biblioteca, nunca se
+  auto-aprueban ni se auto-publican**. Tope de 3 piezas por formato y 6 por corrida (un déficit
+  grande se repone gradualmente en varios días). Nuevo cron `/api/cron/auto-draft-content` (11:00
+  UTC = 8:00 ART, antes de las ventanas de publicación 18:00/19:00 ART) — **separado** de
+  `daily-maintenance` a propósito: llamar a la IA puede tardar bastante más que el resto de las
+  tareas diarias, y ese cron ya tuvo el problema de presupuesto de tiempo del punto (3) — Vercel
+  Hobby ya no limita a 2 cron jobs (ver más abajo), así que sumar un quinto no tiene costo de
+  infraestructura. **"reel" queda deliberadamente afuera**: ese formato depende de generar video con
+  Veo (costo real ~USD 0.80-1 por intento) con su propio gate de revisión humana
+  (`video_reference_frame_review`) antes de poder aprobarse — no tiene sentido dispararlo solo, sin
+  que alguien lo pida a mano desde el editor. En modo manual (sin `AI_MODE=gemini_api`) se salta sin
+  error, no hay forma de generar nada solo. `npm test` (999/999), lint y build sin errores. No
+  verificado en vivo el cron en sí (requiere esperar a la corrida real de mañana en producción) —
+  sí verificado en vivo, con las funciones reales de la app, el diagnóstico y backfill del punto (3).
+  Archivos: `src/lib/content-pipeline.ts` (+`CONTENT_CATEGORIES`, `listKnownCategories`,
+  `capHashtags`, `buildDraftContentItem`, exporta `DEFAULT_DUPLICATE_TOPIC_WINDOW_DAYS`),
+  `src/lib/content-auto-draft.ts` (nuevo, +tests), `src/lib/daily-maintenance.ts`,
+  `src/app/api/cron/auto-draft-content/` (nueva), `src/app/(app)/contenido/instagram/page.tsx`,
+  `vercel.json`.
 - 2026-08-04 (atribución y aprendizaje de Instagram): el enlace de una pieza conserva ahora dos
   dimensiones separadas en el mensaje prellenado del bot: `Contenido: <itemId>` y el `Ref:` de
   landing/sede. `whatsapp_sessions.content_item_id` permite comprobar una conversación aun antes de
@@ -1626,6 +1673,13 @@ dispararlos en cualquier minuto de esa hora; la UI muestra la ventana real y no 
    `quota_exceeded`). Por WhatsApp seguiría requiriendo un template aprobado por Meta, así que se
    resolvió por email en su lugar — sin eso configurado, sigue sin avisar nada y hay que revisar la
    tarjeta de Estudio de contenido o los logs de función en Vercel a mano.
+9. **Reposición automática de borradores** (2026-08-05) — `/api/cron/auto-draft-content` corre todos
+   los días a las 11:00 UTC (8:00 ART, antes de las ventanas de publicación) y genera borradores
+   nuevos de post/historia/carrusel cuando el track está activo y se queda sin piezas aprobadas ni
+   borradores esperando revisión (ver `src/lib/content-auto-draft.ts`). Quedan como **Borrador en
+   Biblioteca** — nunca se auto-aprueban ni se auto-publican, seguís generando placa/revisando/
+   aprobando a mano como siempre. No aplica a Reels (requiere generar video con Veo, con costo real y
+   su propio gate de revisión humana — no se dispara solo).
 
 ## Alertas de cron por email — cómo activarlas (2026-07-07)
 
