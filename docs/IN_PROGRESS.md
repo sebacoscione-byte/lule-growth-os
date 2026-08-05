@@ -1,11 +1,11 @@
-# EN CURSO (2026-08-05) — agenda semanal e ingresos por institución
+# CERRADO (2026-08-05) — agenda semanal e ingresos por institución
 
 - [x] Relevar valores, fórmulas, formatos y dependencias de `Horario 15 min` e `Ingresos por institución`.
 - [x] Crear una sección nativa y responsive con agenda semanal, resumen de carga e ingresos.
 - [x] Reproducir en código las reglas económicas y la proyección mensual calendario.
 - [x] Cubrir los cálculos derivados con tests y documentar supuestos/alcance.
 - [x] Ejecutar lint, 109 suites/1017 tests, build, 22 E2E públicos y QA visual.
-- [ ] Publicar por PR, verificar CI/preview, mergear y comprobar producción.
+- [x] Publicado como PR #217; CI, E2E público y preview de Vercel verificados.
 
 ---
 
