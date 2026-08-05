@@ -58,12 +58,27 @@ export function allReferralCodes(): ReferralCodeInfo[] {
 // espaciado antes de enviar, así que el match no es estricto en formato, solo en el patrón del
 // código (2-4 letras - 2-4 letras - 2 dígitos).
 const REF_PATTERN = /ref:?\s*([a-z]{2,4}-[a-z]{2,4}-\d{2})/i
+const CONTENT_PATTERN = /contenido:?\s*([a-z0-9_-]{6,160})/i
 
-/** Devuelve el código detectado (si lo hay) y el texto sin esa referencia, para no pasarla a intake/IA. */
-export function extractReferralCode(text: string): { code: string | null; cleanedText: string } {
-  const match = text.match(REF_PATTERN)
-  if (!match) return { code: null, cleanedText: text }
-  return { code: match[1].toUpperCase(), cleanedText: text.replace(match[0], "").trim() }
+/** Devuelve la sede/landing y la pieza detectadas, sin pasar estos identificadores a intake/IA. */
+export function extractReferralCode(text: string): {
+  code: string | null
+  contentItemId: string | null
+  cleanedText: string
+} {
+  const referralMatch = text.match(REF_PATTERN)
+  const contentMatch = text.match(CONTENT_PATTERN)
+  const cleanedText = text
+    .replace(REF_PATTERN, "")
+    .replace(CONTENT_PATTERN, "")
+    .replace(/[ \t]+\n/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim()
+  return {
+    code: referralMatch?.[1].toUpperCase() ?? null,
+    contentItemId: contentMatch?.[1] ?? null,
+    cleanedText,
+  }
 }
 
 /** Agrega "Ref: <código>" al final de un mensaje de WhatsApp, si existe un código para esa landing/sede. */
@@ -71,6 +86,14 @@ export function withReferralCode(message: string, landingSlug: string, locationK
   const info = getReferralCode(landingSlug, locationKey)
   if (!info) return message
   return `${message}\n\nRef: ${info.code}`
+}
+
+/** Agrega la pieza sólo si el enlace ya apunta al bot mediante una referencia conocida. */
+export function withContentAttribution(message: string, contentItemId: string | null | undefined): string {
+  if (!contentItemId || !REF_PATTERN.test(message)) return message
+  const normalized = contentItemId.trim()
+  if (!/^[a-z0-9_-]{6,160}$/i.test(normalized)) return message
+  return `${message}\nContenido: ${normalized}`
 }
 
 // CTA de respaldo compartido entre todas las landings (no es slug-específico, ver arriba) —

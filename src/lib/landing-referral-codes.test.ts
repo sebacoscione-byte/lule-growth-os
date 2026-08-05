@@ -1,6 +1,6 @@
 import {
   getReferralCode, findReferralCodeInfo, extractReferralCode, withReferralCode,
-  withGeneralFallbackCode, allReferralCodes,
+  withGeneralFallbackCode, withContentAttribution, allReferralCodes,
 } from "./landing-referral-codes"
 
 describe("getReferralCode", () => {
@@ -80,5 +80,22 @@ describe("withReferralCode / withGeneralFallbackCode", () => {
     const { code, cleanedText } = extractReferralCode(withRef)
     expect(code).toBe("LAN-CARD-01")
     expect(cleanedText).toBe(original)
+  })
+
+  it("conserva por separado la pieza y la sede en un enlace atribuible al bot", () => {
+    const withRef = withReferralCode("Hola, quiero turno.", "cardiologa-lanus", "cimel")
+    const attributed = withContentAttribution(withRef, "content_20260804_abc")
+    expect(attributed).toContain("Ref: LAN-CARD-01")
+    expect(attributed).toContain("Contenido: content_20260804_abc")
+    expect(extractReferralCode(attributed)).toEqual({
+      code: "LAN-CARD-01",
+      contentItemId: "content_20260804_abc",
+      cleanedText: "Hola, quiero turno.",
+    })
+  })
+
+  it("no agrega una pieza a un WhatsApp que el bot no puede observar", () => {
+    expect(withContentAttribution("Hola, quiero turno.", "content_20260804_abc"))
+      .toBe("Hola, quiero turno.")
   })
 })

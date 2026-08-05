@@ -55,6 +55,18 @@ test("una pieza con insights muestra las ventanas históricas sin inventar falta
   await expect(history.getByText(/no disponible|sin snapshot comparable/i).first()).toBeVisible()
 })
 
+test("el panel de rendimiento separa clics, conversaciones, leads y turnos", async () => {
+  await page.goto("/contenido/instagram")
+  await page.getByRole("tab", { name: "Rendimiento" }).click()
+
+  await expect(page.getByText("Rendimiento y atribución", { exact: true })).toBeVisible()
+  await expect(page.getByText("Un clic nunca se cuenta como conversión.", { exact: false })).toBeVisible()
+  await expect(page.getByText("Conversaciones", { exact: true }).first()).toBeVisible()
+  await expect(page.getByText("Leads", { exact: true }).first()).toBeVisible()
+  await expect(page.getByText("Turnos confirmados", { exact: true }).first()).toBeVisible()
+  await expect(page.getByText("No disponible", { exact: true }).first()).toBeVisible()
+})
+
 test("abrir una conversación del inbox", async () => {
   await page.goto("/inbox")
   const inboxHeading = page.getByRole("heading", { name: "Inbox", level: 2 })

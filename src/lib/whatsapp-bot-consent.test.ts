@@ -12,7 +12,7 @@ jest.mock("@/lib/whatsapp-intents", () => ({
   INTENT_REPLIES: {},
 }))
 jest.mock("@/lib/landing-referral-codes", () => ({
-  extractReferralCode: jest.fn().mockReturnValue({ code: null }),
+  extractReferralCode: jest.fn().mockReturnValue({ code: null, contentItemId: null }),
   findReferralCodeInfo: jest.fn().mockReturnValue(null),
 }))
 jest.mock("@/lib/medical-safety", () => ({
@@ -57,6 +57,7 @@ import { sendButtons, sendText } from "@/lib/whatsapp"
 import { classifyIntent, extractIntake } from "@/lib/whatsapp-intents"
 import { containsSensitiveMedicalContent, isMedicalBoundaryMessage } from "@/lib/medical-safety"
 import { logWhatsAppMessage } from "@/lib/whatsapp-cost-tracking"
+import { extractReferralCode, findReferralCodeInfo } from "@/lib/landing-referral-codes"
 import {
   CONSENT_ACCEPT_BUTTON_ID,
   hasConsented,
@@ -78,6 +79,9 @@ function baseSession(state: "nuevo" | "esperando_consentimiento" | "derivado", l
     ctwa_clid: null,
     messages_sent_count: 0,
     referral_code: null,
+    content_item_id: null,
+    content_origin_location_key: null,
+    content_attributed_at: null,
     bot_paused: false,
     updated_at: new Date().toISOString(),
   }
@@ -114,6 +118,50 @@ function mockSession(session: ReturnType<typeof baseSession>) {
 beforeEach(() => jest.clearAllMocks())
 
 describe("consentimiento explícito antes del intake", () => {
+  it("preserva pieza y sede como metadata opaca antes del consentimiento", async () => {
+    const sessions = mockSession(baseSession("nuevo"))
+    ;(hasConsented as jest.Mock).mockResolvedValue(false)
+    ;(extractReferralCode as jest.Mock).mockReturnValueOnce({
+      code: "LAN-GRAL-01",
+      contentItemId: "content_20260804_abc",
+    })
+    ;(findReferralCodeInfo as jest.Mock).mockReturnValueOnce({ locationKey: "cimel" })
+
+    await handleIncomingMessage({
+      phone: PHONE,
+      text: "Hola\n\nRef: LAN-GRAL-01\nContenido: content_20260804_abc",
+      waMessageId: "wamid.attribution-1",
+    })
+
+    expect(sessions.update).toHaveBeenCalledWith(expect.objectContaining({
+      state: "esperando_consentimiento",
+      referral_code: "LAN-GRAL-01",
+      content_item_id: "content_20260804_abc",
+      content_origin_location_key: "cimel",
+      content_attributed_at: expect.any(String),
+    }))
+  })
+
+  it("ignora una pieza si el mensaje no trae una referencia interna conocida", async () => {
+    const sessions = mockSession(baseSession("nuevo"))
+    ;(hasConsented as jest.Mock).mockResolvedValue(false)
+    ;(extractReferralCode as jest.Mock).mockReturnValueOnce({
+      code: "XXX-FAKE-99",
+      contentItemId: "content_inventado",
+    })
+    ;(findReferralCodeInfo as jest.Mock).mockReturnValueOnce(null)
+
+    await handleIncomingMessage({ phone: PHONE, text: "mensaje editado", waMessageId: "wamid.attribution-unknown" })
+
+    expect(sessions.update).toHaveBeenCalledWith(expect.objectContaining({
+      referral_code: null,
+      content_item_id: null,
+      content_origin_location_key: null,
+      content_attributed_at: null,
+    }))
+  })
+
+
   it("un mensaje inicial con datos solo recibe el aviso y botones; no se interpreta como aceptación", async () => {
     const sessions = mockSession(baseSession("nuevo", "lead-existing"))
     ;(hasConsented as jest.Mock).mockResolvedValue(false)
