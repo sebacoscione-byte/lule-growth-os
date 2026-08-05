@@ -8,6 +8,7 @@ import {
   generateReply,
   getContentVideoModel,
   getPublicAiError,
+  proposeAutoDraftCategories,
   reviewVideoReferenceFrame,
   stripMarkdownArtifacts,
 } from "@/lib/ai"
@@ -419,6 +420,94 @@ describe("generateText valida JSON antes de dar por exitosa la respuesta (bug re
       if (previousAnthropicKey === undefined) delete process.env.ANTHROPIC_API_KEY
       else process.env.ANTHROPIC_API_KEY = previousAnthropicKey
       anthropicCreateMock.mockReset()
+    }
+  })
+})
+
+// 2026-08-05: a pedido explicito de Seba, el generador automatico de borradores no solo tiene que
+// rotar por antiguedad entre una lista fija de categorias -- tambien tiene que poder proponer
+// categorias genuinamente nuevas mirando el historial de lo ya publicado/aprobado/en borrador (ver
+// content-auto-draft.ts, buildAutoDraftPlan).
+describe("proposeAutoDraftCategories", () => {
+  function geminiHttpResponse(text: string) {
+    return {
+      ok: true,
+      json: async () => ({
+        candidates: [{ finishReason: "STOP", content: { parts: [{ text }] } }],
+        usageMetadata: { promptTokenCount: 10, candidatesTokenCount: 5, totalTokenCount: 15 },
+      }),
+    } as unknown as Response
+  }
+
+  let fetchSpy: jest.SpiedFunction<typeof fetch>
+  let previousProvider: string | undefined
+  let previousDailyLimit: string | undefined
+  let previousGeminiKey: string | undefined
+  let previousAiMode: string | undefined
+
+  beforeEach(() => {
+    previousProvider = process.env.AI_PROVIDER
+    previousDailyLimit = process.env.DAILY_AI_REQUEST_LIMIT
+    previousGeminiKey = process.env.GEMINI_API_KEY
+    previousAiMode = process.env.NEXT_PUBLIC_AI_MODE
+    process.env.AI_PROVIDER = "gemini"
+    process.env.DAILY_AI_REQUEST_LIMIT = "1000"
+    process.env.GEMINI_API_KEY = "test-key"
+    process.env.NEXT_PUBLIC_AI_MODE = "gemini_api"
+  })
+
+  afterEach(() => {
+    fetchSpy.mockRestore()
+    if (previousProvider === undefined) delete process.env.AI_PROVIDER
+    else process.env.AI_PROVIDER = previousProvider
+    if (previousDailyLimit === undefined) delete process.env.DAILY_AI_REQUEST_LIMIT
+    else process.env.DAILY_AI_REQUEST_LIMIT = previousDailyLimit
+    if (previousGeminiKey === undefined) delete process.env.GEMINI_API_KEY
+    else process.env.GEMINI_API_KEY = previousGeminiKey
+    if (previousAiMode === undefined) delete process.env.NEXT_PUBLIC_AI_MODE
+    else process.env.NEXT_PUBLIC_AI_MODE = previousAiMode
+  })
+
+  const baseInput = {
+    count: 2,
+    established_categories: ["Consulta cardiologica", "Colesterol"],
+    recent_history: [{ category: "Colesterol", topic: "t", status: "published", days_ago: 3 }],
+  }
+
+  it("devuelve las categorias que propone la IA", async () => {
+    fetchSpy = jest.spyOn(global, "fetch").mockResolvedValue(
+      geminiHttpResponse(JSON.stringify({ categories: ["Arritmias en el embarazo", "Factores de riesgo"] }))
+    )
+    await expect(proposeAutoDraftCategories(baseInput)).resolves.toEqual(["Arritmias en el embarazo", "Factores de riesgo"])
+  })
+
+  it("deduplica categorias repetidas que la IA haya devuelto por error", async () => {
+    fetchSpy = jest.spyOn(global, "fetch").mockResolvedValue(
+      geminiHttpResponse(JSON.stringify({ categories: ["Colesterol alto", "colesterol alto", "Factores de riesgo"] }))
+    )
+    await expect(proposeAutoDraftCategories(baseInput)).resolves.toEqual(["Colesterol alto", "Factores de riesgo"])
+  })
+
+  it("tira un error claro si la IA no devuelve ninguna categoria", async () => {
+    fetchSpy = jest.spyOn(global, "fetch").mockResolvedValue(geminiHttpResponse(JSON.stringify({ categories: [] })))
+    await expect(proposeAutoDraftCategories(baseInput)).rejects.toThrow(/respuesta incompleta/i)
+  })
+
+  it("tira un error claro si la IA devuelve solo strings vacios", async () => {
+    fetchSpy = jest.spyOn(global, "fetch").mockResolvedValue(geminiHttpResponse(JSON.stringify({ categories: ["  ", ""] })))
+    await expect(proposeAutoDraftCategories(baseInput)).rejects.toThrow(/no propuso ninguna categoría/i)
+  })
+
+  it("en modo manual no llama a ningun proveedor", async () => {
+    const previousMode = process.env.NEXT_PUBLIC_AI_MODE
+    process.env.NEXT_PUBLIC_AI_MODE = "manual"
+    fetchSpy = jest.spyOn(global, "fetch").mockRejectedValue(new Error("no deberia llamarse"))
+    try {
+      await expect(proposeAutoDraftCategories(baseInput)).rejects.toThrow(/modo manual/i)
+      expect(fetchSpy).not.toHaveBeenCalled()
+    } finally {
+      if (previousMode === undefined) delete process.env.NEXT_PUBLIC_AI_MODE
+      else process.env.NEXT_PUBLIC_AI_MODE = previousMode
     }
   })
 })
