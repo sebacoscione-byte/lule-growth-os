@@ -1,11 +1,11 @@
-# EN CURSO (2026-08-05) — reemplazar el Sheet por gestión nativa
+# CERRADO (2026-08-05) — reemplazar el Sheet por gestión nativa
 
 - [x] Convertir el horario y las reglas económicas en configuración editable.
 - [x] Persistir la planificación en Supabase con RLS, roles, MFA y auditoría.
 - [x] Gestionar bloques horarios, aranceles, feriados y período de proyección desde la app.
 - [x] Eliminar la dependencia y las referencias operativas al Google Sheet.
 - [x] Ejecutar migración, lint, 111 suites/1028 tests, build, 22 E2E públicos y QA visual.
-- [ ] Publicar por PR, verificar preview, mergear y comprobar producción.
+- [x] Publicado como PR #218; CI, E2E público, preview y controles de acceso verificados.
 
 ---
 
