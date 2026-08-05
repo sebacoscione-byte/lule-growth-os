@@ -1,3 +1,5 @@
+import { z } from "zod"
+
 export const WEEK_DAYS = [
   { key: "monday", label: "Lunes", shortLabel: "Lun", weekday: 1 },
   { key: "tuesday", label: "Martes", shortLabel: "Mar", weekday: 2 },
@@ -22,6 +24,10 @@ export const ACTIVITY_KEYS = [
 ] as const
 
 export type ActivityKey = (typeof ACTIVITY_KEYS)[number]
+
+const weekDayKeySchema = z.enum(WEEK_DAYS.map(day => day.key) as [WeekDayKey, ...WeekDayKey[]])
+const activityKeySchema = z.enum(ACTIVITY_KEYS)
+const timeSchema = z.string().regex(/^([01]\d|2[0-3]):(00|15|30|45)$/, "Usá intervalos de 15 minutos")
 
 export const ACTIVITY_META: Record<
   ActivityKey,
@@ -57,15 +63,17 @@ export const ACTIVITY_META: Record<
   LIBRE: { label: "Libre", shortLabel: "Libre", color: "gray" },
 }
 
-export interface PracticeRules {
-  minutesPerPatient: number
-  privateConsultationValue: number
-  coveredConsultationValue: number
-  echocardiogramValue: number
-  monthlyResearchValue: number
-  privatePatientsPerDay: number
-  averageWeeksPerMonth: number
-}
+export const practiceRulesSchema = z.object({
+  minutesPerPatient: z.literal(15),
+  privateConsultationValue: z.number().min(0).max(100_000_000),
+  coveredConsultationValue: z.number().min(0).max(100_000_000),
+  echocardiogramValue: z.number().min(0).max(100_000_000),
+  monthlyResearchValue: z.number().min(0).max(1_000_000_000),
+  privatePatientsPerDay: z.number().int().min(0).max(100),
+  averageWeeksPerMonth: z.number().min(1).max(6),
+})
+
+export type PracticeRules = z.infer<typeof practiceRulesSchema>
 
 export const DEFAULT_PRACTICE_RULES: PracticeRules = {
   minutesPerPatient: 15,
@@ -77,12 +85,57 @@ export const DEFAULT_PRACTICE_RULES: PracticeRules = {
   averageWeeksPerMonth: 4.33,
 }
 
-interface ScheduleInterval {
-  day: WeekDayKey
-  start: string
-  end: string
-  activity: ActivityKey
-}
+export const scheduleIntervalSchema = z.object({
+  day: weekDayKeySchema,
+  start: timeSchema,
+  end: timeSchema,
+  activity: activityKeySchema.exclude(["LIBRE"]),
+}).refine(interval => minutes(interval.end) > minutes(interval.start), {
+  message: "La hora de fin debe ser posterior al inicio",
+  path: ["end"],
+})
+
+export type ScheduleInterval = z.infer<typeof scheduleIntervalSchema>
+
+export const planningConfigSchema = z.object({
+  version: z.literal(1),
+  intervals: z.array(scheduleIntervalSchema).min(1).max(100),
+  rules: practiceRulesSchema,
+  holidays: z.array(z.string().date()).max(100),
+  projectionStartMonth: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/),
+  projectionMonths: z.number().int().min(1).max(12),
+}).superRefine((config, context) => {
+  const seenHolidays = new Set<string>()
+  config.holidays.forEach((holiday, index) => {
+    if (seenHolidays.has(holiday)) {
+      context.addIssue({
+        code: "custom",
+        message: "El feriado está repetido",
+        path: ["holidays", index],
+      })
+    }
+    seenHolidays.add(holiday)
+  })
+
+  for (let index = 0; index < config.intervals.length; index += 1) {
+    const current = config.intervals[index]
+    const overlaps = config.intervals.some((candidate, candidateIndex) =>
+      candidateIndex !== index &&
+      candidate.day === current.day &&
+      minutes(candidate.start) < minutes(current.end) &&
+      minutes(candidate.end) > minutes(current.start)
+    )
+    if (overlaps) {
+      context.addIssue({
+        code: "custom",
+        message: "Hay bloques superpuestos en el mismo día",
+        path: ["intervals", index],
+      })
+    }
+  }
+})
+
+export type PlanningConfig = z.infer<typeof planningConfigSchema>
 
 export interface ScheduleSlot {
   start: string
@@ -90,23 +143,22 @@ export interface ScheduleSlot {
   activities: Record<WeekDayKey, ActivityKey | null>
 }
 
-export interface ScheduleBlock extends ScheduleInterval {
+export interface ScheduleBlock {
+  day: WeekDayKey
+  start: string
+  end: string
+  activity: ActivityKey
   slots: number
   hours: number
 }
 
-const BASE_INTERVALS: ScheduleInterval[] = [
+const DEFAULT_INTERVALS: ScheduleInterval[] = [
   ...(["monday", "tuesday", "wednesday", "thursday", "friday"] as WeekDayKey[]).flatMap(
     day => [
       { day, start: "09:00", end: "12:00", activity: "INVESTIGACION" as const },
       { day, start: "12:00", end: "13:00", activity: "ALMUERZO" as const },
-      { day, start: "13:00", end: "20:30", activity: "LIBRE" as const },
     ]
   ),
-  { day: "saturday", start: "09:00", end: "13:00", activity: "CERAMICA" },
-]
-
-const WORK_INTERVALS: ScheduleInterval[] = [
   { day: "tuesday", start: "13:00", end: "15:00", activity: "CONSULTORIO CIMEL" },
   {
     day: "tuesday",
@@ -123,7 +175,17 @@ const WORK_INTERVALS: ScheduleInterval[] = [
   { day: "thursday", start: "13:00", end: "16:00", activity: "CONSULTORIO CIMEL" },
   { day: "friday", start: "13:00", end: "16:00", activity: "CONSULTORIO CIMEL" },
   { day: "friday", start: "17:00", end: "20:00", activity: "CONSULTORIO SMG" },
+  { day: "saturday", start: "09:00", end: "13:00", activity: "CERAMICA" },
 ]
+
+export const DEFAULT_PLANNING_CONFIG: PlanningConfig = {
+  version: 1,
+  intervals: DEFAULT_INTERVALS,
+  rules: DEFAULT_PRACTICE_RULES,
+  holidays: ["2026-10-12", "2026-11-23", "2026-12-07", "2026-12-08", "2026-12-25"],
+  projectionStartMonth: "2026-09",
+  projectionMonths: 4,
+}
 
 function minutes(time: string): number {
   const [hour, minute] = time.split(":").map(Number)
@@ -136,23 +198,23 @@ function timeFromMinutes(value: number): string {
   return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`
 }
 
-function activityAt(day: WeekDayKey, time: string): ActivityKey | null {
+function activityAt(
+  day: WeekDayKey,
+  time: string,
+  intervals: ScheduleInterval[]
+): ActivityKey | null {
   const minute = minutes(time)
-  const matchingWork = WORK_INTERVALS.find(
+  const matching = intervals.find(
     interval =>
       interval.day === day && minute >= minutes(interval.start) && minute < minutes(interval.end)
   )
-  if (matchingWork) return matchingWork.activity
-
-  return (
-    BASE_INTERVALS.find(
-      interval =>
-        interval.day === day && minute >= minutes(interval.start) && minute < minutes(interval.end)
-    )?.activity ?? null
-  )
+  if (matching) return matching.activity
+  return (["monday", "tuesday", "wednesday", "thursday", "friday"] as WeekDayKey[]).includes(day)
+    ? "LIBRE"
+    : null
 }
 
-export function buildScheduleSlots(): ScheduleSlot[] {
+export function buildScheduleSlots(intervals = DEFAULT_PLANNING_CONFIG.intervals): ScheduleSlot[] {
   const result: ScheduleSlot[] = []
   for (let start = minutes("09:00"); start < minutes("20:30"); start += 15) {
     const startTime = timeFromMinutes(start)
@@ -160,7 +222,7 @@ export function buildScheduleSlots(): ScheduleSlot[] {
       start: startTime,
       end: timeFromMinutes(start + 15),
       activities: Object.fromEntries(
-        WEEK_DAYS.map(day => [day.key, activityAt(day.key, startTime)])
+        WEEK_DAYS.map(day => [day.key, activityAt(day.key, startTime, intervals)])
       ) as Record<WeekDayKey, ActivityKey | null>,
     })
   }
@@ -319,21 +381,6 @@ export interface MonthProjection {
   total: number
 }
 
-export const PROJECTION_MONTHS = [
-  { year: 2026, month: 9, label: "Septiembre 2026" },
-  { year: 2026, month: 10, label: "Octubre 2026" },
-  { year: 2026, month: 11, label: "Noviembre 2026" },
-  { year: 2026, month: 12, label: "Diciembre 2026" },
-] as const
-
-export const PROJECTION_HOLIDAYS = new Set([
-  "2026-10-12",
-  "2026-11-23",
-  "2026-12-07",
-  "2026-12-08",
-  "2026-12-25",
-])
-
 function isoDate(year: number, month: number, day: number): string {
   return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`
 }
@@ -343,7 +390,7 @@ export function projectMonth(
   month: number,
   label: string,
   rules = DEFAULT_PRACTICE_RULES,
-  holidays = PROJECTION_HOLIDAYS,
+  holidays = new Set(DEFAULT_PLANNING_CONFIG.holidays),
   slots = buildScheduleSlots()
 ): MonthProjection {
   const daysInMonth = new Date(Date.UTC(year, month, 0)).getUTCDate()
@@ -397,7 +444,20 @@ export function projectMonth(
   }
 }
 
-export function buildMonthlyProjections(): MonthProjection[] {
-  return PROJECTION_MONTHS.map(month => projectMonth(month.year, month.month, month.label))
-}
+export function buildMonthlyProjections(config = DEFAULT_PLANNING_CONFIG): MonthProjection[] {
+  const [startYear, startMonth] = config.projectionStartMonth.split("-").map(Number)
+  const slots = buildScheduleSlots(config.intervals)
+  const holidays = new Set(config.holidays)
 
+  return Array.from({ length: config.projectionMonths }, (_, index) => {
+    const date = new Date(Date.UTC(startYear, startMonth - 1 + index, 1))
+    const year = date.getUTCFullYear()
+    const month = date.getUTCMonth() + 1
+    const label = new Intl.DateTimeFormat("es-AR", {
+      month: "long",
+      year: "numeric",
+      timeZone: "UTC",
+    }).format(date)
+    return projectMonth(year, month, label, config.rules, holidays, slots)
+  })
+}

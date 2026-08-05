@@ -37,6 +37,7 @@ export function isSafeAuditMetadata(metadata: SecurityAuditMetadata): boolean {
     if (key === "config_key") {
       return value === "doctor" || value === "locations"
         || value === "whatsapp_settings" || value === "auto_publish_settings"
+        || value === "practice_planning"
     }
     if (key === "format") return value === "csv"
     if (key === "row_count") return Number.isInteger(value) && Number(value) >= 0

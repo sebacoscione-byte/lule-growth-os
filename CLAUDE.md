@@ -1778,12 +1778,12 @@ dato que hoy no se fetchea.
 
 ## Agenda e ingresos (2026-08-05)
 
-`/planificacion` muestra la semana profesional en 46 franjas de 15 minutos, el resumen de carga e
-ingresos por institución y la proyección calendario septiembre–diciembre de 2026. El modelo fue
-trasladado desde las hojas `Horario 15 min` e `Ingresos por institución` del Sheet
-**ORGANIGRAMA POST FELLOW**. Los valores no se sincronizan en vivo: horario, aranceles y feriados
-se mantienen en `src/lib/practice-planning.ts`, con resultados de referencia cubiertos por
-`practice-planning.test.ts`. Alcance, supuestos y totales: `docs/AGENDA_INGRESOS.md`.
+`/planificacion` reemplaza la planilla externa: permite editar y persistir bloques semanales,
+aranceles, reglas, feriados y período de proyección, y recalcula carga e ingresos por institución.
+No existe conexión ni sincronización con Google Sheets. La configuración vive en la tabla
+`practice_planning`, con RLS forzado; `owner` y `doctor` pueden leer y guardar con MFA, validación
+de superposiciones y auditoría. Los defaults de `src/lib/practice-planning.ts` sólo sirven como
+semilla inicial y la migración nunca reemplaza datos existentes. Alcance: `docs/AGENDA_INGRESOS.md`.
 
 La pantalla es informativa y operativa. No reserva turnos, no confirma disponibilidad y no usa
 datos de pacientes ni cobros reales.

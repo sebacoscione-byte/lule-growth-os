@@ -169,6 +169,31 @@ create trigger app_config_before_update
   before update on app_config
   for each row execute function log_app_config_change();
 
+-- Planificación profesional editable. No contiene pacientes ni cobros reales.
+create table if not exists practice_planning (
+  id text primary key,
+  config jsonb not null,
+  updated_at timestamptz not null default now(),
+  updated_by uuid
+);
+
+alter table practice_planning enable row level security;
+alter table practice_planning force row level security;
+
+create policy "staff_read_practice_planning" on practice_planning for select to authenticated
+  using (id = 'default' and security_role_allowed(array['owner','doctor'], false));
+create policy "clinical_staff_insert_practice_planning" on practice_planning for insert to authenticated
+  with check (id = 'default' and security_role_allowed(array['owner','doctor'], true));
+create policy "clinical_staff_update_practice_planning" on practice_planning for update to authenticated
+  using (id = 'default' and security_role_allowed(array['owner','doctor'], true))
+  with check (id = 'default' and security_role_allowed(array['owner','doctor'], true));
+create policy "service_role_all_practice_planning" on practice_planning for all to service_role
+  using (true) with check (true);
+
+revoke all on table practice_planning from public, anon, authenticated;
+grant select, insert, update on table practice_planning to authenticated;
+grant all on table practice_planning to service_role;
+
 -- ============================================================
 -- AI AUDIT + CACHE
 -- ============================================================
@@ -495,6 +520,10 @@ create trigger leads_updated_at
 
 create trigger config_updated_at
   before update on app_config
+  for each row execute function update_updated_at_column();
+
+create trigger practice_planning_updated_at
+  before update on practice_planning
   for each row execute function update_updated_at_column();
 
 create trigger checklist_updated_at

@@ -2,15 +2,14 @@
 
 ## Alcance
 
-`/planificacion` traslada a la app el modelo operativo del Google Sheet
-**ORGANIGRAMA POST FELLOW**, en particular las hojas `Horario 15 min` e
-`Ingresos por institución`. Es una proyección interna: no agenda turnos, no confirma
-disponibilidad y no representa cobros reales.
+`/planificacion` es la fuente operativa para gestionar la agenda semanal y proyectar ingresos por
+institución. Reemplaza el archivo externo: no lee, escribe ni sincroniza ningún Google Sheet.
+Es una proyección interna; no agenda turnos, no confirma disponibilidad y no representa cobros
+reales.
 
-La versión actual está codificada en la app a partir del Sheet consultado el 2026-08-05. El
-enlace al original aparece en la cabecera de la sección, pero no existe sincronización automática:
-si cambian horarios, aranceles o feriados en el Sheet, también hay que actualizar
-`src/lib/practice-planning.ts` y sus pruebas.
+Los horarios, aranceles, feriados y meses de proyección se editan desde la propia pantalla y se
+guardan en Supabase. Los valores que existían al crear la sección se usan sólo como semilla inicial;
+la migración usa `ON CONFLICT DO NOTHING` y nunca vuelve a pisar una configuración guardada.
 
 ## Horario semanal
 
@@ -47,8 +46,9 @@ totales escritos a mano.
 
 ## Proyección calendario
 
-La proyección exacta replica septiembre–diciembre de 2026 y excluye los feriados del Sheet:
-12/10, 23/11, 07/12, 08/12 y 25/12. Los totales esperados son:
+La semilla inicial proyecta septiembre–diciembre de 2026 y excluye 12/10, 23/11, 07/12, 08/12 y
+25/12. Tanto el período como las fechas se pueden modificar desde la pantalla. Los totales de
+regresión iniciales son:
 
 | Mes | Días hábiles | Total |
 | --- | ---: | ---: |
@@ -60,8 +60,10 @@ La proyección exacta replica septiembre–diciembre de 2026 y excluye los feria
 ## Implementación y verificación
 
 - `src/lib/practice-planning.ts`: horario, reglas y cálculos derivados.
-- `src/lib/practice-planning.test.ts`: regresiones contra los resultados del Sheet.
+- `src/lib/practice-planning.test.ts`: regresiones del cálculo y de configuraciones editadas.
 - `src/app/(app)/planificacion/page.tsx`: presentación responsive y accesible.
+- `src/app/api/planning/route.ts`: lectura y guardado autenticado con validación y auditoría.
+- `supabase/migrations/20260805_practice_planning.sql`: almacenamiento singleton con RLS forzado.
 - La sección está dentro del layout autenticado y requiere los mismos controles de rol/MFA que el
   resto del CRM.
-
+- Sólo `owner` y `doctor` pueden leer; guardar exige MFA y cada cambio deja un evento de auditoría.

@@ -1,8 +1,10 @@
 import {
+  DEFAULT_PLANNING_CONFIG,
   buildMonthlyProjections,
   buildScheduleBlocks,
   buildScheduleSlots,
   summarizeInstitutions,
+  planningConfigSchema,
 } from "./practice-planning"
 
 describe("practice planning", () => {
@@ -86,5 +88,40 @@ describe("practice planning", () => {
       5_140_000,
       5_170_000,
     ])
+  })
+
+  test("recalcula ingresos y meses cuando cambia la configuración", () => {
+    const edited = {
+      ...DEFAULT_PLANNING_CONFIG,
+      rules: { ...DEFAULT_PLANNING_CONFIG.rules, privateConsultationValue: 70_000 },
+      projectionStartMonth: "2027-01",
+      projectionMonths: 2,
+      holidays: [],
+    }
+    const summaries = summarizeInstitutions(buildScheduleSlots(edited.intervals), edited.rules)
+    const projections = buildMonthlyProjections(edited)
+
+    expect(summaries.find(row => row.key === "cimel")?.weeklyIncome).toBe(645_000)
+    expect(projections).toHaveLength(2)
+    expect(projections.map(month => [month.year, month.month])).toEqual([[2027, 1], [2027, 2]])
+  })
+
+  test("rechaza bloques superpuestos y feriados repetidos", () => {
+    const parsed = planningConfigSchema.safeParse({
+      ...DEFAULT_PLANNING_CONFIG,
+      intervals: [
+        ...DEFAULT_PLANNING_CONFIG.intervals,
+        { day: "friday", start: "13:15", end: "14:00", activity: "CONSULTORIO SMG" },
+      ],
+      holidays: ["2026-10-12", "2026-10-12"],
+    })
+
+    expect(parsed.success).toBe(false)
+    if (!parsed.success) {
+      expect(parsed.error.issues.map(issue => issue.message)).toEqual(expect.arrayContaining([
+        "Hay bloques superpuestos en el mismo día",
+        "El feriado está repetido",
+      ]))
+    }
   })
 })
