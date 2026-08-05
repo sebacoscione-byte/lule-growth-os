@@ -1,4 +1,6 @@
 import {
+  VIDEO_PROMPT_RULES_V1,
+  VIDEO_VISUAL_IDENTITY_RULES,
   VEO_V2_NEGATIVE_PROMPT,
   buildFallbackVideoPrompt,
   buildFallbackVideoReferencePrompt,
@@ -35,6 +37,14 @@ describe("versiones del prompt de Veo", () => {
     expect(prompt).toMatch(/adult Latina patient/i)
     expect(prompt).toMatch(/chest\/thorax/i)
     expect(prompt).toMatch(/never on abdomen, belly or stomach/i)
+  })
+
+  it("ubica estetoscopio y manguito de presión en el área corporal correcta", () => {
+    expect(VIDEO_PROMPT_RULES_V1).toMatch(/estetoscopio.*pecho\/torax.*nunca abdomen/i)
+    expect(VIDEO_PROMPT_RULES_V1).toMatch(/manguito de presion.*brazo.*encima del codo/i)
+    expect(VIDEO_VISUAL_IDENTITY_RULES).toMatch(/manguito de presion de brazo.*encima del codo/i)
+    expect(VEO_V2_NEGATIVE_PROMPT).toMatch(/upper-arm blood pressure cuff placed on wrist/i)
+    expect(VEO_V2_NEGATIVE_PROMPT).toMatch(/medical instrument placed on the wrong body area/i)
   })
 
   it("V2 Directa describe toda la escena sin fotograma inicial", () => {
