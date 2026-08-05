@@ -22,6 +22,7 @@ export async function publishApprovedItem(
 ): Promise<{ item: ContentItem; allPublished: boolean }> {
   const result: NonNullable<ContentItem["auto_publish_result"]> = { ...item.auto_publish_result }
   let instagramMediaId: string | null | undefined
+  let instagramPublishedAt: string | undefined
 
   if (channelsToTry.includes("instagram")) {
     try {
@@ -54,6 +55,7 @@ export async function publishApprovedItem(
         instagramMediaId = published.mediaId
       }
       result.instagram = "published"
+      instagramPublishedAt = new Date().toISOString()
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
       console.error(`[content-publish] item=${item.id} canal=instagram: ${message}`)
@@ -73,14 +75,16 @@ export async function publishApprovedItem(
   }
 
   const allPublished = channelsToTry.length > 0 && channelsToTry.every(channel => result[channel] === "published")
+  const updatedAt = new Date().toISOString()
   const nextItem: ContentItem = {
     ...item,
     auto_publish_result: result,
     status: allPublished ? "published" : item.status,
-    updated_at: new Date().toISOString(),
+    updated_at: updatedAt,
     // Se guarda el mismo media_id ante una republicación evergreen (repeat_interval_days): siempre
     // corresponde al post más reciente, que es el que va a seguir acumulando insights.
     ...(instagramMediaId ? { instagram_media_id: instagramMediaId } : {}),
+    ...(instagramPublishedAt ? { published_at: instagramPublishedAt } : {}),
   }
   return { item: nextItem, allPublished }
 }

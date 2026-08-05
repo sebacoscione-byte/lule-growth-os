@@ -1,4 +1,16 @@
-# EN CURSO (2026-08-04) — cronograma editorial de Instagram basado en insights reales
+# EN CURSO (2026-08-04) — historial de rendimiento de Instagram
+
+- [x] Cerrar el cronograma editorial del PR #207 y aplicar la cadencia recomendada en producción.
+- [x] Auditar la captura actual y probar las métricas realmente expuestas por la cuenta conectada.
+- [x] Crear el historial idempotente de snapshots y registrar `published_at` confiable.
+- [x] Capturar métricas disponibles sin convertir ausencias o rechazos de Meta en ceros.
+- [x] Mostrar comparables de 24 h, 72 h y 7 días en la biblioteca de contenido.
+- [x] Documentar; ejecutar lint, 105 suites/971 tests y build; validar visualmente y pasar 5 E2E autenticados con datos reales.
+- [ ] Publicar por rama + PR, verificar CI/preview y mergear.
+
+---
+
+# CERRADO (2026-08-04) — cronograma editorial de Instagram basado en insights reales
 
 - [x] Auditar cron, configuración, colas, reintentos, insights actuales y límites vigentes de Vercel.
 - [x] Confirmar que Vercel Hobby permite 100 cron jobs por proyecto, una corrida diaria por job y precisión horaria de ±59 minutos.
@@ -7,7 +19,7 @@
 - [x] Mostrar por formato estado, días, ventana ART, próxima ventana, cola y último resultado.
 - [x] Cubrir zona horaria, cruce de medianoche UTC, migración, validación y reintentos con tests.
 - [x] Actualizar documentación, ejecutar lint/tests/build y verificar visualmente el preview.
-- [ ] Publicar por rama + PR, validar CI/Vercel y mergear.
+- [x] Publicado y mergeado como PR #207; CI, E2E, producción y configuración real verificados.
 
 ---
 

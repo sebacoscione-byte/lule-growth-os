@@ -225,7 +225,7 @@ create table if not exists weekly_reports (
 );
 
 -- ============================================================
--- SNAPSHOTS MULTICANAL (cron diario publish-content)
+-- SNAPSHOTS MULTICANAL (cron daily-maintenance)
 -- ============================================================
 create table if not exists instagram_follower_snapshots (
   id uuid default uuid_generate_v4() primary key,
@@ -236,6 +236,30 @@ create table if not exists instagram_follower_snapshots (
   link_taps int,
   total_interactions int,
   created_at timestamptz not null default now()
+);
+
+create table if not exists instagram_media_insight_snapshots (
+  id uuid default uuid_generate_v4() primary key,
+  item_id text not null,
+  instagram_media_id text not null,
+  published_at timestamptz not null,
+  captured_at timestamptz not null,
+  capture_date date not null,
+  hours_since_publish int not null check (hours_since_publish >= 0),
+  reach bigint,
+  views bigint,
+  likes bigint,
+  comments bigint,
+  saved bigint,
+  shares bigint,
+  follows bigint,
+  profile_visits bigint,
+  total_watch_time_ms bigint,
+  average_watch_time_ms bigint,
+  reels_skip_rate numeric,
+  raw_metrics_json jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
 );
 
 create table if not exists google_business_snapshots (
@@ -423,6 +447,8 @@ create index if not exists landing_events_session_id_idx on landing_events(sessi
 create index if not exists landing_events_created_type_session_idx on landing_events(created_at desc, event_type, session_id);
 create unique index if not exists weekly_reports_week_start_idx on weekly_reports(week_start);
 create unique index if not exists instagram_follower_snapshots_captured_on_idx on instagram_follower_snapshots(captured_on);
+create unique index if not exists instagram_media_insight_snapshots_media_day_idx on instagram_media_insight_snapshots(instagram_media_id, capture_date);
+create index if not exists instagram_media_insight_snapshots_item_time_idx on instagram_media_insight_snapshots(item_id, captured_at desc);
 create unique index if not exists google_business_snapshots_captured_on_idx on google_business_snapshots(captured_on);
 
 -- ============================================================
@@ -513,6 +539,14 @@ create policy "service_role_write_instagram_follower_snapshots"
 
 create policy "authenticated_read_instagram_follower_snapshots"
   on instagram_follower_snapshots for select to authenticated using (true);
+
+alter table instagram_media_insight_snapshots enable row level security;
+
+create policy "service_role_write_instagram_media_insight_snapshots"
+  on instagram_media_insight_snapshots for all to service_role using (true) with check (true);
+
+create policy "authenticated_read_instagram_media_insight_snapshots"
+  on instagram_media_insight_snapshots for select to authenticated using (true);
 
 alter table google_business_snapshots enable row level security;
 

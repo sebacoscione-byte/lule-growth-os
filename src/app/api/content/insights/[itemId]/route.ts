@@ -3,6 +3,8 @@ import { createClient } from "@/lib/supabase/server"
 import { authorizeStaff } from "@/lib/staff-authz"
 import { readContentItems, writeContentItems } from "@/lib/content-pipeline"
 import { getValidToken, getInstagramMediaInsights } from "@/lib/instagram-business"
+import { normalizeInstagramMediaInsights, persistInstagramInsightSnapshot } from "@/lib/content-insights"
+import { getServiceDb } from "@/lib/supabase/service"
 
 const CONTENT_ROLES = ["owner", "doctor"] as const
 
@@ -33,12 +35,22 @@ export async function GET(
 
   try {
     const insights = await getInstagramMediaInsights(token, item.instagram_media_id)
-    const snapshot = { ...insights, fetched_at: new Date().toISOString() }
+    const capturedAt = new Date()
+    const snapshot = normalizeInstagramMediaInsights(insights, capturedAt.toISOString())
     await writeContentItems(
       supabase,
-      items.map(existing => existing.id === itemId ? { ...existing, instagram_insights: snapshot } : existing)
+      items.map(existing => existing.id === itemId ? {
+        ...existing,
+        published_at: existing.published_at ?? existing.manual_publish_note?.marked_at ?? existing.updated_at,
+        instagram_insights: snapshot,
+      } : existing)
     )
-    return NextResponse.json({ insights })
+    try {
+      await persistInstagramInsightSnapshot(getServiceDb(), item, insights, capturedAt)
+    } catch (historyError) {
+      console.error(`[content/insights] history item=${itemId}: ${historyError instanceof Error ? historyError.message : String(historyError)}`)
+    }
+    return NextResponse.json({ insights: snapshot })
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
     console.error(`[content/insights] item=${itemId} media=${item.instagram_media_id}: ${message}`)

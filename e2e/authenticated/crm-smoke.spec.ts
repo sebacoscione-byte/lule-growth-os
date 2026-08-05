@@ -40,6 +40,21 @@ test("el cronograma editorial muestra ventanas reales en horario argentino", asy
   await expect(page.getByText(/Próxima ventana estimada:/).first()).toBeVisible()
 })
 
+test("una pieza con insights muestra las ventanas históricas sin inventar faltantes", async () => {
+  await page.goto("/contenido/instagram")
+  await page.getByRole("tab", { name: "Biblioteca" }).click()
+
+  const history = page.locator("details").filter({ hasText: "Evolución: 24 h · 72 h · 7 días" }).first()
+  if (await history.count() === 0) return // Un entorno nuevo puede no tener publicaciones vía API todavía.
+
+  await expect(history.locator("summary")).toBeVisible()
+  await history.locator("summary").click()
+  await expect(history.getByText("24 h", { exact: true })).toBeVisible()
+  await expect(history.getByText("72 h", { exact: true })).toBeVisible()
+  await expect(history.getByText("7 días", { exact: true })).toBeVisible()
+  await expect(history.getByText(/no disponible|sin snapshot comparable/i).first()).toBeVisible()
+})
+
 test("abrir una conversación del inbox", async () => {
   await page.goto("/inbox")
   const inboxHeading = page.getByRole("heading", { name: "Inbox", level: 2 })

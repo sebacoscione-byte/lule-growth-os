@@ -215,28 +215,47 @@ export async function getInstagramAccountInsights(token: string): Promise<Instag
   }
 }
 
-export type InstagramMediaInsightMetric = "reach" | "likes" | "comments" | "saved" | "shares"
+export type InstagramMediaInsightMetric =
+  | "reach"
+  | "views"
+  | "likes"
+  | "comments"
+  | "saved"
+  | "shares"
+  | "follows"
+  | "profile_visits"
+  | "ig_reels_video_view_total_time"
+  | "ig_reels_avg_watch_time"
+  | "reels_skip_rate"
 
 export interface InstagramMediaInsights {
   reach: number | null
+  views: number | null
   likes: number | null
   comments: number | null
   saved: number | null
   shares: number | null
+  follows: number | null
+  profile_visits: number | null
+  total_watch_time_ms: number | null
+  average_watch_time_ms: number | null
+  reels_skip_rate: number | null
+  /** Respuestas nativas por nombre de métrica. Nunca incluye URL, token ni headers. */
+  rawMetrics: Record<string, unknown>
 }
 
 async function getMediaInsightMetric(
   token: string,
   mediaId: string,
   metric: InstagramMediaInsightMetric
-): Promise<number | null> {
+): Promise<{ value: number | null; raw: unknown }> {
   const params = new URLSearchParams({ metric, access_token: token })
   const res = await fetch(`${GRAPH_BASE}/${mediaId}/insights?${params}`)
   const data = await res.json() as InstagramInsightResponse
   if (!res.ok || data.error) {
     throw new Error(data.error?.message || `IG media insights error ${res.status}`)
   }
-  return parseInstagramInsightValue(data)
+  return { value: parseInstagramInsightValue(data), raw: data.data ?? [] }
 }
 
 /**
@@ -246,17 +265,43 @@ async function getMediaInsightMetric(
  * que eso deba ocultar las demás.
  */
 export async function getInstagramMediaInsights(token: string, mediaId: string): Promise<InstagramMediaInsights> {
-  const metrics: InstagramMediaInsightMetric[] = ["reach", "likes", "comments", "saved", "shares"]
+  const metrics: InstagramMediaInsightMetric[] = [
+    "reach",
+    "views",
+    "likes",
+    "comments",
+    "saved",
+    "shares",
+    "follows",
+    "profile_visits",
+    "ig_reels_video_view_total_time",
+    "ig_reels_avg_watch_time",
+    "reels_skip_rate",
+  ]
   const results = await Promise.all(metrics.map(async metric => {
     try {
       return await getMediaInsightMetric(token, mediaId, metric)
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
       console.error(`[instagram-media-insights] media=${mediaId} metric=${metric}: ${message}`)
-      return null
+      return { value: null, raw: null }
     }
   }))
-  return { reach: results[0], likes: results[1], comments: results[2], saved: results[3], shares: results[4] }
+  const rawMetrics = Object.fromEntries(metrics.map((metric, index) => [metric, results[index].raw]))
+  return {
+    reach: results[0].value,
+    views: results[1].value,
+    likes: results[2].value,
+    comments: results[3].value,
+    saved: results[4].value,
+    shares: results[5].value,
+    follows: results[6].value,
+    profile_visits: results[7].value,
+    total_watch_time_ms: results[8].value,
+    average_watch_time_ms: results[9].value,
+    reels_skip_rate: results[10].value,
+    rawMetrics,
+  }
 }
 
 interface BusinessDiscoveryData {

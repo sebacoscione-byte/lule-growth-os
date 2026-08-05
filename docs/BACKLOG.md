@@ -1386,12 +1386,12 @@ público para pedir turno.
       captura el `mediaId` que ya devolvía `publishContainer()` y lo guarda como
       `instagram_media_id` en la pieza (`content_pipeline`, mismo mecanismo que el resto de los
       campos — no hizo falta tabla nueva). `getInstagramMediaInsights()` en `instagram-business.ts`
-      pide reach/likes/comments/guardados/compartidos igual que `getInstagramAccountInsights()`
-      (cada métrica por separado, para que una no habilitada no tape las demás). Se piden **en
-      vivo, a pedido** (botón "Ver insights de Instagram" en cada card publicada de Biblioteca,
-      `GET /api/content/insights/[itemId]`) en vez de guardar un historial — evita pegarle a la API
-      de Meta en cada carga de la página. Solo disponible para piezas publicadas por este sistema
-      desde ahora en adelante; las publicadas antes no tienen `instagram_media_id` guardado.
+      pide cada métrica por separado, para que una no habilitada no tape las demás. Desde el PR 2 de
+      agosto 2026, además de la actualización en vivo del botón de cada card, `daily-maintenance`
+      guarda un historial diario en `instagram_media_insight_snapshots`; la carga de Biblioteca lee
+      esa tabla y no vuelve a consultar Meta. Solo las piezas con `instagram_media_id` pueden tener
+      insights nativos; las publicaciones manuales o anteriores a ese campo conservan únicamente la
+      atribución propia por `utm_content`.
       Verificado con `npm run build`/`lint`/`test` (820/820) — no se pudo probar contra la cuenta
       real de Instagram en este entorno (sin credenciales de Meta acá).
 - [x] **Tendencia de rating/reseñas de Google + Performance API** (2026-07-13): rating y cantidad
@@ -1882,8 +1882,11 @@ resubió manualmente a Instagram. No quedó ningún pendiente sobre esa pieza pu
 
 - [x] PR 1: separar mantenimiento, historias y feed; usar ventanas ART explícitas; migrar la
       configuración legacy; validar slots/superposiciones y mostrar próxima ventana por formato.
-- [ ] PR 2: persistir snapshots históricos de insights por pieza a 24 h, 72 h y 7 días, incluyendo
-      `published_at` confiable y métricas de reels realmente expuestas por Meta.
+- [x] PR 2: snapshots históricos por pieza cerca de 24 h, 72 h y 7 días, `published_at` confiable y
+      métricas de reels realmente expuestas por Meta. `daily-maintenance` hace upsert por media+día
+      argentino; faltantes/rechazos quedan `null`; la Biblioteca muestra la evolución plegable con
+      tolerancia ±18 h. La migración `20260804_instagram_media_insight_snapshots.sql` fue validada con
+      rollback y aplicada atómicamente en producción. Detalle en `docs/INSTAGRAM_INSIGHTS.md`.
 - [ ] PR 3: unir contenido, UTM, eventos, conversaciones y leads; agregar comparaciones por formato,
       día/hora/objetivo y recomendaciones con umbral mínimo de muestra y aprobación manual.
 

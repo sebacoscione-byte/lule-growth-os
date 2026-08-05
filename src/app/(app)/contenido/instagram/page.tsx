@@ -22,8 +22,7 @@ import { parseAiJson } from "@/lib/parse-ai-json"
 import { truncateForImagePlate } from "@/lib/content-text"
 import { AUTO_PUBLISH_TIMEZONE, AUTO_PUBLISH_WINDOW_BY_FORMAT, canStillPublishToday, DEFAULT_AUTO_PUBLISH_SETTINGS, estimateAutoPublishDrainDays, estimateAutoPublishDateForPosition, estimateRepeatEndDate, findRecentDuplicateTopic, getScheduledDays, getZonedScheduleParts, pickNextPublishableItems, isReorderableInQueue, normalizeAutoPublishSettings, reorderableQueuePositions } from "@/lib/content-pipeline"
 import { buildFallbackVideoPrompt, getVeoPromptQualityIssues } from "@/lib/video-prompt"
-import type { AutoPublishSettings, AutoPublishTrackSettings, ContentItem, ContentObjective, ContentSlide, ContentSource, ContentStatus, ContentVideoBrandScores, ContentVideoScores, VideoGenerationVersion } from "@/types"
-import type { InstagramMediaInsights } from "@/lib/instagram-business"
+import type { AutoPublishSettings, AutoPublishTrackSettings, ContentInstagramInsights, ContentItem, ContentObjective, ContentSlide, ContentSource, ContentStatus, ContentVideoBrandScores, ContentVideoScores, InstagramInsightWindow, InstagramMediaInsightSnapshot, VideoGenerationVersion } from "@/types"
 import { CONTENT_OBJECTIVE_GOALS, CONTENT_OBJECTIVE_LABELS, WEEKDAY_OPTIONS } from "@/types"
 
 const IS_MANUAL_MODE = process.env.NEXT_PUBLIC_AI_MODE !== "gemini_api"
@@ -861,6 +860,51 @@ function AutoPublishTrackCard({
   )
 }
 
+const INSIGHT_WINDOW_LABELS: Array<[InstagramInsightWindow, string]> = [
+  ["24h", "24 h"],
+  ["72h", "72 h"],
+  ["7d", "7 días"],
+]
+
+function insightMetric(value: number | null, label: string) {
+  return value == null ? `${label}: no disponible` : `${value.toLocaleString("es-AR")} ${label}`
+}
+
+function InsightHistory({ windows }: {
+  windows: Partial<Record<InstagramInsightWindow, InstagramMediaInsightSnapshot>> | undefined
+}) {
+  return (
+    <details className="group mt-1 rounded-md border border-gray-100 bg-gray-50/70 p-2">
+      <summary className="cursor-pointer font-medium text-gray-700 marker:text-gray-400">
+        Evolución: 24 h · 72 h · 7 días
+      </summary>
+      <div className="mt-1 space-y-1">
+        {INSIGHT_WINDOW_LABELS.map(([key, label]) => {
+          const snapshot = windows?.[key]
+          return (
+            <div key={key} className="flex items-start gap-2 rounded bg-white px-2 py-1.5 ring-1 ring-gray-100">
+              <p className="w-12 shrink-0 font-medium text-gray-700">{label}</p>
+              {snapshot ? (
+                <div>
+                  <p>{insightMetric(snapshot.reach, "alcance")}</p>
+                  <p>{insightMetric(snapshot.views, "vistas")}</p>
+                  <p>{insightMetric(snapshot.saved, "guardados")} · {insightMetric(snapshot.shares, "compartidos")}</p>
+                  {snapshot.total_watch_time_ms != null && (
+                    <p>{Math.round(snapshot.total_watch_time_ms / 1000).toLocaleString("es-AR")} s reproducidos</p>
+                  )}
+                </div>
+              ) : (
+                <p className="text-gray-400">Todavía sin snapshot comparable</p>
+              )}
+            </div>
+          )
+        })}
+      </div>
+      <p className="mt-1 text-[11px] text-gray-400">Se toma el snapshot más cercano dentro de ±18 horas; un dato ausente de Meta se muestra como no disponible.</p>
+    </details>
+  )
+}
+
 // ---------------------------------------------------------------------------
 // Main page
 // ---------------------------------------------------------------------------
@@ -883,7 +927,7 @@ export default function ContentStudioPage() {
   const [generating, setGenerating] = useState(false)
   const [working, setWorking] = useState<string | null>(null)
   const [deletingArchived, setDeletingArchived] = useState(false)
-  const [insights, setInsights] = useState<Record<string, InstagramMediaInsights | "loading" | "error">>({})
+  const [insights, setInsights] = useState<Record<string, ContentInstagramInsights | "loading" | "error">>({})
   const [error, setError] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
   const [tab, setTab] = useState("crear")
@@ -2108,19 +2152,32 @@ export default function ContentStudioPage() {
                       // Si todavía no se pidió de nuevo en esta sesión, mostramos el último snapshot
                       // guardado (se actualiza solo, todos los días, en el cron -- ver
                       // src/lib/content-insights.ts) en vez de obligar a clickear para ver algo.
-                      const stats: InstagramMediaInsights | null = liveStats ?? item.instagram_insights ?? null
+                      const stats: ContentInstagramInsights | null = liveStats ?? item.instagram_insights ?? null
                       return (
                         <div className="text-xs text-gray-500 space-y-0.5">
                           {stats && (
-                            <p>
-                              {[
-                                stats.reach != null && `${stats.reach} alcance`,
-                                stats.likes != null && `${stats.likes} me gusta`,
-                                stats.comments != null && `${stats.comments} comentarios`,
-                                stats.saved != null && `${stats.saved} guardados`,
-                                stats.shares != null && `${stats.shares} compartidos`,
-                              ].filter(Boolean).join(" · ") || "Instagram no devolvió datos para este post."}
-                            </p>
+                            <>
+                              <p>
+                                {[
+                                  stats.reach != null && `${stats.reach} alcance`,
+                                  stats.views != null && `${stats.views} vistas`,
+                                  stats.likes != null && `${stats.likes} me gusta`,
+                                  stats.comments != null && `${stats.comments} comentarios`,
+                                  stats.saved != null && `${stats.saved} guardados`,
+                                  stats.shares != null && `${stats.shares} compartidos`,
+                                ].filter(Boolean).join(" · ") || "Instagram no devolvió datos para esta pieza."}
+                              </p>
+                              {(stats.follows != null || stats.profile_visits != null || stats.reels_skip_rate != null || stats.average_watch_time_ms != null) && (
+                                <p>
+                                  {[
+                                    stats.follows != null && `${stats.follows} seguidores obtenidos`,
+                                    stats.profile_visits != null && `${stats.profile_visits} visitas al perfil`,
+                                    stats.average_watch_time_ms != null && `${(stats.average_watch_time_ms / 1000).toFixed(1)} s promedio`,
+                                    stats.reels_skip_rate != null && `${stats.reels_skip_rate.toLocaleString("es-AR")} % skip rate`,
+                                  ].filter(Boolean).join(" · ")}
+                                </p>
+                              )}
+                            </>
                           )}
                           <Button
                             type="button"
@@ -2140,6 +2197,7 @@ export default function ContentStudioPage() {
                               ? `Actualizar (guardado ${new Date(item.instagram_insights.fetched_at).toLocaleDateString("es-AR")})`
                               : "Ver insights de Instagram"}
                           </Button>
+                          <InsightHistory windows={item.instagram_insight_windows} />
                         </div>
                       )
                     })()}
