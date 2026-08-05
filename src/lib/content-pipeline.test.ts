@@ -3,7 +3,8 @@ import {
   estimateAutoPublishDrainDays, estimateAutoPublishDateForPosition, pickNextPublishableItem,
   pickNextPublishableItems, moveItemInQueue, resolveChannelsToPublish, DEFAULT_AUTO_PUBLISH_SETTINGS,
   isRepeatDue, findRecentDuplicateTopic, estimateRepeatEndDate, isReorderableInQueue,
-  reorderableQueuePositions,
+  reorderableQueuePositions, autoPublishSettingsSchema, getZonedScheduleParts,
+  isWithinScheduledWindow, normalizeAutoPublishSettings,
 } from "@/lib/content-pipeline"
 import type { AutoPublishTrackSettings, ContentItem } from "@/types"
 
@@ -35,63 +36,73 @@ function track(overrides: Partial<AutoPublishTrackSettings> = {}): AutoPublishTr
   return { ...DEFAULT_AUTO_PUBLISH_SETTINGS.post, ...overrides }
 }
 
+function slots(days: number[], localTime = "19:00") {
+  return days.map(day => ({ day_of_week: day, local_time: localTime }))
+}
+
 describe("shouldRunAutoPublish", () => {
   // 2026-07-10 = viernes (5), 2026-07-07 = martes (2), 2026-07-15 = miercoles (3)
   it("no corre si esta deshabilitado", () => {
-    expect(shouldRunAutoPublish(track({ enabled: false, days_of_week: [5] }), new Date("2026-07-10T09:00:00.000Z"))).toBe(false)
+    expect(shouldRunAutoPublish(track({ enabled: false, schedule_slots: slots([5]) }), new Date("2026-07-10T22:30:00.000Z"))).toBe(false)
   })
 
   it("no corre si no eligio ningun dia de la semana", () => {
-    const now = new Date("2026-07-10T09:00:00.000Z")
-    expect(shouldRunAutoPublish(track({ enabled: true, days_of_week: [] }), now)).toBe(false)
+    const now = new Date("2026-07-10T22:30:00.000Z")
+    expect(shouldRunAutoPublish(track({ enabled: true, schedule_slots: [] }), now)).toBe(false)
   })
 
   it("no corre si hoy no es uno de los dias elegidos", () => {
-    const now = new Date("2026-07-10T09:00:00.000Z") // viernes
-    const t = track({ enabled: true, days_of_week: [2] }) // solo martes
+    const now = new Date("2026-07-10T22:30:00.000Z") // viernes 19:30 ART
+    const t = track({ enabled: true, schedule_slots: slots([2]) }) // solo martes
     expect(shouldRunAutoPublish(t, now)).toBe(false)
   })
 
   it("corre si hoy es uno de los dias elegidos y nunca publico antes", () => {
-    const now = new Date("2026-07-10T09:00:00.000Z") // viernes
-    const t = track({ enabled: true, days_of_week: [5], last_published_at: null })
+    const now = new Date("2026-07-10T22:30:00.000Z") // viernes 19:30 ART
+    const t = track({ enabled: true, schedule_slots: slots([5]), last_published_at: null })
     expect(shouldRunAutoPublish(t, now)).toBe(true)
   })
 
   it("no corre si ya publico hoy mismo (evita duplicar si el cron corre dos veces)", () => {
-    const now = new Date("2026-07-10T09:00:00.000Z") // viernes
-    const t = track({ enabled: true, days_of_week: [5], last_published_at: "2026-07-10T06:00:00.000Z" })
+    const now = new Date("2026-07-10T22:30:00.000Z") // viernes 19:30 ART
+    const t = track({ enabled: true, schedule_slots: slots([5]), last_published_at: "2026-07-10T22:05:00.000Z" })
     expect(shouldRunAutoPublish(t, now)).toBe(false)
   })
 
   it("corre si hoy es un dia elegido pero la ultima publicacion fue otro dia", () => {
-    const now = new Date("2026-07-10T09:00:00.000Z") // viernes
-    const t = track({ enabled: true, days_of_week: [2, 5], last_published_at: "2026-07-07T09:00:00.000Z" }) // martes
+    const now = new Date("2026-07-10T22:30:00.000Z") // viernes
+    const t = track({ enabled: true, schedule_slots: slots([2, 5]), last_published_at: "2026-07-07T22:00:00.000Z" }) // martes
     expect(shouldRunAutoPublish(t, now)).toBe(true)
   })
 
   it("no corre si tiene una fecha de inicio programada que todavia no llego, aunque hoy sea un dia elegido", () => {
-    const now = new Date("2026-07-10T09:00:00.000Z") // viernes
-    const t = track({ enabled: true, days_of_week: [5], last_published_at: null, starts_at: "2026-07-15T00:00:00.000Z" })
+    const now = new Date("2026-07-10T22:30:00.000Z") // viernes
+    const t = track({ enabled: true, schedule_slots: slots([5]), last_published_at: null, starts_at: "2026-07-15T00:00:00.000Z" })
     expect(shouldRunAutoPublish(t, now)).toBe(false)
   })
 
   it("corre una vez que se cumple la fecha de inicio programada, si ademas hoy es un dia elegido", () => {
-    const now = new Date("2026-07-15T12:00:00.000Z") // miercoles
-    const t = track({ enabled: true, days_of_week: [3], last_published_at: null, starts_at: "2026-07-15T00:00:00.000Z" })
+    const now = new Date("2026-07-15T22:30:00.000Z") // miercoles 19:30 ART
+    const t = track({ enabled: true, schedule_slots: slots([3]), last_published_at: null, starts_at: "2026-07-15T00:00:00.000Z" })
     expect(shouldRunAutoPublish(t, now)).toBe(true)
+  })
+
+  it("no corre fuera de la ventana horaria aunque sea el día correcto", () => {
+    const t = track({ enabled: true, schedule_slots: slots([5]) })
+    expect(shouldRunAutoPublish(t, new Date("2026-07-10T21:59:59.000Z"))).toBe(false)
+    expect(shouldRunAutoPublish(t, new Date("2026-07-10T23:00:00.000Z"))).toBe(false)
   })
 })
 
 describe("isTodayScheduledDay", () => {
   it("true si el dia de now esta en days_of_week", () => {
     const now = new Date("2026-07-10T09:00:00.000Z") // viernes = 5
-    expect(isTodayScheduledDay(track({ days_of_week: [2, 5] }), now)).toBe(true)
+    expect(isTodayScheduledDay(track({ schedule_slots: slots([2, 5]) }), now)).toBe(true)
   })
 
   it("false si el dia de now no esta en days_of_week", () => {
     const now = new Date("2026-07-10T09:00:00.000Z")
-    expect(isTodayScheduledDay(track({ days_of_week: [2] }), now)).toBe(false)
+    expect(isTodayScheduledDay(track({ schedule_slots: slots([2]) }), now)).toBe(false)
   })
 })
 
@@ -108,6 +119,76 @@ describe("alreadyPublishedToday", () => {
   it("false si last_published_at fue otro dia", () => {
     const now = new Date("2026-07-10T09:00:00.000Z")
     expect(alreadyPublishedToday(track({ last_published_at: "2026-07-09T09:00:00.000Z" }), now)).toBe(false)
+  })
+
+  it("usa el día argentino al cruzar medianoche UTC", () => {
+    const now = new Date("2026-07-11T01:30:00.000Z") // viernes 10, 22:30 ART
+    const t = track({ last_published_at: "2026-07-10T22:15:00.000Z" }) // viernes 10, 19:15 ART
+    expect(alreadyPublishedToday(t, now)).toBe(true)
+  })
+})
+
+describe("zona horaria y ventanas editoriales", () => {
+  it("convierte UTC a America/Argentina/Buenos_Aires sin cambiar mal el día", () => {
+    expect(getZonedScheduleParts(new Date("2026-08-04T02:30:00.000Z"))).toEqual({
+      dateKey: "2026-08-03",
+      dayOfWeek: 1,
+      hour: 23,
+      minute: 30,
+    })
+  })
+
+  it("reconoce toda la ventana 19:00-19:59 ART y no las horas contiguas", () => {
+    const t = track({ schedule_slots: slots([2]) })
+    expect(isWithinScheduledWindow(t, new Date("2026-08-04T22:00:00.000Z"))).toBe(true)
+    expect(isWithinScheduledWindow(t, new Date("2026-08-04T22:59:59.000Z"))).toBe(true)
+    expect(isWithinScheduledWindow(t, new Date("2026-08-04T21:59:59.000Z"))).toBe(false)
+    expect(isWithinScheduledWindow(t, new Date("2026-08-04T23:00:00.000Z"))).toBe(false)
+  })
+})
+
+describe("configuración de slots", () => {
+  it("migra days_of_week legacy al horario real del formato y conserva estado operativo", () => {
+    const migrated = normalizeAutoPublishSettings({
+      channels: ["instagram"],
+      post: {
+        enabled: true,
+        times_per_week: 2,
+        days_of_week: [2, 4],
+        items_per_run: 1,
+        starts_at: null,
+        last_published_at: "2026-08-01T22:10:00.000Z",
+        last_run_at: "2026-08-01T22:10:00.000Z",
+        last_run_result: "published:1/1",
+      },
+      historia: { enabled: false, times_per_week: 1, days_of_week: [1], items_per_run: 3 },
+    })
+
+    expect(migrated.post.schedule_slots).toEqual(slots([2, 4]))
+    expect(migrated.post.last_run_result).toBe("published:1/1")
+    expect(migrated.historia.schedule_slots).toEqual(slots([1], "18:00"))
+    expect(migrated.historia.items_per_run).toBe(3)
+  })
+
+  it("rechaza slots duplicados", () => {
+    const settings = structuredClone(DEFAULT_AUTO_PUBLISH_SETTINGS)
+    settings.post.schedule_slots = slots([4, 4])
+    expect(autoPublishSettingsSchema.safeParse(settings).success).toBe(false)
+  })
+
+  it("rechaza dos formatos principales activos la misma noche", () => {
+    const settings = structuredClone(DEFAULT_AUTO_PUBLISH_SETTINGS)
+    settings.post.enabled = true
+    settings.carrusel.enabled = true
+    settings.post.schedule_slots = slots([4])
+    settings.carrusel.schedule_slots = slots([4])
+    expect(autoPublishSettingsSchema.safeParse(settings).success).toBe(false)
+  })
+
+  it("rechaza una hora que el cron desplegado no puede cumplir", () => {
+    const settings = structuredClone(DEFAULT_AUTO_PUBLISH_SETTINGS)
+    settings.reel.schedule_slots = slots([6], "20:00")
+    expect(autoPublishSettingsSchema.safeParse(settings).success).toBe(false)
   })
 })
 

@@ -13,7 +13,7 @@ export interface InstagramFollowerSnapshotResult {
 
 /**
  * Guarda un snapshot diario de seguidores de Instagram (upsert por captured_on, corre dentro del
- * cron de publish-content -- ver route.ts). "skipped" es el estado normal si Instagram todavía no
+ * cron de daily-maintenance -- ver route.ts). "skipped" es el estado normal si Instagram todavía no
  * está conectado, no un error: no bloquea ni alerta el cron.
  */
 export async function snapshotInstagramFollowers(

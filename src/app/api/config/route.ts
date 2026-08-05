@@ -9,6 +9,7 @@ import {
 } from "@/lib/whatsapp-location-config"
 import { authorizeStaff } from "@/lib/staff-authz"
 import { recordSecurityAudit } from "@/lib/security-audit"
+import { autoPublishSettingsSchema, normalizeAutoPublishSettings } from "@/lib/content-pipeline"
 
 const CONFIG_READ_ROLES = ["owner", "doctor"] as const
 const CONFIG_WRITE_ROLES = ["owner"] as const
@@ -48,6 +49,7 @@ export async function GET() {
   data?.forEach((row: { key: string; value: unknown }) => {
     map[row.key] = row.value
   })
+  map.auto_publish_settings = normalizeAutoPublishSettings(map.auto_publish_settings)
   map.locations = parsedLocations.data
   map.locations_status = getWhatsAppLocationsStatus(
     parsedLocations.data,
@@ -90,6 +92,20 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Configuración de WhatsApp inválida" }, { status: 400 })
     }
     value = mergeWhatsAppSettings(settings.data)
+  }
+
+  if (key === "auto_publish_settings") {
+    const settings = autoPublishSettingsSchema.safeParse(value)
+    if (!settings.success) {
+      return NextResponse.json(
+        {
+          error: settings.error.issues[0]?.message ?? "Configuración de publicación automática inválida",
+          code: "invalid_auto_publish_settings",
+        },
+        { status: 400 }
+      )
+    }
+    value = settings.data
   }
 
   try {

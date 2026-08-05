@@ -30,6 +30,16 @@ test("un usuario autorizado puede entrar al dashboard", async () => {
   await expect(page.getByRole("heading", { name: "Dashboard", level: 1 })).toBeVisible()
 })
 
+test("el cronograma editorial muestra ventanas reales en horario argentino", async () => {
+  await page.goto("/contenido/instagram")
+  await page.getByRole("tab", { name: "Biblioteca" }).click()
+
+  await expect(page.getByText("Entre 18:00 y 19:00 ART", { exact: true })).toBeVisible()
+  await expect(page.getByText("Entre 19:00 y 20:00 ART", { exact: true }).first()).toBeVisible()
+  await expect(page.getByText("Zona horaria: America/Argentina/Buenos_Aires.", { exact: true }).first()).toBeVisible()
+  await expect(page.getByText(/Próxima ventana estimada:/).first()).toBeVisible()
+})
+
 test("abrir una conversación del inbox", async () => {
   await page.goto("/inbox")
   const inboxHeading = page.getByRole("heading", { name: "Inbox", level: 2 })

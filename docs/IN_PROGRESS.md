@@ -1,3 +1,16 @@
+# EN CURSO (2026-08-04) — cronograma editorial de Instagram basado en insights reales
+
+- [x] Auditar cron, configuración, colas, reintentos, insights actuales y límites vigentes de Vercel.
+- [x] Confirmar que Vercel Hobby permite 100 cron jobs por proyecto, una corrida diaria por job y precisión horaria de ±59 minutos.
+- [x] Migrar la configuración de `times_per_week`/`days_of_week` a slots explícitos con horario y zona `America/Argentina/Buenos_Aires`.
+- [x] Separar mantenimiento diario, publicación de historias y publicación de feed sin tocar WhatsApp ni lógica médica.
+- [x] Mostrar por formato estado, días, ventana ART, próxima ventana, cola y último resultado.
+- [x] Cubrir zona horaria, cruce de medianoche UTC, migración, validación y reintentos con tests.
+- [x] Actualizar documentación, ejecutar lint/tests/build y verificar visualmente el preview.
+- [ ] Publicar por rama + PR, validar CI/Vercel y mergear.
+
+---
+
 # HOTFIX EN CURSO (2026-08-03) — revisión de fotogramas y request V2 Directa
 
 - [x] Confirmar en producción `FRAME_REVIEW_UNAVAILABLE` y el rechazo de `allow_adult` en text-to-video.
