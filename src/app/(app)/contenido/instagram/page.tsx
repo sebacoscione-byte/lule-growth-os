@@ -1198,12 +1198,30 @@ export default function ContentStudioPage() {
     })
   }, [items, libraryFormat, libraryQuery, libraryStatus, queueInfo, repeatInfo])
 
+  // Las categorías que Seba escribe a mano (no están en CATEGORIES) no se guardaban en ningún
+  // lado -- la próxima vez que abría el formulario, tenía que volver a tipearlas de cero. Como
+  // cada pieza generada ya guarda su `category` tal cual se escribió, alcanza con sumarlas acá
+  // como sugerencia: no hace falta una tabla nueva ni un endpoint de guardado aparte.
+  const knownCategories = useMemo(() => {
+    const seen = new Map<string, string>()
+    for (const value of CATEGORIES) seen.set(value.toLocaleLowerCase("es"), value)
+    const customByRecency = [...items]
+      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+    for (const item of customByRecency) {
+      const trimmed = item.category?.trim()
+      if (!trimmed) continue
+      const key = trimmed.toLocaleLowerCase("es")
+      if (!seen.has(key)) seen.set(key, trimmed)
+    }
+    return [...seen.values()]
+  }, [items])
+
   const filteredCategories = useMemo(() => {
     const query = category.trim().toLocaleLowerCase("es")
     return query
-      ? CATEGORIES.filter(value => value.toLocaleLowerCase("es").includes(query))
-      : CATEGORIES
-  }, [category])
+      ? knownCategories.filter(value => value.toLocaleLowerCase("es").includes(query))
+      : knownCategories
+  }, [category, knownCategories])
 
   // Aviso no bloqueante: si ya se aprobo o publico algo con la misma categoria (o el mismo hook) en
   // los ultimos 15 dias, mostrarlo antes de generar para evitar repetir el mismo angulo sin querer.
@@ -1813,7 +1831,7 @@ export default function ContentStudioPage() {
                     aria-invalid={Boolean(briefErrors.topic)}
                   />
                   {briefErrors.topic && <p className="text-xs font-medium text-red-600">{briefErrors.topic}</p>}
-                  <p className="text-xs text-gray-500">Si lo dejás vacío, la IA elegirá el enfoque más atractivo y útil dentro de la categoría.</p>
+                  <p className="text-xs text-gray-500">Escribí acá el ángulo que querés que tome la publicación (ej. un mensaje, una pregunta a responder, hacia qué sede o servicio dirigirla) — la IA arma el contenido siguiendo exactamente eso. Si lo dejás vacío, elige sola el enfoque más atractivo y útil dentro de la categoría.</p>
                 </div>
                 <div className="space-y-1.5">
                   <Label className="text-gray-900">Objetivo</Label>
