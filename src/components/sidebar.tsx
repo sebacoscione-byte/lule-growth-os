@@ -5,6 +5,7 @@ import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import {
   Camera,
+  CalendarRange,
   DollarSign,
   FileText,
   FlaskConical,
@@ -27,6 +28,7 @@ const NAV_ITEMS = [
   { href: "/leads", label: "Leads", icon: Users },
   { href: "/inbox", label: "Inbox", icon: MessageSquare },
   { href: "/costos", label: "Costos WhatsApp", icon: DollarSign },
+  { href: "/planificacion", label: "Agenda e ingresos", icon: CalendarRange },
   { href: "/google-local", label: "Google Local", icon: MapPin },
   { href: "/contenido/instagram", label: "Contenido", icon: Camera },
   { href: "/landings", label: "Landings", icon: FileText },
