@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { createClient } from "@/lib/supabase/server"
 import { readContentItems, writeContentItems } from "@/lib/content-pipeline"
+import { readContentInsightWindows } from "@/lib/content-insights"
 import type { ContentItem } from "@/types"
 import { authorizeStaff } from "@/lib/staff-authz"
 
@@ -54,11 +55,15 @@ export async function GET() {
   try {
     const supabase = await authenticatedClient()
     const items = await readContentItems(supabase)
-    const attribution = await readAttribution(supabase, items.map(item => item.id))
+    const [attribution, insightWindows] = await Promise.all([
+      readAttribution(supabase, items.map(item => item.id)),
+      readContentInsightWindows(supabase, items),
+    ])
     const itemsWithAttribution = items.map(item => ({
       ...item,
       tracked_visits: attribution[item.id]?.visits ?? 0,
       tracked_interactions: attribution[item.id]?.interactions ?? 0,
+      instagram_insight_windows: insightWindows[item.id] ?? {},
     }))
     return NextResponse.json({ items: itemsWithAttribution })
   } catch (error) {
@@ -254,6 +259,9 @@ export async function PATCH(request: NextRequest) {
       ...changes,
       ...(enablingRepeat ? { repeat_count: 0 } : {}),
       ...(resetApproval ? { status: "draft" as const } : {}),
+      ...(body.status === "published" && current.status !== "published"
+        ? { published_at: body.manual_publish_note?.marked_at ?? now }
+        : {}),
       updated_at: now,
       approved_at: body.status === "approved" ? now : resetApproval ? null : current.approved_at,
       // El orden manual de la cola solo tiene sentido mientras esta aprobada -- si vuelve a borrador

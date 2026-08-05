@@ -287,12 +287,19 @@ export interface ContentItem {
   tracked_interactions?: number
   /** ID de media de Instagram devuelto por publishContainer() al publicar (post o carrusel). Permite pedir insights nativos (reach/likes/comments) después de publicado. null/undefined = nunca se publicó por API o se publicó antes de que esto existiera. */
   instagram_media_id?: string | null
+  /** Momento en que la publicación actual salió realmente. Las publicaciones vía API lo fijan al
+   * recibir el media_id; las manuales usan el instante confirmado por la persona. Para piezas
+   * históricas, la migración 20260804 fija una aproximación única desde la mejor evidencia previa. */
+  published_at?: string | null
   /** Ultimo snapshot guardado de insights nativos de Instagram (reach/likes/comments/guardados/
    * compartidos) de esta pieza. Se actualiza tanto al pedirlo a mano desde la UI
    * (/api/content/insights/[itemId]) como automaticamente en el cron diario (ver
    * snapshotContentInsights) -- para no perder el ultimo dato bueno si nadie vuelve a abrir la
    * pieza o si Meta en algun momento deja de exponerlo para un post viejo. */
   instagram_insights?: ContentInstagramInsights
+  /** Comparables históricos elegidos cerca de 24 h, 72 h y 7 días (tolerancia: +/-18 h). Se
+   * calcula al leer la biblioteca y no se persiste dentro de app_config. */
+  instagram_insight_windows?: Partial<Record<InstagramInsightWindow, InstagramMediaInsightSnapshot>>
   /** Snapshot tomado al clickear "Marcar como publicada manualmente" (approved -> published sin
    * pasar por la API) -- guarda si en ese momento la pieza tenía "Reel de prueba" activado, para
    * dar trazabilidad de esa combinación aunque después se apague el toggle. Solo tiene sentido
@@ -302,11 +309,29 @@ export interface ContentItem {
 
 export interface ContentInstagramInsights {
   reach: number | null
+  views: number | null
   likes: number | null
   comments: number | null
   saved: number | null
   shares: number | null
+  follows: number | null
+  profile_visits: number | null
+  total_watch_time_ms: number | null
+  average_watch_time_ms: number | null
+  reels_skip_rate: number | null
   fetched_at: string
+}
+
+export type InstagramInsightWindow = "24h" | "72h" | "7d"
+
+export interface InstagramMediaInsightSnapshot extends Omit<ContentInstagramInsights, "fetched_at"> {
+  id?: string
+  item_id: string
+  instagram_media_id: string
+  published_at: string
+  captured_at: string
+  capture_date: string
+  hours_since_publish: number
 }
 
 export interface AutoPublishSlot {

@@ -1,6 +1,14 @@
 # Lule Growth OS — Contexto para Claude
 
 ## Estado actual
+- 2026-08-04 (historial de rendimiento de Instagram): `daily-maintenance` conserva snapshots
+  idempotentes por `instagram_media_id` y día argentino en `instagram_media_insight_snapshots`.
+  Las publicaciones nuevas registran `published_at` real; una migración ya aplicada en producción
+  fijó la mejor aproximación disponible para las históricas. Se verificó contra la cuenta conectada
+  que `views` funciona en posts/carruseles/reels y que los reels exponen tiempo total, promedio y skip
+  rate; métricas no habilitadas quedan `null` sin frenar las demás. La Biblioteca muestra, en un
+  detalle plegable, el snapshot más cercano a 24 h, 72 h y 7 días con tolerancia ±18 h. Sin cron ni
+  variables nuevas; operación y rollback en `docs/INSTAGRAM_INSIGHTS.md`.
 - 2026-08-04 (cronograma editorial de Instagram basado en insights reales): se separó el antiguo
   `/api/cron/publish-content` en mantenimiento diario, historias (18:00–18:59 ART) y feed
   (19:00–19:59 ART). Vercel Hobby permite actualmente 100 cron jobs por proyecto —el límite histórico

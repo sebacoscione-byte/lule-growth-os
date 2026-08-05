@@ -199,6 +199,19 @@ El mantenimiento tecnico corre separado en `/api/cron/daily-maintenance`.
   en `src/lib/content-pipeline.ts` como funciones puras testeadas (`content-pipeline.test.ts`); la
   publicacion por canal compartida entre el cron y "Publicar ahora" vive en `src/lib/content-publish.ts`.
 
+## Historial de insights de Instagram
+
+Cada publicación vía API guarda `instagram_media_id` y `published_at`. El mantenimiento diario pide
+las métricas nativas por separado y hace upsert en `instagram_media_insight_snapshots` usando
+`instagram_media_id + capture_date`; un retry del mismo día argentino actualiza la fila en lugar de
+duplicarla. El último valor también queda en la pieza para compatibilidad.
+
+La Biblioteca ofrece un detalle plegable con los snapshots más cercanos a 24 h, 72 h y 7 días,
+dentro de una tolerancia de ±18 horas. Un snapshot inexistente y una métrica no disponible son estados
+distintos en la UI. Reels incorporan `views`, tiempos total/promedio y `reels_skip_rate` cuando Meta
+los devuelve; cualquier métrica rechazada queda `null` sin ocultar las demás. Ver
+`docs/INSTAGRAM_INSIGHTS.md` para el contrato completo, operación y rollback.
+
 ### Repetir una pieza fija (evergreen) — on/off + limite (2026-07-19)
 
 Cada pieza `approved`/`published` tiene en su editor un interruptor **"Repetir esta pieza automaticamente"**

@@ -6,7 +6,7 @@ La publicación editorial está separada del mantenimiento técnico:
 
 | Ruta | Cron UTC | Ventana ART | Responsabilidad |
 |---|---:|---:|---|
-| `/api/cron/daily-maintenance` | `30 10 * * *` | 07:30–08:29 | WhatsApp, alertas, seguidores, insights y Google Business |
+| `/api/cron/daily-maintenance` | `30 10 * * *` | 07:30–08:29 | WhatsApp, alertas, seguidores, historial de insights y Google Business |
 | `/api/cron/publish-stories` | `0 21 * * *` | 18:00–18:59 | Solo historias elegibles |
 | `/api/cron/publish-feed` | `0 22 * * *` | 19:00–19:59 | Posts, carruseles y reels elegibles |
 | `/api/cron/weekly-report` | `0 8 * * 0` | domingo 05:00–05:59 | Reporte semanal existente |

@@ -1,6 +1,17 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { readContentItems, writeContentItems } from "@/lib/content-pipeline"
 import { getValidToken, getInstagramMediaInsights } from "@/lib/instagram-business"
+import type { InstagramMediaInsights } from "@/lib/instagram-business"
+import type {
+  ContentInstagramInsights,
+  ContentItem,
+  InstagramInsightWindow,
+  InstagramMediaInsightSnapshot,
+} from "@/types"
+
+const SNAPSHOT_TABLE = "instagram_media_insight_snapshots"
+const WINDOW_TARGETS: Record<InstagramInsightWindow, number> = { "24h": 24, "72h": 72, "7d": 168 }
+export const INSIGHT_WINDOW_TOLERANCE_HOURS = 18
 
 export interface ContentInsightsSnapshotResult {
   skipped: boolean
@@ -8,16 +19,135 @@ export interface ContentInsightsSnapshotResult {
   error?: string
 }
 
+type SnapshotInsert = Omit<InstagramMediaInsightSnapshot, "id">
+
+function argentinaDateKey(date: Date): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Argentina/Buenos_Aires",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(date)
+}
+
+export function getContentPublishedAt(item: ContentItem): string | null {
+  if (item.published_at) return item.published_at
+  if (item.manual_publish_note?.marked_at) return item.manual_publish_note.marked_at
+  return item.status === "published" ? item.updated_at : null
+}
+
+export function normalizeInstagramMediaInsights(
+  insights: Partial<InstagramMediaInsights>,
+  fetchedAt: string
+): ContentInstagramInsights {
+  return {
+    reach: insights.reach ?? null,
+    views: insights.views ?? null,
+    likes: insights.likes ?? null,
+    comments: insights.comments ?? null,
+    saved: insights.saved ?? null,
+    shares: insights.shares ?? null,
+    follows: insights.follows ?? null,
+    profile_visits: insights.profile_visits ?? null,
+    total_watch_time_ms: insights.total_watch_time_ms ?? null,
+    average_watch_time_ms: insights.average_watch_time_ms ?? null,
+    reels_skip_rate: insights.reels_skip_rate ?? null,
+    fetched_at: fetchedAt,
+  }
+}
+
+export function buildInstagramInsightSnapshot(
+  item: ContentItem,
+  insights: Partial<InstagramMediaInsights>,
+  capturedAt: Date
+): SnapshotInsert | null {
+  const publishedAt = getContentPublishedAt(item)
+  if (!item.instagram_media_id || !publishedAt) return null
+  const normalized = normalizeInstagramMediaInsights(insights, capturedAt.toISOString())
+  const hoursSincePublish = Math.max(
+    0,
+    Math.round((capturedAt.getTime() - new Date(publishedAt).getTime()) / 3_600_000)
+  )
+  const { fetched_at: _fetchedAt, ...metrics } = normalized
+  void _fetchedAt
+  return {
+    item_id: item.id,
+    instagram_media_id: item.instagram_media_id,
+    published_at: publishedAt,
+    captured_at: capturedAt.toISOString(),
+    capture_date: argentinaDateKey(capturedAt),
+    hours_since_publish: hoursSincePublish,
+    ...metrics,
+  }
+}
+
+export async function persistInstagramInsightSnapshot(
+  supabase: SupabaseClient,
+  item: ContentItem,
+  insights: Partial<InstagramMediaInsights>,
+  capturedAt: Date
+): Promise<boolean> {
+  const snapshot = buildInstagramInsightSnapshot(item, insights, capturedAt)
+  if (!snapshot) return false
+  const { error } = await supabase.from(SNAPSHOT_TABLE).upsert({
+    ...snapshot,
+    raw_metrics_json: insights.rawMetrics ?? {},
+    updated_at: capturedAt.toISOString(),
+  }, { onConflict: "instagram_media_id,capture_date" })
+  if (error) throw error
+  return true
+}
+
+export function selectInstagramInsightWindows(
+  snapshots: InstagramMediaInsightSnapshot[]
+): Partial<Record<InstagramInsightWindow, InstagramMediaInsightSnapshot>> {
+  const selected: Partial<Record<InstagramInsightWindow, InstagramMediaInsightSnapshot>> = {}
+  for (const [window, target] of Object.entries(WINDOW_TARGETS) as Array<[InstagramInsightWindow, number]>) {
+    const closest = snapshots
+      .map(snapshot => ({ snapshot, distance: Math.abs(snapshot.hours_since_publish - target) }))
+      .filter(candidate => candidate.distance <= INSIGHT_WINDOW_TOLERANCE_HOURS)
+      .sort((a, b) => a.distance - b.distance ||
+        new Date(b.snapshot.captured_at).getTime() - new Date(a.snapshot.captured_at).getTime())[0]
+    if (closest) selected[window] = closest.snapshot
+  }
+  return selected
+}
+
+export async function readContentInsightWindows(
+  supabase: SupabaseClient,
+  items: ContentItem[]
+): Promise<Record<string, Partial<Record<InstagramInsightWindow, InstagramMediaInsightSnapshot>>>> {
+  const currentMediaByItem = new Map(
+    items
+      .filter(item => item.instagram_media_id)
+      .map(item => [item.id, item.instagram_media_id as string])
+  )
+  if (currentMediaByItem.size === 0) return {}
+
+  const { data, error } = await supabase
+    .from(SNAPSHOT_TABLE)
+    .select("id,item_id,instagram_media_id,published_at,captured_at,capture_date,hours_since_publish,reach,views,likes,comments,saved,shares,follows,profile_visits,total_watch_time_ms,average_watch_time_ms,reels_skip_rate")
+    .in("item_id", [...currentMediaByItem.keys()])
+    .order("captured_at", { ascending: true })
+  if (error) {
+    console.error(`[content-insights] history read failed: ${error.message}`)
+    return {}
+  }
+
+  const grouped = new Map<string, InstagramMediaInsightSnapshot[]>()
+  for (const row of (data ?? []) as InstagramMediaInsightSnapshot[]) {
+    if (currentMediaByItem.get(row.item_id) !== row.instagram_media_id) continue
+    grouped.set(row.item_id, [...(grouped.get(row.item_id) ?? []), row])
+  }
+  return Object.fromEntries(
+    [...grouped.entries()].map(([itemId, snapshots]) => [itemId, selectInstagramInsightWindows(snapshots)])
+  )
+}
+
 /**
- * Refresca el snapshot guardado de insights nativos (reach/likes/comments/guardados/compartidos)
- * de cada pieza publicada por API (instagram_media_id), corriendo dentro del mantenimiento diario.
- * Es el mismo dato que ya se guarda al pedirlo a
- * mano desde la UI (ver /api/content/insights/[itemId]), pero corriendo esto acá el dato se
- * mantiene al día aunque nadie vuelva a abrir la pieza.
- *
- * Un fallo puntual en una pieza (post muy viejo, métrica no habilitada para ese media) no debe
- * perder el último snapshot bueno que ya teníamos guardado -- esa pieza simplemente se deja tal
- * cual está en esta corrida.
+ * Refresca los insights de cada pieza publicada por API y conserva dos vistas: el último valor en
+ * app_config para compatibilidad y un snapshot diario histórico. Un fallo puntual de Meta o de una
+ * fila no frena las demás piezas. Las métricas ausentes quedan en null, nunca en cero inventado.
  */
 export async function snapshotContentInsights(
   supabase: SupabaseClient,
@@ -29,7 +159,8 @@ export async function snapshotContentInsights(
   try {
     const items = await readContentItems(supabase)
     let refreshed = 0
-    const updated: typeof items = []
+    const errors: string[] = []
+    const updated: ContentItem[] = []
     for (const item of items) {
       if (!item.instagram_media_id) {
         updated.push(item)
@@ -37,14 +168,28 @@ export async function snapshotContentInsights(
       }
       try {
         const insights = await getInstagramMediaInsights(token, item.instagram_media_id)
+        const publishedAt = getContentPublishedAt(item)
+        const itemWithPublishedAt = publishedAt && !item.published_at
+          ? { ...item, published_at: publishedAt }
+          : item
+        await persistInstagramInsightSnapshot(supabase, itemWithPublishedAt, insights, now)
         refreshed++
-        updated.push({ ...item, instagram_insights: { ...insights, fetched_at: now.toISOString() } })
-      } catch {
+        updated.push({
+          ...itemWithPublishedAt,
+          instagram_insights: normalizeInstagramMediaInsights(insights, now.toISOString()),
+        })
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error)
+        errors.push(`item=${item.id}: ${message}`)
         updated.push(item)
       }
     }
     if (refreshed > 0) await writeContentItems(supabase, updated)
-    return { skipped: false, refreshed }
+    return {
+      skipped: false,
+      refreshed,
+      ...(errors.length > 0 ? { error: errors.join("; ") } : {}),
+    }
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
     console.error(`[content-insights] snapshot failed: ${message}`)
