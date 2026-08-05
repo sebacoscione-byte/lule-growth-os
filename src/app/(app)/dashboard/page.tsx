@@ -1274,7 +1274,7 @@ export default async function DashboardPage({
             )}
             {growth.google.status === null && (
               <p className="text-sm text-gray-400">
-                Todavía no hay snapshots. Se generan diariamente dentro del cron de publish-content
+                Todavía no hay snapshots. Se generan diariamente dentro del cron de mantenimiento
                 — hace falta al menos una corrida para que este card muestre datos.
               </p>
             )}

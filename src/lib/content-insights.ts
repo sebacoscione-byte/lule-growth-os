@@ -10,8 +10,8 @@ export interface ContentInsightsSnapshotResult {
 
 /**
  * Refresca el snapshot guardado de insights nativos (reach/likes/comments/guardados/compartidos)
- * de cada pieza publicada por API (instagram_media_id), corriendo dentro del cron de
- * publish-content -- no suma un cron job nuevo. Es el mismo dato que ya se guarda al pedirlo a
+ * de cada pieza publicada por API (instagram_media_id), corriendo dentro del mantenimiento diario.
+ * Es el mismo dato que ya se guarda al pedirlo a
  * mano desde la UI (ver /api/content/insights/[itemId]), pero corriendo esto acá el dato se
  * mantiene al día aunque nadie vuelva a abrir la pieza.
  *

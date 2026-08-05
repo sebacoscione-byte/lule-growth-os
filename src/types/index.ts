@@ -309,11 +309,18 @@ export interface ContentInstagramInsights {
   fetched_at: string
 }
 
+export interface AutoPublishSlot {
+  /** Día local en America/Argentina/Buenos_Aires (0=domingo...6=sábado). */
+  day_of_week: number
+  /** Inicio de la ventana editorial local. Vercel Hobby puede ejecutar durante los 59 minutos siguientes. */
+  local_time: string
+}
+
 export interface AutoPublishTrackSettings {
   enabled: boolean
-  times_per_week: number
-  /** Dias de la semana elegidos para publicar (0=domingo...6=sabado, igual que Date.getDay()). Como maximo times_per_week dias. Vacio = todavia no se eligio ningun dia, no publica nada aunque este activado. */
-  days_of_week: number[]
+  timezone: "America/Argentina/Buenos_Aires"
+  /** La cantidad de slots es la frecuencia semanal; evita mantener un contador redundante. */
+  schedule_slots: AutoPublishSlot[]
   /** Cuantas piezas aprobadas publicar juntas en cada corrida (ej. 3 para publicar las 3 sedes de una). Default 1 = comportamiento de siempre. */
   items_per_run: number
   /** Si esta en el futuro, el track no publica nada hasta esa fecha (aunque este activado). null = arrancar ya. */

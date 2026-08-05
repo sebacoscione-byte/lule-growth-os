@@ -23,7 +23,14 @@ import type { AutoPublishTrackSettings } from "@/types"
 import type { GooglePlaceReviews } from "@/lib/google-places"
 
 const DISABLED_TRACK: AutoPublishTrackSettings = {
-  enabled: false, times_per_week: 2, days_of_week: [], items_per_run: 1, starts_at: null, last_published_at: null, last_run_at: null, last_run_result: null,
+  enabled: false,
+  timezone: "America/Argentina/Buenos_Aires",
+  schedule_slots: [],
+  items_per_run: 1,
+  starts_at: null,
+  last_published_at: null,
+  last_run_at: null,
+  last_run_result: null,
 }
 
 describe("web / landings", () => {

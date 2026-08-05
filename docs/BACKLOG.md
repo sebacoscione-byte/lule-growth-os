@@ -1878,3 +1878,13 @@ de poder ocurrir para piezas nuevas.
 
 **La placa ya publicada con el typo fue corregida por Seba a mano (2026-07-30)** — la regeneró y la
 resubió manualmente a Instagram. No quedó ningún pendiente sobre esa pieza puntual.
+# Instagram — optimización basada en insights reales (agosto 2026)
+
+- [x] PR 1: separar mantenimiento, historias y feed; usar ventanas ART explícitas; migrar la
+      configuración legacy; validar slots/superposiciones y mostrar próxima ventana por formato.
+- [ ] PR 2: persistir snapshots históricos de insights por pieza a 24 h, 72 h y 7 días, incluyendo
+      `published_at` confiable y métricas de reels realmente expuestas por Meta.
+- [ ] PR 3: unir contenido, UTM, eventos, conversaciones y leads; agregar comparaciones por formato,
+      día/hora/objetivo y recomendaciones con umbral mínimo de muestra y aprobación manual.
+
+---

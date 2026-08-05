@@ -1,26 +1,153 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
+import { z } from "zod"
 import type { AutoPublishSettings, AutoPublishTrackSettings, ContentChannel, ContentItem } from "@/types"
 
 const CONTENT_KEY = "content_pipeline"
 const SETTINGS_KEY = "auto_publish_settings"
 
-const DEFAULT_TRACK: AutoPublishTrackSettings = {
-  enabled: false,
-  times_per_week: 2,
-  days_of_week: [],
-  items_per_run: 1,
-  starts_at: null,
-  last_published_at: null,
-  last_run_at: null,
-  last_run_result: null,
+export const AUTO_PUBLISH_TIMEZONE = "America/Argentina/Buenos_Aires" as const
+export const AUTO_PUBLISH_WINDOW_BY_FORMAT = {
+  post: "19:00",
+  historia: "18:00",
+  carrusel: "19:00",
+  reel: "19:00",
+} as const
+
+function defaultTrack(dayOfWeek: number[], localTime: string): AutoPublishTrackSettings {
+  return {
+    enabled: false,
+    timezone: AUTO_PUBLISH_TIMEZONE,
+    schedule_slots: dayOfWeek.map(day => ({ day_of_week: day, local_time: localTime })),
+    items_per_run: 1,
+    starts_at: null,
+    last_published_at: null,
+    last_run_at: null,
+    last_run_result: null,
+  }
 }
 
 export const DEFAULT_AUTO_PUBLISH_SETTINGS: AutoPublishSettings = {
   channels: ["instagram"],
-  post: { ...DEFAULT_TRACK, times_per_week: 2 },
-  historia: { ...DEFAULT_TRACK, times_per_week: 3 },
-  carrusel: { ...DEFAULT_TRACK, times_per_week: 1 },
-  reel: { ...DEFAULT_TRACK, times_per_week: 1 },
+  // Cadencia inicial de agosto 2026. Queda preparada pero apagada: activarla siempre es una
+  // decisión explícita del owner desde la UI.
+  post: defaultTrack([4], AUTO_PUBLISH_WINDOW_BY_FORMAT.post),
+  historia: defaultTrack([1, 2, 4, 6, 0], AUTO_PUBLISH_WINDOW_BY_FORMAT.historia),
+  carrusel: defaultTrack([1, 0], AUTO_PUBLISH_WINDOW_BY_FORMAT.carrusel),
+  reel: defaultTrack([6], AUTO_PUBLISH_WINDOW_BY_FORMAT.reel),
+}
+
+const slotSchema = z.object({
+  day_of_week: z.number().int().min(0).max(6),
+  local_time: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/),
+}).strict()
+
+function trackSchema(expectedLocalTime: string, maxItemsPerRun: number) {
+  return z.object({
+    enabled: z.boolean(),
+    timezone: z.literal(AUTO_PUBLISH_TIMEZONE),
+    schedule_slots: z.array(slotSchema).max(7).superRefine((slots, context) => {
+      const seen = new Set<number>()
+      for (const [index, slot] of slots.entries()) {
+        if (seen.has(slot.day_of_week)) {
+          context.addIssue({ code: "custom", path: [index, "day_of_week"], message: "No puede haber dos slots el mismo día." })
+        }
+        seen.add(slot.day_of_week)
+        if (slot.local_time !== expectedLocalTime) {
+          context.addIssue({
+            code: "custom",
+            path: [index, "local_time"],
+            message: `La infraestructura actual admite la ventana ${expectedLocalTime} ART para este formato.`,
+          })
+        }
+      }
+    }),
+    items_per_run: z.number().int().min(1).max(maxItemsPerRun),
+    starts_at: z.string().datetime({ offset: true }).nullable(),
+    last_published_at: z.string().datetime({ offset: true }).nullable(),
+    last_run_at: z.string().datetime({ offset: true }).nullable(),
+    last_run_result: z.string().max(1000).nullable(),
+  }).strict()
+}
+
+export const autoPublishSettingsSchema = z.object({
+  channels: z.array(z.enum(["instagram", "google_business"])).min(1),
+  post: trackSchema(AUTO_PUBLISH_WINDOW_BY_FORMAT.post, 1),
+  historia: trackSchema(AUTO_PUBLISH_WINDOW_BY_FORMAT.historia, 10),
+  carrusel: trackSchema(AUTO_PUBLISH_WINDOW_BY_FORMAT.carrusel, 1),
+  reel: trackSchema(AUTO_PUBLISH_WINDOW_BY_FORMAT.reel, 1),
+}).strict().superRefine((settings, context) => {
+  const occupied = new Map<number, string>()
+  for (const format of ["post", "carrusel", "reel"] as const) {
+    if (!settings[format].enabled) continue
+    for (const [index, slot] of settings[format].schedule_slots.entries()) {
+      const previous = occupied.get(slot.day_of_week)
+      if (previous) {
+        context.addIssue({
+          code: "custom",
+          path: [format, "schedule_slots", index, "day_of_week"],
+          message: `Ya hay una pieza principal de ${previous} esa noche.`,
+        })
+      } else {
+        occupied.set(slot.day_of_week, format)
+      }
+    }
+  }
+})
+
+type LegacyTrack = Partial<AutoPublishTrackSettings> & {
+  days_of_week?: unknown
+  times_per_week?: unknown
+}
+
+function normalizeTrack(
+  raw: LegacyTrack | null | undefined,
+  fallback: AutoPublishTrackSettings,
+  expectedLocalTime: string
+): AutoPublishTrackSettings {
+  if (!raw || typeof raw !== "object") return { ...fallback, schedule_slots: [...fallback.schedule_slots] }
+
+  let scheduleSlots = fallback.schedule_slots
+  if (Object.prototype.hasOwnProperty.call(raw, "schedule_slots")) {
+    scheduleSlots = Array.isArray(raw.schedule_slots)
+      ? raw.schedule_slots.flatMap(slot => {
+          const parsed = slotSchema.safeParse(slot)
+          return parsed.success && parsed.data.local_time === expectedLocalTime ? [parsed.data] : []
+        })
+      : []
+  } else if (Array.isArray(raw.days_of_week)) {
+    scheduleSlots = [...new Set(raw.days_of_week)]
+      .filter((day): day is number => Number.isInteger(day) && Number(day) >= 0 && Number(day) <= 6)
+      .map(day => ({ day_of_week: day, local_time: expectedLocalTime }))
+  }
+
+  return {
+    enabled: typeof raw.enabled === "boolean" ? raw.enabled : fallback.enabled,
+    timezone: AUTO_PUBLISH_TIMEZONE,
+    schedule_slots: scheduleSlots,
+    items_per_run: Number.isInteger(raw.items_per_run) && Number(raw.items_per_run) >= 1
+      ? Math.min(Number(raw.items_per_run), expectedLocalTime === AUTO_PUBLISH_WINDOW_BY_FORMAT.historia ? 10 : 1)
+      : fallback.items_per_run,
+    starts_at: typeof raw.starts_at === "string" || raw.starts_at === null ? raw.starts_at : fallback.starts_at,
+    last_published_at: typeof raw.last_published_at === "string" || raw.last_published_at === null
+      ? raw.last_published_at : fallback.last_published_at,
+    last_run_at: typeof raw.last_run_at === "string" || raw.last_run_at === null ? raw.last_run_at : fallback.last_run_at,
+    last_run_result: typeof raw.last_run_result === "string" || raw.last_run_result === null
+      ? raw.last_run_result : fallback.last_run_result,
+  }
+}
+
+export function normalizeAutoPublishSettings(value: unknown): AutoPublishSettings {
+  const stored = value && typeof value === "object" ? value as Partial<AutoPublishSettings> : {}
+  const channels = Array.isArray(stored.channels)
+    ? stored.channels.filter((channel): channel is ContentChannel => channel === "instagram" || channel === "google_business")
+    : DEFAULT_AUTO_PUBLISH_SETTINGS.channels
+  return {
+    channels: channels.length > 0 ? [...new Set(channels)] : DEFAULT_AUTO_PUBLISH_SETTINGS.channels,
+    post: normalizeTrack(stored.post as LegacyTrack | undefined, DEFAULT_AUTO_PUBLISH_SETTINGS.post, AUTO_PUBLISH_WINDOW_BY_FORMAT.post),
+    historia: normalizeTrack(stored.historia as LegacyTrack | undefined, DEFAULT_AUTO_PUBLISH_SETTINGS.historia, AUTO_PUBLISH_WINDOW_BY_FORMAT.historia),
+    carrusel: normalizeTrack(stored.carrusel as LegacyTrack | undefined, DEFAULT_AUTO_PUBLISH_SETTINGS.carrusel, AUTO_PUBLISH_WINDOW_BY_FORMAT.carrusel),
+    reel: normalizeTrack(stored.reel as LegacyTrack | undefined, DEFAULT_AUTO_PUBLISH_SETTINGS.reel, AUTO_PUBLISH_WINDOW_BY_FORMAT.reel),
+  }
 }
 
 export async function readContentItems(supabase: SupabaseClient): Promise<ContentItem[]> {
@@ -46,22 +173,7 @@ export async function readAutoPublishSettings(supabase: SupabaseClient): Promise
     .select("value")
     .eq("key", SETTINGS_KEY)
     .maybeSingle()
-  const stored = data?.value as Partial<AutoPublishSettings> | undefined
-
-  // Forma vieja (cronograma unico, sin .post/.historia): nunca se llego a activar en produccion
-  // (enabled seguia en false), asi que reseteamos directo a los defaults nuevos en vez de migrar.
-  if (!stored?.post || !stored?.historia) return DEFAULT_AUTO_PUBLISH_SETTINGS
-
-  // .carrusel (2026-07-11) y .reel (2026-07-23) son mas nuevos que post/historia: las configuraciones
-  // ya guardadas en produccion antes de cada uno no los tienen. Nunca resetear post/historia por esto
-  // -- solo completar el track nuevo con el default (deshabilitado).
-  return {
-    channels: stored.channels ?? DEFAULT_AUTO_PUBLISH_SETTINGS.channels,
-    post: { ...DEFAULT_AUTO_PUBLISH_SETTINGS.post, ...stored.post },
-    historia: { ...DEFAULT_AUTO_PUBLISH_SETTINGS.historia, ...stored.historia },
-    carrusel: { ...DEFAULT_AUTO_PUBLISH_SETTINGS.carrusel, ...(stored.carrusel ?? {}) },
-    reel: { ...DEFAULT_AUTO_PUBLISH_SETTINGS.reel, ...(stored.reel ?? {}) },
-  }
+  return normalizeAutoPublishSettings(data?.value)
 }
 
 export async function writeAutoPublishSettings(supabase: SupabaseClient, settings: AutoPublishSettings): Promise<void> {
@@ -76,23 +188,88 @@ export function isScheduledForFuture(track: AutoPublishTrackSettings, now: Date)
   return Boolean(track.starts_at) && now.getTime() < new Date(track.starts_at as string).getTime()
 }
 
-/** Pura, sin I/O: true si "now" cae en uno de los dias de la semana elegidos para el track. */
-export function isTodayScheduledDay(track: AutoPublishTrackSettings, now: Date): boolean {
-  return track.days_of_week.includes(now.getDay())
+export interface ZonedScheduleParts {
+  dateKey: string
+  dayOfWeek: number
+  hour: number
+  minute: number
 }
 
-/** Pura, sin I/O: true si ya se publico algo de este track el mismo dia calendario que "now" (evita duplicar si el cron corre mas de una vez el mismo dia). */
+/** Convierte un instante UTC a las partes de calendario usadas por el cron editorial argentino. */
+export function getZonedScheduleParts(
+  date: Date,
+  timezone: AutoPublishTrackSettings["timezone"] = AUTO_PUBLISH_TIMEZONE
+): ZonedScheduleParts {
+  const values = Object.fromEntries(
+    new Intl.DateTimeFormat("en-CA", {
+      timeZone: timezone,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      hourCycle: "h23",
+    }).formatToParts(date).filter(part => part.type !== "literal").map(part => [part.type, part.value])
+  )
+  const year = Number(values.year)
+  const month = Number(values.month)
+  const day = Number(values.day)
+  return {
+    dateKey: `${values.year}-${values.month}-${values.day}`,
+    dayOfWeek: new Date(Date.UTC(year, month - 1, day)).getUTCDay(),
+    hour: Number(values.hour),
+    minute: Number(values.minute),
+  }
+}
+
+export function getScheduledDays(track: AutoPublishTrackSettings): number[] {
+  return [...new Set(track.schedule_slots.map(slot => slot.day_of_week))]
+}
+
+function localTimeMinutes(localTime: string): number {
+  const [hour, minute] = localTime.split(":").map(Number)
+  return hour * 60 + minute
+}
+
+/** Vercel Hobby dispara dentro de la hora configurada; cada slot representa esa ventana de 60 minutos. */
+export function isWithinScheduledWindow(track: AutoPublishTrackSettings, now: Date): boolean {
+  const local = getZonedScheduleParts(now, track.timezone)
+  const currentMinutes = local.hour * 60 + local.minute
+  return track.schedule_slots.some(slot => {
+    if (slot.day_of_week !== local.dayOfWeek) return false
+    const start = localTimeMinutes(slot.local_time)
+    return currentMinutes >= start && currentMinutes < start + 60
+  })
+}
+
+/** Pura, sin I/O: true si "now" cae en uno de los días locales elegidos para el track. */
+export function isTodayScheduledDay(track: AutoPublishTrackSettings, now: Date): boolean {
+  return getScheduledDays(track).includes(getZonedScheduleParts(now, track.timezone).dayOfWeek)
+}
+
+/** Pura, sin I/O: true si ya se publicó algo el mismo día argentino (evita duplicar un reintento). */
 export function alreadyPublishedToday(track: AutoPublishTrackSettings, now: Date): boolean {
   if (!track.last_published_at) return false
-  return new Date(track.last_published_at).toDateString() === now.toDateString()
+  return getZonedScheduleParts(new Date(track.last_published_at), track.timezone).dateKey
+    === getZonedScheduleParts(now, track.timezone).dateKey
 }
 
-/** Pura, sin I/O: false si el track esta apagado, si la fecha de inicio programada no llego, si hoy no es uno de los dias elegidos, o si ya se publico hoy. */
+/** Pura, sin I/O: exige estado, fecha, slot local vigente y ausencia de una publicación previa ese día. */
 export function shouldRunAutoPublish(track: AutoPublishTrackSettings, now: Date): boolean {
   if (!track.enabled) return false
   if (isScheduledForFuture(track, now)) return false
-  if (!isTodayScheduledDay(track, now)) return false
+  if (!isWithinScheduledWindow(track, now)) return false
   return !alreadyPublishedToday(track, now)
+}
+
+/** Para estimaciones de UI: hoy cuenta si la ventana todavía no terminó y no se publicó. */
+export function canStillPublishToday(track: AutoPublishTrackSettings, now: Date): boolean {
+  if (!track.enabled || isScheduledForFuture(track, now) || alreadyPublishedToday(track, now)) return false
+  const local = getZonedScheduleParts(now, track.timezone)
+  const currentMinutes = local.hour * 60 + local.minute
+  return track.schedule_slots.some(slot =>
+    slot.day_of_week === local.dayOfWeek && currentMinutes < localTimeMinutes(slot.local_time) + 60
+  )
 }
 
 /**
@@ -105,12 +282,11 @@ function nthScheduledDayOffset(n: number, daysOfWeek: number[], now: Date, today
   if (n <= 0 || daysOfWeek.length === 0) return 0
   let found = 0
   let elapsedDays = 0
-  const cursor = new Date(now)
-  if (todayAvailable && daysOfWeek.includes(cursor.getDay())) found++
+  const startingDay = getZonedScheduleParts(now).dayOfWeek
+  if (todayAvailable && daysOfWeek.includes(startingDay)) found++
   while (found < n && elapsedDays < 400) {
-    cursor.setDate(cursor.getDate() + 1)
     elapsedDays++
-    if (daysOfWeek.includes(cursor.getDay())) found++
+    if (daysOfWeek.includes((startingDay + elapsedDays) % 7)) found++
   }
   return elapsedDays
 }
@@ -141,9 +317,11 @@ export function estimateAutoPublishDateForPosition(
   if (position <= 0 || daysOfWeek.length === 0) return null
   const runsNeeded = Math.ceil(position / Math.max(1, itemsPerRun))
   const offsetDays = nthScheduledDayOffset(runsNeeded, daysOfWeek, now, todayAvailable)
-  const result = new Date(now)
-  result.setDate(result.getDate() + offsetDays)
-  return result
+  const local = getZonedScheduleParts(now)
+  const [year, month, day] = local.dateKey.split("-").map(Number)
+  // Mediodía UTC mantiene la fecha civil estable para ART y evita que la zona del navegador/servidor
+  // cambie el día mostrado al sumar offsets de calendario.
+  return new Date(Date.UTC(year, month - 1, day + offsetDays, 12, 0, 0))
 }
 
 /**

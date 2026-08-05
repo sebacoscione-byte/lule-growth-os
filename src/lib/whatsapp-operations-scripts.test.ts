@@ -42,9 +42,11 @@ describe("WhatsApp production operation scripts", () => {
     expect(schedulerScript).toContain("transaction_rolled_back=true")
   })
 
-  it("does not consume a third Vercel cron slot", () => {
+  it("keeps the frequent WhatsApp worker on Supabase instead of Vercel", () => {
     const vercel = JSON.parse(readFileSync(resolve(process.cwd(), "vercel.json"), "utf8"))
-    expect(vercel.crons).toHaveLength(2)
+    // Desde enero de 2026 Hobby admite 100 jobs por proyecto; el worker frecuente sigue afuera
+    // porque Hobby solo permite una ejecución diaria por job.
+    expect(vercel.crons.length).toBeLessThanOrEqual(100)
     expect(vercel.crons).not.toEqual(
       expect.arrayContaining([
         expect.objectContaining({ path: "/api/internal/whatsapp-worker" }),

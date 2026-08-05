@@ -1,6 +1,13 @@
 # Lule Growth OS — Contexto para Claude
 
 ## Estado actual
+- 2026-08-04 (cronograma editorial de Instagram basado en insights reales): se separó el antiguo
+  `/api/cron/publish-content` en mantenimiento diario, historias (18:00–18:59 ART) y feed
+  (19:00–19:59 ART). Vercel Hobby permite actualmente 100 cron jobs por proyecto —el límite histórico
+  de 2 ya no aplica—, aunque conserva una corrida diaria por job y precisión horaria de ±59 minutos.
+  `auto_publish_settings` usa slots explícitos y timezone argentino, migra la forma legacy, valida
+  duplicados/superposiciones y muestra días, ventana, próxima corrida, cola y último resultado por
+  formato. No se tocó lógica médica. Detalle operativo y rollback en `docs/INSTAGRAM_SCHEDULING.md`.
 - 2026-08-03 (continuación de la investigación de fallas en generación de contenido, PR #190/#191/#192):
   Seba siguió reportando que "Generar placa final" fallaba pese a tener crédito disponible en Gemini
   (confirmado con captura del panel de billing de Google AI Studio). Tres hallazgos/cambios reales:
@@ -1568,29 +1575,25 @@ sistema de costos está preparado para ese cambio, pero **no viene con montos re
 ## Publicación automática de contenido — cómo activarla
 
 El Estudio de contenido (`Estudio de contenido → pestaña Biblioteca`) tiene una tarjeta "Publicación
-automática" con **dos cronogramas independientes** — Posts de feed e Historias — para que las piezas
-aprobadas se publiquen solas cada tantas veces por semana, sin depender de que alguien entre a clickear
-"Publicar". Corre vía un **Vercel Cron** diario (`vercel.json`, 11:45 UTC = 08:45 ART, Argentina no tiene
-horario de verano) que pega a
-`/api/cron/publish-content` y evalúa ambos cronogramas en la misma corrida (cada uno con su propio
-enabled/frecuencia/última publicación).
+automática" con cronograma independiente para Posts, Historias, Carruseles y Reels. La publicación ya
+no comparte horario con el mantenimiento: `/api/cron/publish-stories` corre a las 21:00 UTC
+(18:00–18:59 ART) y `/api/cron/publish-feed` a las 22:00 UTC (19:00–19:59 ART). Vercel Hobby puede
+dispararlos en cualquier minuto de esa hora; la UI muestra la ventana real y no promete un minuto.
 
 1. **Setear `CRON_SECRET`** en las env vars de Vercel (y en `.env.local` si querés probarlo local) — sin
    esto, el endpoint devuelve 401 y no hace nada (falla-cerrado a propósito).
 2. Conectar Instagram y Google Business normalmente (como ya se hacía para publicar a mano).
-3. En la tarjeta, activar el track de **Posts** y/o **Historias** por separado, cada uno con su propio
-   "veces por semana" (default: posts 2/semana, historias 3/semana — según investigación de cadencia para
-   cuentas de salud: no conviene publicar todos los días, baja la calidad y la credibilidad). Los canales
-   (Instagram/Google Business) son compartidos, pero Google Business no tiene concepto de "historia", así
-   que ese track en la práctica solo publica a Instagram.
+3. En la tarjeta, activar cada formato y elegir sus días. La cantidad de slots es la frecuencia semanal;
+   `timezone` queda fijo en `America/Argentina/Buenos_Aires`. Los defaults de agosto quedan preparados
+   como Carruseles lunes/domingo, Reel sábado, Post jueves e Historias lunes/martes/jueves/sábado/domingo.
+   Los canales son compartidos, pero Google Business no tiene historias, carruseles ni reels.
 3.1. Cada track tiene además un control **"Empezar: Ahora / fecha programada"** (`starts_at`). Si se deja
    en "Ahora" (`null`), el comportamiento es el de siempre: en cuanto se activa, publica la primera pieza
    aprobada en la próxima corrida del cron. Si se elige una fecha futura, el cron no publica nada de ese
    track hasta que llegue esa fecha (aunque esté activado y ya haya piezas aprobadas esperando) — recién
    ahí arranca a contar el intervalo de "veces por semana" desde la primera publicación real.
-4. Cada track solo auto-publica piezas `aprobadas` de su propio formato (**post** o **historia** según
-   corresponda) — reels y carruseles siguen requiriendo publicación manual (no soportado por la API de
-   Meta sin video/multi-imagen).
+4. Cada track solo auto-publica piezas `aprobadas` de su propio formato. Carruseles requieren portada y
+   todas las slides; Reels requieren un video real ya subido. No se generan esos activos de apuro.
 5. Además del cron, cada card **aprobada** en Biblioteca tiene un botón **"Publicar ahora"** para publicar
    esa pieza al instante en sus canales asignados, sin esperar al cronograma — útil para piezas puntuales
    o para probar que todo funciona.
@@ -1598,10 +1601,9 @@ enabled/frecuencia/última publicación).
    card ("No se pudo publicar en...") y "Publicar ahora" o los botones manuales del editor sirven para
    reintentar. El texto "Último intento: ..." de cada track explica por qué no se publicó nada en la
    corrida más reciente de ese track.
-7. **No hay rampa automática de cadencia** (ej. "3x el primer mes, después 2x") — es una decisión de
-   diseño a propósito, para no tener estado oculto difícil de razonar. Si se quiere arrancar más agresivo
-   el primer mes, subir el número a mano y bajarlo después.
-8. **Alerta por email si el cron falla** (2026-07-07) — `/api/cron/publish-content` y
+7. **No hay cambios automáticos de estrategia**: el sistema ejecuta lo configurado y las recomendaciones
+   futuras requerirán aprobación manual.
+8. **Alerta por email si el cron falla** (2026-07-07) — los tres crons diarios y
    `/api/cron/weekly-report` mandan un email (vía Resend, ver "Alertas de cron por email" abajo) ante
    una excepción no controlada o un error real (no ante estados esperados como `skipped_*` o
    `quota_exceeded`). Por WhatsApp seguiría requiriendo un template aprobado por Meta, así que se
@@ -1610,7 +1612,7 @@ enabled/frecuencia/última publicación).
 
 ## Alertas de cron por email — cómo activarlas (2026-07-07)
 
-Si `/api/cron/publish-content` o `/api/cron/weekly-report` fallan (excepción no controlada, error real
+Si un cron editorial, `/api/cron/daily-maintenance` o `/api/cron/weekly-report` falla (excepción no controlada, error real
 de Supabase, etc.), `src/lib/alert-email.ts` manda un email vía la API de Resend con el detalle del
 error. Es **fail-open a propósito**, mismo patrón que Google Analytics/Places API: sin las env vars
 cargadas, no manda nada y no bloquea el cron.
@@ -1650,9 +1652,8 @@ funcionando exactamente igual que antes.
 Los leads que quedan sin confirmar turno (`derivado_cimel`/`derivado_swiss`/`derivado_britanico`/
 `seguimiento_pendiente` con `followup_due_at` vencido) reciben un reintento de contacto automático
 vía WhatsApp, usando el template `recontacto_incompleto` ("¿Te ayudamos a retomarlo?"). La lógica
-vive en `src/lib/whatsapp-followup.ts` y corre **dentro del mismo Vercel Cron de `publish-content`**
-(no tiene un cron propio en `vercel.json` a propósito, para no sumar un tercer cron job — el plan
-Hobby de Vercel limita a 2). También existe `/api/cron/whatsapp-followup` como endpoint standalone
+vive en `src/lib/whatsapp-followup.ts` y corre dentro de `/api/cron/daily-maintenance` como respaldo
+del worker frecuente de Supabase. También existe `/api/cron/whatsapp-followup` como endpoint standalone
 (mismo `CRON_SECRET`) por si querés dispararlo a mano con `curl` para probar el template sin esperar
 a la corrida diaria.
 - **Requiere que el template `recontacto_incompleto` esté aprobado por Meta** (`Configuración →

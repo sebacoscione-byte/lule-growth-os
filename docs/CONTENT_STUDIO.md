@@ -167,21 +167,23 @@ ademas de la portada:
 
 ## Publicacion automatica
 
-Ademas del boton manual "Publicar en Instagram"/"Publicar en Google" y de "Publicar ahora" (publica una
-pieza aprobada al instante, sin esperar cronograma), las piezas `approved` con formato `post`, `historia`
-o `carrusel` pueden publicarse solas via un Vercel Cron diario (`vercel.json` → `/api/cron/publish-content`,
-protegido por la env var `CRON_SECRET`, ver `CLAUDE.md`).
+Ademas del boton manual "Publicar en Instagram"/"Publicar en Google" y de "Publicar ahora", las piezas
+`approved` pueden publicarse solas mediante dos crons editoriales protegidos por `CRON_SECRET`:
+`/api/cron/publish-stories` para historias y `/api/cron/publish-feed` para posts, carruseles y reels.
+El mantenimiento tecnico corre separado en `/api/cron/daily-maintenance`.
 
-- **Tres cronogramas independientes**: `app_config.auto_publish_settings` tiene `channels` (compartido) y
-  tres sub-objetos `post`/`historia`/`carrusel`, cada uno con `enabled`, `times_per_week`, `last_published_at`,
-  `last_run_at`, `last_run_result`. Se editan por separado desde la tarjeta "Publicacion automatica" en
-  `Estudio de contenido → Biblioteca`. Motivo: no conviene mezclar la cadencia de posts de feed con la de
-  historias ni con la de carruseles (referencia de investigacion sobre cadencia en cuentas de salud: no
-  publicar todos los dias; carrusel por default arranca en 1 vez por semana, es la pieza mas pesada de
-  producir). El tercer track corre dentro del mismo cron job, no suma un cron nuevo de Vercel (el plan
-  Hobby sigue limitado a 2, ver `CLAUDE.md`).
-- Cada cronograma elige, dentro de su propio formato, la pieza aprobada mas antigua (por `approved_at`) —
-  el reel queda siempre pendiente de accion manual, nunca bloquea ninguna cola.
+- **Cuatro cronogramas por formato**: `app_config.auto_publish_settings` tiene `channels` y los tracks
+  `post`/`historia`/`carrusel`/`reel`. Cada track guarda `enabled`, `timezone`, `schedule_slots`,
+  `items_per_run`, `starts_at`, `last_published_at`, `last_run_at` y `last_run_result`. La cantidad de
+  slots es la frecuencia semanal; ya no existe un contador redundante `times_per_week`.
+- La zona canonica es `America/Argentina/Buenos_Aires`. Historias usan la ventana 18:00–18:59 ART y
+  feed 19:00–19:59 ART. Vercel Hobby tiene precision horaria (±59 minutos), por eso la interfaz muestra
+  una ventana y no promete un minuto exacto.
+- La configuracion legacy `days_of_week` se migra al leerla, sin alterar `queue_rank`, piezas aprobadas,
+  evergreen ni los ultimos resultados operativos. Una nueva escritura solo acepta el modelo canonico.
+- Dos formatos principales de feed activos no pueden compartir noche. Como defensa adicional, el runtime
+  detiene los tracks restantes si una configuracion legacy superpuesta ya publico una pieza esa noche.
+- Cada cronograma elige, dentro de su propio formato, la pieza aprobada mas antigua (por `approved_at`).
 - A diferencia de post/historia (que generan la placa "de apuro" en el cron si todavia no existe), el
   track de carrusel **nunca genera imagenes dentro del cron** — como la aprobacion ya exige que todas
   esten listas de antes, si alguna falta simplemente se salta esa pieza con un error en vez de publicar

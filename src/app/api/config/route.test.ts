@@ -149,4 +149,37 @@ describe("POST /api/config", () => {
     expect(response.status).toBe(503)
     expect(JSON.stringify(await response.json())).not.toContain("secret db detail")
   })
+
+  it("rechaza una configuración editorial inconsistente antes de auditar o escribir", async () => {
+    const { upsert } = mockClient()
+    const response = await POST(new Request("http://localhost/api/config", {
+      method: "POST",
+      body: JSON.stringify({
+        key: "auto_publish_settings",
+        value: {
+          channels: ["instagram"],
+          post: {
+            enabled: true,
+            timezone: "America/Argentina/Buenos_Aires",
+            schedule_slots: [
+              { day_of_week: 4, local_time: "19:00" },
+              { day_of_week: 4, local_time: "19:00" },
+            ],
+            items_per_run: 1,
+            starts_at: null,
+            last_published_at: null,
+            last_run_at: null,
+            last_run_result: null,
+          },
+        },
+      }),
+    }))
+
+    expect(response.status).toBe(400)
+    expect(await response.json()).toEqual(expect.objectContaining({
+      code: "invalid_auto_publish_settings",
+    }))
+    expect(recordSecurityAudit).not.toHaveBeenCalled()
+    expect(upsert).not.toHaveBeenCalled()
+  })
 })

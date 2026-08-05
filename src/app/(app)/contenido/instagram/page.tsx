@@ -20,7 +20,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { createClient as createBrowserSupabaseClient } from "@/lib/supabase/client"
 import { parseAiJson } from "@/lib/parse-ai-json"
 import { truncateForImagePlate } from "@/lib/content-text"
-import { DEFAULT_AUTO_PUBLISH_SETTINGS, alreadyPublishedToday, estimateAutoPublishDrainDays, estimateAutoPublishDateForPosition, estimateRepeatEndDate, findRecentDuplicateTopic, pickNextPublishableItems, isReorderableInQueue, reorderableQueuePositions } from "@/lib/content-pipeline"
+import { AUTO_PUBLISH_TIMEZONE, AUTO_PUBLISH_WINDOW_BY_FORMAT, canStillPublishToday, DEFAULT_AUTO_PUBLISH_SETTINGS, estimateAutoPublishDrainDays, estimateAutoPublishDateForPosition, estimateRepeatEndDate, findRecentDuplicateTopic, getScheduledDays, getZonedScheduleParts, pickNextPublishableItems, isReorderableInQueue, normalizeAutoPublishSettings, reorderableQueuePositions } from "@/lib/content-pipeline"
 import { buildFallbackVideoPrompt, getVeoPromptQualityIssues } from "@/lib/video-prompt"
 import type { AutoPublishSettings, AutoPublishTrackSettings, ContentItem, ContentObjective, ContentSlide, ContentSource, ContentStatus, ContentVideoBrandScores, ContentVideoScores, VideoGenerationVersion } from "@/types"
 import type { InstagramMediaInsights } from "@/lib/instagram-business"
@@ -613,7 +613,7 @@ function isFutureStart(track: AutoPublishTrackSettings): boolean {
 
 /** true si hoy todavia puede ser la fecha de la proxima publicacion de este track (no si ya arranco en el futuro, ni si ya publico algo hoy). */
 function isTodayAvailableForQueueEstimate(track: AutoPublishTrackSettings, now: Date): boolean {
-  return !isFutureStart(track) && !alreadyPublishedToday(track, now)
+  return canStillPublishToday(track, now)
 }
 
 function toLocalInputValue(iso: string): string {
@@ -627,7 +627,8 @@ function fromLocalInputValue(value: string): string {
 }
 
 function describeAutoPublishQueue(kind: "post" | "historia" | "carrusel" | "reel", count: number, track: AutoPublishTrackSettings): string {
-  const { days_of_week: daysOfWeek, items_per_run: itemsPerRun } = track
+  const daysOfWeek = getScheduledDays(track)
+  const { items_per_run: itemsPerRun } = track
   const label = kind === "post"
     ? `${count} post${count === 1 ? "" : "s"} aprobado${count === 1 ? "" : "s"} en cola`
     : kind === "historia"
@@ -641,14 +642,42 @@ function describeAutoPublishQueue(kind: "post" | "historia" | "carrusel" | "reel
   const days = estimateAutoPublishDrainDays(count, daysOfWeek, itemsPerRun, now, isTodayAvailableForQueueEstimate(track, now))
   const article = kind === "historia" ? "la última saldría" : "el último saldría"
   const batch = itemsPerRun > 1 ? ` (publicando de a ${itemsPerRun})` : ""
-  const daysLabel = days === 0 ? "hoy" : `en unos ${days} días`
+  const daysLabel = days === 0 ? "hoy" : days === 1 ? "en aproximadamente 1 día" : `en unos ${days} días`
   return `${label} — a este ritmo${batch}, ${article} ${daysLabel}.`
 }
 
 function describeWeekdaySelection(daysOfWeek: number[]): string {
   if (daysOfWeek.length === 0) return ""
   const labels = WEEKDAY_OPTIONS.filter(option => daysOfWeek.includes(option.day)).map(option => option.label)
-  return `Publica los ${labels.join(", ")}.`
+  return `Publica: ${labels.join(", ")}.`
+}
+
+function describeWindow(track: AutoPublishTrackSettings): string {
+  const start = track.schedule_slots[0]?.local_time
+  if (!start) return "Sin horario configurado"
+  const [hour] = start.split(":").map(Number)
+  const end = `${String((hour + 1) % 24).padStart(2, "0")}:00`
+  return `Entre ${start} y ${end} ART`
+}
+
+function describeNextWindow(track: AutoPublishTrackSettings): string {
+  if (!track.enabled) return "Próxima ventana: activá este formato para calcularla."
+  const days = getScheduledDays(track)
+  if (days.length === 0) return "Próxima ventana: elegí al menos un día."
+  const now = new Date()
+  const date = estimateAutoPublishDateForPosition(1, days, 1, now, canStillPublishToday(track, now))
+  if (!date) return "Próxima ventana: no disponible."
+  const localDay = getZonedScheduleParts(date, track.timezone).dayOfWeek
+  const slot = track.schedule_slots.find(candidate => candidate.day_of_week === localDay) ?? track.schedule_slots[0]
+  const [hour] = slot.local_time.split(":").map(Number)
+  const end = `${String((hour + 1) % 24).padStart(2, "0")}:00`
+  const dayLabel = date.toLocaleDateString("es-AR", {
+    timeZone: track.timezone,
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+  })
+  return `Próxima ventana estimada: ${dayLabel}, entre ${slot.local_time} y ${end} ART.`
 }
 
 function describeAutoPublishIssue(issue: string): string {
@@ -659,12 +688,16 @@ function describeAutoPublishIssue(issue: string): string {
 
 function describeLastAutoPublishRun(track: AutoPublishTrackSettings): string | null {
   if (!track.last_run_at) return null
-  const when = new Date(track.last_run_at).toLocaleString("es-AR")
+  const when = new Date(track.last_run_at).toLocaleString("es-AR", { timeZone: track.timezone })
   const reasonMap: Record<string, string> = {
     skipped_disabled: "estaba apagada",
     skipped_scheduled: "todavía no llegó la fecha de inicio programada",
-    skipped_no_days: "no elegiste ningún día de la semana para este cronograma",
-    skipped_interval: "hoy no es uno de los días elegidos, o ya se publicó algo hoy",
+    skipped_no_slots: "no elegiste ningún día para este cronograma",
+    skipped_interval: "la configuración anterior no tenía una ventana elegible en esa corrida",
+    skipped_not_scheduled_day: "hoy no es uno de los días elegidos",
+    skipped_outside_window: "la corrida llegó fuera de la ventana configurada",
+    skipped_already_published: "ya se había publicado una pieza de este formato ese día",
+    skipped_feed_conflict: "ya se había publicado otra pieza principal de feed esa noche",
     skipped_no_item: "no había ninguna pieza aprobada lista para publicar",
   }
   const result = track.last_run_result ?? ""
@@ -689,10 +722,9 @@ function describeLastAutoPublishRun(track: AutoPublishTrackSettings): string | n
 }
 
 function WeekdayPicker({
-  selected, max, disabled, onChange,
+  selected, disabled, onChange,
 }: {
   selected: number[]
-  max: number
   disabled: boolean
   onChange: (days: number[]) => void
 }) {
@@ -700,14 +732,13 @@ function WeekdayPicker({
     <div className="flex flex-wrap gap-1">
       {WEEKDAY_OPTIONS.map(({ day, label }) => {
         const isSelected = selected.includes(day)
-        const atCap = !isSelected && selected.length >= max
         return (
           <Button
             key={day}
             type="button"
             variant={isSelected ? "default" : "outline"}
             size="sm"
-            disabled={disabled || atCap}
+            disabled={disabled}
             className="w-11 px-0"
             onClick={() => {
               const next = isSelected ? selected.filter(d => d !== day) : [...selected, day]
@@ -723,23 +754,24 @@ function WeekdayPicker({
 }
 
 function AutoPublishTrackCard({
-  title, track, queueText, saving, onToggleEnabled, onChangeTimesPerWeek, onChangeDaysOfWeek, onChangeStartsAt,
+  title, track, queueText, saving, issue, onToggleEnabled, onChangeDaysOfWeek, onChangeStartsAt,
   onChangeItemsPerRun,
 }: {
   title: string
   track: AutoPublishTrackSettings
   queueText: string
   saving: boolean
+  issue?: string | null
   onToggleEnabled: () => void
-  onChangeTimesPerWeek: (value: number) => void
   onChangeDaysOfWeek: (days: number[]) => void
   onChangeStartsAt: (iso: string | null) => void
   onChangeItemsPerRun?: (value: number) => void
 }) {
   const scheduled = isFutureStart(track)
   const lastRun = describeLastAutoPublishRun(track)
-  const weekdayLabel = describeWeekdaySelection(track.days_of_week)
-  const missingDays = track.enabled && track.days_of_week.length < track.times_per_week
+  const scheduledDays = getScheduledDays(track)
+  const weekdayLabel = describeWeekdaySelection(scheduledDays)
+  const missingDays = track.enabled && scheduledDays.length === 0
   return (
     <div className="rounded-lg border border-gray-100 p-3 space-y-2">
       <p className="text-sm font-medium text-gray-900">{title}</p>
@@ -752,17 +784,9 @@ function AutoPublishTrackCard({
         >
           {track.enabled ? "Activada" : "Desactivada"}
         </Button>
-        <div className="flex items-center gap-2 text-sm text-gray-700">
-          <Input
-            type="number"
-            min={1}
-            max={7}
-            value={track.times_per_week}
-            onChange={e => onChangeTimesPerWeek(Math.min(7, Math.max(1, Number(e.target.value) || 1)))}
-            className="w-16 text-gray-900"
-          />
-          <span>veces por semana</span>
-        </div>
+        <span className="text-sm text-gray-700">
+          {scheduledDays.length} {scheduledDays.length === 1 ? "vez" : "veces"} por semana
+        </span>
         {onChangeItemsPerRun && (
           <div className="flex items-center gap-2 text-sm text-gray-700">
             <span>Publicar de a</span>
@@ -790,19 +814,24 @@ function AutoPublishTrackCard({
         </p>
       )}
       <div className="space-y-1">
-        <p className="text-xs text-gray-500">Elegí en qué días (hasta {track.times_per_week}):</p>
+        <p className="text-xs text-gray-500">Elegí los días de publicación:</p>
         <WeekdayPicker
-          selected={track.days_of_week}
-          max={track.times_per_week}
+          selected={scheduledDays}
           disabled={saving}
           onChange={onChangeDaysOfWeek}
         />
         {missingDays && (
           <p className="text-xs font-medium text-amber-600">
-            Faltan {track.times_per_week - track.days_of_week.length} día(s) por elegir — hasta entonces no publica nada.
+            Elegí al menos un día; hasta entonces este formato no publica nada.
           </p>
         )}
       </div>
+      <div className="rounded-md bg-blue-50 px-2.5 py-2 text-xs text-blue-900">
+        <p className="font-medium">{describeWindow(track)}</p>
+        <p>Zona horaria: America/Argentina/Buenos_Aires.</p>
+        <p className="mt-1">{describeNextWindow(track)}</p>
+      </div>
+      {issue && <p className="text-xs font-medium text-red-600">{issue}</p>}
       <div className="flex flex-wrap items-center gap-2 text-sm text-gray-700">
         <span className="text-gray-500 shrink-0">Empezar:</span>
         <Button
@@ -824,7 +853,7 @@ function AutoPublishTrackCard({
       <p className="text-xs text-gray-500">{queueText}</p>
       {scheduled && (
         <p className="text-xs font-medium text-blue-700">
-          Programado para arrancar el {new Date(track.starts_at as string).toLocaleString("es-AR")} — hasta esa fecha no publica nada, aunque esté activada.
+          Programado para arrancar el {new Date(track.starts_at as string).toLocaleString("es-AR", { timeZone: track.timezone })} — hasta esa fecha no publica nada, aunque esté activada.
         </p>
       )}
       {lastRun && <p className="text-xs text-gray-500">{lastRun}</p>}
@@ -931,17 +960,9 @@ export default function ContentStudioPage() {
       .then(r => r.json())
       .then(data => {
         const stored = data.auto_publish_settings
-        if (stored?.post && stored?.historia) {
-          const loaded = {
-            channels: stored.channels ?? DEFAULT_AUTO_PUBLISH_SETTINGS.channels,
-            post: { ...DEFAULT_AUTO_PUBLISH_SETTINGS.post, ...stored.post },
-            historia: { ...DEFAULT_AUTO_PUBLISH_SETTINGS.historia, ...stored.historia },
-            carrusel: { ...DEFAULT_AUTO_PUBLISH_SETTINGS.carrusel, ...(stored.carrusel ?? {}) },
-            reel: { ...DEFAULT_AUTO_PUBLISH_SETTINGS.reel, ...(stored.reel ?? {}) },
-          }
-          setAutoPublishSettings(loaded)
-          setSavedAutoPublishSettings(loaded)
-        }
+        const loaded = normalizeAutoPublishSettings(stored)
+        setAutoPublishSettings(loaded)
+        setSavedAutoPublishSettings(loaded)
       })
       .catch(() => {})
   }, [])
@@ -961,9 +982,14 @@ export default function ContentStudioPage() {
     updateAutoPublishSettings({ ...autoPublishSettings, [track]: { ...autoPublishSettings[track], ...patch } })
   }
 
-  function changeTimesPerWeek(track: "post" | "historia" | "carrusel" | "reel", value: number) {
-    const current = autoPublishSettings[track]
-    updateTrackSettings(track, { times_per_week: value, days_of_week: current.days_of_week.slice(0, value) })
+  function changeScheduledDays(track: "post" | "historia" | "carrusel" | "reel", days: number[]) {
+    updateTrackSettings(track, {
+      timezone: AUTO_PUBLISH_TIMEZONE,
+      schedule_slots: days.map(day => ({
+        day_of_week: day,
+        local_time: AUTO_PUBLISH_WINDOW_BY_FORMAT[track],
+      })),
+    })
   }
 
   async function persistAutoPublishSettings() {
@@ -975,12 +1001,13 @@ export default function ContentStudioPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ key: "auto_publish_settings", value: autoPublishSettings }),
       })
-      if (!res.ok) throw new Error(`Error ${res.status}`)
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data.error || `Error ${res.status}`)
       setSavedAutoPublishSettings(autoPublishSettings)
       setAutoPublishSaved(true)
       setTimeout(() => setAutoPublishSaved(false), 2500)
-    } catch {
-      setAutoPublishError("No se pudo guardar. Probá de nuevo.")
+    } catch (error) {
+      setAutoPublishError(error instanceof Error ? error.message : "No se pudo guardar. Probá de nuevo.")
     } finally {
       setSavingAutoPublish(false)
     }
@@ -994,6 +1021,25 @@ export default function ContentStudioPage() {
     approvedCarrusel: items.filter(item => item.status === "approved" && item.format === "carrusel").length,
     approvedReel: items.filter(item => item.status === "approved" && item.format === "reel").length,
   }), [items])
+
+  const autoPublishIssues = useMemo(() => {
+    const issues = new Map<"post" | "historia" | "carrusel" | "reel", string>()
+    const occupied = new Map<number, "post" | "carrusel" | "reel">()
+    for (const format of ["post", "carrusel", "reel"] as const) {
+      const track = autoPublishSettings[format]
+      if (!track.enabled) continue
+      for (const day of getScheduledDays(track)) {
+        const previous = occupied.get(day)
+        if (previous) {
+          issues.set(format, "Ese día ya tiene otra pieza principal de feed. Elegí noches distintas.")
+          issues.set(previous, "Ese día ya tiene otra pieza principal de feed. Elegí noches distintas.")
+        } else {
+          occupied.set(day, format)
+        }
+      }
+    }
+    return issues
+  }, [autoPublishSettings])
 
   // Posicion (1-indexado) de cada pieza aprobada dentro de la cola de auto-publicacion de su propio
   // formato, y una fecha estimada de cuando saldria segun el cronograma configurado. Se usa tanto para
@@ -1013,7 +1059,7 @@ export default function ContentStudioPage() {
       queue.forEach(queuedItem => {
         if (queuedItem.status !== "approved") return
         position += 1
-        const date = estimateAutoPublishDateForPosition(position, track.days_of_week, track.items_per_run, now, todayAvailable)
+        const date = estimateAutoPublishDateForPosition(position, getScheduledDays(track), track.items_per_run, now, todayAvailable)
         const etaLabel = date
           ? date.toDateString() === now.toDateString()
             ? "estimado hoy"
@@ -1048,7 +1094,7 @@ export default function ContentStudioPage() {
       if (item.format !== "post" && item.format !== "historia" && item.format !== "carrusel" && item.format !== "reel") return
       const track = autoPublishSettings[item.format]
       const todayAvailable = isTodayAvailableForQueueEstimate(track, now)
-      const days = track.days_of_week
+      const days = getScheduledDays(track)
       let nextLabel: string
       let nextDate: Date | null = null
       if (days.length === 0) {
@@ -1908,8 +1954,9 @@ export default function ContentStudioPage() {
                 <CardHeader className="pb-3">
                   <CardTitle className="text-sm font-semibold text-gray-900">Publicación automática</CardTitle>
                   <p className="text-xs text-gray-500">
-                    Publica en Instagram de a <strong>una pieza por vez</strong> — la aprobada más antigua primero — con un
-                    cronograma propio para posts de feed y otro para historias, para que no salgan todas juntas.
+                    Cada formato usa días propios y una ventana editorial real en horario argentino. Las historias corren
+                    entre 18:00 y 19:00; posts, carruseles y reels entre 19:00 y 20:00. Vercel puede disparar en cualquier
+                    minuto dentro de esa hora.
                   </p>
                   <div className="flex flex-wrap items-center gap-3 pt-1">
                     <Button
@@ -1932,9 +1979,9 @@ export default function ContentStudioPage() {
                     track={autoPublishSettings.post}
                     queueText={describeAutoPublishQueue("post", counts.approvedPost, autoPublishSettings.post)}
                     saving={savingAutoPublish}
+                    issue={autoPublishIssues.get("post")}
                     onToggleEnabled={() => updateTrackSettings("post", { enabled: !autoPublishSettings.post.enabled })}
-                    onChangeTimesPerWeek={value => changeTimesPerWeek("post", value)}
-                    onChangeDaysOfWeek={days => updateTrackSettings("post", { days_of_week: days })}
+                    onChangeDaysOfWeek={days => changeScheduledDays("post", days)}
                     onChangeStartsAt={iso => updateTrackSettings("post", { starts_at: iso })}
                   />
                   <AutoPublishTrackCard
@@ -1942,9 +1989,9 @@ export default function ContentStudioPage() {
                     track={autoPublishSettings.historia}
                     queueText={describeAutoPublishQueue("historia", counts.approvedHistoria, autoPublishSettings.historia)}
                     saving={savingAutoPublish}
+                    issue={autoPublishIssues.get("historia")}
                     onToggleEnabled={() => updateTrackSettings("historia", { enabled: !autoPublishSettings.historia.enabled })}
-                    onChangeTimesPerWeek={value => changeTimesPerWeek("historia", value)}
-                    onChangeDaysOfWeek={days => updateTrackSettings("historia", { days_of_week: days })}
+                    onChangeDaysOfWeek={days => changeScheduledDays("historia", days)}
                     onChangeStartsAt={iso => updateTrackSettings("historia", { starts_at: iso })}
                     onChangeItemsPerRun={value => updateTrackSettings("historia", { items_per_run: value })}
                   />
@@ -1953,9 +2000,9 @@ export default function ContentStudioPage() {
                     track={autoPublishSettings.carrusel}
                     queueText={describeAutoPublishQueue("carrusel", counts.approvedCarrusel, autoPublishSettings.carrusel)}
                     saving={savingAutoPublish}
+                    issue={autoPublishIssues.get("carrusel")}
                     onToggleEnabled={() => updateTrackSettings("carrusel", { enabled: !autoPublishSettings.carrusel.enabled })}
-                    onChangeTimesPerWeek={value => changeTimesPerWeek("carrusel", value)}
-                    onChangeDaysOfWeek={days => updateTrackSettings("carrusel", { days_of_week: days })}
+                    onChangeDaysOfWeek={days => changeScheduledDays("carrusel", days)}
                     onChangeStartsAt={iso => updateTrackSettings("carrusel", { starts_at: iso })}
                   />
                   <AutoPublishTrackCard
@@ -1963,9 +2010,9 @@ export default function ContentStudioPage() {
                     track={autoPublishSettings.reel}
                     queueText={describeAutoPublishQueue("reel", counts.approvedReel, autoPublishSettings.reel)}
                     saving={savingAutoPublish}
+                    issue={autoPublishIssues.get("reel")}
                     onToggleEnabled={() => updateTrackSettings("reel", { enabled: !autoPublishSettings.reel.enabled })}
-                    onChangeTimesPerWeek={value => changeTimesPerWeek("reel", value)}
-                    onChangeDaysOfWeek={days => updateTrackSettings("reel", { days_of_week: days })}
+                    onChangeDaysOfWeek={days => changeScheduledDays("reel", days)}
                     onChangeStartsAt={iso => updateTrackSettings("reel", { starts_at: iso })}
                   />
                 </CardContent>

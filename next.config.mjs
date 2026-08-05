@@ -89,10 +89,15 @@ const nextConfig = {
       "node_modules/@ffmpeg-installer/**",
     ],
     "/api/content/upload-image": ["node_modules/@ffmpeg-installer/**"],
-    // El cron de publicacion automatica puede llamar a generateContentVisual() como red de seguridad
-    // si a una pieza aprobada le falta la placa (caso raro, ver publish-content/route.ts) -- necesita
-    // los mismos assets que /api/content/visual.
-    "/api/cron/publish-content": [
+    // Los crons editoriales pueden llamar a generateContentVisual() como red de seguridad si a una
+    // pieza aprobada le falta la placa -- necesitan los mismos assets que /api/content/visual.
+    "/api/cron/publish-stories": [
+      "src/lib/fonts/Fraunces-Bold.ttf",
+      "src/lib/fonts/Inter-Regular.ttf",
+      "src/lib/fonts/Inter-Bold.ttf",
+      "node_modules/@ffmpeg-installer/**",
+    ],
+    "/api/cron/publish-feed": [
       "src/lib/fonts/Fraunces-Bold.ttf",
       "src/lib/fonts/Inter-Regular.ttf",
       "src/lib/fonts/Inter-Bold.ttf",
