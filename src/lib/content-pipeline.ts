@@ -1,9 +1,123 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { z } from "zod"
-import type { AutoPublishSettings, AutoPublishTrackSettings, ContentChannel, ContentItem } from "@/types"
+import { CONTENT_OBJECTIVE_GOALS } from "@/types"
+import type { AutoPublishSettings, AutoPublishTrackSettings, ContentChannel, ContentItem, ContentObjective, ContentSource } from "@/types"
 
 const CONTENT_KEY = "content_pipeline"
 const SETTINGS_KEY = "auto_publish_settings"
+
+/** Categorias sugeridas en el combobox de "Generar contenido" -- vive aca (no en la pagina) para
+ * que el generador automatico de borradores (content-auto-draft.ts) pueda elegir entre las mismas
+ * opciones sin duplicar la lista. */
+export const CONTENT_CATEGORIES = [
+  "Consulta cardiologica", "Ecocardiograma", "Estudios cardiologicos", "Presion arterial", "Colesterol",
+  "Palpitaciones", "Sintomas de alarma", "Mitos y errores frecuentes", "Cardiologia femenina",
+  "Corazon y metabolismo", "Chequeo cardiovascular", "Habitos y adherencia", "Factores de riesgo",
+  "Atencion en Lanus", "Atencion en Lomas", "Atencion en Hospital Britanico", "Como pedir turno",
+]
+
+/** Pura, sin I/O: CONTENT_CATEGORIES mas cualquier categoria escrita a mano alguna vez (aunque no
+ * este en la lista curada) -- sin esto, una categoria personalizada tipeada una vez se perdia
+ * apenas se cerraba el formulario (fix 2026-08-05, PR #213). Ordenadas por uso mas reciente primero
+ * entre las personalizadas, para que la que Seba acaba de escribir aparezca arriba la proxima vez. */
+export function listKnownCategories(items: ContentItem[]): string[] {
+  const seen = new Map<string, string>()
+  for (const value of CONTENT_CATEGORIES) seen.set(value.toLocaleLowerCase("es"), value)
+  const byRecency = [...items].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+  for (const item of byRecency) {
+    const trimmed = item.category?.trim()
+    if (!trimmed) continue
+    const key = trimmed.toLocaleLowerCase("es")
+    if (!seen.has(key)) seen.set(key, trimmed)
+  }
+  return [...seen.values()]
+}
+
+export function capHashtags(raw: string, max = 5): string {
+  const tags = raw.match(/#[\p{L}0-9_]+/gu) ?? []
+  return tags.slice(0, max).join(" ")
+}
+
+export interface GeneratedContentPlan {
+  hook: string
+  caption: string
+  google_text: string
+  hashtags: string
+  visual_headline: string
+  visual_subtitle: string
+  visual_style: string
+  image_prompt?: string
+  image_alt_text?: string
+  slides?: Array<{ headline?: string; text?: string; image_prompt?: string }>
+  topic?: string
+  category?: string
+}
+
+/** Pura, sin I/O: arma un ContentItem nuevo (status "draft") a partir de lo que devuelve
+ * generateContentPlan/buildContentPlanPrompt -- misma logica que usaba el editor manual
+ * (saveGeneratedItem en la pagina) para que una pieza generada a mano y una generada por el cron de
+ * reposicion automatica (content-auto-draft.ts) queden exactamente igual de bien formadas. */
+export function buildDraftContentItem(params: {
+  generated: GeneratedContentPlan
+  topic: string
+  category: string
+  format: ContentItem["format"]
+  objective: ContentObjective
+  source?: ContentSource | null
+  now?: Date
+}): ContentItem {
+  const now = (params.now ?? new Date()).toISOString()
+  const text = (value: unknown): string => typeof value === "string" ? value.trim() : ""
+  const inferredTopic =
+    params.topic.trim() ||
+    text(params.generated.topic) ||
+    text(params.generated.visual_headline) ||
+    text(params.generated.hook) ||
+    params.category.trim() ||
+    "Contenido generado"
+  const inferredCategory =
+    params.category.trim() ||
+    text(params.generated.category) ||
+    "Contenido generado"
+  const rawSlides = params.generated.slides
+  const slides = Array.isArray(rawSlides)
+    ? rawSlides
+        .filter((slide): slide is { headline: string; text: string; image_prompt?: string } =>
+          typeof slide.headline === "string" && typeof slide.text === "string")
+        .map(slide => ({
+          headline: slide.headline.slice(0, 60),
+          text: slide.text.slice(0, 300),
+          image_prompt: typeof slide.image_prompt === "string" ? slide.image_prompt.slice(0, 2400) : undefined,
+        }))
+    : undefined
+
+  return {
+    id: crypto.randomUUID(),
+    topic: inferredTopic.slice(0, 200),
+    category: inferredCategory.slice(0, 160),
+    format: params.format,
+    goal: CONTENT_OBJECTIVE_GOALS[params.objective],
+    objective: params.objective,
+    status: "draft",
+    channels: ["instagram"],
+    source: params.source ?? null,
+    created_at: now,
+    updated_at: now,
+    approved_at: null,
+    hook: params.generated.hook,
+    caption: params.generated.caption,
+    google_text: params.generated.google_text.slice(0, 1500),
+    hashtags: capHashtags(params.generated.hashtags),
+    visual_headline: params.generated.visual_headline.slice(0, 90),
+    visual_subtitle: params.generated.visual_subtitle.slice(0, 90),
+    visual_style: (["rose", "blue", "teal"].includes(params.generated.visual_style)
+      ? params.generated.visual_style
+      : "blue") as "rose" | "blue" | "teal",
+    image_prompt: params.generated.image_prompt?.slice(0, 2400),
+    image_alt_text: params.generated.image_alt_text?.slice(0, 180),
+    slides: slides && slides.length > 0 ? slides : undefined,
+  }
+}
 
 export const AUTO_PUBLISH_TIMEZONE = "America/Argentina/Buenos_Aires" as const
 export const AUTO_PUBLISH_WINDOW_BY_FORMAT = {
@@ -477,7 +591,7 @@ export function moveItemInQueue(items: ContentItem[], id: string, direction: "up
   return items.map(item => ranks.has(item.id) ? { ...item, queue_rank: ranks.get(item.id) as number } : item)
 }
 
-const DEFAULT_DUPLICATE_TOPIC_WINDOW_DAYS = 15
+export const DEFAULT_DUPLICATE_TOPIC_WINDOW_DAYS = 15
 
 function normalizeForComparison(text: string): string {
   return text.trim().toLocaleLowerCase("es")

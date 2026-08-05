@@ -1882,13 +1882,15 @@ de poder ocurrir para piezas nuevas.
 **La placa ya publicada con el typo fue corregida por Seba a mano (2026-07-30)** — la regeneró y la
 resubió manualmente a Instagram. No quedó ningún pendiente sobre esa pieza puntual.
 
-### [BACKLOG] Cola de "historias" y "carruseles" aprobados en 0 (2026-08-05)
+### [RESUELTO] Cola de "historias" y "carruseles" aprobados en 0 (2026-08-05)
 `content_pipeline:` el cronograma de auto-publicación (post/historia/carrusel/reel) ya está activado y
 alineado con la cadencia recomendada por el análisis de insights de agosto (verificado en vivo contra
 producción). Pero al mismo momento, la cola de piezas **aprobadas** tenía: post=2, reel=1, carrusel=0,
 historia=0 — y solo 1 borrador sin generar en todo el pipeline. Aunque el cron de carrusel/historia
 dispare en el día/horario correcto, no publica nada real hasta que haya piezas nuevas generadas y
-aprobadas. Seba no confirmó todavía si quiere que se genere contenido nuevo para reponer la cola.
+aprobadas. **Resuelto el mismo día**: Seba confirmó que quiere "generación automática completa" —
+ver la entrada de CLAUDE.md "feedback de Seba sobre el Estudio de contenido" (2026-08-05) y
+`src/lib/content-auto-draft.ts` (nuevo cron `/api/cron/auto-draft-content`).
 
 ### [BUG] Sin diagnosticar — 3 historias con texto idéntico publicadas 11s aparte (2026-07-31)
 `content_pipeline`, items `6c7d370b-9a84-400e-b5ed-15691c6b7eb6`, `44d58e42-6a36-48cb-b698-e174bf52638e`,
