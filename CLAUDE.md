@@ -1,6 +1,28 @@
 ﻿# Lule Growth OS — Contexto para Claude
 
 ## Estado actual
+- 2026-08-06 (mismo día, tercera vuelta sobre el cierre de las historias — "siguen siendo muy
+  bruscas"): con las dos correcciones anteriores ya aplicadas (autocontenida, sin prometer datos que
+  no están), Seba miró las 2 historias reales que había dejado la última corrida del cron y marcó
+  que el cierre seguía sonando abrupto — "¿EL COLESTEROL ALTO SE SIENTE?" cerraba con "Link en la
+  bio para tu turno en Lomas de Zamora." (un fragmento tipo cartel, sin verbo, sin calidez) y
+  "¿SENTÍS VUELCOS EN EL CORAZÓN?" cerraba con "Charlemos en la consulta para que recuperes tu
+  tranquilidad." (vago — ni siquiera menciona la bio). Dio la corrección exacta: "Te invito a entrar
+  en mi bio para conocer más y solicitar un turno." y "Hacé clic en el link de mi bio para agendar
+  una consulta y recuperes tu tranquilidad." — una invitación cálida, en primera persona, que nombra
+  la acción concreta (entrar a la bio / hacer clic en el link), no una alusión vaga. `STORY_VISUAL_TEXT_RULES`
+  suma una prohibición explícita de cierre telegráfico/tipo cartel (con los dos ejemplos reales que
+  ya no sirven como modelo) y reemplaza los ejemplos válidos anteriores (que en retrospectiva
+  también eran demasiado secos, ej. "Link en la bio para pedir turno" — un ejemplo mío del fix
+  anterior que contribuyó a este mismo problema) por los dos ejemplos exactos que dio Seba. `npm
+  test` (1038/1038), lint y build sin errores. **Verificado en vivo** con 3 llamadas reales a
+  `POST /api/content` (`type: "content_plan"`, la misma ruta de "Generar propuesta completa" — no
+  persiste nada, así que no ensució la Biblioteca) para distintas categorías de historia: 2 de 3
+  salieron con el cierre cálido pedido, calcando casi textual los ejemplos de Seba ("Hace clic en el
+  link de mi bio para reservar tu turno.", "Entrá al link de mi bio para reservar tu turno."). La
+  tercera volvió a salir telegráfica ("Link en la bio para turnos.") — variabilidad esperada del
+  modelo, no un fallo de la regla (mismo caveat de siempre: reduce el riesgo, no lo elimina del
+  todo). Archivo: `src/lib/ai.ts` (+tests).
 - 2026-08-06 (mismo día, regeneración + revisión visual de un carrusel puntual en borrador): Seba
   marcó que un carrusel ya existente ("TRIGLICÉRIDOS ALTOS", en Biblioteca) seguía mostrando el
   corte de texto reportado antes en su slide 2 ("...aumentando el", sin terminar la frase) y pidió

@@ -501,7 +501,7 @@ describe("reglas de historia vs post/carrusel en el contenido generado", () => {
     else process.env.GEMINI_API_KEY = previousGeminiKey
   })
 
-  it("generateContentPlan: el system prompt incluye las reglas de historia (sin titulo+bajada, sin prometer datos que no estan, sin CTA de 'guardar')", async () => {
+  it("generateContentPlan: el system prompt incluye las reglas de historia (sin titulo+bajada, sin prometer datos que no estan, sin CTA de 'guardar', sin cierre telegrafico)", async () => {
     let sentSystem = ""
     fetchSpy = jest.spyOn(global, "fetch").mockImplementation(async (_url, init) => {
       const body = JSON.parse((init as RequestInit).body as string)
@@ -515,7 +515,11 @@ describe("reglas de historia vs post/carrusel en el contenido generado", () => {
     // "Guarda esta info". Estas dos prohibiciones nuevas evitan especificamente eso.
     expect(sentSystem).toMatch(/PROHIBIDO prometer contenido que no esta/)
     expect(sentSystem).toMatch(/PROHIBIDO cerrar con "Guarda esto"/)
-    expect(sentSystem).toMatch(/revisar el perfil de Instagram/)
+    // 2026-08-06, tercera vuelta: con esa regla aplicada, el cierre seguia sonando "brusco" (ej.
+    // "Link en la bio para tu turno...", "Charlemos en la consulta...") -- ni telegrafico ni vago,
+    // tiene que ser una invitacion calida que nombre la bio explicitamente.
+    expect(sentSystem).toMatch(/PROHIBIDO tambien un cierre telegrafico/)
+    expect(sentSystem).toMatch(/Te invito a entrar en mi bio/)
   })
 
   it("buildContentPlanPrompt (modo manual): tambien incluye las reglas de historia, sin importar el formato pedido", () => {
@@ -525,6 +529,7 @@ describe("reglas de historia vs post/carrusel en el contenido generado", () => {
     // aplica condicionalmente segun el "Formato Instagram" que ya viaja en el pedido.
     expect(promptForHistoria).toContain("HISTORIAS DE INSTAGRAM")
     expect(promptForHistoria).toMatch(/PROHIBIDO prometer contenido que no esta/)
+    expect(promptForHistoria).toMatch(/PROHIBIDO tambien un cierre telegrafico/)
     expect(promptForPost).toContain("HISTORIAS DE INSTAGRAM")
   })
 
