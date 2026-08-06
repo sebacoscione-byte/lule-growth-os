@@ -524,6 +524,13 @@ describe("reglas de historia vs post/carrusel en el contenido generado", () => {
     // "guardar" con variantes que esquivaban la lista literal anterior (ej. "guardá esta placa",
     // "guardalo") -- la prohibicion ahora cubre la raiz "guard-" en cualquier conjugacion/objeto.
     expect(sentSystem).toMatch(/guardá esta placa/)
+    // 2026-08-06, quinta vuelta: Seba pidio variedad -- no siempre empujar a "agendar", tambien
+    // invitar a informarse en la bio sin mencionar turno. Dos familias de cierre segun el objetivo,
+    // y aclaracion explicita de que la sugerencia de "guardar" de OBJECTIVE_GUIDANCE (pensada para
+    // post/carrusel) no aplica a historia.
+    expect(sentSystem).toMatch(/Informarse \(objetivos alcance\/educacion\/confianza\)/)
+    expect(sentSystem).toMatch(/Pedir turno \(objetivo conversion/)
+    expect(sentSystem).toMatch(/esa sugerencia especifica NO aplica/)
   })
 
   it("buildContentPlanPrompt (modo manual): tambien incluye las reglas de historia, sin importar el formato pedido", () => {
@@ -535,6 +542,7 @@ describe("reglas de historia vs post/carrusel en el contenido generado", () => {
     expect(promptForHistoria).toMatch(/PROHIBIDO prometer contenido que no esta/)
     expect(promptForHistoria).toMatch(/PROHIBIDO tambien un cierre telegrafico/)
     expect(promptForHistoria).toMatch(/PROHIBIDO el verbo "guardar" en CUALQUIER conjugacion/)
+    expect(promptForHistoria).toMatch(/Informarse \(objetivos alcance\/educacion\/confianza\)/)
     expect(promptForPost).toContain("HISTORIAS DE INSTAGRAM")
   })
 
