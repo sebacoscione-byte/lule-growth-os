@@ -1,6 +1,32 @@
 ﻿# Lule Growth OS — Contexto para Claude
 
 ## Estado actual
+- 2026-08-06 (mismo día, regeneración + revisión visual de un carrusel puntual en borrador): Seba
+  marcó que un carrusel ya existente ("TRIGLICÉRIDOS ALTOS", en Biblioteca) seguía mostrando el
+  corte de texto reportado antes en su slide 2 ("...aumentando el", sin terminar la frase) y pidió
+  que se regeneraran sus imágenes y que se revisara el carrusel completo. Confirmado que esas
+  imágenes puntuales eran de antes del fix de truncamiento del día (el campo `slide.text` en la base
+  ya estaba completo — "...aumentando el esfuerzo que debe hacer tu corazón." —, pero la imagen
+  vieja, generada antes del fix, seguía con el corte). Se regeneraron las 5 imágenes (portada + 4
+  slides) llamando a la ruta real `/api/content/visual` con una sesión real autenticada (login
+  headless vía Playwright + TOTP con `e2e/authenticated/login-helper.ts`, mismo mecanismo que usan
+  los tests E2E — no una simulación), y se persistieron en `content_pipeline` igual que hace el
+  editor. **Verificado visualmente de verdad** (se descargó cada imagen final y se inspeccionó,
+  no solo se confió en que la llamada a la API no tirara error): las 4 primeras salieron perfectas,
+  con el texto completo — incluida la slide de 170 caracteres, el subtítulo más largo del carrusel,
+  que ahora envuelve en 6 líneas sin cortarse. **Hallazgo real nuevo en la 5ta imagen (slide 4,
+  "El poder de tus hábitos")**: Gemini generó la foto (persona atándose el cordón en una plaza) pero
+  esa vez **no dibujó ningún texto en absoluto** — ni el titular ni el subtítulo, la placa quedó
+  completamente vacía de texto. No es el mismo bug que el corte (que ya tiene causa raíz y fix real,
+  ver arriba) — es la variabilidad conocida y no eliminable de un modelo generativo: V1 draws el
+  texto en la misma pasada que la foto, así que ocasionalmente puede omitirlo por completo, no solo
+  cortarlo. Un segundo intento (mismo prompt, misma versión) salió perfecto al toque. **No hay forma
+  de detectar esto por código sin OCR** (fuera de alcance) — es exactamente para esto que la card del
+  editor ya dice "Verificá que no haya diagnósticos... antes de aprobar": revisar visualmente antes
+  de aprobar sigue siendo necesario, el riesgo se redujo (fix de corte) pero no se eliminó del todo
+  (omisión ocasional del texto). Las 5 imágenes finales (con el reintento de la slide 4) quedaron
+  persistidas en el item real. No se tocó código en este paso — es una operación de datos, para eso
+  no hace falta PR.
 - 2026-08-06 (3 puntos de feedback de Seba sobre "Generar placa final" e historias automáticas):
   (1) **"la V1 sigue teniendo problemas de insertar el texto y no cortarlo"** — investigado con una
   captura real de una slide de carrusel cortada a mitad de oración ("...aumentando el"). Causa raíz
