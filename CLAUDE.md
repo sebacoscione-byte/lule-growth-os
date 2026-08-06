@@ -70,6 +70,26 @@
   determinístico). El punto (1)/(2) (V1 default, corte de texto) sigue sin una generación de imagen
   real de por medio — eso mantiene su costo real, no se forzó solo para verificar. Ninguna pieza
   aprobada/publicada tocada, solo las 5 en borrador señaladas.
+- 2026-08-06 (mismo día, la verificación de arriba destapó un segundo problema real): Seba revisó
+  las 3 historias nuevas en la Biblioteca y marcó 3 errores concretos con captura — (1) "no se puede
+  guardar una historia" (Instagram no tiene el hábito de "guardar" una historia como un post, pedirle
+  eso a alguien no tiene sentido en este formato); (2) "¿QUÉ MIRA UN ECOCARDIOGRAMA?" / "3 datos
+  clave sobre este estudio... Guardá esta info" — prometía "3 datos clave" y nunca los escribía en
+  ningún lado; (3) "GUARDÁ ESTA LISTA PARA TU PRÓXIMO CHEQUEO" — prometía una lista que tampoco
+  existía. La regla nueva del punto (3) de la entrada de arriba sacó el patrón título-artículo, pero
+  el modelo se corrió a un patrón igual de roto: una promesa vacía de contenido ("datos clave",
+  "esta lista") sin escribirlo, cerrando siempre con "Guardá esto/esta info/esta lista" — un CTA que
+  no tiene sentido para el formato en esta cuenta. Seba dio la corrección explícita con dos reglas
+  concretas: (1) las historias tienen que invitar a revisar las publicaciones del perfil o la bio
+  para pedir turno, nunca a "guardar"; (2) tienen que dar información real y concreta en pocas
+  palabras (ej. "¿Sabés que un electro mide esto, esto y esto? Entrá a mi perfil para conocer más" —
+  con 2-3 datos reales escritos ahí, no una promesa vacía), como gancho hacia el perfil. `STORY_VISUAL_TEXT_RULES`
+  (`src/lib/ai.ts`) reescrita con dos prohibiciones explícitas nuevas: nunca prometer datos/lista/
+  info que no estén escritos en el titular o subtítulo mismo, y nunca cerrar con "Guardá esto" —el
+  cierre siempre invita a revisar el perfil o la bio, para aprender más o para pedir turno según el
+  objetivo de la pieza. Las 3 historias reportadas se borraron (a pedido explícito, "Borra todas las
+  historias generadas ahora") sin volver a correr el cron todavía — antes había que corregir la
+  regla. `npm test` (1035/1035), lint y build sin errores. Archivo: `src/lib/ai.ts` (+tests).
 - 2026-08-05 (feedback de Seba sobre el Estudio de contenido, 4 puntos + generación automática de
   borradores): (1) las categorías escritas a mano en "Generar contenido" (fuera de la lista
   predefinida) no se guardaban en ningún lado — se perdían al reabrir el formulario. Fix: nueva

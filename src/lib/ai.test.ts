@@ -501,7 +501,7 @@ describe("reglas de historia vs post/carrusel en el contenido generado", () => {
     else process.env.GEMINI_API_KEY = previousGeminiKey
   })
 
-  it("generateContentPlan: el system prompt incluye la regla de historia autocontenida (sin patron titulo+bajada)", async () => {
+  it("generateContentPlan: el system prompt incluye las reglas de historia (sin titulo+bajada, sin prometer datos que no estan, sin CTA de 'guardar')", async () => {
     let sentSystem = ""
     fetchSpy = jest.spyOn(global, "fetch").mockImplementation(async (_url, init) => {
       const body = JSON.parse((init as RequestInit).body as string)
@@ -510,15 +510,21 @@ describe("reglas de historia vs post/carrusel en el contenido generado", () => {
     })
     await generateContentPlan(planInput)
     expect(sentSystem).toContain("HISTORIAS DE INSTAGRAM")
-    expect(sentSystem).toMatch(/mensaje COMPLETO por si solo/)
+    // 2026-08-06, segunda vuelta: la primera regla saco el patron "titulo-articulo" pero el modelo se
+    // corrio a otro roto -- prometer "3 datos clave"/"esta lista" sin escribirlos, y cerrar con
+    // "Guarda esta info". Estas dos prohibiciones nuevas evitan especificamente eso.
+    expect(sentSystem).toMatch(/PROHIBIDO prometer contenido que no esta/)
+    expect(sentSystem).toMatch(/PROHIBIDO cerrar con "Guarda esto"/)
+    expect(sentSystem).toMatch(/revisar el perfil de Instagram/)
   })
 
-  it("buildContentPlanPrompt (modo manual): tambien incluye la regla de historia, sin importar el formato pedido", () => {
+  it("buildContentPlanPrompt (modo manual): tambien incluye las reglas de historia, sin importar el formato pedido", () => {
     const promptForHistoria = buildContentPlanPrompt({ ...planInput, format: "historia" })
     const promptForPost = buildContentPlanPrompt({ ...planInput, format: "post" })
     // La regla es estatica (no depende del formato) para no romper el prompt caching -- el modelo la
     // aplica condicionalmente segun el "Formato Instagram" que ya viaja en el pedido.
     expect(promptForHistoria).toContain("HISTORIAS DE INSTAGRAM")
+    expect(promptForHistoria).toMatch(/PROHIBIDO prometer contenido que no esta/)
     expect(promptForPost).toContain("HISTORIAS DE INSTAGRAM")
   })
 })

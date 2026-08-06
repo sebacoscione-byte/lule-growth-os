@@ -311,11 +311,21 @@ const PATIENT_ACQUISITION_RULES = `CRITERIO DE CAPTACION DE PACIENTES:
 // causa: el prompt nunca distinguia el formato "historia" de un post al pedir visual_headline/
 // visual_subtitle, pese a que una historia se publica SIN caption y SIN link (ver asStory en
 // instagram-business.ts) -- el titular/subtitulo de la placa es literalmente todo el mensaje, no un
-// anticipo de algo que sigue.
+// anticipo de algo que sigue. Primer intento de regla (ese mismo dia): pidio un mensaje autocontenido
+// -- el modelo dejo de escribir titulo-articulo, pero se corrio a un patron igual de roto: prometer
+// contenido que nunca aparece ("3 datos clave sobre este estudio...", "Guarda esta lista para tu
+// proximo chequeo") sin escribir esos datos/esa lista en ningun lado, y cerrar siempre con "Guarda
+// esta info/historia" -- un CTA que no tiene sentido para el formato en esta cuenta (no hay ningun
+// habito de "guardar" una historia acá, a diferencia de un post). Reportado por Seba con 3 ejemplos
+// reales en la misma corrida. Reescrita con dos reglas explicitas nuevas: prohibido prometer
+// datos/lista que no esten escritos ahi mismo, y el cierre siempre invita a revisar el perfil
+// (publicaciones) o la bio (para pedir turno), nunca a "guardar".
 const STORY_VISUAL_TEXT_RULES = `HISTORIAS DE INSTAGRAM (formato "historia") -- diferencia critica con un post o carrusel:
 - Una historia se ve como UNA sola imagen a pantalla completa durante unos segundos. No tiene caption, no tiene link ni boton, y nadie puede "seguir leyendo" -- lo unico que la persona ve es el titular y el subtitulo de la placa.
-- Por eso el titular y el subtitulo de una historia NUNCA pueden ser un titulo-gancho + bajada explicativa al estilo de un articulo o de un post (ej: "ECOCARDIOGRAMA SIN MISTERIOS" + "Como es el estudio que mira tu corazon en tiempo real"). Ese patron funciona en un post porque el caption completa la idea despues -- en una historia no hay ningun "despues", asi que la persona se queda sin saber que hacer con lo que acaba de leer.
-- El titular de una historia tiene que ser el mensaje COMPLETO por si solo: un dato concreto, un recordatorio o una pregunta directa que se entiende de un vistazo sin necesitar el subtitulo (ej: "¿Te tomaste la presion esta semana?", "Los mareos frecuentes tambien pueden ser una señal de alarma", "Hoy atiendo en Hospital Britanico (Central)"). El subtitulo, si se usa, es opcional y muy breve -- un cierre corto o recordatorio de canal (ej: "Turnos: link en la bio"), nunca una segunda oracion que explique o complete el titular.
+- Por eso el titular y el subtitulo de una historia NUNCA pueden ser un titulo-gancho + bajada explicativa al estilo de un articulo o de un post (ej: "ECOCARDIOGRAMA SIN MISTERIOS" + "Como es el estudio que mira tu corazon en tiempo real"). Ese patron funciona en un post porque el caption completa la idea despues -- en una historia no hay ningun "despues" en el mismo lugar.
+- PROHIBIDO prometer contenido que no esta: nunca escribas "3 datos clave", "esta lista", "esta info" ni ninguna otra referencia a datos/una lista/informacion que en los hechos NO aparecen en el titular ni en el subtitulo. Si decis que hay un dato, ese dato tiene que estar escrito ahi mismo (aunque sea uno solo, corto) -- nunca una promesa vacia de contenido que no se ve en ningun lado.
+- PROHIBIDO cerrar con "Guarda esto" / "Guarda esta historia" / "Guarda esta info" / "Guarda esta lista" como CTA: no tiene sentido pedirle a alguien que "guarde" una historia en esta cuenta (a diferencia de un post, no es un habito real de este formato aca). El cierre de una historia SIEMPRE invita a revisar el perfil de Instagram (las publicaciones ya guardadas ahi) o el link de la bio -- para aprender mas o para pedir turno, segun el objetivo de la pieza -- nunca a "guardar" nada. Ejemplos validos de cierre: "Mira mis publicaciones para conocer mas", "Entra a mi perfil para el resto", "Link en la bio para pedir turno".
+- Patron recomendado: dar UN dato o idea concreta y real en pocas palabras (nunca una promesa vacia de que hay datos en otro lado) + la invitacion a revisar perfil/bio de arriba. Ejemplo real que sirve de modelo: "¿Sabias que un electrocardiograma mide esto, esto y esto? Entra a mi perfil para conocer mas" -- ahi "esto, esto y esto" representa 2-3 datos reales y cortos que SI van escritos, no una promesa vacia.
 - Mucho mas corto que un post: pensalo como un cartel que se lee entero en dos segundos, no como el titular de una nota.
 - Para post y carrusel, en cambio, el titular SI puede funcionar como gancho/anticipo (el caption da el contexto completo despues) -- esta regla es especifica de "historia".`
 
