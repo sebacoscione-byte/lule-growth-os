@@ -51,6 +51,25 @@
   razonablemente bien — no determinístico, reduce el riesgo pero no lo elimina. Archivos:
   `src/lib/ai.ts` (+tests), `src/app/api/content/visual/route.ts` (+tests),
   `src/app/(app)/contenido/instagram/page.tsx`, `src/types/index.ts`.
+- 2026-08-06 (mismo día, cierre real del punto 3 de arriba): Seba pidió borrar las 5 historias en
+  borrador que había generado el cron con el patrón viejo y volver a correr el cron. Confirmado por
+  datos reales (consulta de solo lectura a `app_config.content_pipeline`, sin PII) que las 5 eran
+  genuinamente del auto-draft: todas con `source: null`, creadas en dos tandas de segundos de
+  diferencia el 2026-08-05 (19:32:15 y 19:33:50 UTC), con el patrón exacto reportado (ej.
+  "ECOCARDIOGRAMA SIN MISTERIOS"/"Cómo es el estudio que mira tu corazón en tiempo real") — nada
+  parecido a una creación manual de a una desde la UI. Borradas por id (mismo criterio que el `DELETE
+  ?id=` de `/api/content/items`, sin tocar ninguna otra pieza). Se corrió `/api/cron/auto-draft-content`
+  de verdad (server local + `curl` con el `CRON_SECRET` real, no un script que reimplementa la
+  lógica) — `{"skipped":false,"planned":3,"generated":3}`, las 3 nuevas piezas salieron formato
+  historia (el resto de los tracks no tenía déficit). **Cierra el "no verificado en vivo" del punto
+  (3) de la entrada de arriba**: las 3 historias nuevas ya no usan el patrón título-artículo +
+  bajada explicativa — ahora son preguntas de identificación o datos concretos con un cierre tipo
+  CTA ("¿Cansancio extremo o falta de aire al caminar?" / "La insuficiencia cardíaca se puede tratar
+  a tiempo. Guardá esta info.") — mejora real y verificada, aunque una de las tres repite la idea de
+  "guardá esto" en titular y subtítulo (no es un error, solo redundante — el modelo sigue sin ser
+  determinístico). El punto (1)/(2) (V1 default, corte de texto) sigue sin una generación de imagen
+  real de por medio — eso mantiene su costo real, no se forzó solo para verificar. Ninguna pieza
+  aprobada/publicada tocada, solo las 5 en borrador señaladas.
 - 2026-08-05 (feedback de Seba sobre el Estudio de contenido, 4 puntos + generación automática de
   borradores): (1) las categorías escritas a mano en "Generar contenido" (fuera de la lista
   predefinida) no se guardaban en ningún lado — se perdían al reabrir el formulario. Fix: nueva
