@@ -1,6 +1,31 @@
 ﻿# Lule Growth OS — Contexto para Claude
 
 ## Estado actual
+- 2026-08-06 (mismo día, borrado + reposición manual a 2 semanas de cola + cuarta vuelta sobre el
+  cierre de historias): Seba pidió borrar las historias en borrador generadas por el cron y volver
+  a generar piezas para tener al menos 2 semanas de cola cubierta. Calculado contra la config real
+  de `auto_publish_settings` (historia publica 5 días/semana, post 1, carrusel 2 — cada uno
+  `items_per_run: 1`): objetivo a 2 semanas = 10 historias / 2 posts / 4 carruseles. Se generaron
+  13 piezas nuevas llamando a la función real (`POST /api/content`, `type: "content_plan"` — la
+  misma que usa "Generar propuesta completa", con una sesión autenticada real vía Playwright+TOTP,
+  no una reimplementación) y se persistieron con la ruta real de guardado
+  (`POST /api/content/items`). **Generando ese lote real a escala (10 historias de una), 7 de 10
+  volvieron a usar el patrón "guardar"** con variantes que esquivaban la lista literal de 4 frases
+  prohibidas del fix anterior (ej. "guardá esta PLACA", "guardalo" — ninguna coincidía exacto con
+  las 4 frases baneadas, pero todas eran la misma idea de fondo) — 2 de esas 7 incluso repitieron
+  frases literales YA prohibidas ("guarda esto", "guardá esta info"), confirmando que además de la
+  laguna de alcance, el modelo tampoco sigue la regla el 100% de las veces. `STORY_VISUAL_TEXT_RULES`
+  reescrita para prohibir la raíz "guard-" en cualquier conjugación/objeto, no una lista cerrada de
+  frases exactas, y se sumaron 2 ejemplos válidos más (variedad). Se regeneraron las 7 no
+  conformes; en esa segunda tanda aparecieron 3 nuevas que ya no usaban "guardar" ni sonaban a
+  cartel, pero **directamente omitían cualquier mención a la bio/perfil** (un incumplimiento
+  distinto, contra un requisito que la regla ya pedía explícitamente) — al reintentar esas 3
+  puntuales se descubrió que devolvían la MISMA respuesta cacheada cada vez (mismo hash de prompt:
+  categoría+objetivo+tema vacío sin variar) — se corrigieron esas 3 a mano, por edición directa de
+  texto (no otra llamada a IA, dado el cacheo), agregando un cierre corto conforme ("Agendá en mi
+  bio."). Estado final verificado uno por uno: 10/10 historias, 2/2 posts y 4/4 carruseles cubren
+  las 2 semanas, y las 10 historias cumplen sin "guardar" y con mención explícita de bio/perfil.
+  `npm test` (1040/1040), lint y build sin errores. Archivo: `src/lib/ai.ts` (+tests).
 - 2026-08-06 (mismo día, dos bugs reales más de texto en la placa V1, encontrados verificando en
   vivo): Seba mandó una captura de una publicación real ya salida al aire con la palabra "seguros"
   partida con un guión al saltar de línea — "...que tus tratamientos sean se-guros." — y pidió

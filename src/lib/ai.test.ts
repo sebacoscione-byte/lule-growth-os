@@ -514,12 +514,16 @@ describe("reglas de historia vs post/carrusel en el contenido generado", () => {
     // corrio a otro roto -- prometer "3 datos clave"/"esta lista" sin escribirlos, y cerrar con
     // "Guarda esta info". Estas dos prohibiciones nuevas evitan especificamente eso.
     expect(sentSystem).toMatch(/PROHIBIDO prometer contenido que no esta/)
-    expect(sentSystem).toMatch(/PROHIBIDO cerrar con "Guarda esto"/)
+    expect(sentSystem).toMatch(/PROHIBIDO el verbo "guardar" en CUALQUIER conjugacion/)
     // 2026-08-06, tercera vuelta: con esa regla aplicada, el cierre seguia sonando "brusco" (ej.
     // "Link en la bio para tu turno...", "Charlemos en la consulta...") -- ni telegrafico ni vago,
     // tiene que ser una invitacion calida que nombre la bio explicitamente.
     expect(sentSystem).toMatch(/PROHIBIDO tambien un cierre telegrafico/)
     expect(sentSystem).toMatch(/Te invito a entrar en mi bio/)
+    // 2026-08-06, cuarta vuelta: generando un lote real de 10 historias, 7/10 volvieron a usar
+    // "guardar" con variantes que esquivaban la lista literal anterior (ej. "guardá esta placa",
+    // "guardalo") -- la prohibicion ahora cubre la raiz "guard-" en cualquier conjugacion/objeto.
+    expect(sentSystem).toMatch(/guardá esta placa/)
   })
 
   it("buildContentPlanPrompt (modo manual): tambien incluye las reglas de historia, sin importar el formato pedido", () => {
@@ -530,6 +534,7 @@ describe("reglas de historia vs post/carrusel en el contenido generado", () => {
     expect(promptForHistoria).toContain("HISTORIAS DE INSTAGRAM")
     expect(promptForHistoria).toMatch(/PROHIBIDO prometer contenido que no esta/)
     expect(promptForHistoria).toMatch(/PROHIBIDO tambien un cierre telegrafico/)
+    expect(promptForHistoria).toMatch(/PROHIBIDO el verbo "guardar" en CUALQUIER conjugacion/)
     expect(promptForPost).toContain("HISTORIAS DE INSTAGRAM")
   })
 
