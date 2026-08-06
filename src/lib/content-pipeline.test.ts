@@ -4,8 +4,9 @@ import {
   pickNextPublishableItems, moveItemInQueue, resolveChannelsToPublish, DEFAULT_AUTO_PUBLISH_SETTINGS,
   isRepeatDue, findRecentDuplicateTopic, estimateRepeatEndDate, isReorderableInQueue,
   reorderableQueuePositions, autoPublishSettingsSchema, getZonedScheduleParts,
-  isWithinScheduledWindow, normalizeAutoPublishSettings,
+  isWithinScheduledWindow, normalizeAutoPublishSettings, buildDraftContentItem,
 } from "@/lib/content-pipeline"
+import { MAX_VISUAL_SUBTITLE_LENGTH } from "@/lib/content-text"
 import type { AutoPublishTrackSettings, ContentItem } from "@/types"
 
 function item(overrides: Partial<ContentItem> = {}): ContentItem {
@@ -641,5 +642,38 @@ describe("resolveChannelsToPublish", () => {
       ["instagram", "google_business"]
     )
     expect(result).toEqual(["google_business"])
+  })
+})
+
+// 2026-08-06: bug real reportado por Seba tras revisar historias generadas por el auto-draft --
+// visual_subtitle se guardaba con un slice(0, 90) ciego, que cortaba a mitad de palabra un subtitulo
+// mas largo (ej. "...te ayuda a protegerlo y manten" en vez de "...y mantenerlo"). La regla nueva de
+// historias (STORY_VISUAL_TEXT_RULES) pide un dato real concreto, que suele superar 90 caracteres --
+// ahora usa truncateForImagePlate (corta en un limite de oracion/palabra, nunca a mitad) con un tope
+// mas alto (140, MAX_VISUAL_SUBTITLE_LENGTH).
+describe("buildDraftContentItem", () => {
+  const generated = {
+    hook: "hook", caption: "caption", google_text: "google text", hashtags: "#tag1 #tag2",
+    visual_headline: "titulo", visual_subtitle: "subtitulo corto", visual_style: "rose",
+  }
+
+  it("no toca un subtitulo que ya entra en el limite", () => {
+    const result = buildDraftContentItem({
+      generated, topic: "Tema", category: "Categoria", format: "historia", objective: "educacion",
+    })
+    expect(result.visual_subtitle).toBe("subtitulo corto")
+  })
+
+  it("un subtitulo largo se corta en un limite de oracion, nunca a mitad de palabra", () => {
+    const longSubtitle = "Significa que trabaja con menos fuerza, no que se detiene por completo, y eso es fundamental entenderlo bien. Un control a tiempo te ayuda a protegerlo y mantenerlo funcionando lo mejor posible por mucho mas tiempo."
+    expect(longSubtitle.length).toBeGreaterThan(MAX_VISUAL_SUBTITLE_LENGTH)
+    const result = buildDraftContentItem({
+      generated: { ...generated, visual_subtitle: longSubtitle },
+      topic: "Tema", category: "Categoria", format: "historia", objective: "educacion",
+    })
+    expect(result.visual_subtitle.length).toBeLessThanOrEqual(MAX_VISUAL_SUBTITLE_LENGTH)
+    // Se corta en el punto de la primera oracion completa, no a mitad de una palabra.
+    expect(result.visual_subtitle).toBe("Significa que trabaja con menos fuerza, no que se detiene por completo, y eso es fundamental entenderlo bien.")
+    expect(longSubtitle.startsWith(result.visual_subtitle)).toBe(true)
   })
 })

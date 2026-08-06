@@ -5,6 +5,7 @@ import { readContentItems, writeContentItems } from "@/lib/content-pipeline"
 import { readContentInsightWindows } from "@/lib/content-insights"
 import type { ContentItem } from "@/types"
 import { authorizeStaff } from "@/lib/staff-authz"
+import { MAX_VISUAL_SUBTITLE_LENGTH } from "@/lib/content-text"
 
 const INTERACTION_EVENT_TYPES = new Set(["click_booking", "click_call", "click_whatsapp", "click_maps"])
 const CONTENT_ROLES = ["owner", "doctor"] as const
@@ -135,7 +136,7 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: "Reel de prueba invalido" }, { status: 400 })
     }
     if ((body.google_text?.length ?? 0) > 1500 || (body.visual_headline?.length ?? 0) > 90 ||
-      (body.visual_subtitle?.length ?? 0) > 90 || (body.image_prompt?.length ?? 0) > 2400 ||
+      (body.visual_subtitle?.length ?? 0) > MAX_VISUAL_SUBTITLE_LENGTH || (body.image_prompt?.length ?? 0) > 2400 ||
       (body.image_alt_text?.length ?? 0) > 180 || (body.video_url?.length ?? 0) > 500 ||
       (body.video_prompt?.length ?? 0) > 2400 || (body.video_reference_frame_url?.length ?? 0) > 500 ||
       (body.video_reference_frame_path?.length ?? 0) > 300) {

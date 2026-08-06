@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js"
 import { z } from "zod"
 import { CONTENT_OBJECTIVE_GOALS } from "@/types"
 import type { AutoPublishSettings, AutoPublishTrackSettings, ContentChannel, ContentItem, ContentObjective, ContentSource } from "@/types"
+import { MAX_VISUAL_SUBTITLE_LENGTH, truncateForImagePlate } from "@/lib/content-text"
 
 const CONTENT_KEY = "content_pipeline"
 const SETTINGS_KEY = "auto_publish_settings"
@@ -109,7 +110,7 @@ export function buildDraftContentItem(params: {
     google_text: params.generated.google_text.slice(0, 1500),
     hashtags: capHashtags(params.generated.hashtags),
     visual_headline: params.generated.visual_headline.slice(0, 90),
-    visual_subtitle: params.generated.visual_subtitle.slice(0, 90),
+    visual_subtitle: truncateForImagePlate(params.generated.visual_subtitle, MAX_VISUAL_SUBTITLE_LENGTH),
     visual_style: (["rose", "blue", "teal"].includes(params.generated.visual_style)
       ? params.generated.visual_style
       : "blue") as "rose" | "blue" | "teal",

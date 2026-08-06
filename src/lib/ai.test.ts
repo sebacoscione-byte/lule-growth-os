@@ -527,6 +527,21 @@ describe("reglas de historia vs post/carrusel en el contenido generado", () => {
     expect(promptForHistoria).toMatch(/PROHIBIDO prometer contenido que no esta/)
     expect(promptForPost).toContain("HISTORIAS DE INSTAGRAM")
   })
+
+  // 2026-08-06: bug real encontrado verificando la regla de arriba en vivo -- al pedirle un dato real
+  // (en vez de una promesa vacia), el modelo escribio subtitulos de mas de 90 caracteres, que
+  // buildDraftContentItem cortaba con un slice(0, 90) ciego a mitad de palabra. generateContentPlan
+  // ahora usa truncateForImagePlate con el tope mas alto MAX_VISUAL_SUBTITLE_LENGTH (140).
+  it("un visual_subtitle largo se corta en un limite de oracion, nunca a mitad de palabra", async () => {
+    const longSubtitle = "Significa que trabaja con menos fuerza, no que se detiene por completo, y eso es fundamental entenderlo bien. Un control a tiempo te ayuda a protegerlo y mantenerlo funcionando lo mejor posible por mucho mas tiempo."
+    fetchSpy = jest.spyOn(global, "fetch").mockResolvedValue(
+      geminiHttpResponse(JSON.stringify({ ...validPlan, visual_subtitle: longSubtitle }))
+    )
+    const result = await generateContentPlan(planInput)
+    expect(result.visual_subtitle.length).toBeLessThanOrEqual(140)
+    expect(result.visual_subtitle).toBe("Significa que trabaja con menos fuerza, no que se detiene por completo, y eso es fundamental entenderlo bien.")
+    expect(longSubtitle.startsWith(result.visual_subtitle)).toBe(true)
+  })
 })
 
 // 2026-08-05: a pedido explicito de Seba, el generador automatico de borradores no solo tiene que

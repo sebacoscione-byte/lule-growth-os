@@ -4,6 +4,7 @@ import { createClient as createSupabaseClient } from "@supabase/supabase-js"
 import { parseAiJson } from "@/lib/parse-ai-json"
 import { EMERGENCY_REPLY, MEDICAL_BOUNDARY_REPLY, isEmergencyMessage, isMedicalBoundaryMessage } from "@/lib/medical-safety"
 import { composeContentPlate } from "@/lib/content-plate"
+import { MAX_VISUAL_SUBTITLE_LENGTH, truncateForImagePlate } from "@/lib/content-text"
 import {
   buildFallbackVideoPrompt,
   buildFallbackVideoReferencePrompt,
@@ -523,7 +524,7 @@ Usá exactamente estas claves:
   "google_text": "texto para publicación en Google Business, máximo 1500 caracteres",
   "hashtags": "#hashtag1 #hashtag2 (3-5, mezclando niveles según HASHTAG_RULES de arriba)",
   "visual_headline": "titular para la placa visual, máximo 60 caracteres",
-  "visual_subtitle": "subtítulo para la placa visual, máximo 80 caracteres",
+  "visual_subtitle": "subtítulo para la placa visual, máximo 120 caracteres (para 'historia', dejale lugar real al dato concreto que pide HISTORIAS DE INSTAGRAM de arriba, no lo escribas tan largo que se corte)",
   "visual_style": "rose",
   "image_prompt": "prompt visual detallado listo para que Gemini genere la placa final",
   "image_alt_text": "descripcion accesible breve en espanol"
@@ -1010,8 +1011,8 @@ ${input.format === "carrusel" ? "Es un CARRUSEL: generá 4-5 slides con headline
   "caption": "...",
   "google_text": "...",
   "hashtags": "3 a 5, mezclando niveles segun HASHTAG_RULES (amplio + nicho + geo), separados por espacio",
-  "visual_headline": "...",
-  "visual_subtitle": "...",
+  "visual_headline": "... (maximo 60 caracteres)",
+  "visual_subtitle": "... (maximo 120 caracteres -- para 'historia', dejale lugar real al dato concreto que pide HISTORIAS DE INSTAGRAM de arriba, no lo escribas tan largo que se corte)",
   "image_prompt": "...",
   "image_alt_text": "..."${slidesSchema}
 }`
@@ -1068,7 +1069,7 @@ ${HASHTAG_RULES}
     google_text: stripMarkdownArtifacts((parsed.google_text as string).slice(0, 1500)),
     hashtags: capHashtags(parsed.hashtags as string),
     visual_headline: stripMarkdownArtifacts((parsed.visual_headline as string).slice(0, 90)),
-    visual_subtitle: stripMarkdownArtifacts((parsed.visual_subtitle as string).slice(0, 90)),
+    visual_subtitle: stripMarkdownArtifacts(truncateForImagePlate(parsed.visual_subtitle as string, MAX_VISUAL_SUBTITLE_LENGTH)),
     visual_style: ["rose", "blue", "teal"].includes(parsed.visual_style as string)
       ? parsed.visual_style as "rose" | "blue" | "teal"
       : "blue",
