@@ -1,6 +1,25 @@
 ﻿# Lule Growth OS — Contexto para Claude
 
 ## Estado actual
+- 2026-08-06 (mismo día, dos bugs reales más de texto en la placa V1, encontrados verificando en
+  vivo): Seba mandó una captura de una publicación real ya salida al aire con la palabra "seguros"
+  partida con un guión al saltar de línea — "...que tus tratamientos sean se-guros." — y pidió
+  arreglarlo. **Causa confirmada** (consulta directa a producción, no una hipótesis): el
+  `visual_subtitle` guardado NO tenía guión — "...sean seguros." completo — así que Gemini lo
+  insertó él mismo al dibujar el texto, como estrategia propia de wrap tipográfico (V1 dibuja el
+  texto, no lo compone nuestro código). El prompt reforzado de más arriba en este mismo día ("nunca
+  cortes/recortes texto, wrappeá como haga falta") nunca prohibió explícitamente partir una palabra
+  con un guión — nueva instrucción explícita en `buildVisualPromptV1`: cada palabra completa en una
+  sola línea, mover la palabra entera a la siguiente línea en vez de partirla, nunca insertar un
+  guión. **Verificando este fix con una generación real** (misma categoría/pieza real que la
+  publicada) apareció un SEGUNDO bug, no reportado, encontrado en el camino: Gemini dibujó la
+  palabra literal **"SUBTITLE"** como si fuera parte de la placa. Causa: el prompt rotulaba cada
+  string como `HEADLINE: "..."` / `SUBTITLE: "..."` pegado a las comillas — a veces el modelo
+  confundía la etiqueta en inglés de la instrucción con texto real a renderizar. Reescrito para
+  aclarar explícitamente que esas dos palabras son solo etiquetas de la instrucción, nunca texto a
+  dibujar. **Verificado en vivo con una segunda generación real, con los dos fixes juntos**: "sean
+  seguros." completo sin guión, sin ningún rastro de "SUBTITLE" ni "HEADLINE" en la imagen. `npm
+  test` (1040/1040), lint y build sin errores. Archivo: `src/lib/ai.ts` (+tests).
 - 2026-08-06 (mismo día, tercera vuelta sobre el cierre de las historias — "siguen siendo muy
   bruscas"): con las dos correcciones anteriores ya aplicadas (autocontenida, sin prometer datos que
   no están), Seba miró las 2 historias reales que había dejado la última corrida del cron y marcó
