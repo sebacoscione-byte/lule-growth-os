@@ -1,6 +1,25 @@
 ﻿# Lule Growth OS — Contexto para Claude
 
 ## Estado actual
+- 2026-08-06 (mismo día, quinta vuelta sobre el cierre de historias — variedad, no siempre "agendá"):
+  Seba marcó que el cierre siempre terminaba empujando a "agendá desde mi bio" y pidió variedad —
+  también invitar a entrar a la bio solo para informarse más, sin mencionar turno. Revisando el
+  motivo real de fondo, se encontró la causa de gran parte de la insistencia con "guardar" de la
+  ronda anterior: `OBJECTIVE_GUIDANCE` (compartida por post/historia/carrusel) le dice
+  explícitamente al modelo que para el objetivo "educación" el CTA debe "invitar a guardar la
+  pieza" — correcto para post/carrusel (ahí "guardar" es un hábito real de Instagram), pero en
+  conflicto directo con la prohibición de "guardar" que rige solo para historia. La mayoría de las
+  piezas del lote de reposición de cola de la entrada de arriba tenían justamente objetivo
+  "educación". `STORY_VISUAL_TEXT_RULES` reescrita con dos familias de cierre válidas según el
+  objetivo editorial de la pieza — "informarse" (alcance/educación/confianza: invita a entrar a la
+  bio/perfil para conocer más, sin mencionar turno) y "pedir turno" (conversión: invita
+  explícitamente a agendar/reservar) — más una aclaración explícita de que la sugerencia de
+  "guardar" de `OBJECTIVE_GUIDANCE` no aplica a historia. **Verificado en vivo con 4 categorías
+  reales, una por objetivo**: educación/alcance/confianza dieron los tres "Entrá a mi bio para
+  conocer más"/"Te invito a mi bio para conocer más" (variedad real, sin turno) y conversión dio
+  "¡Reservá tu turno!" (aunque esa muestra puntual no nombró la bio explícitamente — variabilidad
+  residual ya documentada, no bloqueante). `npm test` (1040/1040), lint y build sin errores.
+  Archivo: `src/lib/ai.ts` (+tests).
 - 2026-08-06 (mismo día, borrado + reposición manual a 2 semanas de cola + cuarta vuelta sobre el
   cierre de historias): Seba pidió borrar las historias en borrador generadas por el cron y volver
   a generar piezas para tener al menos 2 semanas de cola cubierta. Calculado contra la config real
