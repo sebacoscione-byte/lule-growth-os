@@ -744,6 +744,43 @@ describe("generatePhotoWithGemini reintenta ante una falla transitoria (bug real
     expect(result.image_data).toBe(MINIMAL_PNG_BASE64)
   })
 
+  // 2026-08-06: bug real reportado por Seba con una captura -- una placa V1 real publicada mostro
+  // "sean se-guros." partido con un guion a mitad de palabra ("seguros" -> "se-" / "guros"). El
+  // subtitulo guardado NO tenia guion ("...sean seguros.") -- confirmado por consulta directa a
+  // produccion -- asi que Gemini insertaba el guion el mismo al dibujar el texto, como estrategia
+  // propia de wrap tipografico, no detectable por nuestro codigo (V1 no compone el texto, lo dibuja
+  // el modelo). El prompt reforzado del fix anterior (2026-08-06, "nunca cortes/recortes texto, wrappea
+  // como haga falta") no prohibia explicitamente partir una palabra con un guion -- esta prohibicion
+  // nueva lo cubre.
+  it("el prompt V1 prohibe explicitamente partir una palabra con guion al hacer wrap", async () => {
+    let sentPrompt = ""
+    fetchSpy = jest.spyOn(global, "fetch").mockImplementation(async (_url, init) => {
+      const body = JSON.parse((init as RequestInit).body as string)
+      sentPrompt = body.input as string
+      return geminiImageResponse(true)
+    })
+    await generateContentVisual({ ...visualInput, version: "v1" })
+    expect(sentPrompt).toMatch(/NEVER HYPHENATE OR SPLIT A WORD/)
+    expect(sentPrompt).toMatch(/never insert a hyphen/)
+  })
+
+  // 2026-08-06: encontrado verificando el fix de arriba con una generacion real -- Gemini dibujo la
+  // palabra literal "SUBTITLE" como si fuera parte de la placa. Causa: el prompt rotulaba cada string
+  // como `HEADLINE: "..."` / `SUBTITLE: "..."` pegado a las comillas, y el modelo a veces confundio
+  // la etiqueta en ingles con texto real a renderizar. Reescrito para aclarar explicitamente que esas
+  // palabras son solo etiquetas de esta instruccion, nunca texto a dibujar.
+  it("el prompt V1 aclara que 'headline'/'subtitle' son etiquetas de la instruccion, nunca texto a dibujar", async () => {
+    let sentPrompt = ""
+    fetchSpy = jest.spyOn(global, "fetch").mockImplementation(async (_url, init) => {
+      const body = JSON.parse((init as RequestInit).body as string)
+      sentPrompt = body.input as string
+      return geminiImageResponse(true)
+    })
+    await generateContentVisual({ ...visualInput, version: "v1" })
+    expect(sentPrompt).toMatch(/must NEVER themselves appear as visible text/)
+    expect(sentPrompt).toMatch(/never the words "headline" or "subtitle" themselves/)
+  })
+
   it("version 'v2' explicita: el prompt NUNCA menciona el titular/subtitulo real -- los compone composeContentPlate aparte", async () => {
     let callCount = 0
     fetchSpy = jest.spyOn(global, "fetch").mockImplementation(async (_url, init) => {
