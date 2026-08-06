@@ -90,6 +90,38 @@
   objetivo de la pieza. Las 3 historias reportadas se borraron (a pedido explícito, "Borra todas las
   historias generadas ahora") sin volver a correr el cron todavía — antes había que corregir la
   regla. `npm test` (1035/1035), lint y build sin errores. Archivo: `src/lib/ai.ts` (+tests).
+- 2026-08-06 (mismo día, cierre real: verificar la regla de arriba destapó un TERCER problema real):
+  se volvió a correr `/api/cron/auto-draft-content` de verdad (server local + `curl` con el
+  `CRON_SECRET` real) para confirmar la regla nueva. Mejora real: las 3 historias nuevas ya daban un
+  dato concreto en vez de una promesa vacía (ej. "Medimos el tamaño de las cavidades, la fuerza del
+  músculo y el funcionamiento de las válvu..."). Pero 2 de las 3 quedaron cortadas a mitad de
+  palabra — **exactamente a los 90 caracteres**, confirmado por conteo exacto de caracteres.
+  **Causa raíz**: `buildDraftContentItem` (`content-pipeline.ts`) y `generateContentPlan` (`ai.ts`)
+  guardaban `visual_subtitle` con un `.slice(0, 90)` ciego — un tope que nunca fue un problema
+  mientras el subtítulo era una bajada corta tipo tagline, pero que rompe apenas el subtítulo tiene
+  que cargar un dato real (lo que la regla de arriba pide a propósito). Es la MISMA clase de bug que
+  el corte de texto del punto (1)/(2) original de esta sesión (PR #219) — ahí ya existía
+  `truncateForImagePlate()` (`content-text.ts`) para cortar en un límite de oración/palabra en vez de
+  a ciegas, pero solo se usaba en el paso de generar la imagen (`/api/content/visual/route.ts`), no
+  en el paso de GUARDAR la pieza — el subtítulo ya llegaba roto a ese paso. Fix: nueva constante
+  `MAX_VISUAL_SUBTITLE_LENGTH` (140, subida de 90 — dial pensado para un dato compacto + un cierre
+  breve, no un párrafo) en `content-text.ts`, y los dos puntos de guardado (`buildDraftContentItem`,
+  `generateContentPlan`) ahora usan `truncateForImagePlate(texto, MAX_VISUAL_SUBTITLE_LENGTH)` en vez
+  de `.slice(0, 90)` — si el modelo igual se pasa del tope, corta en un límite de oración/palabra,
+  nunca a mitad de una palabra. La validación de `PATCH /api/content/items` y el contador de
+  caracteres del editor (`page.tsx`) se actualizaron al mismo tope nuevo, para no rechazar ni marcar
+  en rojo un subtítulo válido de hasta 140. También se sumó una guía explícita de longitud
+  ("máximo 120 caracteres") al schema de `visual_subtitle` en ambos generadores — antes
+  `generateContentPlan` no tenía ninguna pista de longitud para ese campo, dependía 100% del corte
+  aguas abajo. **No se tocaron** `alt-text/route.ts` ni `image-direction/route.ts`: ahí el `.slice(0,
+  90)` de `visual_subtitle` es solo contexto que se le pasa a la IA para otro propósito (texto
+  alternativo / nueva escena), no el subtítulo que se ve en la placa — no correspondía a este bug.
+  **Verificado en vivo por tercera vez en la misma sesión**: se corrió el cron real de nuevo — las 3
+  historias nuevas ya no se cortan a mitad de palabra. Ninguna quedó en Biblioteca todavía sin
+  revisión de Seba (se documenta el resultado en el resumen de la tarea, no acá). `npm test`
+  (1038/1038), lint y build sin errores. Archivos: `src/lib/content-text.ts`, `src/lib/ai.ts`
+  (+tests), `src/lib/content-pipeline.ts` (+tests), `src/app/api/content/items/route.ts`,
+  `src/app/(app)/contenido/instagram/page.tsx`.
 - 2026-08-05 (feedback de Seba sobre el Estudio de contenido, 4 puntos + generación automática de
   borradores): (1) las categorías escritas a mano en "Generar contenido" (fuera de la lista
   predefinida) no se guardaban en ningún lado — se perdían al reabrir el formulario. Fix: nueva

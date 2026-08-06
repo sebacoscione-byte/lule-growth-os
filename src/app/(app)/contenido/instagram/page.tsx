@@ -20,7 +20,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
 import { createClient as createBrowserSupabaseClient } from "@/lib/supabase/client"
 import { parseAiJson } from "@/lib/parse-ai-json"
-import { truncateForImagePlate } from "@/lib/content-text"
+import { MAX_VISUAL_SUBTITLE_LENGTH, truncateForImagePlate } from "@/lib/content-text"
 import { AUTO_PUBLISH_TIMEZONE, AUTO_PUBLISH_WINDOW_BY_FORMAT, buildDraftContentItem, canStillPublishToday, DEFAULT_AUTO_PUBLISH_SETTINGS, estimateAutoPublishDrainDays, estimateAutoPublishDateForPosition, estimateRepeatEndDate, findRecentDuplicateTopic, getScheduledDays, getZonedScheduleParts, listKnownCategories, pickNextPublishableItems, isReorderableInQueue, normalizeAutoPublishSettings, reorderableQueuePositions } from "@/lib/content-pipeline"
 import type { GeneratedContentPlan } from "@/lib/content-pipeline"
 import { buildFallbackVideoPrompt, getVeoPromptQualityIssues } from "@/lib/video-prompt"
@@ -3461,7 +3461,7 @@ function Editor({
               />
             </div>
             <div className="space-y-1.5">
-              <div className="flex items-center justify-between"><Label className="text-gray-900">Subtítulo de la placa</Label><CharacterCount value={item.visual_subtitle} limit={90} /></div>
+              <div className="flex items-center justify-between"><Label className="text-gray-900">Subtítulo de la placa</Label><CharacterCount value={item.visual_subtitle} limit={MAX_VISUAL_SUBTITLE_LENGTH} /></div>
               <Input
                 value={item.visual_subtitle}
                 maxLength={90}
