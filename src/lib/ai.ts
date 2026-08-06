@@ -305,6 +305,20 @@ const PATIENT_ACQUISITION_RULES = `CRITERIO DE CAPTACION DE PACIENTES:
 - El CTA debe reducir friccion y explicar el siguiente paso por canales oficiales. Nunca uses escasez, culpa, miedo o urgencia comercial.
 - Evita hooks vagos o genericos como "cuidar tu corazon es importante", "todo lo que tenes que saber" o "la salud es lo primero".`
 
+// 2026-08-06: Seba reporto que las historias generadas se leian como un post (titular tipo articulo +
+// bajada explicativa, ej. "ECOCARDIOGRAMA SIN MISTERIOS" + "Como es el estudio que mira tu corazon en
+// tiempo real") y no tenian sentido como historia -- "que hace una persona con una historia asi?". La
+// causa: el prompt nunca distinguia el formato "historia" de un post al pedir visual_headline/
+// visual_subtitle, pese a que una historia se publica SIN caption y SIN link (ver asStory en
+// instagram-business.ts) -- el titular/subtitulo de la placa es literalmente todo el mensaje, no un
+// anticipo de algo que sigue.
+const STORY_VISUAL_TEXT_RULES = `HISTORIAS DE INSTAGRAM (formato "historia") -- diferencia critica con un post o carrusel:
+- Una historia se ve como UNA sola imagen a pantalla completa durante unos segundos. No tiene caption, no tiene link ni boton, y nadie puede "seguir leyendo" -- lo unico que la persona ve es el titular y el subtitulo de la placa.
+- Por eso el titular y el subtitulo de una historia NUNCA pueden ser un titulo-gancho + bajada explicativa al estilo de un articulo o de un post (ej: "ECOCARDIOGRAMA SIN MISTERIOS" + "Como es el estudio que mira tu corazon en tiempo real"). Ese patron funciona en un post porque el caption completa la idea despues -- en una historia no hay ningun "despues", asi que la persona se queda sin saber que hacer con lo que acaba de leer.
+- El titular de una historia tiene que ser el mensaje COMPLETO por si solo: un dato concreto, un recordatorio o una pregunta directa que se entiende de un vistazo sin necesitar el subtitulo (ej: "¿Te tomaste la presion esta semana?", "Los mareos frecuentes tambien pueden ser una señal de alarma", "Hoy atiendo en Hospital Britanico (Central)"). El subtitulo, si se usa, es opcional y muy breve -- un cierre corto o recordatorio de canal (ej: "Turnos: link en la bio"), nunca una segunda oracion que explique o complete el titular.
+- Mucho mas corto que un post: pensalo como un cartel que se lee entero en dos segundos, no como el titular de una nota.
+- Para post y carrusel, en cambio, el titular SI puede funcionar como gancho/anticipo (el caption da el contexto completo despues) -- esta regla es especifica de "historia".`
+
 // 2026-07-19: un pedido con categoria "Investigacion medica" (sin tema) genero contenido sobre
 // "diferencia entre electro y eco" -- un tema real, pero que no tiene nada que ver con investigacion
 // clinica/evidencia cientifica. La categoria llega como texto libre (no siempre es una de las
@@ -439,6 +453,8 @@ ${PLAIN_TEXT_RULES}
 ${IMAGE_PROMPT_RULES}
 
 ${PATIENT_ACQUISITION_RULES}
+
+${STORY_VISUAL_TEXT_RULES}
 
 ${CATEGORY_COHERENCE_RULES}
 
@@ -1012,6 +1028,7 @@ Reglas:
 ${PLAIN_TEXT_RULES}
 ${IMAGE_PROMPT_RULES}
 ${PATIENT_ACQUISITION_RULES}
+${STORY_VISUAL_TEXT_RULES}
 ${CATEGORY_COHERENCE_RULES}
 ${HASHTAG_RULES}
 - El texto de Google debe tener maximo 1500 caracteres.
@@ -1368,16 +1385,18 @@ FINAL ART DIRECTION:
   Render each string exactly ONCE, character for character and letter for letter, keeping every accent (á é í ó ú) and the letter ñ, and keeping every word in the exact same order. Do NOT translate, rephrase, abbreviate, shorten, split, reorder or drop any word (for example, never drop an article such as "LA"). Spell every single word correctly and proof-read the spelling before finalizing (for example it must read "ALARMA", never "ALAMA").
 - Do NOT render ANY other text: no third line, no byline, no credential or title, no doctor name, no caption, no label, no watermark, no logo, no English words, no descriptive words, and no invented, decorative or garbled lettering. The CREATIVE DIRECTION above is written in English and only describes the SCENE to paint — none of its words may EVER appear as visible text inside the image.
 - Headline must dominate; subtitle must remain readable on a small phone screen.
+- CRITICAL — NEVER CUT OFF OR CROP TEXT: both strings must be shown COMPLETE, start to finish, with nothing missing and nothing running off the frame. Reserve a text-safe area with generous margin from all four edges. Wrap each string onto as many lines as it needs (the subtitle especially may need 2-4 lines if it is long) and shrink the font size as needed so every single character of both strings fits entirely inside that safe area. Never let a line touch or extend past any edge of the canvas, and never truncate, crop or omit part of either string to make it fit — resize and wrap instead, always keeping the full text.
 - ${input.format === "historia" || input.format === "reel"
       ? "Keep all text and essential elements inside the central safe zone of the vertical 9:16 frame, away from the top and bottom edges."
       : "Use a 4:5 feed composition. For a carousel, make this an irresistible but medically responsible cover."}
 - No diagnosis, treatment claim, urgency marketing, fear, logos, watermark or extra text.
 - Do not depict the real doctor or invent her likeness.
 
-FINAL CHECK before rendering: the finished image must contain ONLY the two Spanish strings above (HEADLINE and SUBTITLE), each spelled perfectly with correct accents and ñ, every word present and in order, and ZERO other text characters of any kind.`
+FINAL CHECK before rendering: the finished image must contain ONLY the two Spanish strings above (HEADLINE and SUBTITLE), each COMPLETE and uncropped from first to last character, each spelled perfectly with correct accents and ñ, every word present and in order, entirely inside the frame with margin on all sides, and ZERO other text characters of any kind.`
 }
 
-/** Prompt V2.1 (valor persistido "v2", default): SOLO la foto/escena full-bleed, sin texto de ningun
+/** Prompt V2.1 (valor persistido "v2", ya NO es el default desde 2026-08-06 -- ver generateContentVisual):
+ * SOLO la foto/escena full-bleed, sin texto de ningun
  * tipo -- composeContentPlate() integra cobertura/titular/subtitulo/marca aparte, por edicion real. */
 function buildVisualPromptV2(input: {
   category: string
@@ -1412,12 +1431,16 @@ export async function generateContentVisual(input: {
   visual_headline: string
   visual_subtitle: string
   image_prompt: string
-  /** "v2" (default, tambien si se omite): motor actual, foto sola + texto compuesto aparte. "v1":
-   * motor original, Gemini dibuja la placa entera (foto + texto) en una sola pasada -- ver
-   * buildVisualPromptV1/buildVisualPromptV2 y el selector "Motor de generacion" del editor. */
+  /** "v1" (default desde 2026-08-06, tambien si se omite): Gemini dibuja la placa entera (foto +
+   * texto) en una sola pasada -- una sola imagen fotografica, sin corte al medio. "v2": motor
+   * anterior (default hasta el 2026-08-06), foto sola + texto compuesto aparte en un panel al
+   * costado (composeContentPlate) -- Seba lo marco como "muy mala, genera todo imagenes con un
+   * corte a la mitad con un texto a la izquierda y la imagen a la derecha" y pidio volver a V1 por
+   * default. Ver buildVisualPromptV1/buildVisualPromptV2 y el selector "Motor de generacion" del
+   * editor. */
   version?: "v1" | "v2"
 }): Promise<{ mime_type: string; image_data: string }> {
-  const version = input.version === "v1" ? "v1" : "v2"
+  const version = input.version === "v2" ? "v2" : "v1"
   // Un reel es vertical (9:16) igual que una historia -- esta placa nunca es el contenido del reel
   // en si (eso lo publica publishReelToInstagram con video_url), es la portada/miniatura que Meta
   // muestra en la pestaña Reels via cover_url (ver createVideoContainer en instagram-business.ts),

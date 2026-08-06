@@ -2462,7 +2462,7 @@ function Editor({
           visual_subtitle: item.visual_subtitle,
           image_prompt: imagePrompt,
           caption: item.caption,
-          version: item.visual_generation_version ?? "v2",
+          version: item.visual_generation_version ?? "v1",
         }),
       })
       const data = await response.json()
@@ -2528,7 +2528,7 @@ function Editor({
           visual_subtitle: subtitle,
           image_prompt: promptOverride ?? imagePrompt,
           caption: item.caption,
-          version: item.visual_generation_version ?? "v2",
+          version: item.visual_generation_version ?? "v1",
         }),
       })
       const data = await response.json()
@@ -3354,9 +3354,9 @@ function Editor({
             <p className="text-xs text-gray-600">
               {isReel
                 ? "La miniatura que se ve en tu perfil de Instagram (pestaña Reels) y en la Biblioteca de acá — no es el contenido del reel en sí, eso lo define el video de arriba. Si no generás ni subís una, Instagram usa el primer frame del video como portada."
-                : (item.visual_generation_version ?? "v2") === "v2"
-                  ? "Gemini genera la escena; la app integra foto full-bleed, cobertura de lectura y tipografía real según el formato."
-                  : "Gemini resuelve la placa completa, incluida la tipografía, en una sola generación."}
+                : (item.visual_generation_version ?? "v1") === "v1"
+                  ? "Gemini resuelve la placa completa, incluida la tipografía, en una sola generación."
+                  : "Gemini genera la escena; la app integra foto full-bleed, cobertura de lectura y tipografía real según el formato."}
             </p>
           </CardHeader>
           <CardContent className="space-y-3">
@@ -3365,27 +3365,27 @@ function Editor({
               <div className="flex gap-1.5">
                 <Button
                   type="button"
-                  variant={(item.visual_generation_version ?? "v2") === "v2" ? "default" : "outline"}
-                  size="sm"
-                  disabled={busy}
-                  onClick={() => onSave({ visual_generation_version: "v2" })}
-                >
-                  Actual (V2.1)
-                </Button>
-                <Button
-                  type="button"
-                  variant={item.visual_generation_version === "v1" ? "default" : "outline"}
+                  variant={(item.visual_generation_version ?? "v1") === "v1" ? "default" : "outline"}
                   size="sm"
                   disabled={busy}
                   onClick={() => onSave({ visual_generation_version: "v1" })}
                 >
-                  Original (V1)
+                  Predeterminado (V1)
+                </Button>
+                <Button
+                  type="button"
+                  variant={item.visual_generation_version === "v2" ? "default" : "outline"}
+                  size="sm"
+                  disabled={busy}
+                  onClick={() => onSave({ visual_generation_version: "v2" })}
+                >
+                  Alternativo (V2.1)
                 </Button>
               </div>
               <p className="w-full text-[11px] text-gray-500">
-                {(item.visual_generation_version ?? "v2") === "v2"
-                  ? "Gemini genera la foto full-bleed en 2K; la cobertura degradada, el titular, subtítulo y marca se agregan por edición real — sin corte al medio y con ortografía perfecta."
-                  : "Gemini dibuja la placa entera (foto + texto) en una sola pasada — estilo más fotográfico, pero con riesgo real de texto mal escrito o inventado."}
+                {(item.visual_generation_version ?? "v1") === "v1"
+                  ? "Gemini dibuja la placa entera (foto + texto) en una sola pasada — una sola imagen fotográfica, sin corte al medio."
+                  : "Gemini genera la foto full-bleed en 2K aparte; la cobertura degradada, el titular, subtítulo y marca se agregan por edición real en un panel al costado — ortografía perfecta, pero se ve como dos partes separadas en vez de una sola imagen."}
               </p>
             </div>
             {displayedVisualUrl ? (

@@ -1,6 +1,56 @@
-# Lule Growth OS — Contexto para Claude
+﻿# Lule Growth OS — Contexto para Claude
 
 ## Estado actual
+- 2026-08-06 (3 puntos de feedback de Seba sobre "Generar placa final" e historias automáticas):
+  (1) **"la V1 sigue teniendo problemas de insertar el texto y no cortarlo"** — investigado con una
+  captura real de una slide de carrusel cortada a mitad de oración ("...aumentando el"). Causa raíz
+  encontrada con precisión (no una hipótesis): `/api/content/visual/route.ts` truncaba
+  `visual_subtitle` a 120 caracteres con `truncateForImagePlate()` antes de mandarlo a
+  `generateContentVisual`, sin importar el motor. El texto de la captura mide exactamente 114
+  caracteres hasta "el" — el corte cae justo donde `truncateForImagePlate` corta en el último
+  espacio antes del límite de 120. Para la portada (tope de 90 caracteres) esto no se notaba nunca;
+  para una slide de carrusel (tope de 300, "1-2 oraciones") sí, con frecuencia. Fix: V1 ya no trunca
+  el subtítulo (Gemini dibuja el texto tal cual se le pasa, así que truncarlo producía una oración
+  incompleta quemada en la imagen) — se le pasa completo y `buildVisualPromptV1` ahora exige
+  explícitamente mostrar el texto COMPLETO, envolviendo en tantas líneas como haga falta y reduciendo
+  el tamaño de fuente para que entre entero dentro de un margen seguro, nunca cortado ni recortado
+  por el borde. V2 sigue truncando a 120 (su layout compuesto con ffmpeg, `composeContentPlate`, está
+  calibrado para un texto acotado — no se tocó). (2) **"la V2 es muy mala, genera todo imágenes con
+  un corte a la mitad con un texto a la izquierda y la imagen a la derecha, la V1 es mucho más
+  amigable... dejá predeterminada la V1"** — confirma exactamente el diseño de V2.1 (el scrim de
+  texto ocupa el 55% izquierdo, la foto el 40% derecho, ver `buildVisualPromptV2`). Se cambió el
+  default de `generateContentVisual` de "v2" a "v1" (afecta piezas nuevas o sin el campo seteado
+  explícitamente — una pieza donde alguien ya eligió V2 a mano sigue en V2 hasta que se cambie), se
+  actualizaron los 3 lugares del editor que asumían "v2" como default (`?? "v2"` → `?? "v1"`), se
+  reordenaron los botones del selector (V1 primero, "Predeterminado") y se corrigió el texto
+  descriptivo de V2 para dejar de decir "sin corte al medio" (v2 sí se ve partida en dos, es
+  justamente lo que Seba señaló). De paso, el control de diversidad de escena de `route.ts` (evita
+  clichés y escenas repetidas, agregado 2026-08-03) se saltaba a propósito para V1 "para que siguiera
+  siendo una comparación fiel con el motor histórico" — con V1 ahora como default, mantener ese salto
+  hubiera sido una regresión silenciosa de calidad para la mayoría de las piezas nuevas; ahora aplica
+  sin importar la versión. (3) **"las historias creadas de forma automática están muy mal, están
+  creadas como si fuera a ser una publicación... alguien lee 'ecocardiograma sin misterios, cómo es
+  el estudio que mira tu corazón en tiempo real' y ¿qué hace una persona con una historia así?"** —
+  causa raíz: `generateContentPlan`/`buildContentPlanPrompt` nunca distinguían el formato "historia"
+  de un post al pedir `visual_headline`/`visual_subtitle`, pese a que una historia se publica **sin
+  caption y sin link** (`asStory` en `instagram-business.ts`: `caption: asStory ? undefined : ...`)
+  — el titular/subtítulo de la placa es literalmente todo el mensaje que ve la persona, no un
+  anticipo de algo que sigue (como sí lo es en un post, donde el caption completa la idea). Nueva
+  regla compartida `STORY_VISUAL_TEXT_RULES` (estática, no depende del formato — se mantiene
+  `cacheSystem: true` intacto) sumada a ambos generadores: para "historia" pide que el titular sea el
+  mensaje COMPLETO por sí solo (un dato, recordatorio o pregunta directa, nunca un título-gancho +
+  bajada explicativa estilo artículo) y el subtítulo, si se usa, sea un cierre muy breve, nunca una
+  segunda oración que complete al titular. Seba avisó que iba a archivar/eliminar a mano las historias
+  ya generadas por el cron con el patrón viejo — no se tocaron datos existentes, el fix aplica hacia
+  adelante. `npm test` (1035/1035), lint y build sin errores. **No verificado en vivo contra la API
+  real de Gemini** (una llamada de imagen real tiene costo — ver "Generación de imágenes" más abajo —
+  y este entorno no corrió el flujo completo por Playwright en esta sesión): la causa raíz del punto
+  (1) es un cálculo determinístico de nuestro propio código (no depende de la IA, confirmado con el
+  conteo exacto de caracteres de la captura real), pero el resto de las instrucciones de prompt
+  reforzadas (ajuste de tamaño/wrap en V1, tono de historia) dependen de que el modelo las siga
+  razonablemente bien — no determinístico, reduce el riesgo pero no lo elimina. Archivos:
+  `src/lib/ai.ts` (+tests), `src/app/api/content/visual/route.ts` (+tests),
+  `src/app/(app)/contenido/instagram/page.tsx`, `src/types/index.ts`.
 - 2026-08-05 (feedback de Seba sobre el Estudio de contenido, 4 puntos + generación automática de
   borradores): (1) las categorías escritas a mano en "Generar contenido" (fuera de la lista
   predefinida) no se guardaban en ningún lado — se perdían al reabrir el formulario. Fix: nueva
