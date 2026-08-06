@@ -30,14 +30,17 @@ export async function POST(request: Request) {
     }
 
     const version = body.version as "v1" | "v2" | undefined
+    const resolvedVersion = version === "v2" ? "v2" : "v1"
     let imagePrompt = (body.image_prompt as string).slice(0, 2400)
     let imageDirectionRefreshed = false
     let imagePromptIssues: string[] = []
 
-    // V2 separa foto y texto. Antes de consumir un intento de imagen, evita el cliché recurrente
-    // "médica + escritorio + utilería clínica" y escenas demasiado parecidas a piezas recientes.
-    // V1 queda intacta para que siga siendo una comparación fiel con el motor histórico.
-    if (version !== "v1") {
+    // Evita el cliché recurrente "médica + escritorio + utilería clínica" y escenas demasiado
+    // parecidas a piezas recientes -- aplica a V1 y V2 por igual (ambas comparten la misma
+    // CREATIVE DIRECTION de escena, ver buildVisualPromptV1/V2 en ai.ts). Hasta el 2026-08-06 esto
+    // se saltaba para V1 "para que siguiera siendo una comparación fiel con el motor histórico"
+    // (V1 era la variante secundaria) -- ya no aplica: V1 es el motor default desde ese día.
+    {
       const items = await readContentItems(supabase).catch(error => {
         console.error("No se pudieron leer prompts recientes para controlar diversidad:",
           error instanceof Error ? error.message : String(error))
@@ -81,7 +84,15 @@ export async function POST(request: Request) {
       topic: (body.topic as string).slice(0, 200),
       format: body.format as typeof FORMATS[number],
       visual_headline: (body.visual_headline as string).slice(0, 90),
-      visual_subtitle: truncateForImagePlate(body.visual_subtitle as string, 120),
+      // V1: Gemini dibuja el texto -- pasarle el subtitulo COMPLETO (ya acotado a 90/300 caracteres
+      // aguas arriba segun sea portada o slide de carrusel) y dejar que el prompt reforzado de
+      // buildVisualPromptV1 lo ajuste con salto de linea/tamaño de fuente. Truncarlo aca a 120
+      // caracteres (como necesita V2, ver composeContentPlate) cortaba una slide larga a mitad de
+      // oracion -- ej. "...aumentando el" sin terminar la frase (bug real reportado 2026-08-06).
+      // V2 sigue truncando: su layout compuesto por ffmpeg esta calibrado para un texto acotado.
+      visual_subtitle: resolvedVersion === "v1"
+        ? (body.visual_subtitle as string).slice(0, 300)
+        : truncateForImagePlate(body.visual_subtitle as string, 120),
       image_prompt: imagePrompt,
       version,
     })

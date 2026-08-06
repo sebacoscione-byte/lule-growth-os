@@ -454,6 +454,75 @@ describe("generateText valida JSON antes de dar por exitosa la respuesta (bug re
   })
 })
 
+// 2026-08-06: Seba reporto que las historias generadas se leian como un post (titular tipo articulo +
+// bajada explicativa) y no tenian sentido como historia, ya que una historia se publica SIN caption y
+// SIN link (asStory en instagram-business.ts) -- el titular/subtitulo de la placa es todo el mensaje.
+describe("reglas de historia vs post/carrusel en el contenido generado", () => {
+  const planInput = {
+    topic: "", category: "Ecocardiograma", format: "historia" as const, cta: "",
+    objective: "educacion" as const, appointment_link: null, source: null,
+  }
+  const validPlan = {
+    hook: "hook", caption: "caption", google_text: "google", hashtags: "#tag1 #tag2 #tag3",
+    visual_headline: "titulo", visual_subtitle: "subtitulo", image_prompt: "prompt", image_alt_text: "alt",
+  }
+
+  function geminiHttpResponse(text: string) {
+    return {
+      ok: true,
+      json: async () => ({
+        candidates: [{ finishReason: "STOP", content: { parts: [{ text }] } }],
+        usageMetadata: { promptTokenCount: 10, candidatesTokenCount: 5, totalTokenCount: 15 },
+      }),
+    } as unknown as Response
+  }
+
+  let fetchSpy: jest.SpiedFunction<typeof fetch>
+  let previousProvider: string | undefined
+  let previousDailyLimit: string | undefined
+  let previousGeminiKey: string | undefined
+
+  beforeEach(() => {
+    previousProvider = process.env.AI_PROVIDER
+    previousDailyLimit = process.env.DAILY_AI_REQUEST_LIMIT
+    previousGeminiKey = process.env.GEMINI_API_KEY
+    process.env.AI_PROVIDER = "gemini"
+    process.env.DAILY_AI_REQUEST_LIMIT = "1000"
+    process.env.GEMINI_API_KEY = "test-key"
+  })
+
+  afterEach(() => {
+    fetchSpy.mockRestore()
+    if (previousProvider === undefined) delete process.env.AI_PROVIDER
+    else process.env.AI_PROVIDER = previousProvider
+    if (previousDailyLimit === undefined) delete process.env.DAILY_AI_REQUEST_LIMIT
+    else process.env.DAILY_AI_REQUEST_LIMIT = previousDailyLimit
+    if (previousGeminiKey === undefined) delete process.env.GEMINI_API_KEY
+    else process.env.GEMINI_API_KEY = previousGeminiKey
+  })
+
+  it("generateContentPlan: el system prompt incluye la regla de historia autocontenida (sin patron titulo+bajada)", async () => {
+    let sentSystem = ""
+    fetchSpy = jest.spyOn(global, "fetch").mockImplementation(async (_url, init) => {
+      const body = JSON.parse((init as RequestInit).body as string)
+      sentSystem = body.systemInstruction.parts[0].text as string
+      return geminiHttpResponse(JSON.stringify(validPlan))
+    })
+    await generateContentPlan(planInput)
+    expect(sentSystem).toContain("HISTORIAS DE INSTAGRAM")
+    expect(sentSystem).toMatch(/mensaje COMPLETO por si solo/)
+  })
+
+  it("buildContentPlanPrompt (modo manual): tambien incluye la regla de historia, sin importar el formato pedido", () => {
+    const promptForHistoria = buildContentPlanPrompt({ ...planInput, format: "historia" })
+    const promptForPost = buildContentPlanPrompt({ ...planInput, format: "post" })
+    // La regla es estatica (no depende del formato) para no romper el prompt caching -- el modelo la
+    // aplica condicionalmente segun el "Formato Instagram" que ya viaja en el pedido.
+    expect(promptForHistoria).toContain("HISTORIAS DE INSTAGRAM")
+    expect(promptForPost).toContain("HISTORIAS DE INSTAGRAM")
+  })
+})
+
 // 2026-08-05: a pedido explicito de Seba, el generador automatico de borradores no solo tiene que
 // rotar por antiguedad entre una lista fija de categorias -- tambien tiene que poder proponer
 // categorias genuinamente nuevas mirando el historial de lo ya publicado/aprobado/en borrador (ver
@@ -616,9 +685,40 @@ describe("generatePhotoWithGemini reintenta ante una falla transitoria (bug real
     expect(fetchSpy).toHaveBeenCalledTimes(1)
   })
 
-  // 2026-08-03: Seba pidio poder elegir entre el motor actual (V2, foto sola + texto compuesto aparte)
-  // y el original (V1, Gemini dibuja la placa entera de una sola pasada) por pieza, para comparar.
-  it("sin version (o 'v2'): el prompt NUNCA menciona el titular/subtitulo real -- los compone composeContentPlate aparte", async () => {
+  // 2026-08-03: Seba pidio poder elegir entre el motor V2 (foto sola + texto compuesto aparte) y el
+  // original V1 (Gemini dibuja la placa entera de una sola pasada) por pieza, para comparar.
+  // 2026-08-06: Seba marco V2 como "muy mala, corta la imagen al medio" y pidio volver a V1 por
+  // default -- el default paso de "v2" a "v1" (ver generateContentVisual).
+  it("sin version (o 'v1'): el prompt SI incluye el titular/subtitulo exactos -- Gemini dibuja la placa entera, sin composeContentPlate", async () => {
+    let sentPrompt = ""
+    fetchSpy = jest.spyOn(global, "fetch").mockImplementation(async (_url, init) => {
+      const body = JSON.parse((init as RequestInit).body as string)
+      sentPrompt = body.input as string
+      return geminiImageResponse(true)
+    })
+    const result = await generateContentVisual(visualInput)
+    expect(sentPrompt).toContain(visualInput.visual_headline)
+    expect(sentPrompt).toContain(visualInput.visual_subtitle)
+    // V1 no pasa por composeContentPlate (ffmpeg) -- el mime_type es el que devolvio Gemini tal cual.
+    expect(result.mime_type).toBe("image/png")
+    expect(result.image_data).toBe(MINIMAL_PNG_BASE64)
+  })
+
+  it("version 'v1' explicita: mismo comportamiento que el default", async () => {
+    let sentPrompt = ""
+    fetchSpy = jest.spyOn(global, "fetch").mockImplementation(async (_url, init) => {
+      const body = JSON.parse((init as RequestInit).body as string)
+      sentPrompt = body.input as string
+      return geminiImageResponse(true)
+    })
+    const result = await generateContentVisual({ ...visualInput, version: "v1" })
+    expect(sentPrompt).toContain(visualInput.visual_headline)
+    expect(sentPrompt).toContain(visualInput.visual_subtitle)
+    expect(result.mime_type).toBe("image/png")
+    expect(result.image_data).toBe(MINIMAL_PNG_BASE64)
+  })
+
+  it("version 'v2' explicita: el prompt NUNCA menciona el titular/subtitulo real -- los compone composeContentPlate aparte", async () => {
     let callCount = 0
     fetchSpy = jest.spyOn(global, "fetch").mockImplementation(async (_url, init) => {
       callCount += 1
@@ -638,24 +738,9 @@ describe("generatePhotoWithGemini reintenta ante una falla transitoria (bug real
       })
       return geminiImageResponse(true)
     })
-    const result = await generateContentVisual(visualInput)
+    const result = await generateContentVisual({ ...visualInput, version: "v2" })
     expect(result.mime_type).toBe("image/png")
     expect(callCount).toBe(1)
-  })
-
-  it("version 'v1': el prompt SI incluye el titular/subtitulo exactos -- Gemini dibuja la placa entera, sin composeContentPlate", async () => {
-    let sentPrompt = ""
-    fetchSpy = jest.spyOn(global, "fetch").mockImplementation(async (_url, init) => {
-      const body = JSON.parse((init as RequestInit).body as string)
-      sentPrompt = body.input as string
-      return geminiImageResponse(true)
-    })
-    const result = await generateContentVisual({ ...visualInput, version: "v1" })
-    expect(sentPrompt).toContain(visualInput.visual_headline)
-    expect(sentPrompt).toContain(visualInput.visual_subtitle)
-    // V1 no pasa por composeContentPlate (ffmpeg) -- el mime_type es el que devolvio Gemini tal cual.
-    expect(result.mime_type).toBe("image/png")
-    expect(result.image_data).toBe(MINIMAL_PNG_BASE64)
   })
 
   it("fija 9:16 y 2K en la API para historia/reel, no solo dentro del prompt", async () => {

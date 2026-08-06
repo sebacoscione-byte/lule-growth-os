@@ -237,13 +237,14 @@ export interface ContentItem {
   visual_headline: string
   visual_subtitle: string
   visual_style: "rose" | "blue" | "teal"
-  /** Que motor usa "Generar placa final" para esta pieza. "v2" (V2.1 visual; default, sin este campo
-   * tambien cuenta como v2): Gemini genera SOLO la foto full-bleed; la cobertura degradada y el
-   * titular/subtitulo/marca se componen aparte por edicion real (composeContentPlate, ffmpeg) --
-   * ortografia siempre perfecta. "v1": la version
-   * original hasta el 2026-07-30, Gemini dibuja la placa entera en una sola pasada (foto + texto) --
-   * mas "editorial"/fotografico pero con riesgo real de texto mal escrito o inventado (ver
-   * docs/BACKLOG.md). Elegible por pieza para poder comparar/regenerar con el otro motor. */
+  /** Que motor usa "Generar placa final" para esta pieza. "v1" (default desde 2026-08-06, sin este
+   * campo tambien cuenta como v1): Gemini dibuja la placa entera en una sola pasada (foto + texto) --
+   * una sola imagen fotografica/editorial, sin corte al medio. "v2" (V2.1 visual; default hasta el
+   * 2026-08-06): Gemini genera SOLO la foto full-bleed; la cobertura degradada y el titular/
+   * subtitulo/marca se componen aparte por edicion real (composeContentPlate, ffmpeg) -- ortografia
+   * siempre perfecta, pero se ve como dos partes separadas (texto a un lado, foto al otro) en vez de
+   * una sola imagen -- Seba pidio volver a v1 por default el 2026-08-06 (ver docs/BACKLOG.md).
+   * Elegible por pieza para poder comparar/regenerar con el otro motor. */
   visual_generation_version?: "v1" | "v2"
   image_prompt?: string
   image_alt_text?: string
