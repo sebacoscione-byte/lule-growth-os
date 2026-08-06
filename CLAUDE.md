@@ -116,12 +116,17 @@
   aguas abajo. **No se tocaron** `alt-text/route.ts` ni `image-direction/route.ts`: ahí el `.slice(0,
   90)` de `visual_subtitle` es solo contexto que se le pasa a la IA para otro propósito (texto
   alternativo / nueva escena), no el subtítulo que se ve en la placa — no correspondía a este bug.
-  **Verificado en vivo por tercera vez en la misma sesión**: se corrió el cron real de nuevo — las 3
-  historias nuevas ya no se cortan a mitad de palabra. Ninguna quedó en Biblioteca todavía sin
-  revisión de Seba (se documenta el resultado en el resumen de la tarea, no acá). `npm test`
-  (1038/1038), lint y build sin errores. Archivos: `src/lib/content-text.ts`, `src/lib/ai.ts`
-  (+tests), `src/lib/content-pipeline.ts` (+tests), `src/app/api/content/items/route.ts`,
-  `src/app/(app)/contenido/instagram/page.tsx`.
+  `npm test` (1038/1038), lint y build sin errores. Archivos: `src/lib/content-text.ts`,
+  `src/lib/ai.ts` (+tests), `src/lib/content-pipeline.ts` (+tests),
+  `src/app/api/content/items/route.ts`, `src/app/(app)/contenido/instagram/page.tsx`.
+  **Verificado en vivo después de mergear** (cuarta corrida real del cron en la misma sesión, server
+  local + `CRON_SECRET` real): las 2 historias nuevas de esa corrida ya no se cortan a mitad de
+  palabra y quedaron correctas en los 3 frentes reportados por Seba — ej. "¿EL COLESTEROL ALTO SE
+  SIENTE?" / "No da síntomas. La única forma de saberlo es con un control. Link en la bio para tu
+  turno en Lomas de Zamora." (109 caracteres, oración completa, dato real, cierre hacia la bio para
+  turno). Las 3 historias de la corrida anterior (generadas antes de este fix, con el corte a los 90
+  caracteres todavía presente) se borraron para no dejarlas en Biblioteca con el bug ya conocido.
+  Quedaron 2 historias en borrador esperando revisión de Seba.
 - 2026-08-05 (feedback de Seba sobre el Estudio de contenido, 4 puntos + generación automática de
   borradores): (1) las categorías escritas a mano en "Generar contenido" (fuera de la lista
   predefinida) no se guardaban en ningún lado — se perdían al reabrir el formulario. Fix: nueva
