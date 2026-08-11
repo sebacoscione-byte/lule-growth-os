@@ -2603,7 +2603,12 @@ function Editor({
         }))
       }
     }
-    const result = await generateOneVisual(slide.headline, truncateForImagePlate(slide.text), `-slide-${index}`, slidePrompt)
+    // No truncar acá: /api/content/visual ya decide el límite correcto según el motor (V1 recibe el
+    // texto completo hasta 300 caracteres, V2 lo acota a 120 para su layout compuesto) -- llamar a
+    // truncateForImagePlate(slide.text) sin límite acá (default 120) cortaba la slide a mitad de
+    // oración ANTES de llegar a esa lógica, deshaciendo el fix del 2026-08-06 (bug real reportado
+    // 2026-08-10: "...aumentando el" sin terminar la frase, mismo patrón que esa vez).
+    const result = await generateOneVisual(slide.headline, slide.text, `-slide-${index}`, slidePrompt)
     if (result.error) {
       setSlideErrors(previous => ({ ...previous, [index]: result.error as string }))
     } else {
@@ -2646,7 +2651,9 @@ function Editor({
           }))
         }
       }
-      const result = await generateOneVisual(slides[index].headline, truncateForImagePlate(slides[index].text), `-slide-${index}`, slidePrompt)
+      // Mismo motivo que en generateSlideVisual: dejar que /api/content/visual aplique el límite
+      // correcto según el motor, en vez de pre-truncar acá a 120 (default de truncateForImagePlate).
+      const result = await generateOneVisual(slides[index].headline, slides[index].text, `-slide-${index}`, slidePrompt)
       if (result.error) {
         setBulkError(`Slide ${index + 1}: ${result.error} Las imágenes generadas hasta acá ya quedaron guardadas.`)
         setBulkGenerating(false)
