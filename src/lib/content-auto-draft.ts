@@ -17,14 +17,24 @@ import type { AutoPublishSettings, ContentItem, ContentObjective } from "@/types
 // completa" y no tienen ese costo/gate.
 const AUTO_DRAFT_FORMATS: AutoPublishFormat[] = ["post", "historia", "carrusel"]
 const OBJECTIVES: ContentObjective[] = ["conversion", "educacion", "confianza", "alcance"]
+// Cuantas semanas de cronograma tiene que sostener la cola de "esperando revision" (borrador o
+// aprobado) antes de dejar de reponer -- a pedido explicito de Seba (2026-08-12): una semana de
+// colchon se sentía corta, quiere 2 semanas siempre cubiertas.
+const AUTO_DRAFT_TARGET_WEEKS = 2
 // Topes por corrida (no por semana): esto corre una vez al dia dentro de daily-maintenance, asi que
-// un deficit grande se repone gradualmente en varios dias en vez de generar todo de una vez.
+// un deficit grande (mas probable ahora que el objetivo es 2 semanas, no 1) se repone gradualmente
+// en varios dias en vez de generar todo de una vez.
 const MAX_DRAFTS_PER_FORMAT_PER_RUN = 3
 const MAX_DRAFTS_PER_RUN = 6
 // Cuantas piezas recientes le mostramos a la IA de propuesta de categorias como contexto de "que ya
 // esta cubierto" -- alcanza de sobra para ver que categorias se repiten o quedaron sin tocar, sin
 // inflar el prompt con todo el historico.
 const RECENT_HISTORY_LIMIT = 20
+// Cuantas piezas aprobadas/publicadas recientes le mostramos a generateContentPlan como "no repitas
+// este angulo" -- mas amplio que RECENT_HISTORY_LIMIT a proposito: ese es solo para elegir la
+// CATEGORIA, este es para elegir el TEMA/GANCHO puntual dentro de la categoria ya elegida, que es
+// donde Seba reporto sentir repeticion real (2026-08-12) aunque la categoria variara.
+const RECENT_TOPICS_LIMIT = 40
 
 function lastUsedAt(items: ContentItem[], matches: (item: ContentItem) => boolean): number {
   const relevant = items.filter(item => item.status !== "archived" && matches(item))
@@ -59,12 +69,13 @@ export interface PlannedSlot {
 }
 
 /**
- * Pura, sin I/O: cuantos borradores nuevos hace falta generar por formato para sostener una semana
- * de cronograma (dias programados x piezas por corrida) sin pisar lo que ya espera revision
- * (borrador o aprobado) -- a pedido de Seba (2026-08-05, ver docs/BACKLOG.md "Cola de historias y
- * carruseles aprobados en 0"). Nunca elige "reel" (ver AUTO_DRAFT_FORMATS). Solo decide CUANTAS
- * piezas hacen falta por formato -- QUE categoria/objetivo les toca se resuelve aparte en
- * `buildAutoDraftPlan` (necesita llamar a la IA, no puede ser pura).
+ * Pura, sin I/O: cuantos borradores nuevos hace falta generar por formato para sostener
+ * AUTO_DRAFT_TARGET_WEEKS de cronograma (dias programados x piezas por corrida x semanas) sin pisar
+ * lo que ya espera revision (borrador o aprobado) -- a pedido de Seba (2026-08-05, ver
+ * docs/BACKLOG.md "Cola de historias y carruseles aprobados en 0"; objetivo subido de 1 a 2 semanas
+ * el 2026-08-12). Nunca elige "reel" (ver AUTO_DRAFT_FORMATS). Solo decide CUANTAS piezas hacen
+ * falta por formato -- QUE categoria/objetivo les toca se resuelve aparte en `buildAutoDraftPlan`
+ * (necesita llamar a la IA, no puede ser pura).
  */
 export function planAutoDraftSlots(
   items: ContentItem[],
@@ -77,11 +88,11 @@ export function planAutoDraftSlots(
     const track = autoPublishSettings[format]
     if (!track.enabled || track.schedule_slots.length === 0) continue
 
-    const weeklyNeed = track.schedule_slots.length * track.items_per_run
+    const targetSupply = track.schedule_slots.length * track.items_per_run * AUTO_DRAFT_TARGET_WEEKS
     const currentSupply = items.filter(item =>
       item.format === format && (item.status === "draft" || item.status === "approved")
     ).length
-    const deficit = weeklyNeed - currentSupply
+    const deficit = targetSupply - currentSupply
     if (deficit <= 0) continue
 
     const toGenerate = Math.min(deficit, MAX_DRAFTS_PER_FORMAT_PER_RUN, MAX_DRAFTS_PER_RUN - slots.length)
@@ -109,6 +120,23 @@ export function buildRecentHistoryContext(
       status: item.status,
       days_ago: Math.max(0, Math.floor((now.getTime() - new Date(item.created_at).getTime()) / 86_400_000)),
     }))
+}
+
+/** Pura, sin I/O: "no repitas esto" para generateContentPlan -- a diferencia de
+ * buildRecentHistoryContext (que ayuda a elegir la CATEGORIA), esto ayuda a elegir el TEMA/GANCHO
+ * puntual dentro de la categoria ya elegida. A pedido explicito de Seba (2026-08-12: "siento que hay
+ * muchos temas repetidos"), solo mira lo aprobado/publicado -- un borrador todavia puede
+ * descartarse o cambiar de tema, no es una repeticion real todavia (mismo criterio que
+ * findRecentDuplicateTopic en content-pipeline.ts). Mas reciente primero. */
+export function buildRecentTopicsContext(
+  items: ContentItem[],
+  limit: number = RECENT_TOPICS_LIMIT
+): Array<{ category: string; topic: string; hook: string }> {
+  return items
+    .filter(item => item.status === "approved" || item.status === "published")
+    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+    .slice(0, limit)
+    .map(item => ({ category: item.category, topic: item.topic, hook: item.hook }))
 }
 
 /** Pura, sin I/O: el mecanismo anterior a la propuesta por IA (rotacion por "hace mas tiempo que no
@@ -192,12 +220,16 @@ export interface AutoDraftGenerationResult {
 
 /**
  * Genera borradores nuevos para reponer la cola cuando el cronograma de auto-publicacion (post/
- * historia/carrusel) se queda sin piezas aprobadas ni borradores esperando revision -- a pedido
- * explicito de Seba (2026-08-05). Quedan como Borrador en Biblioteca: nunca se auto-aprueban ni se
+ * historia/carrusel) se queda por debajo de AUTO_DRAFT_TARGET_WEEKS semanas de piezas aprobadas o
+ * borradores esperando revision -- a pedido explicito de Seba (2026-08-05, objetivo subido a 2
+ * semanas el 2026-08-12). Quedan como Borrador en Biblioteca: nunca se auto-aprueban ni se
  * auto-publican, el resto del flujo (generar placa, aprobar, publicar) sigue siendo manual como
- * siempre. En modo manual (sin AI_MODE=gemini_api) no hay forma de generar nada solo -- se salta sin
- * error. Un fallo puntual (error transitorio de la IA) no frena los formatos restantes de la misma
- * corrida, salvo que sea el limite diario de IA agotado -- ahi no tiene sentido seguir intentando.
+ * siempre. Cada pieza nueva evita repetir el tema/gancho de lo ya aprobado o publicado (y de lo que
+ * ya se genero en esta misma corrida, ver `buildRecentTopicsContext`) -- tambien a pedido explicito
+ * de Seba, que sentia el contenido repetitivo. En modo manual (sin AI_MODE=gemini_api) no hay forma
+ * de generar nada solo -- se salta sin error. Un fallo puntual (error transitorio de la IA) no frena
+ * los formatos restantes de la misma corrida, salvo que sea el limite diario de IA agotado -- ahi no
+ * tiene sentido seguir intentando.
  */
 export async function runAutoDraftGeneration(
   supabase: SupabaseClient,
@@ -212,6 +244,10 @@ export async function runAutoDraftGeneration(
   const plan = await buildAutoDraftPlan(items, autoPublishSettings, now)
   if (plan.length === 0) return { skipped: false, planned: 0, generated: 0 }
 
+  // Se va actualizando a medida que se generan piezas dentro de esta misma corrida, para que la
+  // pieza 2 de 6 tambien evite repetir el angulo que acaba de elegir la pieza 1 (no solo lo ya
+  // aprobado/publicado antes de empezar a correr).
+  const recentTopics = buildRecentTopicsContext(items)
   const newItems: ContentItem[] = []
   const errors: string[] = []
   for (const planned of plan) {
@@ -222,8 +258,9 @@ export async function runAutoDraftGeneration(
         format: planned.format,
         cta: "",
         objective: planned.objective,
+        avoid_recent_topics: [...recentTopics],
       })
-      newItems.push(buildDraftContentItem({
+      const draft = buildDraftContentItem({
         generated,
         topic: "",
         category: planned.category,
@@ -231,7 +268,9 @@ export async function runAutoDraftGeneration(
         objective: planned.objective,
         source: null,
         now,
-      }))
+      })
+      newItems.push(draft)
+      recentTopics.unshift({ category: draft.category, topic: draft.topic, hook: draft.hook })
     } catch (error) {
       const message = getPublicAiError(error)
       errors.push(`${planned.format}/${planned.category}: ${message}`)

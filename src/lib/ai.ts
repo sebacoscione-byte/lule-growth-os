@@ -991,6 +991,12 @@ export async function generateContentPlan(input: {
   objective?: ContentObjective
   appointment_link?: string | null
   source?: ContentSource | null
+  /** Piezas ya aprobadas/publicadas recientes (categoria + tema + gancho) para que la IA elija un
+   * angulo genuinamente distinto en vez de repetir el mismo gancho/idea central -- usado por la
+   * reposicion automatica de borradores (content-auto-draft.ts), a pedido explicito de Seba
+   * (2026-08-12: "siento que hay muchos temas repetidos"). Opcional: sin esto, el comportamiento es
+   * identico al de siempre (generacion manual desde el editor). */
+  avoid_recent_topics?: Array<{ category: string; topic: string; hook: string }>
 }): Promise<{
   hook: string
   caption: string
@@ -1028,6 +1034,12 @@ El caption debe cerrar invitando a pedir turno con la Dra. Lucia Chahin usando e
   ]`
     : ""
 
+  const avoidTopicsContext = input.avoid_recent_topics && input.avoid_recent_topics.length > 0
+    ? `\nTemas ya cubiertos recientemente (aprobados o publicados, no repitas ninguno) -- elegi un angulo GENUINAMENTE DISTINTO, con un gancho, un dato o un enfoque que no se haya usado todavia, incluso dentro de la misma categoria:\n${input.avoid_recent_topics
+        .map(item => `- [${item.category}] ${item.hook || item.topic}`)
+        .join("\n")}\n`
+    : ""
+
   const userContent = `${input.topic.trim()
     ? `Tema o enfoque sugerido: ${input.topic}`
     : "No se definio un tema. Elegi de forma autonoma el enfoque mas atractivo, util y concreto dentro de la categoria."}
@@ -1035,7 +1047,7 @@ Categoria: ${input.category}
 Formato Instagram: ${input.format}
 CTA: ${input.cta}
 ${input.objective ? OBJECTIVE_GUIDANCE[input.objective] : ""}
-
+${avoidTopicsContext}
 ${appointmentContext}
 
 ${sourceContext}
