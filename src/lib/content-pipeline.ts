@@ -509,9 +509,24 @@ export function reorderableQueuePositions(items: ContentItem[], format: AutoPubl
 }
 
 /**
+ * Pura, sin I/O: dias de calendario (fecha civil, huso ART) que separan dos instantes -- cuenta dias,
+ * no horas exactas transcurridas. Mismo criterio que ya usa `alreadyPublishedToday` para "mismo dia".
+ * Necesario porque `isRepeatDue` solo puede volverse true dentro de la ventana diaria de publicacion
+ * (18:00-18:59 ART): si el ultimo touch de la pieza quedo mas tarde de lo habitual ese dia (un intento
+ * fallido de republicar, ver `publishApprovedItem`, tambien pisa `updated_at`; o una edicion manual),
+ * comparar horas exactas puede dar menos de 24hs hasta la ventana del dia siguiente y saltear la pieza
+ * un dia entero aunque la fecha civil ya haya cambiado.
+ */
+function zonedCalendarDaysBetween(later: Date, earlier: Date): number {
+  const laterMidnight = new Date(`${getZonedScheduleParts(later).dateKey}T00:00:00Z`).getTime()
+  const earlierMidnight = new Date(`${getZonedScheduleParts(earlier).dateKey}T00:00:00Z`).getTime()
+  return Math.round((laterMidnight - earlierMidnight) / (1000 * 60 * 60 * 24))
+}
+
+/**
  * Pura, sin I/O: una pieza evergreen (`repeat_interval_days` seteado) ya publicada vuelve a estar
- * disponible cuando pasaron al menos esos dias desde su ultima publicacion (`updated_at` se pisa
- * en cada publicacion, ver `publishApprovedItem`).
+ * disponible cuando pasaron al menos esos dias (civiles, ART) desde su ultima publicacion (`updated_at`
+ * se pisa en cada publicacion, ver `publishApprovedItem`).
  */
 export function isRepeatDue(item: ContentItem, now: Date): boolean {
   if (item.status !== "published") return false
@@ -519,7 +534,7 @@ export function isRepeatDue(item: ContentItem, now: Date): boolean {
   // Limite opcional de repeticiones: al alcanzarlo, la pieza deja de repetirse sola (queda publicada
   // en su ultima salida). null/undefined = sin limite.
   if (item.repeat_limit != null && (item.repeat_count ?? 0) >= item.repeat_limit) return false
-  const daysSinceLastPublish = (now.getTime() - new Date(item.updated_at).getTime()) / (1000 * 60 * 60 * 24)
+  const daysSinceLastPublish = zonedCalendarDaysBetween(now, new Date(item.updated_at))
   return daysSinceLastPublish >= item.repeat_interval_days
 }
 
