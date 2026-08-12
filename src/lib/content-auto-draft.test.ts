@@ -1,6 +1,7 @@
 import {
   buildAutoDraftPlan,
   buildRecentHistoryContext,
+  buildRecentTopicsContext,
   pickCategoriesDeterministically,
   planAutoDraftSlots,
   runAutoDraftGeneration,
@@ -85,18 +86,31 @@ describe("planAutoDraftSlots", () => {
     expect(planAutoDraftSlots([], settings)).toEqual([])
   })
 
-  it("propone reponer un formato activo sin nada esperando revision", () => {
+  it("propone reponer un formato activo sin nada esperando revision, hasta cubrir 2 semanas", () => {
     const settings = makeSettings({
       post: makeTrack({ enabled: true, schedule_slots: [{ day_of_week: 4, local_time: "19:00" }], items_per_run: 1 }),
     })
-    expect(planAutoDraftSlots([], settings)).toEqual([{ format: "post" }])
+    // 1 slot/semana x 1 por corrida x 2 semanas = objetivo 2, con 0 supply.
+    expect(planAutoDraftSlots([], settings)).toEqual([{ format: "post" }, { format: "post" }])
   })
 
-  it("no propone nada si ya hay suficientes borradores/aprobados para la semana", () => {
+  it("propone reponer si hay menos de 2 semanas de borradores/aprobados", () => {
     const settings = makeSettings({
       post: makeTrack({ enabled: true, schedule_slots: [{ day_of_week: 4, local_time: "19:00" }], items_per_run: 1 }),
     })
+    // 1 slot/semana x 1 por corrida x 2 semanas = objetivo 2 -- con solo 1 borrador, todavia falta 1.
     const items = [makeItem({ id: "a", format: "post", status: "draft" })]
+    expect(planAutoDraftSlots(items, settings)).toEqual([{ format: "post" }])
+  })
+
+  it("no propone nada si ya hay 2 semanas de borradores/aprobados cubiertas", () => {
+    const settings = makeSettings({
+      post: makeTrack({ enabled: true, schedule_slots: [{ day_of_week: 4, local_time: "19:00" }], items_per_run: 1 }),
+    })
+    const items = [
+      makeItem({ id: "a", format: "post", status: "draft" }),
+      makeItem({ id: "b", format: "post", status: "approved" }),
+    ]
     expect(planAutoDraftSlots(items, settings)).toEqual([])
   })
 
@@ -144,6 +158,32 @@ describe("buildRecentHistoryContext", () => {
   })
 })
 
+describe("buildRecentTopicsContext", () => {
+  it("solo incluye aprobadas o publicadas -- un borrador todavia puede cambiar de tema", () => {
+    const items = [
+      makeItem({ id: "draft", status: "draft", category: "Colesterol" }),
+      makeItem({ id: "archived", status: "archived", category: "Palpitaciones" }),
+      makeItem({ id: "approved", status: "approved", category: "Presion arterial", hook: "h1" }),
+      makeItem({ id: "published", status: "published", category: "Ecocardiograma", hook: "h2" }),
+    ]
+    const topics = buildRecentTopicsContext(items)
+    expect(topics.map(t => t.category).sort()).toEqual(["Ecocardiograma", "Presion arterial"])
+  })
+
+  it("ordena de la mas reciente a la mas vieja", () => {
+    const items = [
+      makeItem({ id: "old", status: "approved", category: "Colesterol", created_at: "2026-07-01T12:00:00Z" }),
+      makeItem({ id: "new", status: "published", category: "Presion arterial", created_at: "2026-08-04T12:00:00Z" }),
+    ]
+    expect(buildRecentTopicsContext(items).map(t => t.category)).toEqual(["Presion arterial", "Colesterol"])
+  })
+
+  it("respeta el limite pedido", () => {
+    const items = Array.from({ length: 5 }, (_, i) => makeItem({ id: `item-${i}`, status: "approved" }))
+    expect(buildRecentTopicsContext(items, 2)).toHaveLength(2)
+  })
+})
+
 describe("pickCategoriesDeterministically", () => {
   it("nunca repite la misma categoria dentro del mismo pedido", () => {
     const categories = pickCategoriesDeterministically([], 3)
@@ -175,7 +215,9 @@ describe("buildAutoDraftPlan", () => {
   })
 
   it("usa las categorias que propone la IA, pasandole el historial y las categorias conocidas", async () => {
-    ;(proposeAutoDraftCategories as jest.Mock).mockResolvedValue(["Arritmias en el embarazo"])
+    // post: 1 slot/semana x 1 por corrida x 2 semanas = objetivo 2, con 0 supply (el item existente
+    // esta "published", no cuenta para el deficit -- solo borrador/aprobado cuentan).
+    ;(proposeAutoDraftCategories as jest.Mock).mockResolvedValue(["Arritmias en el embarazo", "Cardiologia deportiva"])
     const settings = makeSettings({
       post: makeTrack({ enabled: true, schedule_slots: [{ day_of_week: 4, local_time: "19:00" }], items_per_run: 1 }),
     })
@@ -183,9 +225,12 @@ describe("buildAutoDraftPlan", () => {
 
     const plan = await buildAutoDraftPlan(items, settings, now)
 
-    expect(plan).toEqual([{ format: "post", category: "Arritmias en el embarazo", objective: expect.any(String) }])
+    expect(plan).toEqual([
+      { format: "post", category: "Arritmias en el embarazo", objective: expect.any(String) },
+      { format: "post", category: "Cardiologia deportiva", objective: expect.any(String) },
+    ])
     const [callArgs] = (proposeAutoDraftCategories as jest.Mock).mock.calls[0]
-    expect(callArgs.count).toBe(1)
+    expect(callArgs.count).toBe(2)
     expect(callArgs.established_categories).toEqual(expect.arrayContaining(["Colesterol"]))
     expect(callArgs.recent_history).toEqual(expect.arrayContaining([expect.objectContaining({ category: "Colesterol" })]))
   })
@@ -198,11 +243,12 @@ describe("buildAutoDraftPlan", () => {
 
     const plan = await buildAutoDraftPlan([], settings, now)
 
-    expect(plan).toHaveLength(1)
+    expect(plan).toHaveLength(2)
     expect(plan[0].category).toEqual(expect.any(String))
   })
 
   it("si la IA devuelve menos categorias de las pedidas, completa el resto con el metodo deterministico", async () => {
+    // 2 slots/semana x 1 por corrida x 2 semanas = objetivo 4, pero el tope por formato/corrida es 3.
     ;(proposeAutoDraftCategories as jest.Mock).mockResolvedValue(["Arritmias en el embarazo"])
     const settings = makeSettings({
       historia: makeTrack({
@@ -214,9 +260,9 @@ describe("buildAutoDraftPlan", () => {
 
     const plan = await buildAutoDraftPlan([], settings, now)
 
-    expect(plan).toHaveLength(2)
+    expect(plan).toHaveLength(3)
     expect(plan.map(item => item.category)).toContain("Arritmias en el embarazo")
-    expect(new Set(plan.map(item => item.category)).size).toBe(2)
+    expect(new Set(plan.map(item => item.category)).size).toBe(3)
   })
 })
 
@@ -249,7 +295,7 @@ describe("runAutoDraftGeneration", () => {
     expect(writeContentItems).not.toHaveBeenCalled()
   })
 
-  it("genera y guarda un borrador nuevo por cada pieza planeada", async () => {
+  it("genera y guarda un borrador nuevo por cada pieza planeada (hasta cubrir 2 semanas)", async () => {
     ;(getAiMode as jest.Mock).mockReturnValue("gemini_api")
     ;(readContentItems as jest.Mock).mockResolvedValue([])
     ;(readAutoPublishSettings as jest.Mock).mockResolvedValue(makeSettings({
@@ -263,18 +309,59 @@ describe("runAutoDraftGeneration", () => {
 
     const result = await runAutoDraftGeneration(supabase, now)
 
+    // 1 slot/semana x 1 por corrida x 2 semanas = objetivo 2, con 0 supply.
     expect(result.skipped).toBe(false)
-    expect(result.planned).toBe(1)
-    expect(result.generated).toBe(1)
+    expect(result.planned).toBe(2)
+    expect(result.generated).toBe(2)
     expect(writeContentItems).toHaveBeenCalledTimes(1)
     const [, savedItems] = (writeContentItems as jest.Mock).mock.calls[0]
-    expect(savedItems).toHaveLength(1)
+    expect(savedItems).toHaveLength(2)
     expect(savedItems[0]).toMatchObject({ status: "draft", format: "post", hook: "h", category: "Categoria IA 1" })
+    expect(savedItems[1]).toMatchObject({ status: "draft", format: "post", hook: "h", category: "Categoria IA 2" })
+  })
+
+  it("le pasa a generateContentPlan los temas ya aprobados/publicados a evitar, y los suma a medida que genera dentro de la misma corrida", async () => {
+    ;(getAiMode as jest.Mock).mockReturnValue("gemini_api")
+    ;(readContentItems as jest.Mock).mockResolvedValue([
+      // Formato "historia" a proposito: no cuenta contra el deficit de "post" (asi el plan sigue
+      // pidiendo 2 piezas nuevas), pero SI tiene que aparecer en avoid_recent_topics (no filtra por
+      // formato -- un tema repetido cruzando formatos igual se siente repetitivo).
+      makeItem({ id: "approved-1", format: "historia", category: "Colesterol", hook: "hook viejo aprobado", status: "approved" }),
+    ])
+    ;(readAutoPublishSettings as jest.Mock).mockResolvedValue(makeSettings({
+      post: makeTrack({ enabled: true, schedule_slots: [{ day_of_week: 4, local_time: "19:00" }], items_per_run: 1 }),
+    }))
+    ;(generateContentPlan as jest.Mock)
+      .mockResolvedValueOnce({
+        hook: "hook nuevo 1", caption: "c", google_text: "g", hashtags: "#a",
+        visual_headline: "vh1", visual_subtitle: "vs", visual_style: "rose",
+      })
+      .mockResolvedValueOnce({
+        hook: "hook nuevo 2", caption: "c", google_text: "g", hashtags: "#a",
+        visual_headline: "vh2", visual_subtitle: "vs", visual_style: "rose",
+      })
+
+    await runAutoDraftGeneration(supabase, now)
+
+    const calls = (generateContentPlan as jest.Mock).mock.calls
+    expect(calls).toHaveLength(2)
+    // La pieza 1 solo ve lo ya aprobado (el borrador existente no cuenta como repeticion real todavia).
+    expect(calls[0][0].avoid_recent_topics).toEqual([
+      { category: "Colesterol", topic: "t", hook: "hook viejo aprobado" },
+    ])
+    // La pieza 2 ya ve tambien lo que genero la pieza 1 en esta misma corrida.
+    expect(calls[1][0].avoid_recent_topics).toEqual([
+      { category: "Categoria IA 1", topic: "vh1", hook: "hook nuevo 1" },
+      { category: "Colesterol", topic: "t", hook: "hook viejo aprobado" },
+    ])
   })
 
   it("un fallo puntual no frena las piezas restantes, salvo que sea el limite diario", async () => {
     ;(getAiMode as jest.Mock).mockReturnValue("gemini_api")
-    ;(readContentItems as jest.Mock).mockResolvedValue([])
+    ;(readContentItems as jest.Mock).mockResolvedValue([
+      makeItem({ id: "existing-post", format: "post", status: "approved" }),
+      makeItem({ id: "existing-carrusel", format: "carrusel", status: "approved" }),
+    ])
     ;(readAutoPublishSettings as jest.Mock).mockResolvedValue(makeSettings({
       post: makeTrack({ enabled: true, schedule_slots: [{ day_of_week: 4, local_time: "19:00" }], items_per_run: 1 }),
       carrusel: makeTrack({ enabled: true, schedule_slots: [{ day_of_week: 0, local_time: "19:00" }], items_per_run: 1 }),
@@ -288,6 +375,8 @@ describe("runAutoDraftGeneration", () => {
 
     const result = await runAutoDraftGeneration(supabase, now)
 
+    // 1 slot/semana x 1 por corrida x 2 semanas = objetivo 2 por formato; con 1 ya existente cada uno,
+    // falta 1 de cada uno.
     expect(result.planned).toBe(2)
     expect(result.generated).toBe(1)
     expect(result.error).toBeDefined()

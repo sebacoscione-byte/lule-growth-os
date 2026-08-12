@@ -341,6 +341,34 @@ describe("generateText valida JSON antes de dar por exitosa la respuesta (bug re
     expect(result.image_alt_text).toBe("alt")
   })
 
+  // 2026-08-12, a pedido explicito de Seba ("siento que hay muchos temas repetidos"): la reposicion
+  // automatica de borradores (content-auto-draft.ts) le pasa a esta funcion los temas ya
+  // aprobados/publicados recientemente para que elija un angulo distinto.
+  it("sin avoid_recent_topics, no menciona ningun tema a evitar (compatible con la generacion manual)", async () => {
+    fetchSpy = jest.spyOn(global, "fetch").mockResolvedValue(geminiHttpResponse(JSON.stringify(validPlan)))
+    await generateContentPlan(planInput)
+    const requestBody = JSON.parse(String(fetchSpy.mock.calls[0][1]?.body))
+    const userText = requestBody.contents[0].parts[0].text as string
+    expect(userText).not.toMatch(/ya cubiertos recientemente/i)
+  })
+
+  it("con avoid_recent_topics, le pide a la IA elegir un angulo distinto y lista los temas/ganchos ya usados", async () => {
+    fetchSpy = jest.spyOn(global, "fetch").mockResolvedValue(geminiHttpResponse(JSON.stringify(validPlan)))
+    await generateContentPlan({
+      ...planInput,
+      avoid_recent_topics: [
+        { category: "Colesterol", topic: "Colesterol alto", hook: "El colesterol alto no da sintomas" },
+        { category: "Presion arterial", topic: "Presion arterial y estres", hook: "" },
+      ],
+    })
+    const requestBody = JSON.parse(String(fetchSpy.mock.calls[0][1]?.body))
+    const userText = requestBody.contents[0].parts[0].text as string
+    expect(userText).toMatch(/ya cubiertos recientemente/i)
+    expect(userText).toContain("[Colesterol] El colesterol alto no da sintomas")
+    // Sin hook, cae al topic como identificador del angulo ya cubierto.
+    expect(userText).toContain("[Presion arterial] Presion arterial y estres")
+  })
+
   // 2026-08-01: el truncamiento de JSON de Gemini es intermitente (confirmado en vivo -- el mismo
   // pedido repetido a veces sale bien y a veces no), asi que antes de saltar a otro proveedor vale la
   // pena reintentar una vez mas con el mismo. AI_PROVIDER="gemini" aisla el escenario a un unico
