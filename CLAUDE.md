@@ -1,6 +1,32 @@
 ﻿# Lule Growth OS — Contexto para Claude
 
 ## Estado actual
+- 2026-08-11 (bug real: historias configuradas a repetir de forma infinita no se publicaron en su
+  corrida programada): Seba reportó que las historias evergreen no salieron ese día. Investigado
+  contra datos reales de producción (consulta de solo lectura a `app_config`/`app_config_history`,
+  sin PII): el cron de historias sí corrió a horario (18:29 ART, dentro de la ventana) y publicó
+  1/1, pero ninguna de las 2 historias con `repeat_interval_days` configurado entró como candidata.
+  **Causa raíz**: `isRepeatDue()` calculaba "días desde la última publicación" con horas exactas
+  transcurridas (`now - updated_at`) en vez de días de calendario — y `publishApprovedItem()` pisa
+  `updated_at` en CADA intento de republicar, incluso uno que falla (`auto_publish_result.instagram:
+  "error"`, no solo un éxito). El historial real mostró que una de las dos piezas tuvo un intento
+  fallido la noche anterior (~22:48 ART, bien fuera de la ventana normal 18:00-18:59) — probablemente
+  un reintento manual — que corrió el reloj a un horario tardío. La corrida programada del día
+  siguiente (18:29 ART) cayó a solo ~19,7 horas reales de esa marca: menos que el intervalo de 1 día
+  exigido en horas exactas, aunque la fecha civil (ART) ya había cambiado — así que la pieza quedó
+  salteada un día entero. Fix: `isRepeatDue()` ahora compara días de calendario en huso ART
+  (`zonedCalendarDaysBetween`, mismo criterio que ya usa `alreadyPublishedToday` para "mismo día") en
+  vez de horas exactas — un touch tardío el día anterior (por la razón que sea) ya no corre el reloj
+  más allá de la fecha civil real. 2 tests nuevos que replican el escenario real reportado (mismos
+  timestamps de producción) + los 91 tests existentes de `content-pipeline.test.ts` siguen pasando sin
+  cambios (los casos ya escritos usan medianoche UTC, insensibles al cambio de criterio). `npm test`
+  (1042/1042), lint y build sin errores. Como el intervalo de estas 2 piezas es diario y el próximo día
+  programado (miércoles) no está en su cronograma (historia publica lunes/martes/jueves/sábado/
+  domingo), sin este fix hubieran vuelto a repetirse recién el jueves — con el fix, la próxima corrida
+  programada (jueves) ya las va a encontrar "due" con normalidad. No se forzó una publicación manual
+  fuera de horario para recuperar el día perdido de hoy (acción real y visible en el Instagram en
+  vivo, fuera del cronograma) — quedó a criterio de Seba. Archivo: `src/lib/content-pipeline.ts`
+  (+tests).
 - 2026-08-06 (mismo día, quinta vuelta sobre el cierre de historias — variedad, no siempre "agendá"):
   Seba marcó que el cierre siempre terminaba empujando a "agendá desde mi bio" y pidió variedad —
   también invitar a entrar a la bio solo para informarse más, sin mencionar turno. Revisando el

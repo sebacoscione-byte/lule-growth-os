@@ -425,6 +425,31 @@ describe("isRepeatDue", () => {
     })
     expect(isRepeatDue(a, new Date("2026-07-10T00:00:00.000Z"))).toBe(true)
   })
+
+  // Bug real 2026-08-11: dos historias con repeat_interval_days=1 no se publicaron en su corrida
+  // programada. Causa: un intento de republicar fallido (o una edicion manual) toco `updated_at` mas
+  // tarde de lo habitual la noche anterior (22:49 ART, fuera de la ventana normal 18:00-18:59), y la
+  // corrida del dia siguiente (18:29 ART) cayo a solo ~19.7hs de esa marca -- menos de 24hs exactas,
+  // aunque la fecha civil ya habia cambiado. Comparar por dia civil (ART) en vez de horas exactas es
+  // el fix: ver `zonedCalendarDaysBetween`.
+  it("true al dia civil siguiente aunque el ultimo touch haya sido tarde a la noche (menos de 24hs exactas)", () => {
+    const a = item({
+      status: "published", repeat_interval_days: 1,
+      updated_at: "2026-08-11T01:49:06.001Z", // 2026-08-10 22:49 ART
+    })
+    // 2026-08-11T21:29:59Z = 2026-08-11 18:29 ART -- ~19.7hs reales despues, pero ya es el dia civil
+    // siguiente en ART.
+    expect(isRepeatDue(a, new Date("2026-08-11T21:29:59.048Z"))).toBe(true)
+  })
+
+  it("false todavia dentro del mismo dia civil (ART), aunque hayan pasado varias horas", () => {
+    const a = item({
+      status: "published", repeat_interval_days: 1,
+      updated_at: "2026-08-10T13:00:00.000Z", // 2026-08-10 10:00 ART
+    })
+    // 2026-08-10T21:34:16Z = 2026-08-10 18:34 ART -- mismo dia civil que el ultimo touch.
+    expect(isRepeatDue(a, new Date("2026-08-10T21:34:16.000Z"))).toBe(false)
+  })
 })
 
 describe("estimateRepeatEndDate", () => {
