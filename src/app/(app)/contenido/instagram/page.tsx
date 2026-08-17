@@ -1524,6 +1524,10 @@ export default function ContentStudioPage() {
       }
       setItems(previous => previous.map(existing => existing.id === item.id ? data.item : existing))
       if (active?.id === item.id) setActive(data.item)
+      // Nunca dar un "exito" mudo: si algun canal no salio, la pieza queda en aprobados y hay que avisarlo.
+      if (data.allPublished === false) {
+        setError("No se pudo publicar en todos los canales. Revisá el detalle en la card de la pieza y reintentá.")
+      }
     } catch {
       setError("No se pudo publicar la pieza. Revisá tu conexión e intentá nuevamente.")
     } finally {
