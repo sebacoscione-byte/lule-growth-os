@@ -31,7 +31,15 @@ export async function POST(request: Request) {
     }
 
     // Reintentar tras una publicacion parcial no debe volver a postear en el canal que ya salio bien.
-    const channelsToPublish = resolveChannelsToPublish(item, item.channels)
+    let channelsToPublish = resolveChannelsToPublish(item, item.channels)
+    // Una pieza "aprobada" cuyo auto_publish_result marca como "published" a TODOS sus canales arrastra un
+    // resultado viejo: si de verdad hubieran salido todos, estaria en "published", no en "approved" (ver
+    // publishApprovedItem). Pasa cuando una pieza publicada se edita -> vuelve a borrador -> se reaprueba.
+    // En ese caso el filtro deja la lista vacia y "Publicar ahora" no haria nada en silencio: republicar
+    // en todos los canales asignados (publishApprovedItem pisa cada resultado con el intento fresco).
+    if (channelsToPublish.length === 0) {
+      channelsToPublish = [...item.channels]
+    }
 
     // getServiceDb() (service role puro), no createServiceClient(): ver nota en instagram-business/publish.
     const service = getServiceDb()

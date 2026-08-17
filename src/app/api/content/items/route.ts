@@ -259,7 +259,12 @@ export async function PATCH(request: NextRequest) {
       ...current,
       ...changes,
       ...(enablingRepeat ? { repeat_count: 0 } : {}),
-      ...(resetApproval ? { status: "draft" as const } : {}),
+      // Al editar el CONTENIDO de una pieza aprobada/publicada, vuelve a borrador -- y su
+      // auto_publish_result queda viejo (describe la publicacion de un contenido que ya no existe). Si no
+      // se limpia, al reaprobar y tocar "Publicar ahora", resolveChannelsToPublish saltea el canal por
+      // creerlo ya publicado y la pieza no se publica nunca (queda en aprobados). Mismo criterio que ya
+      // usan "Deshacer publicacion" y la republicacion evergreen del cron.
+      ...(resetApproval ? { status: "draft" as const, auto_publish_result: {} } : {}),
       ...(body.status === "published" && current.status !== "published"
         ? { published_at: body.manual_publish_note?.marked_at ?? now }
         : {}),

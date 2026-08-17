@@ -1,6 +1,32 @@
 ﻿# Lule Growth OS — Contexto para Claude
 
 ## Estado actual
+- 2026-08-17 (bug real: "Publicar ahora" no publicaba y la pieza quedaba en aprobados): Seba reportó
+  que un carrusel ya publicado, que borró en Instagram por tener un error, tras corregirlo y tocar
+  "Publicar ahora" no se publicaba — quedaba en Aprobados, sin ningún mensaje de error. **Causa raíz**:
+  al editar el CONTENIDO de una pieza aprobada/publicada, vuelve a borrador (`resetApproval` en
+  `PATCH /api/content/items`), pero su `auto_publish_result` quedaba viejo (`{ instagram: "published" }`
+  de la publicación anterior, que ya no existía). Al reaprobar y tocar "Publicar ahora",
+  `resolveChannelsToPublish` saltea todo canal marcado `"published"`, así que la lista de canales
+  quedaba **vacía**: `publishApprovedItem` no publicaba nada, `allPublished` daba `false`, la pieza
+  seguía en `approved` y el front (`publishNow`) no mostraba error (HTTP 200, sin `data.error`) — un
+  no-op mudo. El cron de auto-publicación NO tenía este bug porque ya limpia `auto_publish_result`
+  antes de republicar una evergreen (`content-auto-publish.ts`, `if (dueRepeat) current.auto_publish_result = {}`);
+  el camino manual de "Publicar ahora" nunca replicó esa limpieza. **Fix (3 partes)**: (1) root —
+  `PATCH /api/content/items` ahora limpia `auto_publish_result: {}` cuando una edición de contenido
+  revierte una pieza aprobada/publicada a borrador (mismo criterio que "Deshacer publicación" y el cron);
+  (2) self-heal + no-op mudo — `/api/content/publish-now`: si para una pieza aprobada la lista de canales
+  queda vacía (imposible en una pieza realmente publicada — estaría en `published`), el resultado es viejo
+  y republica en todos los canales asignados (esto además destraba la pieza ya atascada de Seba sin
+  reeditarla); (3) UI — `publishNow` ahora avisa cuando `allPublished === false`, para que un fallo real
+  de un canal deje de ser un "éxito" silencioso. La proteccion contra duplicar un reintento parcial real
+  (Instagram OK, Google falló → reintentar solo Google) se conserva: la lista queda vacía únicamente
+  cuando TODOS los canales figuran `"published"`, no en un parcial. Tests nuevos:
+  `publish-now/route.test.ts` (republica con flag viejo; no re-postea el canal ya salido en un parcial;
+  rechaza pieza no aprobada) e `items/route.test.ts` (limpia el resultado al revertir por edición;
+  lo conserva ante un cambio no-contenido como el cronograma). `npm test` (1054/1054), lint y build sin
+  errores. Archivos: `src/app/api/content/publish-now/route.ts` (+tests),
+  `src/app/api/content/items/route.ts` (+tests), `src/app/(app)/contenido/instagram/page.tsx`.
 - 2026-08-11 (bug real: historias configuradas a repetir de forma infinita no se publicaron en su
   corrida programada): Seba reportó que las historias evergreen no salieron ese día. Investigado
   contra datos reales de producción (consulta de solo lectura a `app_config`/`app_config_history`,
