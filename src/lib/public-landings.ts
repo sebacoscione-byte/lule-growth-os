@@ -87,7 +87,7 @@ export const LANDING_DATA: Record<string, PublicLandingData> = {
     title: "Ecocardiograma en Lomas de Zamora — Dra. Lucía Chahin | Swiss Medical",
     description: "¿Necesitás un ecocardiograma en Lomas de Zamora? La Dra. Lucía Chahin realiza ecocardiogramas los viernes en Swiss Medical Lomas.",
     h1: "Ecocardiograma en Lomas de Zamora — Dra. Lucía Chahin",
-    intro: "Si necesitás un ecocardiograma en Lomas de Zamora, la Dra. Lucía Chahin lo realiza los viernes en Swiss Medical Lomas.",
+    intro: "Si necesitás un ecocardiograma en Lomas de Zamora, la Dra. Lucía Chahin lo realiza los viernes en Swiss Medical Lomas, Oliden 141. Podés pedir turno por la app Mi Swiss Medical, por WhatsApp con Swity o por la central telefónica de la institución.",
     services: ["Ecocardiograma", "Consulta cardiológica"],
     locations: [
       { ...SWISS, instruction: "Llamá a Turnos al 0810-333-8876, escribile a Swity (WhatsApp) o usá la app Mi Swiss Medical, pedí turno con la Dra. Lucía Chahin y mencioná que es para ecocardiograma." },

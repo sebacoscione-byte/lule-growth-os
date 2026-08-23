@@ -109,6 +109,13 @@ const nextConfig = {
   async headers() {
     return [
       {
+        // Es un recurso para previews sociales, no una página. Sin esta señal Google Search
+        // Console lo agrupaba como "Rastreada: actualmente sin indexar" junto a URLs HTML.
+        // Se deja rastreable para que Google y las redes puedan leer el header y descargar la placa.
+        source: "/:slug/opengraph-image",
+        headers: [{ key: "X-Robots-Tag", value: "noindex" }],
+      },
+      {
         source: "/(.*)",
         headers: [
           { key: "Content-Security-Policy", value: csp },

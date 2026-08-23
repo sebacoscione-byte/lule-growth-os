@@ -318,6 +318,16 @@ por qué tipo de acción es, para que sepas qué esperar de cada uno. El detalle
   `/dra-lucia-chahin` como canónica en vez de `/` (Search Console tarda en reflejar el cambio, no
   es instantáneo) — si el motivo "Duplicada" persiste pasadas 2-3 semanas con el 308 ya activo,
   investigar de nuevo.
+  **Segunda verificación (2026-08-23):** el informe bajó de 8 a 3 URLs pendientes. Las dos HTML
+  (`/ecocardiograma-lomas` y `/privacidad`) responden 200, son rastreables, tienen canonical y
+  figuran en el sitemap; Search Console todavía muestra como último rastreo el 2026-07-17. La
+  tercera URL es la imagen PNG dinámica de Open Graph, no una página. Se corrigen las señales:
+  `X-Robots-Tag: noindex` para esa imagen, enlaces HTML desde la landing principal a las nueve
+  landings SEO, contenido operativo más específico en `/ecocardiograma-lomas`, robots explícitos
+  y canonical absoluto. También se elimina el `lastmod` artificial que cambiaba con cada deploy;
+  Google recomienda omitirlo si no refleja una modificación significativa real. Queda pedir una
+  nueva validación/recrawl luego del deploy y monitorear: la indexación final la decide Google y
+  no puede garantizarse desde el código.
 - [ ] **Google Cloud (reseñas)**: revisar antes de octubre 2026 si se activa la cuenta completa o
   se deja pausar la prueba gratuita (Etapa 2).
 

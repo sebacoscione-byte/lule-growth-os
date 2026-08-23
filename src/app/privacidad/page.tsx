@@ -5,11 +5,13 @@ import { GoogleAnalytics } from "@/components/google-analytics"
 import { AnalyticsConsentBanner } from "@/components/analytics-consent-banner"
 import { EcgDivider } from "@/components/ecg-divider"
 import { buildWhatsAppUrl } from "@/lib/public-landings"
+import { PUBLIC_SITE_ORIGIN } from "@/lib/tracked-links"
 
 export const metadata: Metadata = {
   title: "Política de privacidad — Dra. Lucía Chahin",
   description: "Qué datos recolecta este sitio, para qué se usan, con quién se comparten y cómo pedir acceso, corrección o eliminación.",
-  alternates: { canonical: "/privacidad" },
+  robots: { index: true, follow: true },
+  alternates: { canonical: `${PUBLIC_SITE_ORIGIN}/privacidad` },
 }
 
 const CONTACT_MESSAGE = "Hola, quiero hacer una consulta sobre mis datos personales (acceso, corrección o eliminación)."
