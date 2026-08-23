@@ -8,7 +8,7 @@ import {
   Stethoscope, HeartPulse, ClipboardCheck, Heart, type LucideIcon,
 } from "lucide-react"
 import {
-  LANDING_DATA, WHATSAPP_MESSAGES, whatsAppKeyForLocation, SERVICE_MICROCOPY,
+  LANDING_DATA, PUBLIC_LANDING_SLUGS, WHATSAPP_MESSAGES, whatsAppKeyForLocation, SERVICE_MICROCOPY,
   RELATED_LANDING_SLUGS, buildWhatsAppUrl, resolvesToBotNumber, type PublicLandingLocation,
 } from "@/lib/public-landings"
 import { withReferralCode, withGeneralFallbackCode } from "@/lib/landing-referral-codes"
@@ -269,6 +269,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   return {
     title: data.title,
     description: data.description,
+    robots: { index: true, follow: true },
     alternates: { canonical: url },
     openGraph: {
       title: data.title,
@@ -390,6 +391,7 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
   } : null
 
   const relatedSlugs = RELATED_LANDING_SLUGS[slug] ?? []
+  const secondaryLandingSlugs = PUBLIC_LANDING_SLUGS.filter(candidate => candidate !== "dra-lucia-chahin")
 
   return (
     <main className="min-h-screen bg-white pb-20 sm:pb-0">
@@ -805,6 +807,31 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
 
       {/* Pedir turno + formulario */}
       <LandingInteractions slug={slug} locations={sedeActions} heroVariant={heroVariant} />
+
+      {/* Mapa HTML de landings: navegación útil y enlaces rastreables desde la página principal. */}
+      {isMain && (
+        <section aria-labelledby="atencion-por-sede" className="px-4 pb-10">
+          <div className="mx-auto max-w-2xl rounded-2xl border border-line bg-paper p-6">
+            <h2 id="atencion-por-sede" className="font-display text-xl font-semibold text-ink">
+              Atención por sede y servicio
+            </h2>
+            <p className="mt-2 text-sm leading-6 text-ink-soft">
+              Consultá días, dirección y canales oficiales para pedir turno en cada sede.
+            </p>
+            <div className="mt-4 grid gap-2 sm:grid-cols-2">
+              {secondaryLandingSlugs.map(landingSlug => (
+                <Link
+                  key={landingSlug}
+                  href={`/${landingSlug}`}
+                  className="rounded-xl border border-line bg-white px-4 py-3 text-sm font-medium text-cardiac transition-colors hover:border-cardiac/30 hover:bg-cardiac-soft"
+                >
+                  {LANDING_DATA[landingSlug].h1.replace(" — Dra. Lucía Chahin", "")}
+                </Link>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* Enlaces relacionados */}
       {!isMain && (

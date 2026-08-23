@@ -9,18 +9,17 @@ function getBaseUrl(): string {
 
 export default function sitemap(): MetadataRoute.Sitemap {
   const base = getBaseUrl()
-  const now = new Date()
 
+  // No publicar `new Date()` como lastmod: el deploy del panel interno no implica que estas
+  // páginas hayan cambiado. Google recomienda omitir la fecha cuando no puede ser exacta.
   return [
     ...PUBLIC_LANDING_SLUGS.map((slug) => ({
       url: `${base}/${slug}`,
-      lastModified: now,
       changeFrequency: "monthly" as const,
       priority: slug === "dra-lucia-chahin" ? 1.0 : 0.8,
     })),
     {
       url: `${base}/privacidad`,
-      lastModified: now,
       changeFrequency: "yearly" as const,
       priority: 0.3,
     },
