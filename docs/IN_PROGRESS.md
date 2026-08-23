@@ -1,12 +1,12 @@
-# EN CURSO (2026-08-23) — señales de indexación en Google Search Console
+# CERRADO (2026-08-23) — señales de indexación en Google Search Console
 
 - [x] Auditar en producción las tres URLs pendientes y confirmar status, canonical, robots y sitemap.
 - [x] Separar la imagen Open Graph del índice de páginas mediante `X-Robots-Tag: noindex`.
 - [x] Reforzar desde la landing principal los enlaces HTML rastreables a las nueve landings SEO.
 - [x] Mejorar el contenido operativo específico de `/ecocardiograma-lomas` sin agregar consejo médico.
 - [x] Explicitar `index, follow`, canonical absoluto de `/privacidad` y corregir el `lastmod` artificial.
-- [ ] Ejecutar lint, Jest, build y E2E público; validar preview y producción.
-- [ ] Publicar y mergear el PR con CI limpio.
+- [x] Ejecutar lint, 112 suites/1052 tests, build y E2E público; validar local y preview.
+- [x] Publicado como PR #233; CI, E2E público y preview protegido de Vercel verificados.
 
 ---
 
