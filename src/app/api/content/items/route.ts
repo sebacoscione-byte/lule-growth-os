@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from "next/server"
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { createClient } from "@/lib/supabase/server"
-import { readContentItems, writeContentItems } from "@/lib/content-pipeline"
+import {
+  compareAndSwapContentItems,
+  mutateContentItems,
+  readContentItems,
+} from "@/lib/content-pipeline"
 import { readContentInsightWindows } from "@/lib/content-insights"
 import type { ContentItem } from "@/types"
 import { authorizeStaff } from "@/lib/staff-authz"
@@ -85,8 +89,9 @@ export async function POST(request: NextRequest) {
     if (!item.id || typeof item.caption !== "string") {
       return NextResponse.json({ error: "Falta el id de la pieza." }, { status: 400 })
     }
-    const items = await readContentItems(supabase)
-    await writeContentItems(supabase, [item, ...items.filter(existing => existing.id !== item.id)].slice(0, 100))
+    await mutateContentItems(supabase, items =>
+      [item, ...items.filter(existing => existing.id !== item.id)].slice(0, 100)
+    )
     return NextResponse.json({ item })
   } catch (error) {
     return errorResponse(error)
@@ -301,7 +306,12 @@ export async function PATCH(request: NextRequest) {
     }
 
     const updated = items.map(item => item.id === body.id ? nextItem : item)
-    await writeContentItems(supabase, updated)
+    if (!await compareAndSwapContentItems(supabase, items, updated)) {
+      return NextResponse.json({
+        error: "La pieza cambió en otra sesión. Recargamos la biblioteca para que puedas revisar la versión más reciente.",
+        code: "content_items_conflict",
+      }, { status: 409 })
+    }
     return NextResponse.json({ item: nextItem })
   } catch (error) {
     return errorResponse(error)
@@ -319,12 +329,14 @@ export async function DELETE(request: NextRequest) {
     if (status && status !== "archived") {
       return NextResponse.json({ error: "Solo se puede eliminar en lote el estado archivado" }, { status: 400 })
     }
-    const items = await readContentItems(supabase)
-    const remaining = status
-      ? items.filter(item => item.status !== "archived")
-      : items.filter(item => item.id !== id)
-    const deletedCount = items.length - remaining.length
-    await writeContentItems(supabase, remaining)
+    let deletedCount = 0
+    await mutateContentItems(supabase, items => {
+      const remaining = status
+        ? items.filter(item => item.status !== "archived")
+        : items.filter(item => item.id !== id)
+      deletedCount = items.length - remaining.length
+      return remaining
+    })
     return NextResponse.json({ ok: true, deletedCount })
   } catch (error) {
     return errorResponse(error)

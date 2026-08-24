@@ -22,8 +22,19 @@ import { createClient as createBrowserSupabaseClient } from "@/lib/supabase/clie
 import { parseAiJson } from "@/lib/parse-ai-json"
 import { MAX_VISUAL_SUBTITLE_LENGTH, truncateForImagePlate } from "@/lib/content-text"
 import { startContentLibraryRefresh } from "@/lib/content-library-refresh"
-import { AUTO_PUBLISH_TIMEZONE, AUTO_PUBLISH_WINDOW_BY_FORMAT, buildDraftContentItem, canStillPublishToday, DEFAULT_AUTO_PUBLISH_SETTINGS, estimateAutoPublishDrainDays, estimateAutoPublishDateForPosition, estimateRepeatEndDate, findRecentDuplicateTopic, getScheduledDays, getZonedScheduleParts, listKnownCategories, pickNextPublishableItems, isReorderableInQueue, normalizeAutoPublishSettings, reorderableQueuePositions } from "@/lib/content-pipeline"
+import { AUTO_PUBLISH_TIMEZONE, AUTO_PUBLISH_WINDOW_BY_FORMAT, buildDraftContentItem, DEFAULT_AUTO_PUBLISH_SETTINGS, estimateAutoPublishDateForPosition, estimateRepeatEndDate, findRecentDuplicateTopic, getScheduledDays, listKnownCategories, pickNextPublishableItems, isReorderableInQueue, normalizeAutoPublishSettings, reorderableQueuePositions } from "@/lib/content-pipeline"
 import type { GeneratedContentPlan } from "@/lib/content-pipeline"
+import {
+  describeAutoPublishQueue,
+  describeLastAutoPublishRun,
+  describeNextWindow,
+  describeWeekdaySelection,
+  describeWindow,
+  fromLocalInputValue,
+  isFutureStart,
+  isTodayAvailableForQueueEstimate,
+  toLocalInputValue,
+} from "@/lib/content-schedule-display"
 import { buildFallbackVideoPrompt, getVeoPromptQualityIssues } from "@/lib/video-prompt"
 import type { AutoPublishSettings, AutoPublishTrackSettings, ContentInstagramInsights, ContentItem, ContentObjective, ContentSlide, ContentSource, ContentStatus, ContentVideoBrandScores, ContentVideoScores, InstagramInsightWindow, InstagramMediaInsightSnapshot, VideoGenerationVersion } from "@/types"
 import { CONTENT_OBJECTIVE_GOALS, CONTENT_OBJECTIVE_LABELS, WEEKDAY_OPTIONS } from "@/types"
@@ -591,124 +602,6 @@ function BioYFijadosTab() {
       </div>
     </div>
   )
-}
-
-// ---------------------------------------------------------------------------
-// Publicacion automatica: tarjeta por cronograma (posts / historias)
-// ---------------------------------------------------------------------------
-
-function isFutureStart(track: AutoPublishTrackSettings): boolean {
-  return Boolean(track.starts_at) && new Date(track.starts_at as string).getTime() > Date.now()
-}
-
-/** true si hoy todavia puede ser la fecha de la proxima publicacion de este track (no si ya arranco en el futuro, ni si ya publico algo hoy). */
-function isTodayAvailableForQueueEstimate(track: AutoPublishTrackSettings, now: Date): boolean {
-  return canStillPublishToday(track, now)
-}
-
-function toLocalInputValue(iso: string): string {
-  const d = new Date(iso)
-  const pad = (n: number) => String(n).padStart(2, "0")
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
-}
-
-function fromLocalInputValue(value: string): string {
-  return new Date(value).toISOString()
-}
-
-function describeAutoPublishQueue(kind: "post" | "historia" | "carrusel" | "reel", count: number, track: AutoPublishTrackSettings): string {
-  const daysOfWeek = getScheduledDays(track)
-  const { items_per_run: itemsPerRun } = track
-  const label = kind === "post"
-    ? `${count} post${count === 1 ? "" : "s"} aprobado${count === 1 ? "" : "s"} en cola`
-    : kind === "historia"
-    ? `${count} historia${count === 1 ? "" : "s"} aprobada${count === 1 ? "" : "s"} en cola`
-    : kind === "carrusel"
-    ? `${count} carrusel${count === 1 ? "" : "es"} aprobado${count === 1 ? "" : "s"} en cola`
-    : `${count} reel${count === 1 ? "" : "s"} aprobado${count === 1 ? "" : "s"} en cola`
-  if (count === 0) return `${label}.`
-  if (daysOfWeek.length === 0) return `${label} — elegí al menos un día de la semana para que empiece a publicar.`
-  const now = new Date()
-  const days = estimateAutoPublishDrainDays(count, daysOfWeek, itemsPerRun, now, isTodayAvailableForQueueEstimate(track, now))
-  const article = kind === "historia" ? "la última saldría" : "el último saldría"
-  const batch = itemsPerRun > 1 ? ` (publicando de a ${itemsPerRun})` : ""
-  const daysLabel = days === 0 ? "hoy" : days === 1 ? "en aproximadamente 1 día" : `en unos ${days} días`
-  return `${label} — a este ritmo${batch}, ${article} ${daysLabel}.`
-}
-
-function describeWeekdaySelection(daysOfWeek: number[]): string {
-  if (daysOfWeek.length === 0) return ""
-  const labels = WEEKDAY_OPTIONS.filter(option => daysOfWeek.includes(option.day)).map(option => option.label)
-  return `Publica: ${labels.join(", ")}.`
-}
-
-function describeWindow(track: AutoPublishTrackSettings): string {
-  const start = track.schedule_slots[0]?.local_time
-  if (!start) return "Sin horario configurado"
-  const [hour] = start.split(":").map(Number)
-  const end = `${String((hour + 1) % 24).padStart(2, "0")}:00`
-  return `Entre ${start} y ${end} ART`
-}
-
-function describeNextWindow(track: AutoPublishTrackSettings): string {
-  if (!track.enabled) return "Próxima ventana: activá este formato para calcularla."
-  const days = getScheduledDays(track)
-  if (days.length === 0) return "Próxima ventana: elegí al menos un día."
-  const now = new Date()
-  const date = estimateAutoPublishDateForPosition(1, days, 1, now, canStillPublishToday(track, now))
-  if (!date) return "Próxima ventana: no disponible."
-  const localDay = getZonedScheduleParts(date, track.timezone).dayOfWeek
-  const slot = track.schedule_slots.find(candidate => candidate.day_of_week === localDay) ?? track.schedule_slots[0]
-  const [hour] = slot.local_time.split(":").map(Number)
-  const end = `${String((hour + 1) % 24).padStart(2, "0")}:00`
-  const dayLabel = date.toLocaleDateString("es-AR", {
-    timeZone: track.timezone,
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-  })
-  return `Próxima ventana estimada: ${dayLabel}, entre ${slot.local_time} y ${end} ART.`
-}
-
-function describeAutoPublishIssue(issue: string): string {
-  if (issue === "quota_exceeded") return "se alcanzó el límite diario de generación de imágenes con IA"
-  if (issue.startsWith("error:")) return `hubo un error (${issue.replace(/^error:\s*/, "")})`
-  return issue
-}
-
-function describeLastAutoPublishRun(track: AutoPublishTrackSettings): string | null {
-  if (!track.last_run_at) return null
-  const when = new Date(track.last_run_at).toLocaleString("es-AR", { timeZone: track.timezone })
-  const reasonMap: Record<string, string> = {
-    skipped_disabled: "estaba apagada",
-    skipped_scheduled: "todavía no llegó la fecha de inicio programada",
-    skipped_no_slots: "no elegiste ningún día para este cronograma",
-    skipped_interval: "la configuración anterior no tenía una ventana elegible en esa corrida",
-    skipped_not_scheduled_day: "hoy no es uno de los días elegidos",
-    skipped_outside_window: "la corrida llegó fuera de la ventana configurada",
-    skipped_already_published: "ya se había publicado una pieza de este formato ese día",
-    skipped_feed_conflict: "ya se había publicado otra pieza principal de feed esa noche",
-    skipped_no_item: "no había ninguna pieza aprobada lista para publicar",
-  }
-  const result = track.last_run_result ?? ""
-  const publishedMatch = result.match(/^published:(\d+)\/(\d+)(?:\s*\((.+)\))?$/)
-  let readable = reasonMap[result]
-  if (!readable && publishedMatch) {
-    const [, doneStr, totalStr, issue] = publishedMatch
-    const done = Number(doneStr)
-    const total = Number(totalStr)
-    if (done === total) {
-      readable = total === 1 ? "se publicó correctamente" : `se publicaron las ${total} piezas correctamente`
-    } else if (done === 0) {
-      readable = total === 1
-        ? "no se pudo publicar (revisá el detalle de la pieza)"
-        : `no se pudo publicar ninguna de las ${total} piezas (revisá el detalle de cada una)`
-    } else {
-      readable = `se publicaron ${done} de ${total} piezas (revisá el detalle de las que fallaron)`
-    }
-    if (issue) readable += ` — motivo: ${describeAutoPublishIssue(issue)}`
-  }
-  return `Último intento: ${when} — ${readable ?? result}`
 }
 
 function WeekdayPicker({
@@ -1427,7 +1320,11 @@ export default function ContentStudioPage() {
         body: JSON.stringify({ id: item.id, ...changes }),
       })
       const data = await response.json()
-      if (!response.ok || data.error) return setError(data.error ?? "No se pudieron guardar los cambios")
+      if (!response.ok || data.error) {
+        setError(data.error ?? "No se pudieron guardar los cambios")
+        if (response.status === 409) await loadItems()
+        return
+      }
       setItems(previous => previous.map(existing => existing.id === item.id ? data.item : existing))
       setActive(previous => {
         // Si esta operacion es sobre otra pieza (ej. aprobar una card de la biblioteca mientras

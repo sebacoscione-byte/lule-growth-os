@@ -275,11 +275,80 @@ export async function readContentItems(supabase: SupabaseClient): Promise<Conten
   return Array.isArray(data?.value) ? data.value as ContentItem[] : []
 }
 
-export async function writeContentItems(supabase: SupabaseClient, items: ContentItem[]): Promise<void> {
-  const { error } = await supabase
+/**
+ * Reemplaza la biblioteca solo si sigue siendo exactamente la misma que leyó el caller.
+ *
+ * `content_pipeline` vive como un único documento JSONB por compatibilidad histórica. Un upsert
+ * ciego permite que dos cuentas, un cron o la captura de insights se pisen entre sí. La igualdad
+ * JSONB convierte el UPDATE en compare-and-swap sin necesitar una columna/migración adicional.
+ */
+export async function compareAndSwapContentItems(
+  supabase: SupabaseClient,
+  expectedItems: ContentItem[],
+  nextItems: ContentItem[]
+): Promise<boolean> {
+  const { data, error } = await supabase
     .from("app_config")
-    .upsert({ key: CONTENT_KEY, value: items }, { onConflict: "key" })
+    .update({ value: nextItems, updated_at: new Date().toISOString() })
+    .eq("key", CONTENT_KEY)
+    .filter("value", "eq", JSON.stringify(expectedItems))
+    .select("key")
+    .maybeSingle()
   if (error) throw error
+  return Boolean(data)
+}
+
+export class ContentItemsConflictError extends Error {
+  constructor() {
+    super("content_items_conflict")
+    this.name = "ContentItemsConflictError"
+  }
+}
+
+/**
+ * Persiste el resultado externo sin devolver la pieza a una versión vieja. Publicar puede tardar
+ * varios segundos; si alguien editó la pieza mientras Meta/Google respondían, se conservan esos
+ * cambios y solo se adjunta la identidad del post que efectivamente salió.
+ */
+export function mergeContentPublicationResult(
+  latest: ContentItem,
+  publishedFrom: ContentItem,
+  result: ContentItem
+): ContentItem {
+  if (latest.updated_at !== publishedFrom.updated_at) {
+    return {
+      ...latest,
+      ...(result.instagram_media_id ? { instagram_media_id: result.instagram_media_id } : {}),
+      ...(result.published_at ? { published_at: result.published_at } : {}),
+    }
+  }
+  return {
+    ...latest,
+    status: result.status,
+    auto_publish_result: result.auto_publish_result,
+    updated_at: result.updated_at,
+    ...(result.instagram_media_id ? { instagram_media_id: result.instagram_media_id } : {}),
+    ...(result.published_at ? { published_at: result.published_at } : {}),
+    ...(result.repeat_count !== undefined ? { repeat_count: result.repeat_count } : {}),
+  }
+}
+
+/**
+ * Aplica una mutación pura sobre la versión más reciente y reintenta si otro escritor ganó la
+ * carrera. El callback debe limitarse a transformar el array: no hacer I/O ni publicar contenido.
+ */
+export async function mutateContentItems(
+  supabase: SupabaseClient,
+  mutation: (items: ContentItem[]) => ContentItem[],
+  maxAttempts: number = 5
+): Promise<ContentItem[]> {
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    const current = await readContentItems(supabase)
+    const next = mutation(current)
+    if (JSON.stringify(next) === JSON.stringify(current)) return current
+    if (await compareAndSwapContentItems(supabase, current, next)) return next
+  }
+  throw new ContentItemsConflictError()
 }
 
 export async function readAutoPublishSettings(supabase: SupabaseClient): Promise<AutoPublishSettings> {

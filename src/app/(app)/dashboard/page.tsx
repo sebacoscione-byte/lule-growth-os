@@ -5,7 +5,7 @@ import {
   Users, CheckCircle2, Clock,
   MapPin, Camera, Search, MessageSquare, Globe, Lightbulb, Eye,
   MousePointerClick, TrendingUp, ArrowUpRight, ArrowDownRight, Minus,
-  CalendarDays, PhoneCall, Navigation, Star, BarChart3,
+  CalendarDays, PhoneCall, Navigation, Star, BarChart3, AlertTriangle,
 } from "lucide-react"
 import { STATUS_LABELS, STATUS_COLORS, type Lead } from "@/types"
 import { timeAgo } from "@/lib/utils"
@@ -490,6 +490,34 @@ function SectionHeader({ icon: Icon, title }: { icon: typeof Globe; title: strin
   )
 }
 
+function OperationalAction({
+  href,
+  label,
+  value,
+  note,
+  icon: Icon,
+  className,
+}: {
+  href: string
+  label: string
+  value: number
+  note: string
+  icon: typeof Globe
+  className: string
+}) {
+  return (
+    <Link href={href} className="group rounded-xl border border-gray-200 bg-white p-4 shadow-sm transition hover:border-gray-300 hover:shadow">
+      <div className="flex items-start justify-between gap-3">
+        <span className={`flex h-9 w-9 items-center justify-center rounded-lg ${className}`}><Icon className="h-4 w-4" /></span>
+        <ArrowUpRight className="h-4 w-4 text-gray-300 transition group-hover:text-gray-600" />
+      </div>
+      <p className="mt-3 text-2xl font-bold text-gray-950">{value}</p>
+      <p className="text-sm font-semibold text-gray-800">{label}</p>
+      <p className="mt-1 text-xs text-gray-500">{note}</p>
+    </Link>
+  )
+}
+
 function Money({ amount, currency, pending }: { amount: number; currency: string; pending?: number }) {
   return (
     <span>
@@ -620,14 +648,28 @@ export default async function DashboardPage({
         </div>
       </div>
 
+      <section aria-labelledby="operacion-title">
+        <div className="mb-3 flex items-end justify-between gap-3">
+          <div>
+            <h2 id="operacion-title" className="text-sm font-semibold text-gray-950">Acción operativa</h2>
+            <p className="text-xs text-gray-500">Lo que conviene revisar antes de mirar crecimiento y atribución.</p>
+          </div>
+          <Link href="/leads" className="text-xs font-semibold text-indigo-600 hover:text-indigo-800">Ver todos los leads</Link>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-3">
+          <OperationalAction href="/leads?possible_emergency=true" label="Alertas detectadas" value={metrics.emergencies} note="Casos marcados por el guardrail para atención inmediata." icon={AlertTriangle} className="bg-red-50 text-red-700" />
+          <OperationalAction href="/leads?requires_human=true" label="Esperan respuesta humana" value={metrics.requires_human} note="Conversaciones derivadas que necesitan intervención del equipo." icon={MessageSquare} className="bg-orange-50 text-orange-700" />
+          <OperationalAction href="/leads?status=seguimiento_pendiente" label="Seguimientos pendientes" value={metrics.followup_pending} note="Pacientes a los que corresponde volver a contactar." icon={Clock} className="bg-amber-50 text-amber-700" />
+        </div>
+      </section>
+
       {/* KPIs principales */}
-      <div className="grid grid-cols-2 gap-3 xl:grid-cols-6">
+      <div className="grid grid-cols-2 gap-3 xl:grid-cols-5">
         <KpiCard title="Visitas web" value={growth.available ? growth.summary.visits.current : "—"} comparison={growth.available ? growth.summary.visits : undefined} icon={Eye} iconClass="bg-indigo-50 text-indigo-700" />
         <KpiCard title="Visitas con acción" value={growth.available ? growth.summary.engagedVisits.current : "—"} comparison={growth.available ? growth.summary.engagedVisits : undefined} icon={MousePointerClick} iconClass="bg-cyan-50 text-cyan-700" />
         <KpiCard title="Leads nuevos" value={growth.available ? growth.summary.leads.current : "—"} comparison={growth.available ? growth.summary.leads : undefined} icon={Users} iconClass="bg-violet-50 text-violet-700" />
         <KpiCard title="Turnos confirmados" value={growth.available ? growth.summary.confirmed.current : "—"} comparison={growth.available ? growth.summary.confirmed : undefined} icon={CheckCircle2} iconClass="bg-emerald-50 text-emerald-700" />
         <KpiCard title="Lead → turno" value={growth.available ? `${growth.summary.leadToConfirmedRate.current}%` : "—"} comparison={growth.available ? growth.summary.leadToConfirmedRate : undefined} rate icon={TrendingUp} iconClass="bg-green-50 text-green-700" />
-        <KpiCard title="Seguimientos pendientes" value={metrics.followup_pending} icon={Clock} iconClass="bg-amber-50 text-amber-700" note="estado actual" />
       </div>
 
       {!growth.available && (

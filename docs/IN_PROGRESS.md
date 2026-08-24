@@ -1,3 +1,15 @@
+# EN CURSO (2026-08-24) — hardening técnico posterior a la review integral
+
+- [x] Actualizar Next.js y dependencias transitivas vulnerables hasta dejar `npm audit` sin hallazgos altos.
+- [x] Evitar actualizaciones perdidas en la Biblioteca cuando coinciden dos cuentas, un cron o la captura de insights.
+- [x] Simplificar la landing principal sin perder contenido operativo, SEO ni el CTA móvil.
+- [x] Reducir la deuda de mantenibilidad de los módulos más críticos sin cambiar lógica médica.
+- [x] Ejecutar `npm audit` (0 vulnerabilidades), lint, 118 suites/1075 tests, build y 22 E2E públicos;
+      verificar la landing desktop/móvil y el desplegable de trayectoria en navegador real.
+- [ ] Publicar por rama + PR, verificar CI/preview, mergear y reconciliar el backlog.
+
+---
+
 # CERRADO (2026-08-24) — cierre de pendientes técnicos accionables
 
 - [x] Confirmar por el usuario que Search Console recibió el pedido de recrawl/validación y que la

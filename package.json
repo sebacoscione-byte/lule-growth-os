@@ -16,7 +16,7 @@
     "push-e2e-ci-secrets": "node scripts/push-e2e-ci-secrets.mjs"
   },
   "overrides": {
-    "postcss": "^8.5.15"
+    "postcss": "^8.5.23"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.104.1",
@@ -38,7 +38,7 @@
     "clsx": "^2.1.1",
     "date-fns": "^4.4.0",
     "lucide-react": "^1.17.0",
-    "next": "16.2.10",
+    "next": "16.3.2",
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "tailwind-merge": "^3.6.0",
@@ -52,7 +52,7 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
-    "eslint-config-next": "16.2.9",
+    "eslint-config-next": "16.3.2",
     "jest": "^30.4.2",
     "jest-environment-node": "^30.4.1",
     "otpauth": "^9.5.1",

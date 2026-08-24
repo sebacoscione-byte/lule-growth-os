@@ -6,15 +6,16 @@ jest.mock("@/lib/supabase/server", () => ({ createClient: jest.fn() }))
 jest.mock("@/lib/staff-authz", () => ({ authorizeStaff: jest.fn() }))
 jest.mock("@/lib/content-pipeline", () => ({
   ...jest.requireActual("@/lib/content-pipeline"),
+  compareAndSwapContentItems: jest.fn(),
   readContentItems: jest.fn(),
-  writeContentItems: jest.fn(),
+  mutateContentItems: jest.fn(),
 }))
 jest.mock("@/lib/content-insights", () => ({ readContentInsightWindows: jest.fn() }))
 
 import { PATCH } from "./route"
 import { createClient } from "@/lib/supabase/server"
 import { authorizeStaff } from "@/lib/staff-authz"
-import { readContentItems, writeContentItems } from "@/lib/content-pipeline"
+import { compareAndSwapContentItems, readContentItems } from "@/lib/content-pipeline"
 import type { ContentItem } from "@/types"
 
 function item(overrides: Partial<ContentItem> = {}): ContentItem {
@@ -60,7 +61,10 @@ describe("PATCH /api/content/items — limpiar resultado de publicacion viejo", 
     written = null
     ;(createClient as jest.Mock).mockResolvedValue({})
     ;(authorizeStaff as jest.Mock).mockResolvedValue({ ok: true })
-    ;(writeContentItems as jest.Mock).mockImplementation(async (_db, items: ContentItem[]) => { written = items })
+    ;(compareAndSwapContentItems as jest.Mock).mockImplementation(async (_db, _expected, items: ContentItem[]) => {
+      written = items
+      return true
+    })
   })
 
   it("limpia auto_publish_result al volver a borrador por editar el contenido", async () => {
@@ -84,5 +88,17 @@ describe("PATCH /api/content/items — limpiar resultado de publicacion viejo", 
     expect(response.status).toBe(200)
     expect(data.item.status).toBe("approved")
     expect(data.item.auto_publish_result).toEqual({ instagram: "published" })
+  })
+
+  it("devuelve conflicto y no pisa una edición concurrente", async () => {
+    ;(readContentItems as jest.Mock).mockResolvedValue([item()])
+    ;(compareAndSwapContentItems as jest.Mock).mockResolvedValue(false)
+
+    const response = await PATCH(patch({ id: "carrusel-1", hook: "Edición local" }))
+    const data = await response.json()
+
+    expect(response.status).toBe(409)
+    expect(data.code).toBe("content_items_conflict")
+    expect(data.error).toMatch(/otra sesión/i)
   })
 })

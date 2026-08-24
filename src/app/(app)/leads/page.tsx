@@ -14,7 +14,7 @@ const PAGE_SIZE = 50
 export default async function LeadsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ status?: string; channel?: string; service?: string; q?: string; requires_human?: string; page?: string }>
+  searchParams: Promise<{ status?: string; channel?: string; service?: string; q?: string; requires_human?: string; possible_emergency?: string; page?: string }>
 }) {
   const sp = await searchParams
   const supabase = await createClient()
@@ -25,6 +25,7 @@ export default async function LeadsPage({
   const from = (currentPage - 1) * PAGE_SIZE
   const to = from + PAGE_SIZE - 1
   const isAttentionView = sp.requires_human === "true"
+  const isEmergencyView = sp.possible_emergency === "true"
 
   let query = supabase.from("leads").select("*", { count: "exact" })
   if (!isAttentionView) query = query.order("created_at", { ascending: false })
@@ -33,6 +34,7 @@ export default async function LeadsPage({
   if (sp.channel) query = query.eq("origin_channel", sp.channel)
   if (sp.service) query = query.eq("requested_service", sp.service)
   if (isAttentionView) query = query.eq("requires_human", true)
+  if (isEmergencyView) query = query.eq("possible_emergency", true)
   if (sp.q) {
     const safeQ = sanitizePostgrestValue(sp.q)
     if (safeQ) query = query.or(`name.ilike.%${safeQ}%,phone.ilike.%${safeQ}%,instagram_username.ilike.%${safeQ}%`)
@@ -79,6 +81,7 @@ export default async function LeadsPage({
     if (sp.channel) params.set("channel", sp.channel)
     if (sp.service) params.set("service", sp.service)
     if (sp.requires_human) params.set("requires_human", sp.requires_human)
+    if (sp.possible_emergency) params.set("possible_emergency", sp.possible_emergency)
     if (sp.q) params.set("q", sp.q)
     if (targetPage > 1) params.set("page", String(targetPage))
     const qs = params.toString()
@@ -114,7 +117,7 @@ export default async function LeadsPage({
       {/* Filtros — scroll horizontal en móvil */}
       <div className="flex gap-2 mb-4 overflow-x-auto pb-1 -mx-4 px-4 md:mx-0 md:px-0 md:flex-wrap">
         <Link href="/leads" className="shrink-0">
-          <Button variant={!sp.status && !sp.channel && !sp.service ? "default" : "outline"} size="sm">
+          <Button variant={!sp.status && !sp.channel && !sp.service && !isAttentionView && !isEmergencyView ? "default" : "outline"} size="sm">
             Todos
           </Button>
         </Link>
@@ -129,6 +132,11 @@ export default async function LeadsPage({
         <Link href="/leads?requires_human=true" className="shrink-0">
           <Button variant={sp.requires_human === "true" ? "default" : "outline"} size="sm">
             Atención
+          </Button>
+        </Link>
+        <Link href="/leads?possible_emergency=true" className="shrink-0">
+          <Button variant={isEmergencyView ? "destructive" : "outline"} size="sm">
+            Alertas
           </Button>
         </Link>
         <Link href="/leads?status=confirmo_que_pidio_turno" className="shrink-0">

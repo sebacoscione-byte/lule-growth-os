@@ -447,7 +447,7 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
                     fill
                     sizes="(min-width: 640px) 288px, 224px"
                     className="object-cover object-top"
-                    priority
+                    preload
                   />
                 </div>
               </div>
@@ -545,25 +545,28 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
             <h2 className="font-display mb-4 text-center text-2xl font-semibold text-ink">Sobre la Dra. Lucía Chahin</h2>
             <div className="rounded-2xl border border-line bg-paper p-6 text-sm leading-6 text-ink-soft space-y-3">
               {configDoctor.bio && <p>{configDoctor.bio}</p>}
-              <p>
-                La Dra. <strong>Lucía Chahin</strong> es médica cardióloga con formación avanzada en
-                ecocardiografía. Realizó su residencia de cardiología en el <strong>Hospital Británico de
-                Buenos Aires</strong> (2020-2024) y hoy continúa allí como cardióloga de planta, atendiendo
-                los miércoles, además de atender en <strong>Swiss Medical</strong> desde 2025.
-              </p>
-              <p>
-                Es subinvestigadora de ensayos clínicos en <strong>CIMEL Lanús</strong>, con trayectoria en
-                estudios sobre lípidos, cardiometabolismo, diabetes, obesidad e insuficiencia cardíaca. Cuenta
-                con diplomaturas de posgrado en hipertensión arterial y cardiometabolismo de la
-                <strong> Pontificia Universidad Católica Argentina</strong>, y formación continua en
-                ecocardiografía y Doppler cardíaco de la <strong>Sociedad Argentina de Cardiología</strong>.
-              </p>
-              <p>
-                Atiende pacientes en <strong>CIMEL Lanús</strong> — centro médico de larga trayectoria en
-                Lanús —, en el <strong>Hospital Británico (Central)</strong> los miércoles y en{" "}
-                <strong>Swiss Medical Lomas de Zamora</strong>. Realiza consultas cardiológicas,
-                ecocardiogramas y controles cardiovasculares.
-              </p>
+              <details className="group rounded-xl border border-line/80 bg-white px-4 py-3">
+                <summary className="cursor-pointer list-none font-medium text-ink marker:content-none">
+                  <span className="flex items-center justify-between gap-3">
+                    Ver formación y trayectoria completas
+                    <span aria-hidden="true" className="text-cardiac transition-transform group-open:rotate-180">⌄</span>
+                  </span>
+                </summary>
+                <div className="mt-3 space-y-3 border-t border-line/70 pt-3">
+                  <p>
+                    Realizó su residencia de cardiología en el <strong>Hospital Británico de Buenos Aires</strong>
+                    (2020-2024) y hoy continúa allí como cardióloga de planta. Atiende también en
+                    <strong> Swiss Medical</strong> desde 2025.
+                  </p>
+                  <p>
+                    Es subinvestigadora de ensayos clínicos en <strong>CIMEL Lanús</strong>, con trayectoria en
+                    estudios sobre lípidos, cardiometabolismo, diabetes, obesidad e insuficiencia cardíaca. Cuenta
+                    con diplomaturas de posgrado en hipertensión arterial y cardiometabolismo de la
+                    <strong> Pontificia Universidad Católica Argentina</strong>, y formación continua en
+                    ecocardiografía y Doppler cardíaco de la <strong>Sociedad Argentina de Cardiología</strong>.
+                  </p>
+                </div>
+              </details>
               {configDoctor.matricula && (
                 <p className="text-xs text-ink-soft/80">Matrícula profesional: {configDoctor.matricula}</p>
               )}

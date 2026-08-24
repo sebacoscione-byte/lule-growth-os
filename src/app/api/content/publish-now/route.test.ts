@@ -9,8 +9,8 @@ jest.mock("@/lib/supabase/service", () => ({ getServiceDb: jest.fn() }))
 jest.mock("@/lib/staff-authz", () => ({ authorizeStaff: jest.fn() }))
 jest.mock("@/lib/content-pipeline", () => ({
   ...jest.requireActual("@/lib/content-pipeline"),
+  mutateContentItems: jest.fn(),
   readContentItems: jest.fn(),
-  writeContentItems: jest.fn(),
 }))
 jest.mock("@/lib/content-publish", () => ({ publishApprovedItem: jest.fn() }))
 
@@ -18,7 +18,7 @@ import { POST } from "./route"
 import { createClient } from "@/lib/supabase/server"
 import { getServiceDb } from "@/lib/supabase/service"
 import { authorizeStaff } from "@/lib/staff-authz"
-import { readContentItems, writeContentItems } from "@/lib/content-pipeline"
+import { mutateContentItems, readContentItems } from "@/lib/content-pipeline"
 import { publishApprovedItem } from "@/lib/content-publish"
 import type { ContentChannel, ContentItem } from "@/types"
 
@@ -62,7 +62,9 @@ describe("POST /api/content/publish-now — auto_publish_result viejo", () => {
     ;(createClient as jest.Mock).mockResolvedValue({})
     ;(authorizeStaff as jest.Mock).mockResolvedValue({ ok: true })
     ;(getServiceDb as jest.Mock).mockReturnValue({})
-    ;(writeContentItems as jest.Mock).mockResolvedValue(undefined)
+    ;(mutateContentItems as jest.Mock).mockImplementation(async (_db, mutation) =>
+      mutation(await (readContentItems as jest.Mock)())
+    )
     ;(publishApprovedItem as jest.Mock).mockImplementation(
       async (_db: unknown, source: ContentItem, channels: ContentChannel[]) => ({
         item: { ...source, status: channels.length > 0 ? "published" : source.status },
