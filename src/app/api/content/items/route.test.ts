@@ -8,6 +8,7 @@ jest.mock("@/lib/content-pipeline", () => ({
   ...jest.requireActual("@/lib/content-pipeline"),
   compareAndSwapContentItems: jest.fn(),
   readContentItems: jest.fn(),
+  readContentItemsSnapshot: jest.fn(),
   mutateContentItems: jest.fn(),
 }))
 jest.mock("@/lib/content-insights", () => ({ readContentInsightWindows: jest.fn() }))
@@ -15,7 +16,7 @@ jest.mock("@/lib/content-insights", () => ({ readContentInsightWindows: jest.fn(
 import { PATCH } from "./route"
 import { createClient } from "@/lib/supabase/server"
 import { authorizeStaff } from "@/lib/staff-authz"
-import { compareAndSwapContentItems, readContentItems } from "@/lib/content-pipeline"
+import { compareAndSwapContentItems, readContentItemsSnapshot } from "@/lib/content-pipeline"
 import type { ContentItem } from "@/types"
 
 function item(overrides: Partial<ContentItem> = {}): ContentItem {
@@ -68,7 +69,10 @@ describe("PATCH /api/content/items — limpiar resultado de publicacion viejo", 
   })
 
   it("limpia auto_publish_result al volver a borrador por editar el contenido", async () => {
-    ;(readContentItems as jest.Mock).mockResolvedValue([item()])
+    ;(readContentItemsSnapshot as jest.Mock).mockResolvedValue({
+      items: [item()],
+      version: "2026-08-24T10:00:00.000Z",
+    })
 
     const response = await PATCH(patch({ id: "carrusel-1", hook: "Hook corregido" }))
     const data = await response.json()
@@ -80,7 +84,10 @@ describe("PATCH /api/content/items — limpiar resultado de publicacion viejo", 
   })
 
   it("conserva auto_publish_result cuando el cambio no es de contenido (no revierte a borrador)", async () => {
-    ;(readContentItems as jest.Mock).mockResolvedValue([item({ status: "approved" })])
+    ;(readContentItemsSnapshot as jest.Mock).mockResolvedValue({
+      items: [item({ status: "approved" })],
+      version: "2026-08-24T10:00:00.000Z",
+    })
 
     const response = await PATCH(patch({ id: "carrusel-1", repeat_interval_days: 1 }))
     const data = await response.json()
@@ -91,7 +98,10 @@ describe("PATCH /api/content/items — limpiar resultado de publicacion viejo", 
   })
 
   it("devuelve conflicto y no pisa una edición concurrente", async () => {
-    ;(readContentItems as jest.Mock).mockResolvedValue([item()])
+    ;(readContentItemsSnapshot as jest.Mock).mockResolvedValue({
+      items: [item()],
+      version: "2026-08-24T10:00:00.000Z",
+    })
     ;(compareAndSwapContentItems as jest.Mock).mockResolvedValue(false)
 
     const response = await PATCH(patch({ id: "carrusel-1", hook: "Edición local" }))

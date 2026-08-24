@@ -1,3 +1,13 @@
+# EN CURSO (2026-08-24) — historias: primera publicada y segunda omitida por HTTP 414
+
+- [x] Reconstruir la corrida real con datos de Supabase, Meta y logs de Vercel, sin exponer secretos.
+- [x] Confirmar que Meta publicó la primera historia y que el cron terminó HTTP 500 antes de persistirla.
+- [ ] Reemplazar el CAS que envía toda la Biblioteca en la URL por una versión corta basada en `updated_at`.
+- [ ] Agregar cobertura de regresión para una Biblioteca grande y para ediciones concurrentes.
+- [ ] Ejecutar lint, tests y build; verificar el preview, mergear el PR y validar producción.
+
+---
+
 # CERRADO (2026-08-24) — hardening técnico posterior a la review integral
 
 - [x] Actualizar Next.js y dependencias transitivas vulnerables hasta dejar `npm audit` sin hallazgos altos.

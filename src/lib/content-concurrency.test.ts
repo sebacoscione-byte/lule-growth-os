@@ -29,20 +29,29 @@ function item(id: string, topic: string): ContentItem {
   }
 }
 
-function fakeClient(reads: ContentItem[][], casResults: boolean[]) {
+function fakeClient(
+  reads: Array<{ items: ContentItem[]; version: string }>,
+  casResults: boolean[]
+) {
   const update = jest.fn()
-  const filter = jest.fn()
+  const versionEq = jest.fn()
 
   const supabase = {
     from: jest.fn(() => ({
       select: jest.fn(() => ({
         eq: jest.fn(() => ({
-          maybeSingle: jest.fn(async () => ({ data: { value: reads.shift() ?? [] }, error: null })),
+          maybeSingle: jest.fn(async () => {
+            const read = reads.shift()
+            return {
+              data: read ? { value: read.items, updated_at: read.version } : null,
+              error: null,
+            }
+          }),
         })),
       })),
       update: update.mockImplementation(() => ({
         eq: jest.fn(() => ({
-          filter: filter.mockImplementation(() => ({
+          eq: versionEq.mockImplementation(() => ({
             select: jest.fn(() => ({
               maybeSingle: jest.fn(async () => ({
                 data: casResults.shift() ? { key: "content_pipeline" } : null,
@@ -55,23 +64,26 @@ function fakeClient(reads: ContentItem[][], casResults: boolean[]) {
     })),
   } as unknown as SupabaseClient
 
-  return { supabase, update, filter }
+  return { supabase, update, versionEq }
 }
 
 describe("biblioteca de contenido con compare-and-swap", () => {
-  it("compara el documento leído antes de reemplazarlo", async () => {
-    const original = [item("a", "Original")]
-    const next = [item("a", "Corregido")]
-    const { supabase, filter } = fakeClient([], [true])
+  it("compara una versión corta en vez de serializar la Biblioteca en la URL", async () => {
+    const version = "2026-08-24T10:00:00.000Z"
+    const next = Array.from({ length: 100 }, (_, index) => item(String(index), "X".repeat(10_000)))
+    const { supabase, versionEq } = fakeClient([], [true])
 
-    await expect(compareAndSwapContentItems(supabase, original, next)).resolves.toBe(true)
-    expect(filter).toHaveBeenCalledWith("value", "eq", JSON.stringify(original))
+    await expect(compareAndSwapContentItems(supabase, version, next)).resolves.toBe(true)
+    expect(versionEq).toHaveBeenCalledWith("updated_at", version)
   })
 
   it("reintenta sobre la versión más reciente y conserva el cambio concurrente", async () => {
     const original = [item("a", "Original")]
     const concurrent = [item("b", "Creado por otra sesión"), ...original]
-    const { supabase, update } = fakeClient([original, concurrent], [false, true])
+    const { supabase, update } = fakeClient([
+      { items: original, version: "2026-08-24T10:00:00.000Z" },
+      { items: concurrent, version: "2026-08-24T10:01:00.000Z" },
+    ], [false, true])
 
     const result = await mutateContentItems(supabase, items =>
       items.map(existing => existing.id === "a" ? { ...existing, topic: "Corregido" } : existing)
@@ -86,7 +98,9 @@ describe("biblioteca de contenido con compare-and-swap", () => {
 
   it("no escribe si la mutación ya está aplicada", async () => {
     const original = [item("a", "Original")]
-    const { supabase, update } = fakeClient([original], [])
+    const { supabase, update } = fakeClient([
+      { items: original, version: "2026-08-24T10:00:00.000Z" },
+    ], [])
 
     await expect(mutateContentItems(supabase, items => items)).resolves.toEqual(original)
     expect(update).not.toHaveBeenCalled()
