@@ -1,4 +1,4 @@
-# EN CURSO (2026-08-24) — cierre de pendientes técnicos accionables
+# CERRADO (2026-08-24) — cierre de pendientes técnicos accionables
 
 - [x] Confirmar por el usuario que Search Console recibió el pedido de recrawl/validación y que la
       placa histórica con el typo fue regenerada.
@@ -9,7 +9,8 @@
 - [x] Reconciliar falsos pendientes ya resueltos por PRs anteriores y actualizar el backlog.
 - [x] Ejecutar lint, 116 suites/1065 tests, build y 22 E2E públicos; verificar localmente el HTML
       con los tres nodos `MedicalClinic` y sus vínculos al `Physician`.
-- [ ] Publicar por rama + PR y mergear si todos los controles quedan verdes.
+- [x] Publicado como PR #234; CI, E2E público y Vercel Preview verdes. El preview respondió con los
+      tres nodos `MedicalClinic` esperados y sus vínculos al `Physician`.
 
 ---
 
