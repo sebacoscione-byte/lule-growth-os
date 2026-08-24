@@ -1,4 +1,4 @@
-# EN CURSO (2026-08-24) — hardening técnico posterior a la review integral
+# CERRADO (2026-08-24) — hardening técnico posterior a la review integral
 
 - [x] Actualizar Next.js y dependencias transitivas vulnerables hasta dejar `npm audit` sin hallazgos altos.
 - [x] Evitar actualizaciones perdidas en la Biblioteca cuando coinciden dos cuentas, un cron o la captura de insights.
@@ -6,7 +6,9 @@
 - [x] Reducir la deuda de mantenibilidad de los módulos más críticos sin cambiar lógica médica.
 - [x] Ejecutar `npm audit` (0 vulnerabilidades), lint, 118 suites/1075 tests, build y 22 E2E públicos;
       verificar la landing desktop/móvil y el desplegable de trayectoria en navegador real.
-- [ ] Publicar por rama + PR, verificar CI/preview, mergear y reconciliar el backlog.
+- [x] Publicado como PR #235; build, E2E público y Vercel Preview verdes. El preview protegido se
+      verificó con acceso autenticado de Vercel y devolvió la landing, el bloque compacto de
+      trayectoria y el CTA móvil esperados.
 
 ---
 
