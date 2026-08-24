@@ -15,6 +15,7 @@ import { withReferralCode, withGeneralFallbackCode } from "@/lib/landing-referra
 import { getServiceDb } from "@/lib/supabase/service"
 import { getGooglePlaceReviews } from "@/lib/google-places"
 import { HERO_VARIANT_COOKIE } from "@/lib/landing-track"
+import { buildMedicalClinicJsonLd, PHYSICIAN_SCHEMA_FRAGMENT } from "@/lib/public-schema"
 import { GoogleAnalytics } from "@/components/google-analytics"
 import { AnalyticsConsentBanner } from "@/components/analytics-consent-banner"
 import { EcgDivider } from "@/components/ecg-divider"
@@ -319,10 +320,13 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
   const sedeActions = buildSedeActions(data.locations, configLocations, slug)
   const faq = isMain ? MAIN_FAQ : buildSubpageFaq(data)
   const faqJsonLd = buildFaqJsonLd(faq)
+  const physicianUrl = `${base}/dra-lucia-chahin`
+  const clinicJsonLd = buildMedicalClinicJsonLd(sedeActions, physicianUrl)
 
   const personJsonLd = {
     "@context": "https://schema.org",
     "@type": "Physician",
+    "@id": `${physicianUrl}${PHYSICIAN_SCHEMA_FRAGMENT}`,
     "name": "Dra. Lucía Belén Chahin",
     "alternateName": "Lucía Chahin",
     "jobTitle": "Médica Cardióloga y Ecocardiografista",
@@ -400,12 +404,14 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
       {isMain && (
         <>
           <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(personJsonLd) }} />
+          <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(clinicJsonLd) }} />
           <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }} />
         </>
       )}
       {!isMain && (
         <>
           <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }} />
+          <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(clinicJsonLd) }} />
           <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }} />
         </>
       )}

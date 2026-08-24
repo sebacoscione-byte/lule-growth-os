@@ -4,22 +4,23 @@ import {
   pickNextPublishableItems, moveItemInQueue, resolveChannelsToPublish, DEFAULT_AUTO_PUBLISH_SETTINGS,
   isRepeatDue, findRecentDuplicateTopic, estimateRepeatEndDate, isReorderableInQueue,
   reorderableQueuePositions, autoPublishSettingsSchema, getZonedScheduleParts,
-  isWithinScheduledWindow, normalizeAutoPublishSettings, buildDraftContentItem,
+  isWithinScheduledWindow, normalizeAutoPublishSettings, buildDraftContentItem, contentPublicationSignature,
 } from "@/lib/content-pipeline"
 import { MAX_VISUAL_SUBTITLE_LENGTH } from "@/lib/content-text"
 import type { AutoPublishTrackSettings, ContentItem } from "@/types"
 
 function item(overrides: Partial<ContentItem> = {}): ContentItem {
+  const id = overrides.id ?? "1"
   return {
-    id: "1",
+    id,
     topic: "Tema",
     category: "Categoria",
     format: "post",
     goal: "",
     status: "approved",
     channels: ["instagram", "google_business"],
-    hook: "hook",
-    caption: "caption",
+    hook: `hook ${id}`,
+    caption: `caption ${id}`,
     google_text: "google text",
     hashtags: "#tag",
     visual_headline: "titulo",
@@ -338,6 +339,24 @@ describe("pickNextPublishableItems", () => {
     expect(pickNextPublishableItems([a], "historia", 3)).toHaveLength(1)
   })
 
+  it("no publica dos historias con hook y caption idénticos en la misma corrida", () => {
+    const first = item({
+      id: "first", format: "historia", hook: "¿Ya pediste turno?", caption: "Consultá por la sede.",
+      approved_at: "2026-07-01T00:00:00.000Z",
+    })
+    const duplicate = item({
+      id: "duplicate", format: "historia", hook: "  ¿YA PEDISTE   TURNO? ", caption: "consultá por la sede.",
+      approved_at: "2026-07-02T00:00:00.000Z",
+    })
+    const distinct = item({
+      id: "distinct", format: "historia", hook: "Conocé las sedes", caption: "Lanús, CABA y Lomas.",
+      approved_at: "2026-07-03T00:00:00.000Z",
+    })
+
+    expect(pickNextPublishableItems([first, duplicate, distinct], "historia", 3).map(i => i.id))
+      .toEqual(["first", "distinct"])
+  })
+
   it("array vacio si count es 0", () => {
     const a = item({ id: "a", format: "historia" })
     expect(pickNextPublishableItems([a], "historia", 0)).toEqual([])
@@ -373,6 +392,14 @@ describe("pickNextPublishableItems", () => {
     })
     const now = new Date("2026-07-05T00:00:00.000Z") // solo 4 dias despues
     expect(pickNextPublishableItems([evergreen], "historia", 1, now)).toEqual([])
+  })
+})
+
+describe("contentPublicationSignature", () => {
+  it("normaliza solo diferencias irrelevantes de mayúsculas y espacios", () => {
+    const a = item({ id: "a", hook: "Mismo  hook", caption: "Mismo texto" })
+    const b = item({ id: "b", hook: " mismo HOOK ", caption: "mismo   texto" })
+    expect(contentPublicationSignature(a)).toBe(contentPublicationSignature(b))
   })
 })
 

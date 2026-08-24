@@ -224,6 +224,10 @@ distintos en la UI. Reels incorporan `views`, tiempos total/promedio y `reels_sk
 los devuelve; cualquier métrica rechazada queda `null` sin ocultar las demás. Ver
 `docs/INSTAGRAM_INSIGHTS.md` para el contrato completo, operación y rollback.
 
+Como owner y doctor comparten la misma Biblioteca, la lista se refresca cada 30 segundos. La carga
+inicial es inmediata; los refrescos no se solapan y se omiten mientras la pestaña del navegador está
+oculta para no consultar innecesariamente piezas, atribución e insights.
+
 ### Repetir una pieza fija (evergreen) — on/off + limite (2026-07-19)
 
 Cada pieza `approved`/`published` tiene en su editor un interruptor **"Repetir esta pieza automaticamente"**
@@ -244,6 +248,9 @@ track — tener ambas cosas se pisaba). Los campos viven en el JSON de la pieza 
   (`pickNextPublishableItems` = `[...aprobadas.slice(0, count), ...evergreenVencidas]`). Ej: con "Publicar de a
   1" y una pieza fija marcada para repetirse, cada día programado salen 2 publicaciones — la nueva del cupo y
   la fija aparte. Una pieza fija nunca le quita el lugar a una nueva ni al revés.
+- Dentro de una misma corrida, dos piezas con el mismo formato, hook y caption no se publican una detrás
+  de otra. Se publica la primera según el orden de cola y las copias permanecen aprobadas para que el
+  equipo las diferencie o archive; el sistema no borra contenido automáticamente.
 - **Limitacion de plataforma**: los reposteos van por la API de Instagram, que nunca permite sticker de link
   en historias. Si el link tiene que estar (ir a la web, etc.), va escrito o como QR dentro de la imagen. Para
   mandar a Historias Destacadas no hace falta link: la placa indica "toca mi perfil" y la persona entra sola.

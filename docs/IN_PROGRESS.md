@@ -1,3 +1,19 @@
+# CERRADO (2026-08-24) — cierre de pendientes técnicos accionables
+
+- [x] Confirmar por el usuario que Search Console recibió el pedido de recrawl/validación y que la
+      placa histórica con el typo fue regenerada.
+- [x] Completar el refresco periódico de la Biblioteca sin solapar requests ni consultar con la
+      pestaña oculta, y cubrir el scheduler con tests.
+- [x] Impedir que una misma corrida automática publique piezas con texto idéntico una detrás de otra.
+- [x] Agregar datos estructurados `MedicalClinic` por sede usando únicamente datos públicos vigentes.
+- [x] Reconciliar falsos pendientes ya resueltos por PRs anteriores y actualizar el backlog.
+- [x] Ejecutar lint, 116 suites/1065 tests, build y 22 E2E públicos; verificar localmente el HTML
+      con los tres nodos `MedicalClinic` y sus vínculos al `Physician`.
+- [x] Publicado como PR #234; CI, E2E público y Vercel Preview verdes. El preview respondió con los
+      tres nodos `MedicalClinic` esperados y sus vínculos al `Physician`.
+
+---
+
 # CERRADO (2026-08-23) — señales de indexación en Google Search Console
 
 - [x] Auditar en producción las tres URLs pendientes y confirmar status, canonical, robots y sitemap.
@@ -81,14 +97,14 @@
 
 ---
 
-# HOTFIX EN CURSO (2026-08-03) — revisión de fotogramas y request V2 Directa
+# HOTFIX CERRADO (2026-08-03) — revisión de fotogramas y request V2 Directa
 
 - [x] Confirmar en producción `FRAME_REVIEW_UNAVAILABLE` y el rechazo de `allow_adult` en text-to-video.
 - [x] Adaptar `personGeneration` por modalidad: `allow_adult` para V2 Controlada y `allow_all` para V2 Directa.
 - [x] Estructurar el JSON del revisor, limitar thinking y reintentar sobre la misma imagen.
 - [x] Evitar generar tres variantes cuando el revisor está temporalmente indisponible.
 - [x] Ejecutar lint, 102 suites/946 tests y build de producción.
-- [ ] Publicar por PR, verificar preview y producción.
+- [x] Publicado y mergeado como PR #206; el código vigente en `main` contiene el hotfix y sus tests.
 
 ---
 

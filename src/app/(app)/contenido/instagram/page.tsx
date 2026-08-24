@@ -21,6 +21,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { createClient as createBrowserSupabaseClient } from "@/lib/supabase/client"
 import { parseAiJson } from "@/lib/parse-ai-json"
 import { MAX_VISUAL_SUBTITLE_LENGTH, truncateForImagePlate } from "@/lib/content-text"
+import { startContentLibraryRefresh } from "@/lib/content-library-refresh"
 import { AUTO_PUBLISH_TIMEZONE, AUTO_PUBLISH_WINDOW_BY_FORMAT, buildDraftContentItem, canStillPublishToday, DEFAULT_AUTO_PUBLISH_SETTINGS, estimateAutoPublishDrainDays, estimateAutoPublishDateForPosition, estimateRepeatEndDate, findRecentDuplicateTopic, getScheduledDays, getZonedScheduleParts, listKnownCategories, pickNextPublishableItems, isReorderableInQueue, normalizeAutoPublishSettings, reorderableQueuePositions } from "@/lib/content-pipeline"
 import type { GeneratedContentPlan } from "@/lib/content-pipeline"
 import { buildFallbackVideoPrompt, getVeoPromptQualityIssues } from "@/lib/video-prompt"
@@ -989,8 +990,10 @@ export default function ContentStudioPage() {
   }, [])
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    loadItems()
+    // Refresco periódico: la Biblioteca es compartida entre cuentas (owner/doctor) y no tiene
+    // suscripción realtime -- sin esto, una aprobación hecha desde otra sesión no aparece hasta
+    // recargar la página a mano. Mismo patrón que el refresco de leads del Inbox.
+    return startContentLibraryRefresh(loadItems)
   }, [loadItems])
 
   useEffect(() => {
