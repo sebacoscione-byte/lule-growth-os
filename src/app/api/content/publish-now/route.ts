@@ -1,7 +1,12 @@
 import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { getServiceDb } from "@/lib/supabase/service"
-import { readContentItems, writeContentItems, resolveChannelsToPublish } from "@/lib/content-pipeline"
+import {
+  mergeContentPublicationResult,
+  mutateContentItems,
+  readContentItems,
+  resolveChannelsToPublish,
+} from "@/lib/content-pipeline"
 import { publishApprovedItem } from "@/lib/content-publish"
 import { parseJsonBody } from "@/lib/api-validation"
 import { authorizeStaff } from "@/lib/staff-authz"
@@ -44,7 +49,11 @@ export async function POST(request: Request) {
     // getServiceDb() (service role puro), no createServiceClient(): ver nota en instagram-business/publish.
     const service = getServiceDb()
     const { item: nextItem, allPublished } = await publishApprovedItem(service, item, channelsToPublish)
-    await writeContentItems(supabase, items.map(existing => existing.id === item.id ? nextItem : existing))
+    await mutateContentItems(supabase, latestItems =>
+      latestItems.map(existing => existing.id === item.id
+        ? mergeContentPublicationResult(existing, item, nextItem)
+        : existing)
+    )
 
     return NextResponse.json({ item: nextItem, allPublished })
   } catch (error) {

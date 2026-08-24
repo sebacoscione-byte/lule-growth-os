@@ -7,7 +7,7 @@ import {
   runAutoDraftGeneration,
 } from "@/lib/content-auto-draft"
 import { generateContentPlan, getAiMode, proposeAutoDraftCategories } from "@/lib/ai"
-import { readAutoPublishSettings, readContentItems, writeContentItems, DEFAULT_AUTO_PUBLISH_SETTINGS } from "@/lib/content-pipeline"
+import { mutateContentItems, readAutoPublishSettings, readContentItems, DEFAULT_AUTO_PUBLISH_SETTINGS } from "@/lib/content-pipeline"
 import type { SupabaseClient } from "@supabase/supabase-js"
 import type { AutoPublishSettings, AutoPublishTrackSettings, ContentItem } from "@/types"
 
@@ -25,7 +25,7 @@ jest.mock("@/lib/content-pipeline", () => {
   return {
     ...actual,
     readContentItems: jest.fn(),
-    writeContentItems: jest.fn(),
+    mutateContentItems: jest.fn(),
     readAutoPublishSettings: jest.fn(),
   }
 })
@@ -272,6 +272,9 @@ describe("runAutoDraftGeneration", () => {
 
   beforeEach(() => {
     jest.resetAllMocks()
+    ;(mutateContentItems as jest.Mock).mockImplementation(async (_db, mutation) =>
+      mutation(await (readContentItems as jest.Mock)())
+    )
     ;(proposeAutoDraftCategories as jest.Mock).mockImplementation(({ count }: { count: number }) =>
       Promise.resolve(Array.from({ length: count }, (_, i) => `Categoria IA ${i + 1}`))
     )
@@ -292,7 +295,7 @@ describe("runAutoDraftGeneration", () => {
     const result = await runAutoDraftGeneration(supabase, now)
     expect(result).toEqual({ skipped: false, planned: 0, generated: 0 })
     expect(generateContentPlan).not.toHaveBeenCalled()
-    expect(writeContentItems).not.toHaveBeenCalled()
+    expect(mutateContentItems).not.toHaveBeenCalled()
   })
 
   it("genera y guarda un borrador nuevo por cada pieza planeada (hasta cubrir 2 semanas)", async () => {
@@ -313,8 +316,9 @@ describe("runAutoDraftGeneration", () => {
     expect(result.skipped).toBe(false)
     expect(result.planned).toBe(2)
     expect(result.generated).toBe(2)
-    expect(writeContentItems).toHaveBeenCalledTimes(1)
-    const [, savedItems] = (writeContentItems as jest.Mock).mock.calls[0]
+    expect(mutateContentItems).toHaveBeenCalledTimes(1)
+    const [, mutation] = (mutateContentItems as jest.Mock).mock.calls[0]
+    const savedItems = mutation([])
     expect(savedItems).toHaveLength(2)
     expect(savedItems[0]).toMatchObject({ status: "draft", format: "post", hook: "h", category: "Categoria IA 1" })
     expect(savedItems[1]).toMatchObject({ status: "draft", format: "post", hook: "h", category: "Categoria IA 2" })
@@ -380,7 +384,7 @@ describe("runAutoDraftGeneration", () => {
     expect(result.planned).toBe(2)
     expect(result.generated).toBe(1)
     expect(result.error).toBeDefined()
-    expect(writeContentItems).toHaveBeenCalledTimes(1)
+    expect(mutateContentItems).toHaveBeenCalledTimes(1)
   })
 
   it("corta el resto de la corrida apenas se agota el limite diario de IA", async () => {

@@ -3,6 +3,24 @@
 
 ---
 
+## [HARDENING] ✅ Review técnica resuelta (2026-08-24)
+
+- Dependencias actualizadas a Next.js 16.3.2 / `eslint-config-next` 16.3.2, PostCSS 8.5.26,
+  Sharp 0.35.3 y Nanoid 3.3.18. `npm audit` pasó de 4 vulnerabilidades altas a 0 hallazgos.
+- La Biblioteca dejó de hacer reemplazos ciegos del JSON compartido: todas las mutaciones usan
+  compare-and-swap y reintentan sobre la versión más reciente. Una cuenta, el cron, la publicación
+  y los insights ya no pueden borrar silenciosamente cambios concurrentes.
+- Si una publicación externa termina después de que otra persona editó la pieza, se conserva la
+  edición nueva y solo se adjunta la identidad del post que efectivamente salió.
+- El dashboard separa primero la acción operativa (alertas, respuesta humana y seguimientos) y la
+  lista de leads permite filtrar las alertas de forma específica.
+- La landing principal mantiene el contenido de trayectoria y SEO, pero lo muestra de forma
+  desplegable para reducir el recorrido móvil antes de sedes y turnos.
+- Los textos/cálculos de cronograma editorial se extrajeron del componente de 3.000+ líneas a un
+  módulo puro con tests. No se modificó lógica médica ni se agregó ninguna migración.
+
+---
+
 ## [DECISIÓN] ✅ Generación de video separada en V1/V2 (2026-08-03)
 
 El paper-cut incorporado como corrección defensiva evitó personas y utilería médica deformada, pero

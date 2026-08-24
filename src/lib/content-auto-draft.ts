@@ -3,9 +3,9 @@ import { generateContentPlan, getAiMode, getPublicAiError, proposeAutoDraftCateg
 import {
   buildDraftContentItem,
   listKnownCategories,
+  mutateContentItems,
   readAutoPublishSettings,
   readContentItems,
-  writeContentItems,
   type AutoPublishFormat,
 } from "@/lib/content-pipeline"
 import type { AutoPublishSettings, ContentItem, ContentObjective } from "@/types"
@@ -278,7 +278,12 @@ export async function runAutoDraftGeneration(
     }
   }
 
-  if (newItems.length > 0) await writeContentItems(supabase, [...newItems, ...items])
+  if (newItems.length > 0) {
+    await mutateContentItems(supabase, current => [
+      ...newItems,
+      ...current.filter(item => !newItems.some(created => created.id === item.id)),
+    ].slice(0, 100))
+  }
   return {
     skipped: false,
     planned: plan.length,

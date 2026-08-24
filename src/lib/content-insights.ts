@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
-import { readContentItems, writeContentItems } from "@/lib/content-pipeline"
+import { mutateContentItems, readContentItems } from "@/lib/content-pipeline"
 import { getValidToken, getInstagramMediaInsights } from "@/lib/instagram-business"
 import type { InstagramMediaInsights } from "@/lib/instagram-business"
 import type {
@@ -161,6 +161,7 @@ export async function snapshotContentInsights(
     let refreshed = 0
     const errors: string[] = []
     const updated: ContentItem[] = []
+    const insightUpdates = new Map<string, Pick<ContentItem, "published_at" | "instagram_insights">>()
     for (const item of items) {
       if (!item.instagram_media_id) {
         updated.push(item)
@@ -174,9 +175,14 @@ export async function snapshotContentInsights(
           : item
         await persistInstagramInsightSnapshot(supabase, itemWithPublishedAt, insights, now)
         refreshed++
-        updated.push({
+        const refreshedItem = {
           ...itemWithPublishedAt,
           instagram_insights: normalizeInstagramMediaInsights(insights, now.toISOString()),
+        }
+        updated.push(refreshedItem)
+        insightUpdates.set(item.id, {
+          published_at: refreshedItem.published_at,
+          instagram_insights: refreshedItem.instagram_insights,
         })
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error)
@@ -184,7 +190,12 @@ export async function snapshotContentInsights(
         updated.push(item)
       }
     }
-    if (refreshed > 0) await writeContentItems(supabase, updated)
+    if (refreshed > 0) {
+      await mutateContentItems(supabase, latestItems => latestItems.map(item => {
+        const patch = insightUpdates.get(item.id)
+        return patch ? { ...item, ...patch } : item
+      }))
+    }
     return {
       skipped: false,
       refreshed,

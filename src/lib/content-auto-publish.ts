@@ -6,13 +6,14 @@ import {
   isScheduledForFuture,
   isTodayScheduledDay,
   isWithinScheduledWindow,
+  mergeContentPublicationResult,
   pickNextPublishableItems,
+  mutateContentItems,
   readAutoPublishSettings,
   readContentItems,
   resolveChannelsToPublish,
   shouldRunAutoPublish,
   writeAutoPublishSettings,
-  writeContentItems,
 } from "@/lib/content-pipeline"
 import { publishApprovedItem } from "@/lib/content-publish"
 import type { AutoPublishFormat } from "@/lib/content-pipeline"
@@ -103,9 +104,10 @@ export async function runAutoPublishTrack(
     const persistItem = dueRepeat && allPublished
       ? { ...nextItem, repeat_count: (current.repeat_count ?? 0) + 1 }
       : nextItem
-    await writeContentItems(
-      supabase,
-      freshItems.map(existing => existing.id === current.id ? persistItem : existing)
+    await mutateContentItems(supabase, latestItems =>
+      latestItems.map(existing => existing.id === current.id
+        ? mergeContentPublicationResult(existing, current, persistItem)
+        : existing)
     )
     if (allPublished) publishedCount++
   }

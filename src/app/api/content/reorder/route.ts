@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
-import { readContentItems, writeContentItems, moveItemInQueue, isReorderableInQueue } from "@/lib/content-pipeline"
+import { mutateContentItems, moveItemInQueue, isReorderableInQueue } from "@/lib/content-pipeline"
 import { parseJsonBody } from "@/lib/api-validation"
 import { authorizeStaff } from "@/lib/staff-authz"
 
@@ -20,20 +20,21 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "itemId y direction (\"up\"/\"down\") son requeridos" }, { status: 400 })
     }
 
-    const items = await readContentItems(supabase)
-    const item = items.find(existing => existing.id === itemId)
-    if (!item) return NextResponse.json({ error: "Pieza no encontrada" }, { status: 404 })
-    if (!isReorderableInQueue(item)) {
+    let found = false
+    let reorderable = false
+    const reordered = await mutateContentItems(supabase, items => {
+      const item = items.find(existing => existing.id === itemId)
+      found = Boolean(item)
+      reorderable = Boolean(item && isReorderableInQueue(item))
+      return reorderable ? moveItemInQueue(items, itemId, direction) : items
+    })
+    if (!found) return NextResponse.json({ error: "Pieza no encontrada" }, { status: 404 })
+    if (!reorderable) {
       return NextResponse.json(
         { error: "Solo se puede reordenar una pieza aprobada o una evergreen que siga repitiéndose" },
         { status: 400 }
       )
     }
-
-    // moveItemInQueue puede tocar el queue_rank de toda la cola de ese formato (normalizacion), asi que
-    // se devuelve y guarda la lista completa en vez de un solo item.
-    const reordered = moveItemInQueue(items, itemId, direction)
-    await writeContentItems(supabase, reordered)
 
     return NextResponse.json({ items: reordered })
   } catch (error) {

@@ -4,7 +4,7 @@ import {
   selectInstagramInsightWindows,
   snapshotContentInsights,
 } from "@/lib/content-insights"
-import { readContentItems, writeContentItems } from "@/lib/content-pipeline"
+import { mutateContentItems, readContentItems } from "@/lib/content-pipeline"
 import { getValidToken, getInstagramMediaInsights } from "@/lib/instagram-business"
 import type { SupabaseClient } from "@supabase/supabase-js"
 import type { ContentItem } from "@/types"
@@ -59,6 +59,9 @@ describe("snapshotContentInsights", () => {
     jest.resetAllMocks()
     upsert.mockResolvedValue({ error: null })
     ;(supabase.from as jest.Mock).mockReturnValue({ upsert })
+    ;(mutateContentItems as jest.Mock).mockImplementation(async (_db, mutation) =>
+      mutation(await (readContentItems as jest.Mock)())
+    )
   })
 
   it("no hace nada si Instagram no está conectado", async () => {
@@ -67,7 +70,7 @@ describe("snapshotContentInsights", () => {
     const result = await snapshotContentInsights(supabase, new Date("2026-07-29T12:00:00Z"))
 
     expect(result).toEqual({ skipped: true, refreshed: 0 })
-    expect(writeContentItems).not.toHaveBeenCalled()
+    expect(mutateContentItems).not.toHaveBeenCalled()
   })
 
   it("guarda un snapshot por cada pieza con instagram_media_id y deja el resto intacto", async () => {
@@ -81,7 +84,9 @@ describe("snapshotContentInsights", () => {
     const result = await snapshotContentInsights(supabase, now)
 
     expect(result).toEqual({ skipped: false, refreshed: 1 })
-    expect(writeContentItems).toHaveBeenCalledWith(supabase, [
+    expect(mutateContentItems).toHaveBeenCalledTimes(1)
+    const [, mutation] = (mutateContentItems as jest.Mock).mock.calls[0]
+    expect(mutation([withMedia, withoutMedia])).toEqual([
       {
         ...withMedia,
         published_at: withMedia.updated_at,
@@ -116,7 +121,9 @@ describe("snapshotContentInsights", () => {
     const result = await snapshotContentInsights(supabase, now)
 
     expect(result).toEqual({ skipped: false, refreshed: 1, error: "item=broken: media too old" })
-    expect(writeContentItems).toHaveBeenCalledWith(supabase, [
+    expect(mutateContentItems).toHaveBeenCalledTimes(1)
+    const [, mutation] = (mutateContentItems as jest.Mock).mock.calls[0]
+    expect(mutation([broken, healthy])).toEqual([
       broken,
       {
         ...healthy,
@@ -135,7 +142,7 @@ describe("snapshotContentInsights", () => {
     const result = await snapshotContentInsights(supabase, new Date("2026-07-29T12:00:00Z"))
 
     expect(result).toEqual({ skipped: false, refreshed: 0 })
-    expect(writeContentItems).not.toHaveBeenCalled()
+    expect(mutateContentItems).not.toHaveBeenCalled()
   })
 
   it("un fallo al guardar una pieza no frena las siguientes", async () => {
