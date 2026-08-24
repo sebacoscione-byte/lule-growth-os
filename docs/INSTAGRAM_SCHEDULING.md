@@ -53,6 +53,8 @@ el owner puede aplicar la estrategia desde `Estudio de contenido → Biblioteca`
 ## Idempotencia y degradación
 
 - Un track no vuelve a publicar si `last_published_at` corresponde al mismo día argentino.
+- Una corrida con varias historias deduplica formato + hook + caption antes de publicar, evitando
+  ráfagas de copias exactas separadas por segundos sin borrar las piezas omitidas.
 - Antes de cada pieza se relee la cola; una pieza que ya dejó de estar aprobada no se publica.
 - Los canales ya exitosos se excluyen de un reintento parcial.
 - Un feed legacy con noches superpuestas publica como máximo un formato esa noche y registra
@@ -63,7 +65,7 @@ el owner puede aplicar la estrategia desde `Estudio de contenido → Biblioteca`
 ## Configuración en Vercel
 
 No hay variables nuevas. Después del deploy, verificar en `Project → Settings → Cron Jobs` que las
-cuatro rutas de `vercel.json` estén activas y que `CRON_SECRET` siga configurado en Production.
+cinco rutas de `vercel.json` estén activas y que `CRON_SECRET` siga configurado en Production.
 
 ## Rollback
 

@@ -1,6 +1,16 @@
 ﻿# Lule Growth OS — Contexto para Claude
 
 ## Estado actual
+- 2026-08-24 (cierre de pendientes técnicos accionables): Seba confirmó que pidió la nueva
+  validación/recrawl en Search Console y que regeneró la placa histórica con "SINTOMAS DE ALAMA".
+  Se completó el WIP local de refresco de Biblioteca: carga inmediata + polling cada 30 segundos,
+  sin requests solapados y sin consultar con la pestaña oculta. La selección automática bloquea
+  copias exactas de formato/hook/caption dentro de una misma corrida, evitando repetir el incidente
+  de tres historias iguales separadas por segundos. Las landings exponen `MedicalClinic` por sede y
+  vinculan cada nodo al `Physician`. También se reconciliaron dos falsos pendientes ya cerrados por
+  PR #206 y #232. Verificación: lint, 116 suites/1065 tests, build y 22 E2E públicos; el HTML local
+  incluyó los tres nodos de sede y sus vínculos. No se tocó lógica médica, WhatsApp, RLS ni se
+  agregaron crons.
 - 2026-08-17 (bug real: "Publicar ahora" no publicaba y la pieza quedaba en aprobados): Seba reportó
   que un carrusel ya publicado, que borró en Instagram por tener un error, tras corregirlo y tocar
   "Publicar ahora" no se publicaba — quedaba en Aprobados, sin ningún mensaje de error. **Causa raíz**:
@@ -526,9 +536,9 @@
   ya no importa para la confiabilidad del texto qué modelo puntual esté configurado ahí. **Pendiente
   real, queda como polish, no bloquea nada**: íconos de marca vectoriales (hoja, corazón-estetoscopio,
   latido) y una onda decorativa real en vez de la barra de acento simplificada actual — requieren assets
-  de diseño que hoy no existen. La placa YA PUBLICADA con el typo original no se regeneró (no estaba
-  pedido explícitamente sobre esa pieza puntual) — con el pipeline nuevo, hacerlo es tan simple como
-  volver a generar la placa de esa pieza en Biblioteca. Detalle completo, incluidas las capturas del
+  de diseño que hoy no existen. **Actualización 2026-08-24:** Seba confirmó que la placa histórica con
+  el typo original ya fue regenerada; no queda ninguna acción sobre esa pieza. Detalle completo,
+  incluidas las capturas del
   proceso de calibración del layout, en `docs/BACKLOG.md`. Archivos: `src/lib/ai.ts`,
   `src/lib/content-plate.ts` (nuevo), `src/lib/fonts/Fraunces-Bold.ttf` (nuevo),
   `src/lib/fonts/Inter-Regular.ttf` (nuevo), `src/lib/fonts/Inter-Bold.ttf` (nuevo),

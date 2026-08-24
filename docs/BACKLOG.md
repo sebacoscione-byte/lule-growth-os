@@ -1,5 +1,5 @@
 # Backlog — Lule Growth OS
-**Actualizado:** 2026-08-05 | **Basado en:** PRD Estrategia de Captación v2.1
+**Actualizado:** 2026-08-24 | **Basado en:** PRD Estrategia de Captación v2.1
 
 ---
 
@@ -149,9 +149,9 @@ de antes — ningún cambio visible. Nuevas env vars: `OPENAI_API_KEY`, `OPENAI_
   build sin errores — no hay tests automatizados de esta ruta (mismo criterio que el resto de
   funciones que tocan ffmpeg/APIs de imagen en este archivo, no mockeadas en Jest).
 
-Pendiente separado, del reporte original: la placa YA PUBLICADA con el typo ("SINTOMAS DE ALAMA") no
-se regeneró — ver la entrada `[BUG]` correspondiente más abajo en este archivo, ahora con una nota de
-que regenerarla es trivial con el pipeline nuevo.
+**Cerrado y reconfirmado por Seba (2026-08-24):** la placa publicada con el typo
+"SINTOMAS DE ALAMA" fue regenerada. La causa raíz ya estaba eliminada por el compositor de texto real;
+no queda ninguna acción sobre esa pieza.
 
 ---
 
@@ -314,10 +314,8 @@ por qué tipo de acción es, para que sepas qué esperar de cada uno. El detalle
   landing real pese a que ésta ya declara su propio `<link rel="canonical">`. Cambiado a 308
   (permanente) — verificado con `curl -I https://draluciachahin.ar/` en producción real, ya sirve
   308. Se pidió reindexación manual de `/dra-lucia-chahin` desde Search Console el mismo día.
-  **Pendiente real**: confirmar en unos días/semanas que el próximo rastreo de Google elige
-  `/dra-lucia-chahin` como canónica en vez de `/` (Search Console tarda en reflejar el cambio, no
-  es instantáneo) — si el motivo "Duplicada" persiste pasadas 2-3 semanas con el 308 ya activo,
-  investigar de nuevo.
+  Esa verificación quedó incorporada a la revisión posterior del 23/8 y al nuevo pedido de recrawl
+  confirmado por Seba el 24/8; ya no es una acción técnica separada.
   **Segunda verificación (2026-08-23):** el informe bajó de 8 a 3 URLs pendientes. Las dos HTML
   (`/ecocardiograma-lomas` y `/privacidad`) responden 200, son rastreables, tienen canonical y
   figuran en el sitemap; Search Console todavía muestra como último rastreo el 2026-07-17. La
@@ -325,9 +323,9 @@ por qué tipo de acción es, para que sepas qué esperar de cada uno. El detalle
   `X-Robots-Tag: noindex` para esa imagen, enlaces HTML desde la landing principal a las nueve
   landings SEO, contenido operativo más específico en `/ecocardiograma-lomas`, robots explícitos
   y canonical absoluto. También se elimina el `lastmod` artificial que cambiaba con cada deploy;
-  Google recomienda omitirlo si no refleja una modificación significativa real. Queda pedir una
-  nueva validación/recrawl luego del deploy y monitorear: la indexación final la decide Google y
-  no puede garantizarse desde el código.
+  Google recomienda omitirlo si no refleja una modificación significativa real. **Cerrado por Seba
+  (2026-08-24):** pidió la nueva validación/recrawl y comenzó el seguimiento en Search Console. La
+  indexación final la decide Google y no puede garantizarse desde el código.
 - [ ] **Google Cloud (reseñas)**: revisar antes de octubre 2026 si se activa la cuenta completa o
   se deja pausar la prueba gratuita (Etapa 2).
 
@@ -699,15 +697,15 @@ deliberado: primero integridad de WhatsApp y datos de pacientes; luego medición
       (crash a una respuesta genérica de Next) en vez de un `400` claro. Envueltas con el mismo
       helper `parseJsonBody` que ya usaban las rutas públicas; se agregaron también topes de
       longitud puntuales donde el texto viaja a una API externa de pago (Google Business Profile).
-  - **Aceptación parcial cumplida**: el límite de abuso se mantiene entre instancias, las dos
+  - **Aceptación cumplida**: el límite de abuso se mantiene entre instancias, las dos
     rutas públicas sin sesión y ahora también las rutas autenticadas de mayor uso real (leads,
     experimentos, WhatsApp admin, Google Business, mensajería) validan tipo/longitud/enum y no
-    revientan con una excepción no controlada ante un JSON malformado. **Pendiente real**: quedan
-    sin tocar `/api/instagram-business/auth`, `/callback`, `/disconnect`, `/status`,
+    revientan con una excepción no controlada ante un JSON malformado. Quedan deliberadamente sin
+    ese helper `/api/instagram-business/auth`, `/callback`, `/disconnect`, `/status`,
     `/api/google-business/auth`, `/callback`, `/disconnect`, `/locations`, `/status` (todas
     GET/OAuth por query params, no reciben body JSON del cliente) y las rutas de contenido que ya
-    tenían validación propia sólida (mencionadas arriba) — revisión completa, no queda ninguna
-    ruta genuinamente sin analizar.
+    tenían validación propia sólida (mencionadas arriba): no reciben body JSON o ya validan su
+    contrato. Revisión completa; no queda ninguna ruta genuinamente sin analizar ni implementar.
 
 - [x] **SEC-02 — Export CSV segura.** ✅ Resuelto (2026-07-11)
   - `src/lib/csv.ts` (`neutralizeCsvFormula`/`escapeCsvCell`, con tests) antepone una comilla
@@ -800,10 +798,10 @@ deliberado: primero integridad de WhatsApp y datos de pacientes; luego medición
     ubicación loguea pero igual redirige con `connected=1` (no fatal, ya cubierto por el diseño
     existente); un intercambio exitoso guarda los tokens y redirige con `connected=1`/
     `ig_connected=1`.
-  - **Pendiente real**: extender el mismo patrón a los estados de publicación de contenido
-    (`content/items` PATCH con sus distintas transiciones de estado) como test de integración de
-    ruta completa — el patrón ya está probado y funcionando en 6 rutas distintas, extenderlo al
-    resto es mecánico pero son varias rutas más y no bloquea nada.
+  - **Cerrado (2026-08-23, PR #232)**: `content/items` PATCH ya tiene un test de integración de ruta
+    completa para sus transiciones críticas. Verifica que editar contenido publicado/aprobado vuelva
+    la pieza a borrador y limpie el resultado de publicación viejo, y que un cambio operativo que no
+    altera contenido conserve el estado y el ledger.
   - **Aceptación cumplida**: los casos cubiertos —incluidas la ruta más crítica del proyecto y
     ambos callbacks de OAuth— fallarían en CI si la ruta perdiera autenticación, dejara de
     deduplicar, la validación de CSV se rompiera, o el logging de un fallo de OAuth desapareciera.
@@ -1223,7 +1221,8 @@ Google Maps, Instagram, WhatsApp y búsqueda orgánica.
 - [x] Servicios como cards con microcopy orientado a síntomas/motivo de consulta
 - [x] Sección "Obras sociales y formas de atención" — muestra coberturas cargadas por sede en Configuración, o mensaje honesto invitando a consultar si todavía no hay datos cargados *(ya cargadas por sede — ver "✍️ Contenido para cargar/publicar", verificado 2026-07-17)*
 - [x] Sección "Opiniones de pacientes" — reseñas reales de Google vía Places API (New) desde el 2026-07-04 (`GOOGLE_PLACES_API_KEY` + `GOOGLE_PLACE_ID`, ver CLAUDE.md). Cae al placeholder honesto si la API no está disponible.
-- [x] JSON-LD: `Physician` + `FAQPage` en todas las landings, `BreadcrumbList` en landings SEO, `identifier` (matrícula) cuando esté cargada *(pendiente: `MedicalClinic` por sede)*
+- [x] JSON-LD: `Physician` + `FAQPage`, `BreadcrumbList` en landings SEO, `identifier` (matrícula)
+      cuando esté cargada y `MedicalClinic` por cada sede visible (2026-08-24).
 - [x] Eventos de analítica ampliados (2026-07-06) — `landing_events` ahora también registra `page_view` (una vez por carga de landing) y clicks separados por acción (`click_booking`/`click_call`/`click_whatsapp`/`click_maps`) con `location_key` por sede, además de los `cta_*` históricos que se mantienen para no romper las métricas globales existentes. El link "Cómo llegar" no trackeaba nada antes; ahora sí.
 
 ### Revertido (2026-07-04)
@@ -1270,7 +1269,7 @@ orgánico de búsqueda y convierten con instrucciones claras para pedir turno.
 ### Pendiente
 - [x] FAQ específica por landing (preguntas frecuentes distintas por servicio/sede)
 - [x] Links internos entre landings (ej. Lanús → Lomas y viceversa, para SEO)
-- [x] Datos estructurados JSON-LD (Physician, FAQPage, BreadcrumbList) *(MedicalClinic por sede pendiente)*
+- [x] Datos estructurados JSON-LD (`Physician`, `FAQPage`, `BreadcrumbList` y `MedicalClinic` por sede)
 - [x] ~~Formulario "No pude pedir turno" en cada landing SEO~~ — revertido, ver nota en Etapa 2
 
 ### Acciones externas (las hace el equipo)
@@ -1475,9 +1474,9 @@ público para pedir turno.
 
 ## Etapa 8 — Escalamiento
 
-- [ ] Google Search Console: monitorear keywords, indexación y clics — la propiedad ya está
-  configurada y verificada (2026-07-17, ver 📌 Pendientes tuyos); esto es el hábito de revisión
-  periódica, no trabajo de build pendiente.
+- [x] Google Search Console: propiedad configurada, sitemap enviado y nueva validación/recrawl pedida;
+  Seba confirmó el seguimiento de keywords, indexación y clics el 2026-08-24. Continúa como hábito
+  operativo periódico, no como trabajo de build pendiente.
 - [ ] Google Analytics: visitas, sesiones, tasa de rebote y conversión por página — GA4 ya está
   implementado con consentimiento opt-in (DATA-03, Ola 1); esto es revisar el panel con regularidad
   una vez que `NEXT_PUBLIC_GA_MEASUREMENT_ID` esté cargado, no trabajo de build pendiente.
@@ -1902,7 +1901,7 @@ aprobadas. **Resuelto el mismo día**: Seba confirmó que quiere "generación au
 ver la entrada de CLAUDE.md "feedback de Seba sobre el Estudio de contenido" (2026-08-05) y
 `src/lib/content-auto-draft.ts` (nuevo cron `/api/cron/auto-draft-content`).
 
-### [BUG] Sin diagnosticar — 3 historias con texto idéntico publicadas 11s aparte (2026-07-31)
+### [BUG] ✅ Recurrencia inmediata bloqueada (2026-08-24) — 3 historias con texto idéntico publicadas 11s aparte (2026-07-31)
 `content_pipeline`, items `6c7d370b-9a84-400e-b5ed-15691c6b7eb6`, `44d58e42-6a36-48cb-b698-e174bf52638e`,
 `a326745e-c403-4aff-8e65-08184fd9866a` — 3 historias con el mismo `hook`/`caption` palabra por palabra
 ("¿Sos de los que postergan el turno al médico porque no sabés si tu cobertura te cubre la consulta?"),
@@ -1910,13 +1909,14 @@ mismo `category`/`goal`, publicadas a Instagram con **11-22 segundos de diferenc
 10:37:21, 10:37:32 y 10:37:43 UTC. Confirmado que son 3 posts reales distintos (media_id de Meta
 distinto cada uno: `17875751109687204`, `18088394294394414`, `18089898524541401` — no es un glitch de
 la base) — o sea que 3 historias idénticas seguidas les llegaron a los seguidores ese día. No se
-diagnosticó la causa raíz (¿se generó el mismo contenido 3 veces vía "Generar propuesta" y las 3 se
-aprobaron y quedaron en cola juntas? ¿`items_per_run` de historia estaba en 3 ese día, coincidiendo con
-3 piezas casi idénticas por casualidad de contenido?) ni si haría falta un chequeo de duplicado más
-fuerte que el actual `findRecentDuplicateTopic` (que ya existe pero es solo un aviso no bloqueante,
-ver `content-pipeline.ts`). Encontrado investigando un reporte de Seba sobre "historias que se repiten"
-que en realidad resultó ser otra cosa (ver [[project_instagram_content_studio_verification_2026_08_05]]
-en memoria) — este hallazgo quedó sin cerrar.
+El histórico no permite distinguir si las tres se generaron manualmente o por una reposición antigua,
+pero el mecanismo de publicación sí explica la ráfaga: Historias admite `items_per_run > 1` y elegía las
+primeras N aprobadas sin deduplicar el texto. `pickNextPublishableItems()` ahora calcula una firma exacta
+de formato + hook + caption (normaliza sólo mayúsculas y espacios) y conserva una sola copia por corrida.
+Las copias quedan aprobadas para corregirlas o archivarlas; no se borran ni se publican en ráfaga. Tests
+cubren el caso de tres aprobadas, dos idénticas y una distinta. La generación automática moderna también
+recibe los temas recientes y evita repetir dentro de la misma reposición, por lo que quedan cubiertos
+tanto el origen probable como el daño observado.
 
 # Instagram — optimización basada en insights reales (agosto 2026)
 

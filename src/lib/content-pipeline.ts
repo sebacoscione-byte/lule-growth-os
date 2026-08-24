@@ -542,6 +542,17 @@ export function isRepeatDue(item: ContentItem, now: Date): boolean {
  * subido a mano en el item (video_url) -- la app no genera video, ver publishReelToInstagram. */
 export type AutoPublishFormat = "post" | "historia" | "carrusel" | "reel"
 
+function normalizeForComparison(text: string): string {
+  return text.trim().replace(/\s+/g, " ").toLocaleLowerCase("es")
+}
+
+/** Identidad textual exacta de una publicación, tolerante solo a mayúsculas y espacios. */
+export function contentPublicationSignature(item: ContentItem): string {
+  const hook = normalizeForComparison(item.hook)
+  const caption = normalizeForComparison(item.caption)
+  return hook || caption ? `${item.format}\n${hook}\n${caption}` : `${item.format}\nitem:${item.id}`
+}
+
 /**
  * Pura, sin I/O: elige que items auto-publicar de un formato puntual (post, historia o carrusel, cada
  * uno con su propio cronograma). `count` (items_per_run) limita SOLO las piezas nuevas aprobadas
@@ -565,8 +576,26 @@ export function pickNextPublishableItems(
   // reordeno a mano (mismas flechas que ya existian para la cola aprobada, ver moveItemInQueue) puede
   // intercalarse en cualquier lugar -- esto determina el orden real de publicacion de la corrida (ej.
   // el orden en que unas Historias quedan una detras de otra para quien las mira).
-  return [...approved.slice(0, Math.max(0, count)), ...dueRepeats]
+  const seenApproved = new Set<string>()
+  const uniqueApproved = approved.filter(item => {
+    const signature = contentPublicationSignature(item)
+    if (seenApproved.has(signature)) return false
+    seenApproved.add(signature)
+    return true
+  }).slice(0, Math.max(0, count))
+
+  // Las historias pueden publicar varias piezas por corrida. Si la cola contiene copias exactas,
+  // publicar solo la primera evita ráfagas idénticas separadas por segundos; las demás permanecen
+  // aprobadas para que el equipo pueda diferenciarlas o archivarlas.
+  const selected = [...uniqueApproved, ...dueRepeats]
     .sort((a, b) => effectiveQueueRank(a) - effectiveQueueRank(b))
+  const selectedSignatures = new Set<string>()
+  return selected.filter(item => {
+    const signature = contentPublicationSignature(item)
+    if (selectedSignatures.has(signature)) return false
+    selectedSignatures.add(signature)
+    return true
+  })
 }
 
 /** Pura, sin I/O: elige el proximo item para auto-publicar de un formato puntual. Ver `pickNextPublishableItems`. */
@@ -608,10 +637,6 @@ export function moveItemInQueue(items: ContentItem[], id: string, direction: "up
 }
 
 export const DEFAULT_DUPLICATE_TOPIC_WINDOW_DAYS = 15
-
-function normalizeForComparison(text: string): string {
-  return text.trim().toLocaleLowerCase("es")
-}
 
 /**
  * Pura, sin I/O: la pieza mas reciente con la misma categoria o el mismo hook (comparacion exacta,
