@@ -265,33 +265,48 @@ export function normalizeAutoPublishSettings(value: unknown): AutoPublishSetting
   }
 }
 
-export async function readContentItems(supabase: SupabaseClient): Promise<ContentItem[]> {
+export interface ContentItemsSnapshot {
+  items: ContentItem[]
+  /** `app_config.updated_at` funciona como versión corta del documento completo. */
+  version: string | null
+}
+
+export async function readContentItemsSnapshot(supabase: SupabaseClient): Promise<ContentItemsSnapshot> {
   const { data, error } = await supabase
     .from("app_config")
-    .select("value")
+    .select("value, updated_at")
     .eq("key", CONTENT_KEY)
     .maybeSingle()
   if (error) throw error
-  return Array.isArray(data?.value) ? data.value as ContentItem[] : []
+  return {
+    items: Array.isArray(data?.value) ? data.value as ContentItem[] : [],
+    version: typeof data?.updated_at === "string" ? data.updated_at : null,
+  }
+}
+
+export async function readContentItems(supabase: SupabaseClient): Promise<ContentItem[]> {
+  return (await readContentItemsSnapshot(supabase)).items
 }
 
 /**
  * Reemplaza la biblioteca solo si sigue siendo exactamente la misma que leyó el caller.
  *
  * `content_pipeline` vive como un único documento JSONB por compatibilidad histórica. Un upsert
- * ciego permite que dos cuentas, un cron o la captura de insights se pisen entre sí. La igualdad
- * JSONB convierte el UPDATE en compare-and-swap sin necesitar una columna/migración adicional.
+ * ciego permite que dos cuentas, un cron o la captura de insights se pisen entre sí. `updated_at`
+ * es la versión del documento: mantiene el compare-and-swap atómico sin serializar toda la
+ * Biblioteca en el query string de PostgREST (eso superaba el límite de URL y devolvía HTTP 414).
  */
 export async function compareAndSwapContentItems(
   supabase: SupabaseClient,
-  expectedItems: ContentItem[],
+  expectedVersion: string | null,
   nextItems: ContentItem[]
 ): Promise<boolean> {
+  if (!expectedVersion) return false
   const { data, error } = await supabase
     .from("app_config")
     .update({ value: nextItems, updated_at: new Date().toISOString() })
     .eq("key", CONTENT_KEY)
-    .filter("value", "eq", JSON.stringify(expectedItems))
+    .eq("updated_at", expectedVersion)
     .select("key")
     .maybeSingle()
   if (error) throw error
@@ -343,10 +358,10 @@ export async function mutateContentItems(
   maxAttempts: number = 5
 ): Promise<ContentItem[]> {
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
-    const current = await readContentItems(supabase)
-    const next = mutation(current)
-    if (JSON.stringify(next) === JSON.stringify(current)) return current
-    if (await compareAndSwapContentItems(supabase, current, next)) return next
+    const snapshot = await readContentItemsSnapshot(supabase)
+    const next = mutation(snapshot.items)
+    if (JSON.stringify(next) === JSON.stringify(snapshot.items)) return snapshot.items
+    if (await compareAndSwapContentItems(supabase, snapshot.version, next)) return next
   }
   throw new ContentItemsConflictError()
 }

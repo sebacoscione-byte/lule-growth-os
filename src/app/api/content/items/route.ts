@@ -5,6 +5,7 @@ import {
   compareAndSwapContentItems,
   mutateContentItems,
   readContentItems,
+  readContentItemsSnapshot,
 } from "@/lib/content-pipeline"
 import { readContentInsightWindows } from "@/lib/content-insights"
 import type { ContentItem } from "@/types"
@@ -102,7 +103,8 @@ export async function PATCH(request: NextRequest) {
   try {
     const supabase = await authenticatedClient()
     const body = await request.json() as Partial<ContentItem> & { id: string }
-    const items = await readContentItems(supabase)
+    const snapshot = await readContentItemsSnapshot(supabase)
+    const items = snapshot.items
     const current = items.find(item => item.id === body.id)
     if (!current) return NextResponse.json({ error: "Borrador no encontrado" }, { status: 404 })
 
@@ -306,7 +308,7 @@ export async function PATCH(request: NextRequest) {
     }
 
     const updated = items.map(item => item.id === body.id ? nextItem : item)
-    if (!await compareAndSwapContentItems(supabase, items, updated)) {
+    if (!await compareAndSwapContentItems(supabase, snapshot.version, updated)) {
       return NextResponse.json({
         error: "La pieza cambió en otra sesión. Recargamos la biblioteca para que puedas revisar la versión más reciente.",
         code: "content_items_conflict",
