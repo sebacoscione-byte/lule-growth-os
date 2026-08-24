@@ -1,6 +1,20 @@
 ﻿# Lule Growth OS — Contexto para Claude
 
 ## Estado actual
+- 2026-08-24 (bug real: de 2 historias evergreen salió solo la primera): reconstruido contra Meta,
+  Supabase y logs de Vercel. El cron comenzó a las 18:43 ART y Meta publicó **"TU CONTROL
+  CARDIOVASCULAR, SIN POSTERGACIONES"** a las 18:44, pero Vercel terminó la ruta
+  `/api/cron/publish-stories` con HTTP 500; la app no llegó a guardar ese éxito ni a intentar
+  **"obras sociales que atiendo"**. Causa raíz introducida ese mismo día por PR #235: el nuevo CAS
+  de la Biblioteca hacía `.filter("value", "eq", JSON.stringify(expectedItems))`, serializando el
+  documento JSONB completo en el query string de PostgREST. Con el tamaño real de producción,
+  Cloudflare respondió `414 Request-URI Too Large` inmediatamente después del efecto externo en
+  Instagram. Fix: el CAS sigue siendo atómico y conservando ediciones concurrentes, pero ahora lee
+  `app_config.updated_at` como versión corta y condiciona el `UPDATE` por esa marca; la Biblioteca
+  completa viaja solo en el body. La regresión usa una Biblioteca artificial de ~1 MB y confirma que
+  el único predicado variable en URL es el timestamp. El predicado corto también se verificó en
+  lectura contra la fila real de producción. Verificación: lint, 118 suites/1075 tests, build, CI,
+  E2E público y Vercel Preview verdes. PR #236. No se tocó lógica médica, WhatsApp, RLS ni cronograma.
 - 2026-08-24 (cierre de pendientes técnicos accionables): Seba confirmó que pidió la nueva
   validación/recrawl en Search Console y que regeneró la placa histórica con "SINTOMAS DE ALAMA".
   Se completó el WIP local de refresco de Biblioteca: carga inmediata + polling cada 30 segundos,
