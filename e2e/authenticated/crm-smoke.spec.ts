@@ -43,8 +43,15 @@ test("un usuario autorizado puede entrar al dashboard", async () => {
   await expect(journey.getByText("Evolución del recorrido", { exact: true })).toBeVisible()
 
   const channels = page.locator("details").filter({ hasText: "Ver información detallada por canal" }).first()
-  await channels.locator("summary").click()
-  await expect(channels.getByText("Consultas recientes", { exact: true })).toBeVisible()
+  await channels.locator(":scope > summary").click()
+  await expect(channels.getByText(/Vista rápida por canal/)).toBeVisible()
+  await expect(channels.getByText("Consultas recientes", { exact: true })).not.toBeVisible()
+
+  const siteDetails = channels.locator("details").filter({ hasText: "Sitio y pacientes" }).first()
+  await siteDetails.locator(":scope > summary").click()
+  await expect(siteDetails.getByText("Consultas recientes", { exact: true })).toBeVisible()
+  await expect(siteDetails.getByText("Análisis avanzado del sitio", { exact: true })).toBeVisible()
+  await expect(siteDetails.getByText("Prueba de los botones principales del sitio", { exact: true })).not.toBeVisible()
 })
 
 test("la planificación reproduce agenda e ingresos del organigrama", async () => {

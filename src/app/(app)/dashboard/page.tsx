@@ -567,6 +567,84 @@ function DashboardDisclosure({
   )
 }
 
+function ChannelSummaryCard({
+  icon: Icon,
+  title,
+  headline,
+  detail,
+  className,
+}: {
+  icon: typeof Globe
+  title: string
+  headline: string
+  detail: string
+  className: string
+}) {
+  return (
+    <div className="rounded-xl border border-gray-200 bg-white p-4">
+      <div className="flex items-center gap-2">
+        <span className={`flex h-8 w-8 items-center justify-center rounded-lg ${className}`}>
+          <Icon className="h-4 w-4" />
+        </span>
+        <p className="text-sm font-semibold text-gray-700">{title}</p>
+      </div>
+      <p className="mt-3 text-xl font-bold text-gray-950">{headline}</p>
+      <p className="mt-1 text-xs leading-relaxed text-gray-500">{detail}</p>
+    </div>
+  )
+}
+
+function ChannelDisclosure({
+  icon: Icon,
+  title,
+  description,
+  children,
+}: {
+  icon: typeof Globe
+  title: string
+  description: string
+  children: ReactNode
+}) {
+  return (
+    <details className="group/channel overflow-hidden rounded-xl border border-gray-200 bg-white">
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-4 p-4 marker:hidden">
+        <div className="flex min-w-0 items-start gap-3">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-gray-100 text-gray-600">
+            <Icon className="h-4 w-4" />
+          </span>
+          <div>
+            <h3 className="text-sm font-semibold text-gray-950">{title}</h3>
+            <p className="mt-0.5 text-xs leading-relaxed text-gray-500">{description}</p>
+          </div>
+        </div>
+        <ChevronDown className="h-5 w-5 shrink-0 text-gray-400 transition-transform group-open/channel:rotate-180" />
+      </summary>
+      <div className="space-y-4 border-t border-gray-100 bg-gray-50/50 p-4">
+        {children}
+      </div>
+    </details>
+  )
+}
+
+function AdvancedSiteDisclosure({ children }: { children: ReactNode }) {
+  return (
+    <details className="group/advanced overflow-hidden rounded-xl border border-dashed border-gray-300 bg-white">
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-4 p-4 marker:hidden">
+        <div>
+          <h4 className="text-sm font-semibold text-gray-800">Análisis avanzado del sitio</h4>
+          <p className="mt-0.5 text-xs leading-relaxed text-gray-500">
+            Desglose por sede y página, recorrido completo y prueba de los botones principales.
+          </p>
+        </div>
+        <ChevronDown className="h-5 w-5 shrink-0 text-gray-400 transition-transform group-open/advanced:rotate-180" />
+      </summary>
+      <div className="space-y-4 border-t border-gray-100 bg-gray-50/50 p-4">
+        {children}
+      </div>
+    </details>
+  )
+}
+
 function OperationalAction({
   href,
   label,
@@ -1232,14 +1310,70 @@ export default async function DashboardPage({
       <DashboardDisclosure
         icon={BarChart3}
         title="Ver información detallada por canal"
-        description="Histórico de consultas, páginas del sitio, WhatsApp, Instagram, Google y reportes semanales."
+        description="Primero, una lectura rápida. Abrí un canal sólo cuando necesites entender de dónde salió cada número."
+      >
+      <div>
+        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-gray-500">Vista rápida por canal · {periodLabel}</p>
+        <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <ChannelSummaryCard
+            icon={Globe}
+            title="Sitio"
+            headline={growth.available ? `${growth.summary.visits.current} visitas` : "Sin datos todavía"}
+            detail={growth.available
+              ? `${growth.summary.engagedVisits.current} ${growth.summary.engagedVisits.current === 1 ? "persona intentó" : "personas intentaron"} contactarse · ${growth.summary.leads.current} consultas registradas.`
+              : "El seguimiento del sitio no respondió para este período."}
+            className="bg-indigo-50 text-indigo-700"
+          />
+          <ChannelSummaryCard
+            icon={Camera}
+            title="Instagram"
+            headline={growth.instagram.followersDelta === null
+              ? growth.instagram.followers === null ? "Sin datos todavía" : `${growth.instagram.followers} seguidores`
+              : growth.instagram.followersDelta > 0 ? `+${growth.instagram.followersDelta} seguidores`
+              : growth.instagram.followersDelta < 0 ? `${growth.instagram.followersDelta} seguidores`
+              : "Sin cambios"}
+            detail={growth.instagram.followers === null
+              ? "Todavía falta una comparación diaria."
+              : `${growth.instagram.followers} seguidores totales · ${instagramChannel?.leads ?? 0} consultas identificadas desde Instagram.`}
+            className="bg-pink-50 text-pink-700"
+          />
+          <ChannelSummaryCard
+            icon={MapPin}
+            title="Google"
+            headline={growth.google.reviewCount === null ? "Sin datos de reseñas" : `${growth.google.reviewCount} reseñas`}
+            detail={growth.google.rating === null
+              ? `${googleChannel?.leads ?? 0} consultas identificadas desde Google.`
+              : `${growth.google.rating.toFixed(1)} de calificación · ${googleChannel?.leads ?? 0} consultas identificadas.`}
+            className="bg-blue-50 text-blue-700"
+          />
+          <ChannelSummaryCard
+            icon={MessageSquare}
+            title="WhatsApp"
+            headline={periodChannelOverview.available ? `${periodChannelOverview.whatsappLeads} consultas` : "Sin datos todavía"}
+            detail={periodChannelOverview.available
+              ? `${periodChannelOverview.whatsappClicks} clics desde el sitio durante el período.`
+              : "No se pudo leer el movimiento de este canal."}
+            className="bg-emerald-50 text-emerald-700"
+          />
+        </div>
+        <p className="mt-2 text-[11px] leading-relaxed text-gray-400">
+          “Identificadas” significa que el enlace conservó el origen. Puede haber consultas sin origen cuando una persona escribe directamente.
+        </p>
+      </div>
+
+      <div className="space-y-3">
+      <ChannelDisclosure
+        icon={Globe}
+        title="Sitio y pacientes"
+        description="Visitas, intentos de contacto, consultas, turnos y páginas que generan más interés."
       >
       <SectionHeader icon={Users} title="Consultas y pacientes" />
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         {/* Por canal */}
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Consultas por origen · histórico</CardTitle>
+            <CardTitle className="text-base">De dónde llegaron las consultas</CardTitle>
+            <p className="text-xs text-gray-500">Total acumulado desde que comenzó el registro, no sólo del período seleccionado.</p>
           </CardHeader>
           <CardContent className="space-y-3">
             {[
@@ -1325,8 +1459,8 @@ export default async function DashboardPage({
       {/* Acciones web del período */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Qué hacen las personas en la web</CardTitle>
-          <p className="text-xs text-gray-500">Clicks reales en los canales de pedido de turno durante el período seleccionado. Una misma visita puede hacer más de una acción.</p>
+            <CardTitle className="text-base">Cómo intentaron contactarse desde el sitio</CardTitle>
+            <p className="text-xs text-gray-500">Clics en los botones para pedir turno durante el período seleccionado. Una misma persona puede usar más de un botón.</p>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
@@ -1350,10 +1484,10 @@ export default async function DashboardPage({
       {landingRanking.available && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Páginas que reciben más interés</CardTitle>
+            <CardTitle className="text-base">Páginas que más ayudan a iniciar un contacto</CardTitle>
             <p className="text-xs text-gray-500">
-              Visitas e interacciones con los botones de pedir turno (últimos {period}{" "}días). La tasa de
-              interacción es la proporción de visitas que hicieron click en pedir turno online, llamar,
+              Visitas e interacciones con los botones de pedir turno (últimos {period}{" "}días). El porcentaje
+              muestra cuántas visitas hicieron clic en pedir turno online, llamar,
               WhatsApp o cómo llegar — no confirma que hayan pedido turno.
             </p>
           </CardHeader>
@@ -1370,8 +1504,8 @@ export default async function DashboardPage({
                     <tr className="border-b text-left text-xs text-gray-500">
                       <th className="pb-2 font-medium">Landing</th>
                       <th className="pb-2 font-medium text-right">Visitas</th>
-                      <th className="pb-2 font-medium text-right">Interacciones</th>
-                      <th className="pb-2 font-medium text-right">Tasa</th>
+                      <th className="pb-2 font-medium text-right">Intentos de contacto</th>
+                      <th className="pb-2 font-medium text-right">Porcentaje</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1395,15 +1529,17 @@ export default async function DashboardPage({
         </Card>
       )}
 
+      <AdvancedSiteDisclosure>
+
       {/* Clicks por sede: llamada y WhatsApp (incluye Swiss y Británico, que no pasan por el bot) */}
       {clicksByLocation.available && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Clicks por sede: llamada y WhatsApp</CardTitle>
+            <CardTitle className="text-base">Intentos de contacto por sede</CardTitle>
             <p className="text-xs text-gray-500">
-              Últimos {period}{" "}días. Incluye Swiss Medical y Hospital Británico aunque ninguna de las dos
+              Clics en llamar o WhatsApp durante los últimos {period}{" "}días. Incluye Swiss Medical y Hospital Británico aunque ninguna de las dos
               sedes pase por el bot de WhatsApp de Lucía (Swiss usa su propio WhatsApp, &quot;Swity&quot;;
-              Británico deriva a teléfono/central de turnos) — se puede medir el click, pero no si ese
+              Británico deriva a teléfono/central de turnos) — se puede medir el clic, pero no si ese
               contacto externo terminó en un turno confirmado.
             </p>
           </CardHeader>
@@ -1440,10 +1576,10 @@ export default async function DashboardPage({
       {instagramWebClicks.available && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Clicks a Instagram desde la web</CardTitle>
+            <CardTitle className="text-base">Personas que fueron del sitio a Instagram</CardTitle>
             <p className="text-xs text-gray-500">
-              Últimos {period}{" "}días. Cuenta clicks en el link de confianza a Instagram de las 7 landings
-              públicas — no cuenta como paso hacia pedir turno, es un dato aparte de la tasa de conversión.
+              Clics en el enlace a Instagram durante los últimos {period}{" "}días. Es una señal de interés,
+              pero no significa que la persona haya pedido turno.
             </p>
           </CardHeader>
           <CardContent>
@@ -1456,9 +1592,9 @@ export default async function DashboardPage({
       {referralFunnel.available && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Recorrido por página</CardTitle>
+            <CardTitle className="text-base">Del ingreso a la consulta, página por página</CardTitle>
             <p className="text-xs text-gray-500">
-              Cada página aparece una sola vez: visita → clic a WhatsApp → consulta → turno confirmado
+              Muestra el recorrido visita → clic a WhatsApp → consulta → turno confirmado
               durante los últimos {period} días. Las visitas son únicas por pestaña; el desglose inferior
               muestra qué sede recibió cada clic y conversión.
             </p>
@@ -1534,18 +1670,14 @@ export default async function DashboardPage({
       {heroVariantResults.available && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Test A/B: hero de la landing principal</CardTitle>
+            <CardTitle className="text-base">Prueba de los botones principales del sitio</CardTitle>
             <p className="text-xs text-gray-500">
-              La variante B invierte cuál botón del hero es primario (&quot;Pedir turno&quot; vs
-               &quot;Ver sedes y horarios&quot;), asignada automáticamente 50/50 por cookie (últimos {period}{" "}
-              días). No hay ganador automático — mirá la tasa de interacción y decidí manualmente
-              cuándo cortar el test.
+              Se comparan dos portadas: una destaca &quot;Pedir turno&quot; y la otra &quot;Ver sedes y horarios&quot;.
+              Cada visitante ve una de las dos al azar durante los últimos {period} días.
             </p>
             <p className="text-xs text-gray-500">
-              Criterio de finalización: se necesitan al menos {AB_TEST_MIN_VISITS_PER_VARIANT} visitas
-              por variante y una diferencia de al menos {AB_TEST_MIN_RATE_GAP} puntos de interacción
-              entre ambas para considerar el resultado confiable — con menos que eso, cualquier
-              diferencia puede ser ruido.
+              Para tomar una decisión hacen falta al menos {AB_TEST_MIN_VISITS_PER_VARIANT} visitas en cada versión
+              y una diferencia de {AB_TEST_MIN_RATE_GAP} puntos. Antes de eso, el resultado es sólo orientativo.
             </p>
           </CardHeader>
           <CardContent>
@@ -1591,10 +1723,10 @@ export default async function DashboardPage({
                       <tr className="border-b text-left text-xs text-gray-500">
                         <th className="pb-2 font-medium">Variante</th>
                         <th className="pb-2 font-medium text-right">Visitas</th>
-                        <th className="pb-2 font-medium text-right">Click &quot;Pedir turno&quot;</th>
-                        <th className="pb-2 font-medium text-right">Click &quot;Ver sedes&quot;</th>
-                        <th className="pb-2 font-medium text-right">Interacciones</th>
-                        <th className="pb-2 font-medium text-right">Tasa</th>
+                        <th className="pb-2 font-medium text-right">Clic en &quot;Pedir turno&quot;</th>
+                        <th className="pb-2 font-medium text-right">Clic en &quot;Ver sedes&quot;</th>
+                        <th className="pb-2 font-medium text-right">Intentos de contacto</th>
+                        <th className="pb-2 font-medium text-right">Porcentaje</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -1619,17 +1751,24 @@ export default async function DashboardPage({
         </Card>
       )}
 
-      <SectionHeader icon={MessageSquare} title="WhatsApp" />
+      </AdvancedSiteDisclosure>
+
+      </ChannelDisclosure>
+
+      <ChannelDisclosure
+        icon={MessageSquare}
+        title="WhatsApp"
+        description="Cuántas personas llegaron por este canal y cuánto cuestan los mensajes enviados."
+      >
 
       {/* Costo de WhatsApp (mismo cálculo que /costos, resumen liviano) */}
       {whatsappCostSummary.available && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Costo de WhatsApp</CardTitle>
+            <CardTitle className="text-base">Costo de los mensajes enviados</CardTitle>
             <p className="text-xs text-gray-500">
-              Mensajes salientes con tarifa cargada (últimos 7 y 30 días). Detalle completo, costo
-              por paciente/turno/protocolo y ranking de flows en{" "}
-              <Link href="/costos" className="underline">/costos</Link>.
+              Total cobrado por WhatsApp en los mensajes que envió el sistema. El detalle por persona
+              y tipo de seguimiento está en <Link href="/costos" className="font-semibold underline">Costos</Link>.
             </p>
           </CardHeader>
           <CardContent>
@@ -1651,13 +1790,22 @@ export default async function DashboardPage({
         </Card>
       )}
 
-      <SectionHeader icon={Camera} title="Instagram" />
+      {!whatsappCostSummary.available && (
+        <p className="text-sm text-gray-500">Todavía no hay costos de WhatsApp disponibles para mostrar.</p>
+      )}
+      </ChannelDisclosure>
+
+      <ChannelDisclosure
+        icon={Camera}
+        title="Instagram"
+        description="Seguidores, alcance, visitas al perfil y contenido que llevó personas al sitio."
+      >
 
       {growth.instagram.available && (
         <Card>
           <CardHeader>
             <CardTitle className="text-base flex items-center gap-2">
-              <Camera className="h-4 w-4 text-pink-600" /> Instagram: alcance y tráfico
+              <Camera className="h-4 w-4 text-pink-600" /> Qué pasó en Instagram
             </CardTitle>
             <p className="text-xs text-gray-500">Datos de Instagram más las visitas y consultas que llegaron por el enlace de la bio.</p>
           </CardHeader>
@@ -1672,10 +1820,10 @@ export default async function DashboardPage({
                   <MetricTile label="Seguidores" value={growth.instagram.followers} helper={growth.instagram.followersDelta === null ? "sin comparación todavía" : `${growth.instagram.followersDelta >= 0 ? "+" : ""}${growth.instagram.followersDelta} en el período`} />
                   <MetricTile label="Alcance" value={growth.instagram.reach} helper="cuentas alcanzadas" />
                   <MetricTile label="Visitas al perfil" value={growth.instagram.profileViews} />
-                  <MetricTile label="Taps en enlaces" value={growth.instagram.linkTaps} helper="métrica nativa de Meta" />
-                  <MetricTile label="Interacciones" value={growth.instagram.totalInteractions} helper="métrica nativa de Meta" />
-                  <MetricTile label="Visitas web atribuidas" value={instagramChannel?.visits ?? 0} helper="utm_source=instagram" />
-                  <MetricTile label="Consultas atribuidas" value={instagramChannel?.leads ?? 0} helper={`${instagramChannel?.confirmed ?? 0} turnos confirmados`} />
+                  <MetricTile label="Toques en el enlace" value={growth.instagram.linkTaps} helper="informado por Instagram" />
+                  <MetricTile label="Interacciones" value={growth.instagram.totalInteractions} helper="me gusta, comentarios y guardados" />
+                  <MetricTile label="Visitas al sitio identificadas" value={instagramChannel?.visits ?? 0} helper="llegaron desde Instagram" />
+                  <MetricTile label="Consultas identificadas" value={instagramChannel?.leads ?? 0} helper={`${instagramChannel?.confirmed ?? 0} turnos confirmados`} />
                 </div>
                 <TrendChart
                   points={growth.instagram.series}
@@ -1689,14 +1837,14 @@ export default async function DashboardPage({
               <div className="border-t border-gray-100 pt-4">
                 <div className="mb-3 flex items-center justify-between gap-3">
                   <div>
-                    <p className="text-sm font-semibold text-gray-900">Contenido que llevó personas a la web</p>
-                    <p className="text-xs text-gray-500">Atribución del link de seguimiento de historias, bio o Linktree.</p>
+                    <p className="text-sm font-semibold text-gray-900">Contenido que llevó personas al sitio</p>
+                    <p className="text-xs text-gray-500">Historias o publicaciones cuyo enlace permitió reconocer el origen.</p>
                   </div>
                   <Link href="/contenido/instagram" className="text-xs font-semibold text-pink-700 hover:underline">Abrir estudio</Link>
                 </div>
                 <div className="overflow-x-auto">
                   <table className="w-full min-w-[520px] text-sm">
-                    <thead><tr className="border-b text-left text-xs text-gray-500"><th className="pb-2 font-medium">Pieza</th><th className="pb-2 text-right font-medium">Visitas</th><th className="pb-2 text-right font-medium">Con acción</th><th className="pb-2 text-right font-medium">Tasa</th></tr></thead>
+                    <thead><tr className="border-b text-left text-xs text-gray-500"><th className="pb-2 font-medium">Contenido</th><th className="pb-2 text-right font-medium">Visitas al sitio</th><th className="pb-2 text-right font-medium">Intentaron contactarse</th><th className="pb-2 text-right font-medium">Porcentaje</th></tr></thead>
                     <tbody>
                       {contentPerformance.rows.map(row => (
                         <tr key={row.itemId} className="border-b border-gray-50 last:border-0">
@@ -1715,13 +1863,22 @@ export default async function DashboardPage({
         </Card>
       )}
 
-      <SectionHeader icon={MapPin} title="Google" />
+      {!growth.instagram.available && (
+        <p className="text-sm text-gray-500">Instagram todavía no tiene información disponible para este período.</p>
+      )}
+      </ChannelDisclosure>
+
+      <ChannelDisclosure
+        icon={MapPin}
+        title="Google"
+        description="Reseñas, visibilidad en Maps y Search, llamadas, visitas al sitio y consultas identificadas."
+      >
 
       {growth.google.available && (
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base"><MapPin className="h-4 w-4 text-blue-600" /> Google Business y Maps</CardTitle>
-            <p className="text-xs text-gray-500">Rendimiento nativo de la ficha, reputación en Google y tráfico que llegó a la web por el enlace medible.</p>
+            <CardTitle className="flex items-center gap-2 text-base"><MapPin className="h-4 w-4 text-blue-600" /> Qué pasó en Google</CardTitle>
+            <p className="text-xs text-gray-500">Cuántas veces apareció la ficha, qué hicieron las personas y cuántas consultas pudimos identificar.</p>
           </CardHeader>
           <CardContent className="space-y-5">
             {growth.google.status === "quota_blocked" && (
@@ -1741,14 +1898,14 @@ export default async function DashboardPage({
               </p>
             )}
             <div className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-8">
-              <MetricTile label="Impresiones Search" value={growth.google.impressionsSearch} />
-              <MetricTile label="Impresiones Maps" value={growth.google.impressionsMaps} />
-              <MetricTile label="Clicks al sitio" value={growth.google.websiteClicks} helper="métrica nativa" />
-              <MetricTile label="Clicks en llamar" value={growth.google.callClicks} />
+              <MetricTile label="Apariciones en búsquedas" value={growth.google.impressionsSearch} />
+              <MetricTile label="Apariciones en Maps" value={growth.google.impressionsMaps} />
+              <MetricTile label="Clics al sitio" value={growth.google.websiteClicks} />
+              <MetricTile label="Clics en llamar" value={growth.google.callClicks} />
               <MetricTile label="Cómo llegar" value={growth.google.directionRequests} />
-              <MetricTile label="Visitas web atribuidas" value={googleChannel?.visits ?? 0} helper="utm_source=google_maps" />
-              <MetricTile label="Consultas atribuidas" value={googleChannel?.leads ?? 0} helper={`${googleChannel?.confirmed ?? 0} turnos`} />
-              <MetricTile label="Rating y reseñas" value={growth.google.rating === null ? null : `${growth.google.rating.toFixed(1)} ★`} helper={growth.google.reviewCount === null ? "sin datos" : `${growth.google.reviewCount} reseñas${growth.google.reviewDelta === null ? "" : ` · ${growth.google.reviewDelta >= 0 ? "+" : ""}${growth.google.reviewDelta}`}`} />
+              <MetricTile label="Visitas al sitio identificadas" value={googleChannel?.visits ?? 0} helper="llegaron desde Google Maps" />
+              <MetricTile label="Consultas identificadas" value={googleChannel?.leads ?? 0} helper={`${googleChannel?.confirmed ?? 0} turnos`} />
+              <MetricTile label="Calificación" value={growth.google.rating === null ? null : `${growth.google.rating.toFixed(1)} ★`} helper={growth.google.reviewCount === null ? "sin datos" : `${growth.google.reviewCount} reseñas${growth.google.reviewDelta === null ? "" : ` · ${growth.google.reviewDelta >= 0 ? "+" : ""}${growth.google.reviewDelta}`}`} />
             </div>
             {growth.google.series.length > 1 && (
               <div className="border-t border-gray-100 pt-4">
@@ -1760,7 +1917,16 @@ export default async function DashboardPage({
         </Card>
       )}
 
-      <SectionHeader icon={Clock} title="Reportes" />
+      {!growth.google.available && (
+        <p className="text-sm text-gray-500">Google todavía no tiene información disponible para este período.</p>
+      )}
+      </ChannelDisclosure>
+
+      <ChannelDisclosure
+        icon={Clock}
+        title="Historial semanal"
+        description="Compará semanas anteriores sin mezclar esos datos con la lectura del período actual."
+      >
 
       {/* Reportes semanales */}
       {weeklyReports.available && (
@@ -1808,6 +1974,11 @@ export default async function DashboardPage({
           </CardContent>
         </Card>
       )}
+      {!weeklyReports.available && (
+        <p className="text-sm text-gray-500">El historial semanal todavía no está disponible.</p>
+      )}
+      </ChannelDisclosure>
+      </div>
       </DashboardDisclosure>
     </div>
   )
