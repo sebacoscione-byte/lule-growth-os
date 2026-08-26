@@ -1,4 +1,4 @@
-import type { DashboardPeriod } from "@/lib/dashboard-growth"
+import { getDashboardDateRange, type DashboardPeriod } from "@/lib/dashboard-growth"
 
 const GRAPH_API_VERSION_PATTERN = /^v\d{1,2}\.\d{1,2}$/
 const META_ADS_TIMEOUT_MS = 8_000
@@ -76,15 +76,6 @@ function roundedMoney(value: number): number {
   return Math.round(value * 100) / 100
 }
 
-function argentinaDate(value: Date): string {
-  return new Intl.DateTimeFormat("en-CA", {
-    timeZone: "America/Argentina/Buenos_Aires",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(value)
-}
-
 function classifyProviderFailure(status: number): MetaAdsStatus {
   return status >= 400 && status < 500 ? "provider_rejected" : "provider_unavailable"
 }
@@ -155,8 +146,9 @@ export async function getMetaAdsDashboardMetrics(
 
   const fetcher = options.fetcher ?? fetch
   const now = options.now ?? new Date()
-  const since = argentinaDate(new Date(now.getTime() - (period - 1) * 24 * 60 * 60 * 1000))
-  const until = argentinaDate(now)
+  const range = getDashboardDateRange(period, now)
+  const since = range.currentStart
+  const until = range.currentEnd
   const base = `https://graph.facebook.com/${config.version}`
   const headers = { Authorization: `Bearer ${config.token}` }
 

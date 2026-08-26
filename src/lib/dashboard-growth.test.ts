@@ -2,6 +2,7 @@ import {
   buildGrowthPeriodSummary,
   buildCampaignPerformance,
   combineChannelPerformance,
+  getDashboardDateRange,
   normalizeDashboardChannel,
   parseDashboardPeriod,
   type GrowthTrendPoint,
@@ -18,8 +19,38 @@ describe("dashboard growth", () => {
   it("acepta solo periodos soportados", () => {
     expect(parseDashboardPeriod("7")).toBe(7)
     expect(parseDashboardPeriod("365")).toBe(365)
-    expect(parseDashboardPeriod("999")).toBe(30)
-    expect(parseDashboardPeriod(undefined)).toBe(30)
+    expect(parseDashboardPeriod("999")).toBe(7)
+    expect(parseDashboardPeriod(undefined)).toBe(7)
+  })
+
+  it("alinea la vista semanal de lunes a domingo en horario argentino", () => {
+    expect(getDashboardDateRange(7, new Date("2026-08-26T15:00:00.000Z"))).toEqual({
+      currentStart: "2026-08-24",
+      currentEnd: "2026-08-26",
+      displayEnd: "2026-08-30",
+      previousStart: "2026-08-17",
+      previousEnd: "2026-08-19",
+      calendarWeek: true,
+    })
+  })
+
+  it("respeta el cambio de día de Argentina aunque UTC siga en la fecha anterior", () => {
+    expect(getDashboardDateRange(7, new Date("2026-08-24T02:30:00.000Z"))).toEqual(expect.objectContaining({
+      currentStart: "2026-08-17",
+      currentEnd: "2026-08-23",
+      displayEnd: "2026-08-23",
+    }))
+  })
+
+  it("mantiene ventanas móviles para los períodos históricos", () => {
+    expect(getDashboardDateRange(30, new Date("2026-08-26T15:00:00.000Z"))).toEqual({
+      currentStart: "2026-07-28",
+      currentEnd: "2026-08-26",
+      displayEnd: "2026-08-26",
+      previousStart: "2026-06-28",
+      previousEnd: "2026-07-27",
+      calendarWeek: false,
+    })
   })
 
   it("compara el embudo actual con el periodo anterior", () => {

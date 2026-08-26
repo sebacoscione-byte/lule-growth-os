@@ -30,8 +30,10 @@ import Link from "next/link"
 import { TrendChart } from "@/components/dashboard/trend-chart"
 import {
   getDashboardGrowthData,
+  getDashboardDateRange,
   parseDashboardPeriod,
   DASHBOARD_PERIODS,
+  type DashboardDateRange,
   type DashboardPeriod,
   type PeriodValue,
 } from "@/lib/dashboard-growth"
@@ -371,8 +373,43 @@ async function count(supabase: Awaited<ReturnType<typeof createClient>>, filter:
   return n ?? 0
 }
 
+type PeriodChannelOverview = {
+  available: boolean
+  whatsappLeads: number
+  whatsappClicks: number
+}
+
+function nextDateKey(dateKey: string): string {
+  const date = new Date(`${dateKey}T12:00:00.000Z`)
+  date.setUTCDate(date.getUTCDate() + 1)
+  return date.toISOString().slice(0, 10)
+}
+
+async function getPeriodChannelOverview(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  range: DashboardDateRange,
+): Promise<PeriodChannelOverview> {
+  const from = `${range.currentStart}T00:00:00-03:00`
+  const to = `${nextDateKey(range.currentEnd)}T00:00:00-03:00`
+  const [whatsappLeads, whatsappClicks] = await Promise.all([
+    supabase.from("leads").select("id", { count: "exact", head: true })
+      .eq("origin_channel", "whatsapp").gte("created_at", from).lt("created_at", to),
+    supabase.from("landing_events").select("id", { count: "exact", head: true })
+      .eq("event_type", "click_whatsapp").gte("created_at", from).lt("created_at", to),
+  ])
+  if (whatsappLeads.error || whatsappClicks.error) {
+    return { available: false, whatsappLeads: 0, whatsappClicks: 0 }
+  }
+  return {
+    available: true,
+    whatsappLeads: whatsappLeads.count ?? 0,
+    whatsappClicks: whatsappClicks.count ?? 0,
+  }
+}
+
 async function getDashboardData(period: DashboardPeriod) {
   const supabase = await createClient()
+  const range = getDashboardDateRange(period)
 
   const [
     { count: total },
@@ -431,6 +468,7 @@ async function getDashboardData(period: DashboardPeriod) {
     growth,
     contentPerformance,
     metaAds,
+    periodChannelOverview,
   ] = await Promise.all([
     getLandingRanking(supabase, period),
     getHeroVariantResults(supabase, period),
@@ -442,6 +480,7 @@ async function getDashboardData(period: DashboardPeriod) {
     getDashboardGrowthData(supabase, period),
     getContentPerformance(supabase, period),
     getMetaAdsDashboardMetrics(period),
+    getPeriodChannelOverview(supabase, range),
   ])
   const growthRecommendations = await getGrowthRecommendationsData(supabase, landingRanking.rows, heroVariantResults.rows, period)
 
@@ -449,6 +488,7 @@ async function getDashboardData(period: DashboardPeriod) {
     metrics, recentLeads: (recentLeads ?? []) as Lead[],
     landingRanking, heroVariantResults, referralFunnel, clicksByLocation, instagramWebClicks,
     whatsappCostSummary, growthRecommendations, weeklyReports, growth, contentPerformance, metaAds,
+    periodChannelOverview,
   }
 }
 
@@ -592,6 +632,7 @@ function KpiCard({
   iconClass,
   note,
   rate = false,
+  comparisonLabel = "vs. período anterior",
 }: {
   title: string
   value: number | string
@@ -600,6 +641,7 @@ function KpiCard({
   iconClass: string
   note?: string
   rate?: boolean
+  comparisonLabel?: string
 }) {
   return (
     <Card className="overflow-hidden">
@@ -616,7 +658,7 @@ function KpiCard({
           {comparison && (
             <div>
               <Comparison value={comparison} rate={rate} />
-              <span className="ml-1 text-xs text-gray-400">vs. período anterior</span>
+              <span className="ml-1 text-xs text-gray-400">{comparisonLabel}</span>
             </div>
           )}
         </div>
@@ -684,6 +726,45 @@ function formatAdsMoney(amount: number, currency: string | null): string {
   }).format(amount)
 }
 
+function formatDateKey(dateKey: string, options: Intl.DateTimeFormatOptions): string {
+  return new Intl.DateTimeFormat("es-AR", { timeZone: "UTC", ...options })
+    .format(new Date(`${dateKey}T12:00:00.000Z`))
+}
+
+function formatWeekLabel(range: DashboardDateRange): string {
+  const start = new Date(`${range.currentStart}T12:00:00.000Z`)
+  const end = new Date(`${range.displayEnd}T12:00:00.000Z`)
+  const sameMonth = start.getUTCMonth() === end.getUTCMonth() && start.getUTCFullYear() === end.getUTCFullYear()
+  const startLabel = formatDateKey(range.currentStart, sameMonth
+    ? { day: "numeric" }
+    : { day: "numeric", month: "long" })
+  const endLabel = formatDateKey(range.displayEnd, { day: "numeric", month: "long" })
+  return `${startLabel} al ${endLabel}`
+}
+
+function WeeklySummaryItem({
+  icon: Icon,
+  title,
+  headline,
+  detail,
+}: {
+  icon: typeof Globe
+  title: string
+  headline: string
+  detail: string
+}) {
+  return (
+    <article className="border-t border-white/10 pt-4">
+      <div className="flex items-center gap-2 text-indigo-200">
+        <Icon className="h-4 w-4" />
+        <h3 className="text-xs font-semibold uppercase tracking-wide">{title}</h3>
+      </div>
+      <p className="mt-2 text-lg font-semibold text-white">{headline}</p>
+      <p className="mt-1 text-xs leading-relaxed text-gray-400">{detail}</p>
+    </article>
+  )
+}
+
 export default async function DashboardPage({
   searchParams,
 }: {
@@ -694,13 +775,17 @@ export default async function DashboardPage({
     metrics, recentLeads, landingRanking,
     heroVariantResults, referralFunnel, clicksByLocation, instagramWebClicks,
     whatsappCostSummary, growthRecommendations, weeklyReports, growth, contentPerformance,
-    metaAds,
+    metaAds, periodChannelOverview,
   } = await getDashboardData(period)
 
   const maxFunnel = Math.max(growth.summary.visits.current, 1)
   const instagramChannel = growth.channels.find(channel => channel.channel === "instagram")
   const googleChannel = growth.channels.find(channel => channel.channel === "google_maps")
-  const periodLabel = period === 365 ? "el último año" : `los últimos ${period} días`
+  const range = getDashboardDateRange(period)
+  const periodLabel = period === 7
+    ? `Semana del ${formatWeekLabel(range)}`
+    : period === 365 ? "el último año" : `los últimos ${period} días`
+  const comparisonLabel = period === 7 ? "vs. mismos días de la semana anterior" : "vs. período anterior"
   const pendingOperational = metrics.emergencies + metrics.requires_human + metrics.followup_pending
   const platformClicks = metaAds.campaigns.reduce<Record<string, number>>((totals, row) => {
     totals[row.platform] = (totals[row.platform] ?? 0) + row.linkClicks
@@ -714,7 +799,7 @@ export default async function DashboardPage({
         <div>
           <p className="mb-1 text-xs font-semibold uppercase tracking-[0.18em] text-indigo-600">Resumen del consultorio</p>
           <h1 className="text-2xl font-bold tracking-tight text-gray-950 md:text-3xl">Dashboard</h1>
-          <p className="mt-1 text-sm text-gray-500">Una lectura simple de pacientes, turnos y publicidad.</p>
+          <p className="mt-1 text-sm text-gray-500">Una lectura simple de pacientes, canales y publicidad.</p>
         </div>
         <div className="flex w-fit rounded-xl border border-gray-200 bg-white p-1 shadow-sm" aria-label="Período del dashboard">
           {DASHBOARD_PERIODS.map(value => (
@@ -723,15 +808,15 @@ export default async function DashboardPage({
               href={`/dashboard?period=${value}`}
               className={`rounded-lg px-3 py-2 text-xs font-semibold transition-colors ${period === value ? "bg-gray-950 text-white" : "text-gray-500 hover:bg-gray-100 hover:text-gray-900"}`}
             >
-              {value === 365 ? "1 año" : `${value} días`}
+              {value === 7 ? "Esta semana" : value === 365 ? "1 año" : `${value} días`}
             </Link>
           ))}
         </div>
       </div>
 
-      <section className="overflow-hidden rounded-2xl bg-gray-950 p-5 text-white shadow-sm md:p-6" aria-labelledby="resumen-title">
-        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-indigo-300">En pocas palabras · {periodLabel}</p>
-        <h2 id="resumen-title" className="mt-2 max-w-4xl text-xl font-semibold leading-snug md:text-2xl">
+      <section className="overflow-hidden rounded-2xl bg-gray-950 p-4 text-white shadow-sm md:p-6" aria-labelledby="resumen-title">
+        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-indigo-300">Resumen general · {periodLabel}</p>
+        <h2 id="resumen-title" className="mt-2 max-w-4xl text-lg font-semibold leading-snug md:text-2xl">
           {growth.available ? (
             <>
               <strong>{growth.summary.visits.current}</strong> personas llegaron al sitio, <strong>{growth.summary.engagedVisits.current}</strong> hicieron
@@ -741,11 +826,57 @@ export default async function DashboardPage({
             <>El seguimiento de visitas todavía no está disponible; la información operativa y publicitaria continúa funcionando.</>
           )}
         </h2>
-        {metaAds.status === "available" && (
-          <p className="mt-3 text-sm leading-relaxed text-gray-300">
-            La publicidad lleva gastados <strong className="text-white">{formatAdsMoney(metaAds.totals.spend, metaAds.currency)}</strong> y generó <strong className="text-white">{metaAds.totals.linkClicks} clics</strong> hacia el sitio en este período.
+        {period === 7 && (
+          <p className="mt-3 text-xs text-gray-400">
+            Datos acumulados hasta {formatDateKey(range.currentEnd, { weekday: "long", day: "numeric", month: "long" }).replace(",", "")}.
           </p>
         )}
+        <div className="mt-5 grid gap-x-6 gap-y-1 sm:grid-cols-2 xl:grid-cols-4">
+          <WeeklySummaryItem
+            icon={Camera}
+            title="Instagram"
+            headline={growth.instagram.followersDelta === null
+              ? growth.instagram.followers === null ? "Sin datos todavía" : `${growth.instagram.followers} seguidores`
+              : growth.instagram.followersDelta > 0 ? `+${growth.instagram.followersDelta} seguidores`
+              : growth.instagram.followersDelta < 0 ? `${growth.instagram.followersDelta} seguidores`
+              : "Sin cambios en seguidores"}
+            detail={growth.instagram.followers === null
+              ? "La cuenta está conectada, pero todavía falta una comparación diaria."
+              : `${growth.instagram.followers} seguidores totales${growth.instagram.profileViews === null ? "" : ` · ${growth.instagram.profileViews} visitas al perfil`}.`}
+          />
+          <WeeklySummaryItem
+            icon={Megaphone}
+            title="Publicidad"
+            headline={metaAds.status === "available"
+              ? `${formatAdsMoney(metaAds.totals.spend, metaAds.currency)} invertidos`
+              : "Sin datos publicitarios"}
+            detail={metaAds.status === "available"
+              ? `${metaAds.totals.linkClicks} clics al sitio · ${metaAds.totals.impressions.toLocaleString("es-AR")} impresiones.`
+              : "El resto del resumen sigue funcionando aunque Meta no responda."}
+          />
+          <WeeklySummaryItem
+            icon={Star}
+            title="Google"
+            headline={growth.google.reviewCount === null
+              ? "Sin datos de reseñas"
+              : growth.google.reviewDelta && growth.google.reviewDelta > 0
+                ? `+${growth.google.reviewDelta} reseñas`
+                : `${growth.google.reviewCount} reseñas totales`}
+            detail={growth.google.rating === null
+              ? "Google todavía no informó una calificación."
+              : `${growth.google.rating.toFixed(1)} de calificación${growth.google.directionRequests === null ? "" : ` · ${growth.google.directionRequests} solicitudes de cómo llegar`}.`}
+          />
+          <WeeklySummaryItem
+            icon={MessageSquare}
+            title="WhatsApp"
+            headline={periodChannelOverview.available
+              ? `${periodChannelOverview.whatsappLeads} consultas registradas`
+              : "Sin datos del canal"}
+            detail={periodChannelOverview.available
+              ? `${periodChannelOverview.whatsappClicks} clics a WhatsApp desde el sitio.`
+              : "No se pudo leer el movimiento de WhatsApp para este período."}
+          />
+        </div>
       </section>
 
       <section aria-labelledby="operacion-title">
@@ -772,10 +903,10 @@ export default async function DashboardPage({
 
       {/* KPIs principales */}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <KpiCard title="Llegaron al sitio" value={growth.available ? growth.summary.visits.current : "—"} comparison={growth.available ? growth.summary.visits : undefined} note="Personas que abrieron alguna página pública." icon={Eye} iconClass="bg-indigo-50 text-indigo-700" />
-        <KpiCard title="Intentaron contactarse" value={growth.available ? growth.summary.engagedVisits.current : "—"} comparison={growth.available ? growth.summary.engagedVisits : undefined} note="Tocaron turno, WhatsApp, llamada o cómo llegar." icon={MousePointerClick} iconClass="bg-cyan-50 text-cyan-700" />
-        <KpiCard title="Consultas registradas" value={growth.available ? growth.summary.leads.current : "—"} comparison={growth.available ? growth.summary.leads : undefined} note="Personas identificadas para seguimiento." icon={Users} iconClass="bg-violet-50 text-violet-700" />
-        <KpiCard title="Turnos confirmados" value={growth.available ? growth.summary.confirmed.current : "—"} comparison={growth.available ? growth.summary.confirmed : undefined} note="Personas que confirmaron haber solicitado turno." icon={CheckCircle2} iconClass="bg-emerald-50 text-emerald-700" />
+        <KpiCard title="Llegaron al sitio" value={growth.available ? growth.summary.visits.current : "—"} comparison={growth.available ? growth.summary.visits : undefined} comparisonLabel={comparisonLabel} note="Personas que abrieron alguna página pública." icon={Eye} iconClass="bg-indigo-50 text-indigo-700" />
+        <KpiCard title="Intentaron contactarse" value={growth.available ? growth.summary.engagedVisits.current : "—"} comparison={growth.available ? growth.summary.engagedVisits : undefined} comparisonLabel={comparisonLabel} note="Tocaron turno, WhatsApp, llamada o cómo llegar." icon={MousePointerClick} iconClass="bg-cyan-50 text-cyan-700" />
+        <KpiCard title="Consultas registradas" value={growth.available ? growth.summary.leads.current : "—"} comparison={growth.available ? growth.summary.leads : undefined} comparisonLabel={comparisonLabel} note="Personas identificadas para seguimiento." icon={Users} iconClass="bg-violet-50 text-violet-700" />
+        <KpiCard title="Turnos confirmados" value={growth.available ? growth.summary.confirmed.current : "—"} comparison={growth.available ? growth.summary.confirmed : undefined} comparisonLabel={comparisonLabel} note="Personas que confirmaron haber solicitado turno." icon={CheckCircle2} iconClass="bg-emerald-50 text-emerald-700" />
       </div>
 
       {!growth.available && (
@@ -971,7 +1102,7 @@ export default async function DashboardPage({
             Publicidad en Facebook e Instagram
           </CardTitle>
           <p className="text-xs text-gray-500">
-            Cuánto se gastó y cuántas visitas generaron los anuncios durante {periodLabel}.
+            Cuánto se gastó y cuántas visitas generaron los anuncios durante {periodLabel.toLocaleLowerCase("es-AR")}.
           </p>
         </CardHeader>
         <CardContent>

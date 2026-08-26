@@ -1,3 +1,13 @@
+# CERRADO (2026-08-26) — resumen semanal integral del dashboard
+
+- [x] Revisar qué canales y métricas ya están disponibles para el resumen.
+- [x] Usar la semana calendario actual (lunes a domingo) como vista inicial.
+- [x] Integrar pacientes, publicidad, Instagram, Google y WhatsApp en el primer bloque.
+- [x] Mantener comparaciones y estados faltantes en lenguaje simple.
+- [x] Validar lint, 122 suites/1093 tests, build, 7 E2E autenticados y visuales desktop/móvil antes de publicar.
+
+---
+
 # CERRADO (2026-08-26) — dashboard simple para seguimiento
 
 - [x] Auditar la jerarquía y el lenguaje de la pantalla completa.
