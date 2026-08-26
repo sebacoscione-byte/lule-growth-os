@@ -6,7 +6,7 @@ import {
   MapPin, Camera, Search, MessageSquare, Globe, Lightbulb, Eye,
   MousePointerClick, TrendingUp, ArrowUpRight, ArrowDownRight, Minus,
   CalendarDays, PhoneCall, Navigation, Star, BarChart3, AlertTriangle,
-  Megaphone, DollarSign,
+  Megaphone, DollarSign, ChevronDown,
 } from "lucide-react"
 import { STATUS_LABELS, STATUS_COLORS, type Lead } from "@/types"
 import { timeAgo } from "@/lib/utils"
@@ -36,6 +36,7 @@ import {
   type PeriodValue,
 } from "@/lib/dashboard-growth"
 import { getMetaAdsDashboardMetrics, type MetaAdsStatus } from "@/lib/meta-ads"
+import type { ReactNode } from "react"
 
 const CHANNEL_ICON: Record<RecommendationChannel, typeof Globe> = {
   web: Globe, whatsapp: MessageSquare, instagram: Camera, google: MapPin,
@@ -494,6 +495,38 @@ function SectionHeader({ icon: Icon, title }: { icon: typeof Globe; title: strin
   )
 }
 
+function DashboardDisclosure({
+  icon: Icon,
+  title,
+  description,
+  children,
+}: {
+  icon: typeof Globe
+  title: string
+  description: string
+  children: ReactNode
+}) {
+  return (
+    <details className="group overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-4 p-4 marker:hidden md:p-5">
+        <div className="flex min-w-0 items-start gap-3">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gray-100 text-gray-600">
+            <Icon className="h-4 w-4" />
+          </span>
+          <div>
+            <h2 className="text-sm font-semibold text-gray-950 md:text-base">{title}</h2>
+            <p className="mt-0.5 text-xs leading-relaxed text-gray-500">{description}</p>
+          </div>
+        </div>
+        <ChevronDown className="h-5 w-5 shrink-0 text-gray-400 transition-transform group-open:rotate-180" />
+      </summary>
+      <div className="space-y-5 border-t border-gray-100 bg-gray-50/40 p-4 md:p-5">
+        {children}
+      </div>
+    </details>
+  )
+}
+
 function OperationalAction({
   href,
   label,
@@ -578,9 +611,14 @@ function KpiCard({
           </span>
         </div>
         <p className="text-2xl font-bold tracking-tight text-gray-950 md:text-3xl">{value}</p>
-        <div className="mt-0.5 min-h-4 md:mt-1 md:min-h-5">
-          {comparison ? <Comparison value={comparison} rate={rate} /> : note ? <p className="text-xs text-gray-400">{note}</p> : null}
-          {comparison && <span className="ml-1 text-xs text-gray-400">vs. período anterior</span>}
+        <div className="mt-1 min-h-8 space-y-1">
+          {note && <p className="text-xs leading-relaxed text-gray-500">{note}</p>}
+          {comparison && (
+            <div>
+              <Comparison value={comparison} rate={rate} />
+              <span className="ml-1 text-xs text-gray-400">vs. período anterior</span>
+            </div>
+          )}
         </div>
       </CardContent>
     </Card>
@@ -604,7 +642,7 @@ const CHANNEL_META: Record<string, { label: string; icon: typeof Globe; classNam
   whatsapp: { label: "WhatsApp", icon: MessageSquare, className: "bg-emerald-50 text-emerald-700" },
   referral: { label: "Referidos", icon: Users, className: "bg-amber-50 text-amber-700" },
   landing_page: { label: "Landing / directo", icon: Globe, className: "bg-gray-100 text-gray-700" },
-  direct: { label: "Directo / sin UTM", icon: Globe, className: "bg-gray-100 text-gray-700" },
+  direct: { label: "Acceso directo", icon: Globe, className: "bg-gray-100 text-gray-700" },
   manual: { label: "Carga manual", icon: Users, className: "bg-gray-100 text-gray-700" },
 }
 
@@ -616,11 +654,11 @@ const ACTION_META: Record<string, { label: string; icon: typeof Globe; className
 }
 
 const META_ADS_STATUS_COPY: Record<Exclude<MetaAdsStatus, "available">, string> = {
-  not_configured: "La atribución web ya está activa. Falta habilitar la lectura de la cuenta publicitaria de Meta para sumar inversión, alcance, impresiones y clics.",
+  not_configured: "El seguimiento del sitio ya está activo. Falta conectar la cuenta publicitaria para sumar inversión, alcance, impresiones y clics.",
   invalid_configuration: "La configuración de Meta Ads está incompleta o tiene un identificador inválido.",
   provider_rejected: "Meta rechazó la credencial publicitaria. Hay que renovarla o revisar el permiso ads_read.",
-  provider_unavailable: "Meta Ads no respondió a tiempo. La atribución propia sigue funcionando y se volverá a intentar al recargar.",
-  invalid_provider_response: "Meta devolvió una respuesta que no se pudo validar. La atribución propia sigue disponible.",
+  provider_unavailable: "Meta Ads no respondió a tiempo. El seguimiento del sitio sigue funcionando y se volverá a intentar al recargar.",
+  invalid_provider_response: "Meta devolvió una respuesta que no se pudo validar. El seguimiento del sitio sigue disponible.",
 }
 
 const META_PLATFORM_LABEL: Record<string, string> = {
@@ -662,14 +700,21 @@ export default async function DashboardPage({
   const maxFunnel = Math.max(growth.summary.visits.current, 1)
   const instagramChannel = growth.channels.find(channel => channel.channel === "instagram")
   const googleChannel = growth.channels.find(channel => channel.channel === "google_maps")
+  const periodLabel = period === 365 ? "el último año" : `los últimos ${period} días`
+  const pendingOperational = metrics.emergencies + metrics.requires_human + metrics.followup_pending
+  const platformClicks = metaAds.campaigns.reduce<Record<string, number>>((totals, row) => {
+    totals[row.platform] = (totals[row.platform] ?? 0) + row.linkClicks
+    return totals
+  }, {})
+  const platformClickRows = Object.entries(platformClicks).sort((a, b) => b[1] - a[1])
 
   return (
-    <div className="space-y-5 bg-gray-50/60 p-4 md:space-y-7 md:p-6">
+    <div className="space-y-5 bg-gray-50/60 p-4 text-gray-950 md:space-y-7 md:p-6">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <p className="mb-1 text-xs font-semibold uppercase tracking-[0.18em] text-indigo-600">Growth OS</p>
-          <h1 className="text-2xl font-bold tracking-tight text-gray-950 md:text-3xl">Dashboard de crecimiento</h1>
-          <p className="mt-1 text-sm text-gray-500">De la visita al turno confirmado, con evolución y atribución por canal.</p>
+          <p className="mb-1 text-xs font-semibold uppercase tracking-[0.18em] text-indigo-600">Resumen del consultorio</p>
+          <h1 className="text-2xl font-bold tracking-tight text-gray-950 md:text-3xl">Dashboard</h1>
+          <p className="mt-1 text-sm text-gray-500">Una lectura simple de pacientes, turnos y publicidad.</p>
         </div>
         <div className="flex w-fit rounded-xl border border-gray-200 bg-white p-1 shadow-sm" aria-label="Período del dashboard">
           {DASHBOARD_PERIODS.map(value => (
@@ -684,28 +729,53 @@ export default async function DashboardPage({
         </div>
       </div>
 
+      <section className="overflow-hidden rounded-2xl bg-gray-950 p-5 text-white shadow-sm md:p-6" aria-labelledby="resumen-title">
+        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-indigo-300">En pocas palabras · {periodLabel}</p>
+        <h2 id="resumen-title" className="mt-2 max-w-4xl text-xl font-semibold leading-snug md:text-2xl">
+          {growth.available ? (
+            <>
+              <strong>{growth.summary.visits.current}</strong> personas llegaron al sitio, <strong>{growth.summary.engagedVisits.current}</strong> hicieron
+              una acción para contactarse, <strong>{growth.summary.leads.current}</strong> consultas quedaron registradas y <strong>{growth.summary.confirmed.current}</strong> confirmaron que pidieron turno.
+            </>
+          ) : (
+            <>El seguimiento de visitas todavía no está disponible; la información operativa y publicitaria continúa funcionando.</>
+          )}
+        </h2>
+        {metaAds.status === "available" && (
+          <p className="mt-3 text-sm leading-relaxed text-gray-300">
+            La publicidad lleva gastados <strong className="text-white">{formatAdsMoney(metaAds.totals.spend, metaAds.currency)}</strong> y generó <strong className="text-white">{metaAds.totals.linkClicks} clics</strong> hacia el sitio en este período.
+          </p>
+        )}
+      </section>
+
       <section aria-labelledby="operacion-title">
         <div className="mb-3 flex items-end justify-between gap-3">
           <div>
-            <h2 id="operacion-title" className="text-sm font-semibold text-gray-950">Acción operativa</h2>
-            <p className="text-xs text-gray-500">Lo que conviene revisar antes de mirar crecimiento y atribución.</p>
+              <h2 id="operacion-title" className="text-sm font-semibold text-gray-950">Para revisar hoy</h2>
+              <p className="text-xs text-gray-500">Tareas que pueden necesitar una acción del equipo.</p>
           </div>
-          <Link href="/leads" className="text-xs font-semibold text-indigo-600 hover:text-indigo-800">Ver todos los leads</Link>
+          <Link href="/leads" className="text-xs font-semibold text-indigo-600 hover:text-indigo-800">Ver todas las consultas</Link>
         </div>
-        <div className="grid gap-3 sm:grid-cols-3">
-          <OperationalAction href="/leads?possible_emergency=true" label="Alertas detectadas" value={metrics.emergencies} note="Casos marcados por el guardrail para atención inmediata." icon={AlertTriangle} className="bg-red-50 text-red-700" />
-          <OperationalAction href="/leads?requires_human=true" label="Esperan respuesta humana" value={metrics.requires_human} note="Conversaciones derivadas que necesitan intervención del equipo." icon={MessageSquare} className="bg-orange-50 text-orange-700" />
-          <OperationalAction href="/leads?status=seguimiento_pendiente" label="Seguimientos pendientes" value={metrics.followup_pending} note="Pacientes a los que corresponde volver a contactar." icon={Clock} className="bg-amber-50 text-amber-700" />
-        </div>
+        {pendingOperational === 0 ? (
+          <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800">
+            <p className="font-semibold">No hay tareas urgentes pendientes.</p>
+            <p className="mt-1 text-xs text-emerald-700">No se detectaron alertas, consultas esperando respuesta humana ni seguimientos vencidos.</p>
+          </div>
+        ) : (
+          <div className="grid gap-3 sm:grid-cols-3">
+            <OperationalAction href="/leads?possible_emergency=true" label="Alertas para revisar" value={metrics.emergencies} note="Casos marcados para atención inmediata." icon={AlertTriangle} className="bg-red-50 text-red-700" />
+            <OperationalAction href="/leads?requires_human=true" label="Necesitan respuesta" value={metrics.requires_human} note="Conversaciones que requieren intervención del equipo." icon={MessageSquare} className="bg-orange-50 text-orange-700" />
+            <OperationalAction href="/leads?status=seguimiento_pendiente" label="Seguimientos pendientes" value={metrics.followup_pending} note="Personas a las que corresponde volver a contactar." icon={Clock} className="bg-amber-50 text-amber-700" />
+          </div>
+        )}
       </section>
 
       {/* KPIs principales */}
-      <div className="grid grid-cols-2 gap-3 xl:grid-cols-5">
-        <KpiCard title="Visitas web" value={growth.available ? growth.summary.visits.current : "—"} comparison={growth.available ? growth.summary.visits : undefined} icon={Eye} iconClass="bg-indigo-50 text-indigo-700" />
-        <KpiCard title="Visitas con acción" value={growth.available ? growth.summary.engagedVisits.current : "—"} comparison={growth.available ? growth.summary.engagedVisits : undefined} icon={MousePointerClick} iconClass="bg-cyan-50 text-cyan-700" />
-        <KpiCard title="Leads nuevos" value={growth.available ? growth.summary.leads.current : "—"} comparison={growth.available ? growth.summary.leads : undefined} icon={Users} iconClass="bg-violet-50 text-violet-700" />
-        <KpiCard title="Turnos confirmados" value={growth.available ? growth.summary.confirmed.current : "—"} comparison={growth.available ? growth.summary.confirmed : undefined} icon={CheckCircle2} iconClass="bg-emerald-50 text-emerald-700" />
-        <KpiCard title="Lead → turno" value={growth.available ? `${growth.summary.leadToConfirmedRate.current}%` : "—"} comparison={growth.available ? growth.summary.leadToConfirmedRate : undefined} rate icon={TrendingUp} iconClass="bg-green-50 text-green-700" />
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <KpiCard title="Llegaron al sitio" value={growth.available ? growth.summary.visits.current : "—"} comparison={growth.available ? growth.summary.visits : undefined} note="Personas que abrieron alguna página pública." icon={Eye} iconClass="bg-indigo-50 text-indigo-700" />
+        <KpiCard title="Intentaron contactarse" value={growth.available ? growth.summary.engagedVisits.current : "—"} comparison={growth.available ? growth.summary.engagedVisits : undefined} note="Tocaron turno, WhatsApp, llamada o cómo llegar." icon={MousePointerClick} iconClass="bg-cyan-50 text-cyan-700" />
+        <KpiCard title="Consultas registradas" value={growth.available ? growth.summary.leads.current : "—"} comparison={growth.available ? growth.summary.leads : undefined} note="Personas identificadas para seguimiento." icon={Users} iconClass="bg-violet-50 text-violet-700" />
+        <KpiCard title="Turnos confirmados" value={growth.available ? growth.summary.confirmed.current : "—"} comparison={growth.available ? growth.summary.confirmed : undefined} note="Personas que confirmaron haber solicitado turno." icon={CheckCircle2} iconClass="bg-emerald-50 text-emerald-700" />
       </div>
 
       {!growth.available && (
@@ -714,12 +784,17 @@ export default async function DashboardPage({
         </div>
       )}
 
+      <DashboardDisclosure
+        icon={TrendingUp}
+        title="Cómo avanzan las personas hasta pedir turno"
+        description="Abrí esta sección para ver la evolución diaria, las tasas y qué canal trae más consultas."
+      >
       {/* Evolución + embudo */}
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1.7fr)_minmax(300px,0.8fr)]">
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="flex items-center gap-2 text-base"><BarChart3 className="h-4 w-4 text-indigo-600" /> Evolución del embudo</CardTitle>
-            <p className="text-xs text-gray-500">Datos diarios de los últimos {period === 365 ? "12 meses" : `${period} días`}. Los turnos se atribuyen a la fecha de entrada del lead.</p>
+            <CardTitle className="flex items-center gap-2 text-base"><BarChart3 className="h-4 w-4 text-indigo-600" /> Evolución del recorrido</CardTitle>
+            <p className="text-xs text-gray-500">Datos diarios de los últimos {period === 365 ? "12 meses" : `${period} días`}. Los turnos se cuentan según la fecha de la primera consulta.</p>
           </CardHeader>
           <CardContent>
             <TrendChart
@@ -727,7 +802,7 @@ export default async function DashboardPage({
               series={[
                 { key: "visits", label: "Visitas", color: "#4f46e5" },
                 { key: "engagedVisits", label: "Con acción", color: "#0891b2" },
-                { key: "leads", label: "Leads", color: "#7c3aed" },
+                { key: "leads", label: "Consultas", color: "#7c3aed" },
                 { key: "confirmed", label: "Turnos", color: "#059669" },
               ]}
             />
@@ -735,14 +810,14 @@ export default async function DashboardPage({
         </Card>
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Embudo del período</CardTitle>
+            <CardTitle className="text-base">Recorrido del período</CardTitle>
             <p className="text-xs text-gray-500">Personas, no cantidad de botones tocados.</p>
           </CardHeader>
           <CardContent className="space-y-5">
             {[
               { label: "Visitas", value: growth.summary.visits.current, color: "bg-indigo-500" },
               { label: "Hicieron una acción", value: growth.summary.engagedVisits.current, color: "bg-cyan-500" },
-              { label: "Se convirtieron en lead", value: growth.summary.leads.current, color: "bg-violet-500" },
+              { label: "Quedaron como consulta", value: growth.summary.leads.current, color: "bg-violet-500" },
               { label: "Confirmaron que pidieron turno", value: growth.summary.confirmed.current, color: "bg-emerald-500" },
             ].map(item => (
               <div key={item.label}>
@@ -756,8 +831,8 @@ export default async function DashboardPage({
               </div>
             ))}
             <div className="grid grid-cols-2 gap-2 border-t border-gray-100 pt-4">
-              <MetricTile label="Visita → lead" value={`${growth.summary.visitToLeadRate.current}%`} />
-              <MetricTile label="Lead → turno" value={`${growth.summary.leadToConfirmedRate.current}%`} />
+              <MetricTile label="Visita → consulta" value={`${growth.summary.visitToLeadRate.current}%`} />
+              <MetricTile label="Consulta → turno" value={`${growth.summary.leadToConfirmedRate.current}%`} />
             </div>
           </CardContent>
         </Card>
@@ -767,8 +842,8 @@ export default async function DashboardPage({
       {growth.channels.length > 0 && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Canales que generan pacientes</CardTitle>
-            <p className="text-xs text-gray-500">Visitas atribuidas por UTM y leads del período. “Directo / sin UTM” señala enlaces que conviene reemplazar por los medibles de Instagram y Google.</p>
+            <CardTitle className="text-base">De dónde llegan las consultas</CardTitle>
+            <p className="text-xs text-gray-500">Compara las visitas, consultas y turnos que llegaron desde cada canal.</p>
           </CardHeader>
           <CardContent>
             <div className="overflow-x-auto">
@@ -777,10 +852,10 @@ export default async function DashboardPage({
                   <tr className="border-b text-left text-xs text-gray-500">
                     <th className="pb-3 font-medium">Canal</th>
                     <th className="pb-3 text-right font-medium">Visitas</th>
-                    <th className="pb-3 text-right font-medium">Leads</th>
-                    <th className="pb-3 text-right font-medium">Visita → lead</th>
+                    <th className="pb-3 text-right font-medium">Consultas</th>
+                    <th className="pb-3 text-right font-medium">Visita → consulta</th>
                     <th className="pb-3 text-right font-medium">Turnos</th>
-                    <th className="pb-3 text-right font-medium">Lead → turno</th>
+                    <th className="pb-3 text-right font-medium">Consulta → turno</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -809,24 +884,30 @@ export default async function DashboardPage({
           </CardContent>
         </Card>
       )}
+      </DashboardDisclosure>
 
       <SectionHeader icon={Megaphone} title="Campañas y publicidad" />
 
+      <DashboardDisclosure
+        icon={Megaphone}
+        title="Qué pasó después de cada campaña"
+        description="Relaciona cada enlace publicitario con las consultas y turnos que luego quedaron registrados."
+      >
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
             <Megaphone className="h-4 w-4 text-fuchsia-600" />
-            Resultados atribuidos por campaña
+            Resultados después del clic
           </CardTitle>
           <p className="text-xs text-gray-500">
-            Usa los UTM guardados por la landing para seguir visita → acción → lead → turno. Incluye
-            datos históricos de la campaña actual aunque este panel se haya agregado después de publicarla.
+            Sigue el recorrido desde que una persona abre el enlace hasta que su consulta o turno queda registrado.
+            Incluye datos históricos aunque el panel se haya agregado después de publicar la campaña.
           </p>
         </CardHeader>
         <CardContent>
           {growth.campaigns.length === 0 ? (
             <p className="text-sm text-gray-400">
-              Todavía no hay visitas con <span className="font-mono">utm_campaign</span> en este período.
+              Todavía no hay visitas identificadas para una campaña en este período.
             </p>
           ) : (
             <div className="overflow-x-auto">
@@ -836,11 +917,11 @@ export default async function DashboardPage({
                     <th className="pb-3 font-medium">Campaña / contenido</th>
                     <th className="pb-3 font-medium">Origen</th>
                     <th className="pb-3 text-right font-medium">Visitas</th>
-                    <th className="pb-3 text-right font-medium">Con acción</th>
-                    <th className="pb-3 text-right font-medium">Leads</th>
-                    <th className="pb-3 text-right font-medium">Visita → lead</th>
+                    <th className="pb-3 text-right font-medium">Intentaron contactarse</th>
+                    <th className="pb-3 text-right font-medium">Consultas</th>
+                    <th className="pb-3 text-right font-medium">Visita → consulta</th>
                     <th className="pb-3 text-right font-medium">Turnos</th>
-                    <th className="pb-3 text-right font-medium">Lead → turno</th>
+                    <th className="pb-3 text-right font-medium">Consulta → turno</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -876,22 +957,21 @@ export default async function DashboardPage({
             </div>
           )}
           <p className="mt-3 text-[11px] text-gray-400">
-            “Con acción” cuenta visitas únicas que tocaron turno online, llamada, WhatsApp o cómo llegar;
-            no suma varias veces a la misma pestaña. Un enlace con <span className="font-mono">utm_source=instagram</span>
-            se atribuye a Instagram aunque Meta lo haya mostrado también en Facebook.
+            “Intentaron contactarse” cuenta personas que tocaron turno online, llamada, WhatsApp o cómo llegar;
+            no suma varias veces a la misma visita. El detalle técnico de origen del enlace se conserva para auditoría.
           </p>
         </CardContent>
       </Card>
+      </DashboardDisclosure>
 
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
             <DollarSign className="h-4 w-4 text-emerald-600" />
-            Métricas de la cuenta publicitaria de Meta
+            Publicidad en Facebook e Instagram
           </CardTitle>
           <p className="text-xs text-gray-500">
-            Datos directos de Meta para el mismo período: inversión, impresiones y clics separados por
-            campaña y plataforma. No se envían datos de pacientes a Meta.
+            Cuánto se gastó y cuántas visitas generaron los anuncios durante {periodLabel}.
           </p>
         </CardHeader>
         <CardContent>
@@ -900,22 +980,40 @@ export default async function DashboardPage({
               <p className="font-semibold">Integración publicitaria pendiente</p>
               <p className="mt-1">{META_ADS_STATUS_COPY[metaAds.status]}</p>
               <p className="mt-2 text-xs text-amber-700">
-                Esto no afecta la campaña en circulación ni el seguimiento UTM de la tabla anterior.
+                Esto no afecta la campaña en circulación ni el seguimiento propio del sitio.
               </p>
             </div>
           ) : (
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-                <MetricTile label="Inversión" value={formatAdsMoney(metaAds.totals.spend, metaAds.currency)} helper={metaAds.accountName ?? "Cuenta de Meta Ads"} />
-                <MetricTile label="Impresiones" value={metaAds.totals.impressions.toLocaleString("es-AR")} />
-                <MetricTile label="Clics en enlace" value={metaAds.totals.linkClicks.toLocaleString("es-AR")} helper={`CTR ${metaAds.totals.linkCtr}%`} />
-                <MetricTile label="Costo por clic" value={metaAds.totals.costPerLinkClick === null ? null : formatAdsMoney(metaAds.totals.costPerLinkClick, metaAds.currency)} />
+                <MetricTile label="Gastado" value={formatAdsMoney(metaAds.totals.spend, metaAds.currency)} helper="Inversión acumulada en el período" />
+                <MetricTile label="Veces que se mostró" value={metaAds.totals.impressions.toLocaleString("es-AR")} helper="Una persona puede verlo más de una vez" />
+                <MetricTile label="Clics hacia el sitio" value={metaAds.totals.linkClicks.toLocaleString("es-AR")} helper="No equivale todavía a una consulta" />
+                <MetricTile label="Costo por clic" value={metaAds.totals.costPerLinkClick === null ? null : formatAdsMoney(metaAds.totals.costPerLinkClick, metaAds.currency)} helper="Promedio pagado por cada clic" />
               </div>
+
+              {metaAds.totals.linkClicks > 0 && (
+                <div className="rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm leading-relaxed text-blue-900">
+                  <p className="font-semibold">Lectura rápida</p>
+                  <p className="mt-1">
+                    Meta registró <strong>{metaAds.totals.linkClicks} clics</strong> con una inversión de <strong>{formatAdsMoney(metaAds.totals.spend, metaAds.currency)}</strong>.
+                    {platformClickRows.length > 1 && (
+                      <> {META_PLATFORM_LABEL[platformClickRows[0][0]] ?? readableTrackingValue(platformClickRows[0][0])} aportó {platformClickRows[0][1]} clics y {META_PLATFORM_LABEL[platformClickRows[1][0]] ?? readableTrackingValue(platformClickRows[1][0])} {platformClickRows[1][1]}.</>
+                    )}
+                    {growth.available && <> Más arriba podés comparar esos clics con las <strong>{growth.summary.leads.current} consultas registradas</strong> y los <strong>{growth.summary.confirmed.current} turnos confirmados</strong>.</>}
+                  </p>
+                </div>
+              )}
 
               {metaAds.campaigns.length === 0 ? (
                 <p className="text-sm text-gray-400">Meta no registró actividad publicitaria en este período.</p>
               ) : (
-                <div className="overflow-x-auto border-t border-gray-100 pt-4">
+                <details className="group rounded-xl border border-gray-200 bg-white">
+                  <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-sm font-semibold text-gray-800 marker:hidden">
+                    Ver desglose por plataforma y campaña
+                    <ChevronDown className="h-4 w-4 text-gray-400 transition-transform group-open:rotate-180" />
+                  </summary>
+                <div className="overflow-x-auto border-t border-gray-100 p-4">
                   <table className="w-full min-w-[860px] text-sm">
                     <thead>
                       <tr className="border-b text-left text-xs text-gray-500">
@@ -945,7 +1043,11 @@ export default async function DashboardPage({
                     </tbody>
                   </table>
                 </div>
+                </details>
               )}
+              <p className="text-[11px] leading-relaxed text-gray-400">
+                Los datos publicitarios vienen directamente de Meta. La app sólo lee resultados agregados y no envía información de pacientes.
+              </p>
             </div>
           )}
         </CardContent>
@@ -953,15 +1055,19 @@ export default async function DashboardPage({
 
       {/* Recomendaciones de crecimiento */}
       {growthRecommendations.available && growthRecommendations.recommendations.length > 0 && (
+        <DashboardDisclosure
+          icon={Lightbulb}
+          title="Sugerencias para mejorar"
+          description="Avisos automáticos para revisar cuando quieras optimizar el sitio, Instagram, Google o WhatsApp."
+        >
         <Card>
           <CardHeader>
             <CardTitle className="text-base flex items-center gap-2">
               <Lightbulb className="h-4 w-4 text-amber-500" />
-              Recomendaciones de crecimiento
+              Sugerencias automáticas
             </CardTitle>
             <p className="text-xs text-gray-500">
-              Reglas simples sobre los datos que ya se juntan en web, WhatsApp, Instagram y Google Maps
-              — no hay acción automática, cada una es para que decidas vos.
+              Se calculan con los datos disponibles. No realizan cambios automáticos.
             </p>
           </CardHeader>
           <CardContent className="space-y-2">
@@ -989,14 +1095,20 @@ export default async function DashboardPage({
             })}
           </CardContent>
         </Card>
+        </DashboardDisclosure>
       )}
 
-      <SectionHeader icon={Users} title="Pacientes y leads" />
+      <DashboardDisclosure
+        icon={BarChart3}
+        title="Ver información detallada por canal"
+        description="Histórico de consultas, páginas del sitio, WhatsApp, Instagram, Google y reportes semanales."
+      >
+      <SectionHeader icon={Users} title="Consultas y pacientes" />
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         {/* Por canal */}
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Leads por canal · histórico</CardTitle>
+            <CardTitle className="text-base">Consultas por origen · histórico</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
             {[
@@ -1054,11 +1166,11 @@ export default async function DashboardPage({
         {/* Leads recientes */}
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Leads recientes</CardTitle>
+            <CardTitle className="text-base">Consultas recientes</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
             {recentLeads.length === 0 && (
-              <p className="text-sm text-gray-400">No hay leads todavía</p>
+              <p className="text-sm text-gray-400">No hay consultas todavía</p>
             )}
             {recentLeads.map((lead) => (
               <Link key={lead.id} href={`/leads/${lead.id}`} className="flex items-center justify-between hover:bg-gray-50 -mx-2 px-2 py-1 rounded">
@@ -1077,7 +1189,7 @@ export default async function DashboardPage({
         </Card>
       </div>
 
-      <SectionHeader icon={Globe} title="Sitio web y landings" />
+      <SectionHeader icon={Globe} title="Sitio web y páginas" />
 
       {/* Acciones web del período */}
       <Card>
@@ -1107,7 +1219,7 @@ export default async function DashboardPage({
       {landingRanking.available && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Ranking de landings</CardTitle>
+            <CardTitle className="text-base">Páginas que reciben más interés</CardTitle>
             <p className="text-xs text-gray-500">
               Visitas e interacciones con los botones de pedir turno (últimos {period}{" "}días). La tasa de
               interacción es la proporción de visitas que hicieron click en pedir turno online, llamar,
@@ -1213,9 +1325,9 @@ export default async function DashboardPage({
       {referralFunnel.available && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Atribución por landing</CardTitle>
+            <CardTitle className="text-base">Recorrido por página</CardTitle>
             <p className="text-xs text-gray-500">
-              Cada landing aparece una sola vez: visita → clic a WhatsApp → lead → turno confirmado
+              Cada página aparece una sola vez: visita → clic a WhatsApp → consulta → turno confirmado
               durante los últimos {period} días. Las visitas son únicas por pestaña; el desglose inferior
               muestra qué sede recibió cada clic y conversión.
             </p>
@@ -1245,7 +1357,7 @@ export default async function DashboardPage({
                         {[
                           { label: "Visitas únicas", value: landing.visits, className: "text-indigo-700" },
                           { label: "Clics WhatsApp", value: landing.whatsappClicks, className: "text-emerald-700" },
-                          { label: "Leads atribuidos", value: landing.leads, className: "text-violet-700" },
+                          { label: "Consultas atribuidas", value: landing.leads, className: "text-violet-700" },
                           { label: "Turnos", value: landing.confirmed, className: "text-gray-950" },
                         ].map(metric => (
                           <div key={metric.label} className="rounded-lg bg-gray-50 px-3 py-2 text-center">
@@ -1267,7 +1379,7 @@ export default async function DashboardPage({
                             <p className="mt-2 text-xs text-gray-600">
                               <strong className="text-emerald-700">{destination.whatsappClicks}</strong> clics
                               <span className="mx-1.5 text-gray-300">→</span>
-                              <strong className="text-violet-700">{destination.leads}</strong> leads
+                              <strong className="text-violet-700">{destination.leads}</strong> consultas
                               <span className="mx-1.5 text-gray-300">→</span>
                               <strong className="text-gray-900">{destination.confirmed}</strong> turnos
                             </p>
@@ -1279,7 +1391,7 @@ export default async function DashboardPage({
                 ))}
                 <p className="px-1 text-[11px] text-gray-400">
                   La atribución depende del código incluido en el mensaje prellenado. Si la persona abre
-                  WhatsApp pero no envía el mensaje, o borra el código, queda el clic pero no el lead atribuido.
+                  WhatsApp pero no envía el mensaje, o borra el código, queda el clic pero no la consulta atribuida.
                 </p>
               </div>
             )}
@@ -1416,12 +1528,12 @@ export default async function DashboardPage({
             <CardTitle className="text-base flex items-center gap-2">
               <Camera className="h-4 w-4 text-pink-600" /> Instagram: alcance y tráfico
             </CardTitle>
-            <p className="text-xs text-gray-500">Insights nativos de Meta más las visitas y leads que llegaron por el enlace medible de la bio.</p>
+            <p className="text-xs text-gray-500">Datos de Instagram más las visitas y consultas que llegaron por el enlace de la bio.</p>
           </CardHeader>
           <CardContent className="space-y-5">
             {growth.instagram.followers === null ? (
               <p className="text-sm text-gray-400">
-                Todavía no hay snapshots. Hace falta Instagram conectado y al menos una corrida del cron diario.
+                Todavía no hay registros diarios. Hace falta Instagram conectado y al menos una actualización automática.
               </p>
             ) : (
               <div className="grid gap-5 xl:grid-cols-[minmax(0,1.35fr)_minmax(320px,0.65fr)]">
@@ -1432,13 +1544,13 @@ export default async function DashboardPage({
                   <MetricTile label="Taps en enlaces" value={growth.instagram.linkTaps} helper="métrica nativa de Meta" />
                   <MetricTile label="Interacciones" value={growth.instagram.totalInteractions} helper="métrica nativa de Meta" />
                   <MetricTile label="Visitas web atribuidas" value={instagramChannel?.visits ?? 0} helper="utm_source=instagram" />
-                  <MetricTile label="Leads atribuidos" value={instagramChannel?.leads ?? 0} helper={`${instagramChannel?.confirmed ?? 0} turnos confirmados`} />
+                  <MetricTile label="Consultas atribuidas" value={instagramChannel?.leads ?? 0} helper={`${instagramChannel?.confirmed ?? 0} turnos confirmados`} />
                 </div>
                 <TrendChart
                   points={growth.instagram.series}
                   height={190}
                   series={[{ key: "followers", label: "Seguidores", color: "#db2777" }]}
-                  emptyMessage="La evolución aparece al acumular al menos dos snapshots diarios."
+                  emptyMessage="La evolución aparece al acumular al menos dos registros diarios."
                 />
               </div>
             )}
@@ -1483,7 +1595,7 @@ export default async function DashboardPage({
           <CardContent className="space-y-5">
             {growth.google.status === "quota_blocked" && (
               <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs leading-relaxed text-amber-800">
-                Google todavía mantiene la Business Profile Performance API con cuota 0. Las impresiones, llamadas y direcciones nativas se activarán automáticamente cuando Google habilite el acceso; mientras tanto, las visitas y leads desde la ficha sí se miden con <span className="font-mono">/go/google</span>.
+                Google todavía no habilitó sus métricas completas. Mientras tanto, las visitas y consultas desde la ficha sí se miden mediante el enlace configurado.
               </div>
             )}
             {growth.google.status === "not_connected" && (
@@ -1493,8 +1605,8 @@ export default async function DashboardPage({
             )}
             {growth.google.status === null && (
               <p className="text-sm text-gray-400">
-                Todavía no hay snapshots. Se generan diariamente dentro del cron de mantenimiento
-                — hace falta al menos una corrida para que este card muestre datos.
+                Todavía no hay registros diarios. Se generan automáticamente una vez por día
+                y hace falta al menos una actualización para mostrar resultados.
               </p>
             )}
             <div className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-8">
@@ -1504,7 +1616,7 @@ export default async function DashboardPage({
               <MetricTile label="Clicks en llamar" value={growth.google.callClicks} />
               <MetricTile label="Cómo llegar" value={growth.google.directionRequests} />
               <MetricTile label="Visitas web atribuidas" value={googleChannel?.visits ?? 0} helper="utm_source=google_maps" />
-              <MetricTile label="Leads atribuidos" value={googleChannel?.leads ?? 0} helper={`${googleChannel?.confirmed ?? 0} turnos`} />
+              <MetricTile label="Consultas atribuidas" value={googleChannel?.leads ?? 0} helper={`${googleChannel?.confirmed ?? 0} turnos`} />
               <MetricTile label="Rating y reseñas" value={growth.google.rating === null ? null : `${growth.google.rating.toFixed(1)} ★`} helper={growth.google.reviewCount === null ? "sin datos" : `${growth.google.reviewCount} reseñas${growth.google.reviewDelta === null ? "" : ` · ${growth.google.reviewDelta >= 0 ? "+" : ""}${growth.google.reviewDelta}`}`} />
             </div>
             {growth.google.series.length > 1 && (
@@ -1525,9 +1637,8 @@ export default async function DashboardPage({
           <CardHeader>
             <CardTitle className="text-base">Reportes semanales</CardTitle>
             <p className="text-xs text-gray-500">
-              Snapshot automático generado todos los domingos (leads nuevos, conversión y canales de
-              la semana anterior — Lucía revisa los datos ese día). No se envía a ningún lado todavía
-              — se guarda acá para consultar.
+              Resumen automático generado todos los domingos con las consultas, turnos y canales de
+              la semana anterior. No se envía: queda guardado acá para consultar.
             </p>
           </CardHeader>
           <CardContent>
@@ -1541,10 +1652,10 @@ export default async function DashboardPage({
                   <thead>
                     <tr className="border-b text-left text-xs text-gray-500">
                       <th className="pb-2 font-medium">Semana</th>
-                      <th className="pb-2 font-medium text-right">Leads nuevos</th>
+                      <th className="pb-2 font-medium text-right">Consultas nuevas</th>
                       <th className="pb-2 font-medium text-right">Confirmados</th>
                       <th className="pb-2 font-medium text-right">Conversión</th>
-                      <th className="pb-2 font-medium text-right">Visitas landing</th>
+                      <th className="pb-2 font-medium text-right">Visitas al sitio</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1566,6 +1677,7 @@ export default async function DashboardPage({
           </CardContent>
         </Card>
       )}
+      </DashboardDisclosure>
     </div>
   )
 }

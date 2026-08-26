@@ -1,3 +1,13 @@
+# CERRADO (2026-08-26) — dashboard simple para seguimiento
+
+- [x] Auditar la jerarquía y el lenguaje de la pantalla completa.
+- [x] Convertir la vista inicial en un resumen ejecutivo sin jerga de growth.
+- [x] Mantener el detalle existente dentro de secciones desplegables.
+- [x] Simplificar la lectura de Meta Ads y explicar la relación clic → consulta → turno.
+- [x] Validar lint, 122 suites/1090 tests, build, 7 E2E autenticados y vista móvil antes de publicar.
+
+---
+
 # CERRADO (2026-08-26) — rendimiento de campañas pagas
 
 - [x] Auditar la atribución UTM, el dashboard y la conexión existente con Instagram/Meta.

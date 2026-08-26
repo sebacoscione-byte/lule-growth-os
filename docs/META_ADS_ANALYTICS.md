@@ -5,7 +5,7 @@
 El dashboard separa dos fuentes para no confundir un clic publicitario con una conversión propia:
 
 1. **Atribución UTM propia**: se obtiene de `landing_events` y `leads`. Mide visitas únicas, visitas
-   con una acción de contacto, leads y turnos confirmados por `utm_source`, `utm_medium`,
+   con una acción de contacto, consultas registradas y turnos confirmados por `utm_source`, `utm_medium`,
    `utm_campaign` y `utm_content`.
 2. **Entrega publicitaria de Meta**: se consulta en modo lectura desde Marketing API. Mide inversión,
    impresiones, alcance, clics en enlace, CTR y costo por clic por campaña y plataforma.
@@ -60,13 +60,13 @@ que revele síntomas, diagnósticos, servicio o sede consultada, datos de contac
 
 ## Validación operativa
 
-Después de configurar los activos externos:
+Configuración completada y validada en producción el 2026-08-26. Para controles posteriores:
 
 1. Abrir `/dashboard?period=7`.
 2. Confirmar que la tarjeta de Meta muestra la moneda correcta y actividad de la cuenta esperada.
 3. Comparar “Clics en enlace” de Meta con “Visitas” UTM. No tienen que ser idénticos: una persona
    puede tocar el anuncio y no terminar de cargar la landing, repetir el clic o bloquear el tracking.
-4. Comparar luego visitas con acción, leads y turnos para evaluar calidad, no sólo volumen.
+4. Comparar luego visitas con acción, consultas y turnos para evaluar calidad, no sólo volumen.
 
 ## Implementación
 
