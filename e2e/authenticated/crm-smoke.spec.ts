@@ -28,6 +28,8 @@ test("un usuario autorizado puede entrar al dashboard", async () => {
   await page.goto("/dashboard")
   await expect(page).not.toHaveURL(/\/login/)
   await expect(page.getByRole("heading", { name: "Dashboard", level: 1 })).toBeVisible()
+  await expect(page.getByText("Resultados atribuidos por campaña", { exact: true })).toBeVisible()
+  await expect(page.getByText("Métricas de la cuenta publicitaria de Meta", { exact: true })).toBeVisible()
 })
 
 test("la planificación reproduce agenda e ingresos del organigrama", async () => {

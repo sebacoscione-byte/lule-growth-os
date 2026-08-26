@@ -1,5 +1,6 @@
 import {
   buildGrowthPeriodSummary,
+  buildCampaignPerformance,
   combineChannelPerformance,
   normalizeDashboardChannel,
   parseDashboardPeriod,
@@ -46,5 +47,57 @@ describe("dashboard growth", () => {
       visitToLeadRate: 7.7,
       leadToConfirmedRate: 33.3,
     })])
+  })
+
+  it("calcula el embudo de una campaña UTM sin permitir conteos imposibles", () => {
+    expect(buildCampaignPerformance({
+      source: "instagram",
+      medium: "paid_social",
+      campaign: "presentacion_doctora_agosto_2026",
+      content: "post_presentacion",
+      visits: "100",
+      engaged_visits: "120",
+      leads: "8",
+      confirmed: "12",
+      first_seen: "2026-08-26",
+      last_seen: "2026-09-01",
+    })).toEqual({
+      source: "instagram",
+      medium: "paid_social",
+      campaign: "presentacion_doctora_agosto_2026",
+      content: "post_presentacion",
+      visits: 100,
+      engagedVisits: 100,
+      leads: 8,
+      confirmed: 8,
+      visitToActionRate: 100,
+      visitToLeadRate: 8,
+      leadToConfirmedRate: 100,
+      firstSeen: "2026-08-26",
+      lastSeen: "2026-09-01",
+    })
+  })
+
+  it("normaliza una campaña sin contenido y evita divisiones por cero", () => {
+    expect(buildCampaignPerformance({
+      source: null,
+      medium: null,
+      campaign: null,
+      content: "sin_contenido",
+      visits: 0,
+      engaged_visits: 3,
+      leads: 0,
+      confirmed: 2,
+    })).toEqual(expect.objectContaining({
+      source: "direct",
+      medium: "sin_medium",
+      campaign: "sin_campana",
+      content: null,
+      engagedVisits: 0,
+      confirmed: 0,
+      visitToActionRate: 0,
+      visitToLeadRate: 0,
+      leadToConfirmedRate: 0,
+    }))
   })
 })
