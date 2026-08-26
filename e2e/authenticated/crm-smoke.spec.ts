@@ -28,8 +28,18 @@ test("un usuario autorizado puede entrar al dashboard", async () => {
   await page.goto("/dashboard")
   await expect(page).not.toHaveURL(/\/login/)
   await expect(page.getByRole("heading", { name: "Dashboard", level: 1 })).toBeVisible()
-  await expect(page.getByText("Resultados atribuidos por campaña", { exact: true })).toBeVisible()
-  await expect(page.getByText("Métricas de la cuenta publicitaria de Meta", { exact: true })).toBeVisible()
+  await expect(page.getByText(/En pocas palabras/)).toBeVisible()
+  await expect(page.getByText("Publicidad en Facebook e Instagram", { exact: true })).toBeVisible()
+
+  const journey = page.locator("details").filter({ hasText: "Cómo avanzan las personas hasta pedir turno" }).first()
+  await expect(journey.locator("summary")).toBeVisible()
+  await expect(journey.getByText("Evolución del recorrido", { exact: true })).not.toBeVisible()
+  await journey.locator("summary").click()
+  await expect(journey.getByText("Evolución del recorrido", { exact: true })).toBeVisible()
+
+  const channels = page.locator("details").filter({ hasText: "Ver información detallada por canal" }).first()
+  await channels.locator("summary").click()
+  await expect(channels.getByText("Consultas recientes", { exact: true })).toBeVisible()
 })
 
 test("la planificación reproduce agenda e ingresos del organigrama", async () => {

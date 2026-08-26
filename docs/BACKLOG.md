@@ -3,24 +3,16 @@
 
 ---
 
-## [ACCIÓN DE SEBA] Habilitar lectura de Meta Ads en producción (2026-08-26)
+## [RESUELTO] ✅ Lectura de Meta Ads en producción (2026-08-26)
 
-El código ya puede mostrar en `/dashboard` inversión, impresiones, alcance, clics en enlace, CTR y
-costo por clic por campaña, con desglose Instagram/Facebook. También quedó resuelto el embudo propio
-por UTM (visita → acción → lead → turno), que funciona sin Meta y recupera retroactivamente la campaña
-`presentacion_doctora_agosto_2026`.
-
-Para que aparezcan las métricas publicitarias nativas falta una acción externa con acceso al portfolio:
-
-1. En **Configuración del negocio → Cuentas → Cuentas publicitarias**, confirmar que la cuenta usada
-   para promocionar el post pertenece al portfolio **Dra Lucia Chahin** y que Sebastián tiene acceso.
-2. En Meta for Developers, habilitar Marketing API para la app/negocio y generar una credencial de
-   servidor con permiso de lectura `ads_read` sobre esa cuenta. Meta puede exigir verificación del
-   negocio o revisión del permiso según el tipo/estado de la app.
-3. Cargar únicamente en Vercel Production, nunca en el repositorio ni en un chat:
-   `META_AD_ACCOUNT_ID` y `META_ADS_ACCESS_TOKEN`. `META_GRAPH_API_VERSION` ya existe y se reutiliza.
-4. Redeployar y abrir `/dashboard?period=7`: la tarjeta “Métricas de la cuenta publicitaria de Meta”
-   debe pasar de “Integración pendiente” a los resultados reales.
+- La cuenta publicitaria, la página de Facebook y `@draluciachahin` quedaron vinculadas al portfolio.
+- La app de Meta tiene el caso de uso de Marketing API y un usuario de sistema dedicado con acceso
+  mínimo de lectura al rendimiento de la cuenta.
+- El token se guardó exclusivamente como secreto de Vercel Production y no se incorporó al repositorio.
+- El redeploy quedó operativo: `/dashboard` ya recibe inversión, impresiones, clics, CTR y costo por
+  clic reales, con desglose entre Instagram y Facebook.
+- El seguimiento propio por UTM continúa midiendo el recorrido visita → acción → consulta → turno sin
+  enviar datos de pacientes a Meta.
 
 Guía operativa y controles de privacidad: `docs/META_ADS_ANALYTICS.md`.
 

@@ -1,6 +1,14 @@
 ﻿# Lule Growth OS — Contexto para Claude
 
 ## Estado actual
+- 2026-08-26 (dashboard simple para Lucía y Seba): la vista inicial ahora prioriza un resumen escrito
+  en lenguaje común, las tareas que requieren atención y cuatro números explicados (personas que
+  llegaron, intentos de contacto, consultas registradas y turnos confirmados). El recorrido completo,
+  las tablas UTM, recomendaciones y detalle por canal siguen disponibles, pero plegados para no
+  competir con la lectura diaria. La sección de Meta se presenta como “Publicidad en Facebook e
+  Instagram”, explica gastado, veces que se mostró, clics hacia el sitio y costo por clic, y deja el
+  desglose técnico por plataforma/campaña bajo demanda. Se verificaron lint, 122 suites/1090 tests,
+  build, 7 E2E autenticados y vistas desktop/móvil. No se tocó lógica médica, WhatsApp, RLS ni crons.
 - 2026-08-26 (campañas pagas y Meta Ads): `/dashboard` agrega un embudo por dimensiones UTM
   (`source`/`medium`/`campaign`/`content`) con visitas únicas, visitas con acción, leads y turnos;
   recupera datos históricos ya guardados, incluida `presentacion_doctora_agosto_2026`. Se sumó un
