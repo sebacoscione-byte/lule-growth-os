@@ -1,3 +1,12 @@
+# CERRADO (2026-08-26) — detalle del dashboard más claro por canal
+
+- [x] Auditar la sección actual y separar información ejecutiva de datos técnicos.
+- [x] Agregar una vista rápida comparable para Sitio, Instagram, Google y WhatsApp.
+- [x] Reorganizar el detalle en bloques plegables con lenguaje simple.
+- [x] Validar lint, 122 suites/1093 tests, build, 7 E2E autenticados y la experiencia real en escritorio y celular.
+
+---
+
 # CERRADO (2026-08-26) — resumen semanal integral del dashboard
 
 - [x] Revisar qué canales y métricas ya están disponibles para el resumen.
