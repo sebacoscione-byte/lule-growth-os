@@ -2280,6 +2280,9 @@ plano, sin cookies, que siempre autentica como `service_role` real.
 - **Nombre**: Dra. Lucía Chahin
 - **Especialidad**: Cardiología
 - **Servicios**: Consulta cardiológica, Ecocardiograma
+- **Contacto profesional**: el correo se guarda en `app_config.doctor.email` y es editable desde
+  Configuración → Datos de la doctora. No confundirlo con emails de Supabase Auth ni publicarlo en
+  la landing sin una decisión explícita sobre el canal de atención.
 - **Ubicaciones**:
   - CIMEL Lanús
   - Hospital Británico Lanús
