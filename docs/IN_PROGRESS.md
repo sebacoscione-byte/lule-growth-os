@@ -1,10 +1,12 @@
-# EN CURSO (2026-08-26) — rendimiento de campañas pagas
+# CERRADO (2026-08-26) — rendimiento de campañas pagas
 
 - [x] Auditar la atribución UTM, el dashboard y la conexión existente con Instagram/Meta.
 - [x] Agregar un embudo por `utm_source`/`utm_medium`/`utm_campaign`/`utm_content` que recupere también la campaña ya iniciada.
 - [x] Mostrar métricas publicitarias de Meta cuando exista una credencial `ads_read`, sin exponer tokens ni bloquear el dashboard cuando falte.
 - [x] Documentar en backlog únicamente los pasos externos que requieren acceso de Seba a Meta/Vercel.
-- [ ] Ejecutar lint, tests, build, migración y QA del preview; publicar y mergear por PR.
+- [x] Ejecutar lint, 122 suites/1090 tests, build, migración, 22 E2E públicos y 7 E2E autenticados.
+- [x] Publicado como PR #239; CI, E2E público y Vercel Preview verdes. El preview protegido respondió
+      correctamente: landing pública HTTP 200 y `/dashboard` redirigió a login sin sesión.
 
 ---
 
