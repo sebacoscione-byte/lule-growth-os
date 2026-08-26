@@ -10,6 +10,7 @@ import {
 import { authorizeStaff } from "@/lib/staff-authz"
 import { recordSecurityAudit } from "@/lib/security-audit"
 import { autoPublishSettingsSchema, normalizeAutoPublishSettings } from "@/lib/content-pipeline"
+import { doctorConfigSchema } from "@/lib/doctor-config"
 
 const CONFIG_READ_ROLES = ["owner", "doctor"] as const
 const CONFIG_WRITE_ROLES = ["owner"] as const
@@ -92,6 +93,20 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Configuración de WhatsApp inválida" }, { status: 400 })
     }
     value = mergeWhatsAppSettings(settings.data)
+  }
+
+  if (key === "doctor") {
+    const doctor = doctorConfigSchema.safeParse(value)
+    if (!doctor.success) {
+      return NextResponse.json(
+        {
+          error: doctor.error.issues[0]?.message ?? "Datos de la doctora inválidos",
+          code: "invalid_doctor_config",
+        },
+        { status: 400 }
+      )
+    }
+    value = doctor.data
   }
 
   if (key === "auto_publish_settings") {

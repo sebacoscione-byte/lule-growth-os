@@ -1210,6 +1210,10 @@ Herramientas internas de la app para gestionar leads, contenido y seguimiento.
 
 ## Etapa 2 — Web pública: /dra-lucia-chahin
 
+- [x] **Correo profesional interno (2026-08-26):** guardado en `app_config.doctor.email`,
+  editable desde Configuración → Datos de la doctora y validado por la API. No se publica en la
+  landing ni se usa como cuenta de acceso.
+
 - [x] **Cronograma ampliado (2026-08-26):** la web pública muestra CIMEL Lanús martes, jueves y
   viernes; Hospital Británico Lanús para ecocardiogramas los martes; Hospital Británico Central
   los miércoles y Swiss Medical Lomas los viernes. La landing `ecocardiograma-lanus` deriva al

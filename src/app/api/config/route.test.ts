@@ -94,6 +94,38 @@ describe("GET /api/config", () => {
 })
 
 describe("POST /api/config", () => {
+  it("normaliza el correo profesional antes de guardar", async () => {
+    const { upsert } = mockClient()
+    const response = await POST(new Request("http://localhost/api/config", {
+      method: "POST",
+      body: JSON.stringify({
+        key: "doctor",
+        value: { name: "Dra. Lucía Chahin", email: "  DraLuciaChahin@GMAIL.COM " },
+      }),
+    }))
+
+    expect(response.status).toBe(200)
+    expect(upsert).toHaveBeenCalledWith({
+      key: "doctor",
+      value: { name: "Dra. Lucía Chahin", email: "draluciachahin@gmail.com" },
+    }, { onConflict: "key" })
+  })
+
+  it("rechaza un correo profesional inválido antes de auditar o escribir", async () => {
+    const { upsert } = mockClient()
+    const response = await POST(new Request("http://localhost/api/config", {
+      method: "POST",
+      body: JSON.stringify({ key: "doctor", value: { email: "correo-invalido" } }),
+    }))
+
+    expect(response.status).toBe(400)
+    expect(await response.json()).toEqual(expect.objectContaining({
+      code: "invalid_doctor_config",
+    }))
+    expect(recordSecurityAudit).not.toHaveBeenCalled()
+    expect(upsert).not.toHaveBeenCalled()
+  })
+
   it("audita antes de escribir configuración no relacionada con sedes", async () => {
     const { upsert } = mockClient()
     const response = await POST(new Request("http://localhost/api/config", {

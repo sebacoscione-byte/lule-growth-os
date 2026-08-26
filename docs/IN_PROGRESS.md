@@ -1323,3 +1323,35 @@ historias de Instagram, usando la agenda operativa existente como fuente para lo
 - No se modifica el webhook ni la lógica del bot de WhatsApp.
 - La web mantiene la derivación a los canales oficiales de CIMEL, Hospital Británico y Swiss
   Medical; no reserva ni confirma disponibilidad.
+# COMPLETADO (2026-08-26) — correo profesional de la doctora
+
+## Objetivo
+
+Guardar el correo profesional confirmado en la configuración interna de la doctora, con validación
+y sin publicarlo automáticamente en la landing ni mezclarlo con cuentas de acceso.
+
+## Plan
+
+- [x] Agregar `doctor.email` al modelo y al formulario interno.
+- [x] Validar y normalizar el correo en la API de configuración.
+- [x] Crear una migración aditiva con `jsonb_set`, preservando el resto del objeto `doctor`.
+- [x] Ejecutar lint, tests, build y dry-run de la migración.
+- [x] Abrir PR #238, verificar preview, aplicar la migración y mergear.
+
+## Validación final
+
+- `npm run lint`: sin errores.
+- `npm test`: 120 suites y 1.083 tests aprobados.
+- `npm run build`: compilación y TypeScript correctos; 85 páginas generadas.
+- Migración validada primero con rollback y aplicada después en una transacción atómica.
+- Verificación read-only de producción: `doctor.email` quedó guardado con el valor confirmado.
+- Playwright: `/configuracion` redirige a login sin sesión y no expone el dato públicamente.
+- Preview de Vercel, CI y E2E público aprobados.
+
+## Alcance y seguridad
+
+- El correo se trata como contacto profesional, no como credencial ni cuenta de autenticación.
+- No se modifica la landing pública, el bot/webhook de WhatsApp ni lógica médica.
+- No se agregan teléfonos, direcciones ni horarios generales a Facebook desde esta tarea.
+
+---

@@ -16,6 +16,7 @@ import { createClient } from "@/lib/supabase/client"
 
 type Doctor = {
   name: string
+  email: string
   specialty: string
   bio: string
   matricula: string
@@ -336,7 +337,7 @@ export default function ConfiguracionPage() {
           specializations: [...(doctor.specializations ?? [])],
           conditions_treated: [...(doctor.conditions_treated ?? [])],
         }
-      : { name: "", specialty: "", bio: "", matricula: "", specializations: [], conditions_treated: [] }
+      : { name: "", email: "", specialty: "", bio: "", matricula: "", specializations: [], conditions_treated: [] }
     )
     setEditingDoctor(true)
   }
@@ -841,6 +842,15 @@ export default function ConfiguracionPage() {
               <Field label="Especialidad">
                 <Input value={doctorDraft.specialty} onChange={e => setDoctorDraft({ ...doctorDraft, specialty: e.target.value })} placeholder="Cardiología" />
               </Field>
+              <Field label="Correo profesional">
+                <Input
+                  type="email"
+                  value={doctorDraft.email ?? ""}
+                  onChange={e => setDoctorDraft({ ...doctorDraft, email: e.target.value })}
+                  placeholder="nombre@dominio.com"
+                  autoComplete="email"
+                />
+              </Field>
               <Field label="Matrícula">
                 <Input value={doctorDraft.matricula} onChange={e => setDoctorDraft({ ...doctorDraft, matricula: e.target.value })} placeholder="MP 12345 / MN 67890" />
               </Field>
@@ -886,6 +896,7 @@ export default function ConfiguracionPage() {
             <div className="space-y-2">
               <Row label="Nombre" value={doctor.name} />
               <Row label="Especialidad" value={doctor.specialty} />
+              {doctor.email && <Row label="Correo profesional" value={doctor.email} />}
               {doctor.matricula && <Row label="Matrícula" value={doctor.matricula} />}
               {doctor.bio && (
                 <div className="text-sm">
