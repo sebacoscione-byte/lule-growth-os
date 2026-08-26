@@ -1,7 +1,11 @@
 export interface PublicLandingLocation {
+  /** Clave única de UI/SEO. `trackingKey` agrupa sedes de una misma institución. */
+  key?: string
+  trackingKey?: "cimel" | "swiss" | "britanico"
   name: string
   address?: string
   day: string
+  hours?: string
   instruction: string
   phone?: string
   mapsUrl?: string
@@ -17,48 +21,71 @@ export interface PublicLandingData {
 }
 
 const CIMEL = {
+  key: "cimel",
+  trackingKey: "cimel" as const,
   name: "CIMEL Lanús",
   address: "Tucumán 1314, Lanús",
-  day: "Martes",
+  day: "martes, jueves y viernes",
+  hours: "Martes 13:00–15:00\nJueves y viernes 13:00–16:00",
   phone: "011 4249-3412",
   mapsUrl: "https://share.google/rsph8WtMpJAiRkeki",
 }
 
 const SWISS = {
+  key: "swiss",
+  trackingKey: "swiss" as const,
   name: "Swiss Medical Lomas",
   address: "Oliden 141, Lomas de Zamora",
-  day: "Viernes",
+  day: "viernes",
+  hours: "Viernes 17:00–20:00",
   phone: "0810-333-8876",
   mapsUrl: "https://maps.app.goo.gl/tzSVjSYm47UfNkLJ8",
 }
 
-const BRITANICO = {
+const BRITANICO_CENTRAL = {
+  key: "britanico-central",
+  trackingKey: "britanico" as const,
   name: "Hospital Británico (Central)",
   address: "Perdriel 74, CABA",
-  day: "Miércoles",
+  day: "miércoles",
+  hours: "Miércoles 17:00–19:45",
   phone: "4309-6400",
   mapsUrl: "https://maps.app.goo.gl/ZPbUhv7PAtUnS6D79",
 }
 
+const BRITANICO_LANUS = {
+  key: "britanico-lanus",
+  trackingKey: "britanico" as const,
+  name: "Hospital Británico Lanús",
+  address: "Av. Hipólito Yrigoyen 4429, Lanús",
+  day: "martes",
+  hours: "Martes 16:00–19:30 · Ecocardiogramas",
+  phone: "0810-222-2748",
+  mapsUrl: "https://www.google.com/maps/search/?api=1&query=Hospital%20Brit%C3%A1nico%20Lan%C3%BAs%20Av.%20Hip%C3%B3lito%20Yrigoyen%204429",
+}
+
+const BRITANICO_INSTRUCTION = "Llamá a la Central de Turnos 0810-222-2748 o al 4309-6400, o pedí turno desde la app del Hospital Británico, y solicitá turno con la Dra. Lucía Chahin indicando la sede."
+
 export const LANDING_DATA: Record<string, PublicLandingData> = {
   "dra-lucia-chahin": {
-    title: "Dra. Lucía Chahin — Cardióloga | CIMEL Lanús · Hospital Británico (Central) · Swiss Medical Lomas",
-    description: "Dra. Lucía Chahin, médica cardióloga con formación avanzada en ecocardiografía. Residencia de cardiología en el Hospital Británico de Buenos Aires, donde hoy continúa como cardióloga de planta. Atiende en CIMEL Lanús (martes), Hospital Británico (Central) (miércoles) y Swiss Medical Lomas de Zamora (viernes).",
+    title: "Dra. Lucía Chahin — Cardióloga | Lanús · CABA · Lomas de Zamora",
+    description: "Dra. Lucía Chahin, médica cardióloga y ecocardiografista. Atiende en CIMEL Lanús los martes, jueves y viernes; realiza ecocardiogramas en Hospital Británico Lanús los martes; atiende en Hospital Británico Central los miércoles y en Swiss Medical Lomas los viernes.",
     h1: "Dra. Lucía Chahin — Cardióloga",
-    intro: "La Dra. Lucía Chahin es médica cardióloga con formación avanzada en ecocardiografía, formada en el Hospital Británico de Buenos Aires. Atiende consultas cardiológicas y ecocardiogramas en Lanús, en el Hospital Británico (Central) y en Lomas de Zamora.",
+    intro: "La Dra. Lucía Chahin es médica cardióloga con formación avanzada en ecocardiografía, formada en el Hospital Británico de Buenos Aires. Atiende en CIMEL Lanús, Hospital Británico Lanús y Central, y Swiss Medical Lomas de Zamora.",
     services: ["Consulta cardiológica", "Ecocardiograma", "Control cardiológico", "Evaluación cardiovascular"],
     locations: [
       { ...CIMEL, instruction: "Llamá al 011 4249-3412, solicitá turno con la Dra. Lucía Chahin y mencioná que es para cardiología." },
-      { ...BRITANICO, instruction: "Llamá al 4309-6400 (atención telefónica 24hs) o a la Central de Turnos 0810-222-2748 / 11-3015-9749, o pedí turno desde la app del Hospital Británico, y solicitá turno con la Dra. Lucía Chahin en cardiología." },
+      { ...BRITANICO_LANUS, instruction: `${BRITANICO_INSTRUCTION} Mencioná que es para ecocardiograma en Hospital Británico Lanús.` },
+      { ...BRITANICO_CENTRAL, instruction: `${BRITANICO_INSTRUCTION} Mencioná que es para cardiología en Hospital Británico Central.` },
       { ...SWISS, instruction: "Llamá a Turnos al 0810-333-8876, escribile a Swity (WhatsApp) o usá la app Mi Swiss Medical, pedí turno con la Dra. Lucía Chahin y mencioná que es para cardiología." },
     ],
   },
   "cardiologa-lanus": {
     title: "Cardióloga en Lanús — Dra. Lucía Chahin | CIMEL Lanús",
-    description: "¿Buscás una cardióloga en Lanús? La Dra. Lucía Belén Chahin atiende los martes en CIMEL Lanús, Tucumán 1314. Consultas cardiológicas y ecocardiogramas.",
+    description: "¿Buscás una cardióloga en Lanús? La Dra. Lucía Belén Chahin atiende los martes, jueves y viernes en CIMEL Lanús, Tucumán 1314. Consultas cardiológicas y controles.",
     h1: "Cardióloga en Lanús — Dra. Lucía Chahin",
-    intro: "Si buscás una cardióloga en Lanús, la Dra. Lucía Chahin atiende los martes en CIMEL Lanús. Realizá consultas cardiológicas y ecocardiogramas.",
-    services: ["Consulta cardiológica", "Ecocardiograma", "Control cardiológico"],
+    intro: "Si buscás una cardióloga en Lanús, la Dra. Lucía Chahin atiende los martes, jueves y viernes en CIMEL Lanús.",
+    services: ["Consulta cardiológica", "Control cardiológico", "Evaluación cardiovascular"],
     locations: [
       { ...CIMEL, instruction: "Llamá al 011 4249-3412, pedí turno con la Dra. Lucía Chahin y mencioná que es para cardiología." },
     ],
@@ -74,13 +101,13 @@ export const LANDING_DATA: Record<string, PublicLandingData> = {
     ],
   },
   "ecocardiograma-lanus": {
-    title: "Ecocardiograma en Lanús — Dra. Lucía Chahin | CIMEL Lanús",
-    description: "¿Necesitás un ecocardiograma en Lanús? La Dra. Lucía Chahin realiza ecocardiogramas los martes en CIMEL Lanús (Tucumán 1314).",
+    title: "Ecocardiograma en Lanús — Dra. Lucía Chahin | Hospital Británico",
+    description: "¿Necesitás un ecocardiograma en Lanús? La Dra. Lucía Chahin realiza ecocardiogramas los martes de 16:00 a 19:30 en Hospital Británico Lanús, Av. Hipólito Yrigoyen 4429.",
     h1: "Ecocardiograma en Lanús — Dra. Lucía Chahin",
-    intro: "Si necesitás un ecocardiograma en Lanús, la Dra. Lucía Chahin lo realiza los martes en CIMEL Lanús.",
-    services: ["Ecocardiograma", "Consulta cardiológica"],
+    intro: "Si necesitás un ecocardiograma en Lanús, la Dra. Lucía Chahin lo realiza los martes en Hospital Británico Lanús.",
+    services: ["Ecocardiograma"],
     locations: [
-      { ...CIMEL, instruction: "Llamá al 011 4249-3412, pedí turno con la Dra. Lucía Chahin y mencioná que es para ecocardiograma." },
+      { ...BRITANICO_LANUS, instruction: `${BRITANICO_INSTRUCTION} Mencioná que es para ecocardiograma en Hospital Británico Lanús.` },
     ],
   },
   "ecocardiograma-lomas": {
@@ -95,10 +122,10 @@ export const LANDING_DATA: Record<string, PublicLandingData> = {
   },
   "consulta-cardiologica-lanus": {
     title: "Consulta Cardiológica en Lanús — Dra. Lucía Chahin | CIMEL",
-    description: "Consulta cardiológica en Lanús con la Dra. Lucía Chahin. Atiende los martes en CIMEL Lanús, Tucumán 1314.",
+    description: "Consulta cardiológica en Lanús con la Dra. Lucía Chahin. Atiende los martes, jueves y viernes en CIMEL Lanús, Tucumán 1314.",
     h1: "Consulta Cardiológica en Lanús — Dra. Lucía Chahin",
-    intro: "Para una consulta cardiológica en Lanús, la Dra. Lucía Chahin atiende los martes en CIMEL Lanús.",
-    services: ["Consulta cardiológica", "Ecocardiograma", "Control cardiovascular"],
+    intro: "Para una consulta cardiológica en Lanús, la Dra. Lucía Chahin atiende los martes, jueves y viernes en CIMEL Lanús.",
+    services: ["Consulta cardiológica", "Control cardiovascular"],
     locations: [
       { ...CIMEL, instruction: "Llamá al 011 4249-3412, pedí turno con la Dra. Lucía Chahin y mencioná que es para consulta de cardiología." },
     ],
@@ -120,7 +147,7 @@ export const LANDING_DATA: Record<string, PublicLandingData> = {
     intro: "Si buscás una cardióloga en CABA, la Dra. Lucía Chahin atiende los miércoles en el Hospital Británico (Central), donde se formó como residente de cardiología y hoy continúa como cardióloga de planta. Realizá consultas cardiológicas y ecocardiogramas.",
     services: ["Consulta cardiológica", "Ecocardiograma", "Control cardiológico"],
     locations: [
-      { ...BRITANICO, instruction: "Llamá al 4309-6400 (atención telefónica 24hs) o a la Central de Turnos 0810-222-2748 / 11-3015-9749, o pedí turno desde la app del Hospital Británico, y solicitá turno con la Dra. Lucía Chahin en cardiología." },
+      { ...BRITANICO_CENTRAL, instruction: `${BRITANICO_INSTRUCTION} Mencioná que es para cardiología en Hospital Británico Central.` },
     ],
   },
   "ecocardiograma-caba": {
@@ -130,7 +157,7 @@ export const LANDING_DATA: Record<string, PublicLandingData> = {
     intro: "Si necesitás un ecocardiograma en CABA, la Dra. Lucía Chahin lo realiza los miércoles en el Hospital Británico (Central).",
     services: ["Ecocardiograma", "Consulta cardiológica"],
     locations: [
-      { ...BRITANICO, instruction: "Llamá al 4309-6400 (atención telefónica 24hs) o a la Central de Turnos 0810-222-2748 / 11-3015-9749, o pedí turno desde la app del Hospital Británico, y solicitá turno con la Dra. Lucía Chahin y mencioná que es para ecocardiograma." },
+      { ...BRITANICO_CENTRAL, instruction: `${BRITANICO_INSTRUCTION} Mencioná que es para ecocardiograma en Hospital Británico Central.` },
     ],
   },
   "consulta-cardiologica-caba": {
@@ -140,7 +167,7 @@ export const LANDING_DATA: Record<string, PublicLandingData> = {
     intro: "Para una consulta cardiológica en CABA, la Dra. Lucía Chahin atiende los miércoles en el Hospital Británico (Central).",
     services: ["Consulta cardiológica", "Ecocardiograma", "Control cardiovascular"],
     locations: [
-      { ...BRITANICO, instruction: "Llamá al 4309-6400 (atención telefónica 24hs) o a la Central de Turnos 0810-222-2748 / 11-3015-9749, o pedí turno desde la app del Hospital Británico, y solicitá turno con la Dra. Lucía Chahin y mencioná que es para consulta de cardiología." },
+      { ...BRITANICO_CENTRAL, instruction: `${BRITANICO_INSTRUCTION} Mencioná que es para consulta de cardiología en Hospital Británico Central.` },
     ],
   },
 }
@@ -174,9 +201,9 @@ export function resolvesToBotNumber(rawNumber?: string): boolean {
 
 export const WHATSAPP_MESSAGES = {
   general: "Hola, me gustaría consultar cómo pedir turno con la Dra. Lucía Chahin.",
-  cimel: "Hola, me gustaría pedir turno con la Dra. Lucía Chahin en CIMEL Lanús (martes). ¿Me pueden ayudar?",
+  cimel: "Hola, me gustaría pedir turno con la Dra. Lucía Chahin en CIMEL Lanús (martes, jueves o viernes). ¿Me pueden ayudar?",
   swiss: "Hola, me gustaría pedir turno con la Dra. Lucía Chahin en Swiss Medical Lomas (viernes). ¿Me pueden ayudar?",
-  britanico: "Hola, me gustaría pedir turno con la Dra. Lucía Chahin en el Hospital Británico (miércoles). ¿Me pueden ayudar?",
+  britanico: "Hola, me gustaría pedir turno con la Dra. Lucía Chahin en el Hospital Británico. ¿Me pueden ayudar?",
 }
 
 // Microcopy por servicio: ayuda al paciente a autoidentificarse antes de pedir turno.

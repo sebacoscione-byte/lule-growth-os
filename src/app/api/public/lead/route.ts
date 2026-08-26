@@ -55,9 +55,9 @@ export async function POST(request: Request) {
     utm_source === "whatsapp" ? "whatsapp" : "landing_page"
 
   const preferredDay =
-    preferred_location === "cimel_lanus" ? "martes" :
+    preferred_location === "cimel_lanus" ? "martes, jueves o viernes" :
     preferred_location === "swiss_lomas" ? "viernes" :
-    preferred_location === "hospital_britanico" ? "miercoles" : "sin_definir"
+    preferred_location === "hospital_britanico" ? "martes en Lanús o miércoles en Central" : "sin_definir"
 
   const followupDueAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
 

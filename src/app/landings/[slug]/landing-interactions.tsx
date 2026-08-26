@@ -8,6 +8,7 @@ import { withContentAttribution } from "@/lib/landing-referral-codes"
 
 export interface SedeAction {
   key: string
+  trackingKey: "cimel" | "swiss" | "britanico" | "general"
   name: string
   day: string
   hours?: string
@@ -196,15 +197,21 @@ export function LandingInteractions({
     trackLandingEvent("page_view", slug, { ...variantExtra, ...freshUtms })
   )
 
-  function engage(key: string) {
-    if (engagedKeys.has(key)) return
-    setEngagedKeys(prev => new Set(prev).add(key))
-    if (isTrackedKey(key)) trackLandingEvent(`cta_${key}`, slug, { ...utms, ...variantExtra })
+  function engage(sede: SedeAction) {
+    if (engagedKeys.has(sede.key)) return
+    setEngagedKeys(prev => new Set(prev).add(sede.key))
+    if (isTrackedKey(sede.trackingKey)) {
+      trackLandingEvent(`cta_${sede.trackingKey}`, slug, { ...utms, ...variantExtra })
+    }
   }
 
-  function trackClick(key: string, action: CtaClickAction) {
-    if (isTrackedKey(key)) {
-      trackLandingEvent(`click_${action}`, slug, { ...utms, ...variantExtra, location_key: key })
+  function trackClick(sede: SedeAction, action: CtaClickAction) {
+    if (isTrackedKey(sede.trackingKey)) {
+      trackLandingEvent(`click_${action}`, slug, {
+        ...utms,
+        ...variantExtra,
+        location_key: sede.trackingKey,
+      })
     }
   }
 
@@ -222,8 +229,8 @@ export function LandingInteractions({
             sede={sede}
             expanded={expandedKey === sede.key}
             onToggle={() => setExpandedKey(prev => prev === sede.key ? null : sede.key)}
-            onEngage={() => engage(sede.key)}
-            onClickAction={action => trackClick(sede.key, action)}
+            onEngage={() => engage(sede)}
+            onClickAction={action => trackClick(sede, action)}
             contentItemId={utms.utm_content}
           />
         ))}

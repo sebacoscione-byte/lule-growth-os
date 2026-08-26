@@ -1284,3 +1284,42 @@ Google Business y evitar que logs/capturas temporales vuelvan a ensuciar el work
 - [x] Ignorar `dev-server.log` y las capturas PNG generadas por la skill visual local.
 - [x] Ejecutar lint, tests y build.
 - [x] Publicar el cambio por rama + PR, verificar CI/preview y mergear.
+---
+
+# COMPLETADO (2026-08-26) — nuevos días y sede Hospital Británico Lanús
+
+## Objetivo
+
+Actualizar la web pública y las ayudas editoriales con el cronograma confirmado por las nuevas
+historias de Instagram, usando la agenda operativa existente como fuente para los horarios exactos:
+
+- CIMEL Lanús: martes 13:00–15:00, jueves y viernes 13:00–16:00.
+- Hospital Británico Lanús: ecocardiogramas los martes 16:00–19:30.
+- Hospital Británico Central: miércoles 17:00–19:45.
+- Swiss Medical Lomas: viernes 17:00–20:00.
+
+## Plan
+
+- [x] Relevar landings, SEO, datos estructurados y textos editoriales con el cronograma anterior.
+- [x] Actualizar las cuatro sedes y las landings de Lanús sin depender del bot de WhatsApp.
+- [x] Actualizar Bio y Fijados, CTAs y prompts para que el futuro carrusel no regenere datos viejos.
+- [x] Agregar regresiones para horarios, sede y tracking sin claves duplicadas.
+- [x] Correr lint, Jest, build y verificación visual responsive con Playwright.
+- [x] Abrir PR #237, verificar preview de Vercel y mergear a `main`.
+
+## Validación final
+
+- `npm run lint`: sin errores.
+- `npm test`: 118 suites y 1.077 tests aprobados.
+- `npm run build`: compilación, TypeScript y 85 páginas generadas correctamente.
+- Playwright: revisión responsive de la landing principal y `ecocardiograma-lanus`, sin errores
+  de consola de la aplicación.
+- Preview de Vercel: HTML desplegado verificado con el horario, teléfono, mapa y datos
+  estructurados de Hospital Británico Lanús; CI y E2E público aprobados.
+
+## Alcance y seguridad
+
+- No se modifica clasificación médica, guardrails, diagnósticos ni tratamientos.
+- No se modifica el webhook ni la lógica del bot de WhatsApp.
+- La web mantiene la derivación a los canales oficiales de CIMEL, Hospital Británico y Swiss
+  Medical; no reserva ni confirma disponibilidad.

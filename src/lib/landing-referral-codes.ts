@@ -23,7 +23,7 @@ const REFERRAL_CODES: ReferralCodeInfo[] = [
   { code: "LAN-CARD-01", landingSlug: "cardiologa-lanus", locationKey: "cimel", specialty: "cardiologia", description: "Landing 'Cardióloga en Lanús'" },
   { code: "LOM-CARD-01", landingSlug: "cardiologa-lomas", locationKey: "swiss", specialty: "cardiologia", description: "Landing 'Cardióloga en Lomas de Zamora'" },
   { code: "CABA-CARD-01", landingSlug: "cardiologa-caba", locationKey: "britanico", specialty: "cardiologia", description: "Landing 'Cardióloga en CABA'" },
-  { code: "LAN-ECO-01", landingSlug: "ecocardiograma-lanus", locationKey: "cimel", specialty: "ecocardiograma", description: "Landing 'Ecocardiograma en Lanús'" },
+  { code: "LAN-ECO-01", landingSlug: "ecocardiograma-lanus", locationKey: "britanico", specialty: "ecocardiograma", description: "Landing 'Ecocardiograma en Lanús' — Hospital Británico Lanús" },
   { code: "LOM-ECO-01", landingSlug: "ecocardiograma-lomas", locationKey: "swiss", specialty: "ecocardiograma", description: "Landing 'Ecocardiograma en Lomas de Zamora'" },
   { code: "CABA-ECO-01", landingSlug: "ecocardiograma-caba", locationKey: "britanico", specialty: "ecocardiograma", description: "Landing 'Ecocardiograma en CABA'" },
   { code: "LAN-CONS-01", landingSlug: "consulta-cardiologica-lanus", locationKey: "cimel", specialty: "consulta_cardiologica", description: "Landing 'Consulta Cardiológica en Lanús'" },

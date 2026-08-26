@@ -95,19 +95,19 @@ const SERVICE_ICONS: Record<string, LucideIcon> = {
 const MAIN_FAQ = [
   {
     q: "¿Dónde atiende la Dra. Lucía Chahin?",
-    a: "La Dra. Lucía Chahin atiende en tres sedes: CIMEL Lanús (Tucumán 1314, Lanús) los martes, Hospital Británico (Central) (Perdriel 74, CABA) los miércoles, y Swiss Medical Lomas de Zamora (Oliden 141) los viernes.",
+    a: "La Dra. Lucía Chahin atiende en CIMEL Lanús los martes, jueves y viernes; realiza ecocardiogramas en Hospital Británico Lanús los martes; atiende en Hospital Británico Central los miércoles y en Swiss Medical Lomas los viernes.",
   },
   {
     q: "¿Qué días atiende en CIMEL Lanús?",
-    a: "Atiende los martes en CIMEL Lanús, Tucumán 1314, Lanús.",
+    a: "Atiende en CIMEL Lanús los martes de 13:00 a 15:00 y los jueves y viernes de 13:00 a 16:00, en Tucumán 1314, Lanús.",
   },
   {
     q: "¿Qué días atiende en Swiss Medical Lomas?",
-    a: "Atiende los viernes en Swiss Medical Lomas de Zamora, Oliden 141.",
+    a: "Atiende los viernes de 17:00 a 20:00 en Swiss Medical Lomas de Zamora, Oliden 141.",
   },
   {
     q: "¿Qué días atiende en el Hospital Británico?",
-    a: "Atiende los miércoles en el Hospital Británico (Central), Perdriel 74, CABA.",
+    a: "Realiza ecocardiogramas los martes de 16:00 a 19:30 en Hospital Británico Lanús y atiende los miércoles de 17:00 a 19:45 en Hospital Británico Central.",
   },
   {
     q: "¿Qué estudios realiza la Dra. Lucía Chahin?",
@@ -123,7 +123,7 @@ const MAIN_FAQ = [
   },
   {
     q: "¿Cómo pido turno en el Hospital Británico?",
-    a: "Llamá al 4309-6400 (atención telefónica 24hs) o a la Central de Turnos 0810-222-2748 / 11-3015-9749, o pedí turno desde la app del Hospital Británico (Central), y solicitá turno con la Dra. Lucía Chahin en cardiología.",
+    a: "Llamá a la Central de Turnos 0810-222-2748 o al 4309-6400, o pedí turno desde la app del Hospital Británico. Solicitá turno con la Dra. Lucía Chahin e indicá si buscás Hospital Británico Lanús o Central.",
   },
   {
     q: "¿La Dra. Lucía Chahin atiende con obra social?",
@@ -154,7 +154,8 @@ function buildSubpageFaq(data: (typeof LANDING_DATA)[string]) {
   const loc = data.locations[0]
   const allSedes = LANDING_DATA["dra-lucia-chahin"].locations
   const otherSedes = allSedes.filter(s => s.name !== loc.name)
-  const otherSedesText = otherSedes.map(s => `${s.name} los ${s.day.toLowerCase()}`).join(" y ")
+  const otherSedesText = new Intl.ListFormat("es-AR", { type: "conjunction" })
+    .format(otherSedes.map(s => `${s.name} los ${s.day.toLowerCase()}`))
   return [
     { q: `¿Cómo pido turno con la Dra. Lucía Chahin en ${loc.name}?`, a: loc.instruction },
     {
@@ -220,7 +221,15 @@ function matchConfigLocation(locName: string, configLocations: ConfigLocation[])
     const cName = (c.name ?? "").toLowerCase()
     if (lower.includes("cimel") && cName.includes("cimel")) return true
     if (lower.includes("swiss") && cName.includes("swiss")) return true
-    if ((lower.includes("británico") || lower.includes("britanico")) && (cName.includes("británico") || cName.includes("britanico"))) return true
+    const isBritanico = lower.includes("británico") || lower.includes("britanico")
+    const configIsBritanico = cName.includes("británico") || cName.includes("britanico")
+    if (isBritanico && configIsBritanico) {
+      const wantsLanus = lower.includes("lanús") || lower.includes("lanus")
+      const configIsLanus = cName.includes("lanús") || cName.includes("lanus")
+      // La configuración histórica de Hospital Británico representa Central. Nunca usarla para
+      // pisar dirección/horarios de la nueva sede Lanús si esa sede aún no fue cargada por separado.
+      return wantsLanus ? configIsLanus : !configIsLanus
+    }
     return cName === lower
   })
 }
@@ -228,12 +237,16 @@ function matchConfigLocation(locName: string, configLocations: ConfigLocation[])
 function buildSedeActions(locations: PublicLandingLocation[], configLocations: ConfigLocation[], slug: string): SedeAction[] {
   return locations.map(loc => {
     const cfg = matchConfigLocation(loc.name, configLocations)
-    const key = whatsAppKeyForLocation(loc.name)
+    const trackingKey = loc.trackingKey ?? whatsAppKeyForLocation(loc.name)
+    const key = loc.key ?? trackingKey
     return {
       key,
+      trackingKey,
       name: loc.name,
       day: loc.day,
-      hours: cfg?.hours || undefined,
+      // El cronograma confirmado por la doctora es la fuente pública; la configuración puede
+      // completar sedes antiguas, pero no volver a mostrar horarios previos después del deploy.
+      hours: loc.hours || cfg?.hours || undefined,
       address: cfg?.address || loc.address,
       phone: cfg?.phone || loc.phone,
       mapsUrl: cfg?.google_maps_link || loc.mapsUrl,
@@ -246,11 +259,11 @@ function buildSedeActions(locations: PublicLandingLocation[], configLocations: C
       // llega a nuestro webhook -- el código no se podría leer nunca, y solo ensuciaría el mensaje
       // que ve la recepción de esa institución.
       whatsappMessage: resolvesToBotNumber(cfg?.whatsapp)
-        ? withReferralCode(WHATSAPP_MESSAGES[key], slug, key)
-        : WHATSAPP_MESSAGES[key],
+        ? withReferralCode(WHATSAPP_MESSAGES[trackingKey], slug, trackingKey)
+        : WHATSAPP_MESSAGES[trackingKey],
       whatsapp: cfg?.whatsapp || undefined,
-      color: SEDE_COLOR[key] ?? "blue",
-      preferredLocationValue: PREFERRED_LOCATION_BY_KEY[key] ?? "sin_definir",
+      color: SEDE_COLOR[trackingKey] ?? "blue",
+      preferredLocationValue: PREFERRED_LOCATION_BY_KEY[trackingKey] ?? "sin_definir",
     }
   })
 }
@@ -330,7 +343,7 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
     "name": "Dra. Lucía Belén Chahin",
     "alternateName": "Lucía Chahin",
     "jobTitle": "Médica Cardióloga y Ecocardiografista",
-    "description": configDoctor.bio || "Médica cardióloga con formación en ecocardiografía avanzada, egresada de la residencia de cardiología del Hospital Británico de Buenos Aires, donde hoy continúa como cardióloga de planta. Atiende en CIMEL Lanús los martes, en el Hospital Británico (Central) los miércoles y en Swiss Medical Lomas de Zamora los viernes.",
+    "description": configDoctor.bio || "Médica cardióloga con formación en ecocardiografía avanzada, egresada de la residencia de cardiología del Hospital Británico de Buenos Aires, donde hoy continúa como cardióloga de planta. Atiende en CIMEL Lanús los martes, jueves y viernes; realiza ecocardiogramas en Hospital Británico Lanús los martes; atiende en Hospital Británico Central los miércoles y en Swiss Medical Lomas los viernes.",
     "medicalSpecialty": "Cardiology",
     "image": `${base}/lucia-chahin.jpg`,
     ...(configDoctor.matricula ? { "identifier": configDoctor.matricula } : {}),
@@ -352,6 +365,18 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
         "address": {
           "@type": "PostalAddress",
           "streetAddress": "Tucumán 1314",
+          "addressLocality": "Lanús",
+          "addressRegion": "Buenos Aires",
+          "addressCountry": "AR"
+        }
+      },
+      {
+        "@type": "MedicalOrganization",
+        "name": "Hospital Británico Lanús",
+        "telephone": "0810-222-2748",
+        "address": {
+          "@type": "PostalAddress",
+          "streetAddress": "Av. Hipólito Yrigoyen 4429",
           "addressLocality": "Lanús",
           "addressRegion": "Buenos Aires",
           "addressCountry": "AR"
@@ -504,7 +529,7 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
                 </div>
 
                 <div className="mt-5 flex flex-wrap justify-center gap-2 sm:justify-start">
-                  {["Hospital Británico", "CIMEL Lanús", "Swiss Medical Lomas", "Ecocardiograma"].map(chip => (
+                  {["CIMEL Lanús", "Hospital Británico Lanús", "Hospital Británico Central", "Swiss Medical Lomas", "Ecocardiograma"].map(chip => (
                     <span key={chip} className="rounded-full border border-line bg-white px-3 py-1 text-xs font-medium text-ink-soft">
                       {chip}
                     </span>

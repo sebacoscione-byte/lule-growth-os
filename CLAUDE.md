@@ -1148,6 +1148,11 @@
   a roles autorizados con MFA, no pasan por IA y no producen respuestas automáticas; la barrida
   semanal existente los elimina sin sumar un cron. La cabecera móvil del Inbox apila identidad y
   acciones para evitar botones cortados.
+- 2026-08-26: la agenda pública quedó actualizada con cuatro sedes/bloques de atención: CIMEL
+  Lanús (martes 13:00–15:00; jueves y viernes 13:00–16:00), Hospital Británico Lanús
+  (ecocardiogramas los martes 16:00–19:30), Hospital Británico Central (miércoles
+  17:00–19:45) y Swiss Medical Lomas (viernes 17:00–20:00). Las landings derivan a los canales
+  oficiales de cada institución y no dependen del bot de WhatsApp para pedir turno.
 - 2026-07-16 (**estado vigente del bot de WhatsApp; supersede las notas históricas de Ola 0/WA-02/WA-03 y DATA-02 que describen la implementación anterior**): el webhook valida firma sobre el body crudo, limita tamaño, normaliza con esquema cerrado y persiste un envelope mínimo en una cola durable. El worker usa leases, reintentos, DLQ, checkpoint `handler_completed_at` y ACK idempotente; no se vuelve a ejecutar el handler después de completar el efecto de negocio. Las salidas usan un outbox/ledger con identidad estable, CAS antes de Meta y cuarentena ante resultado ambiguo. El borrado crea tombstones HMAC y coordina writers/workers con advisory locks. La IA de WhatsApp solo puede devolver enums de clasificación validados: **nunca genera texto médico libre visible al paciente**, y todo contenido médico/sensible se responde con catálogo fijo determinístico sin persistir el texto. Presión arterial de alarma: sistólica `>180` o diastólica `>120`, con manejo de negación, antecedentes y terceros. El seguimiento requiere consentimiento específico `appointment_followup` vigente, además del estado/claim correspondiente. Los PR #96–#102 están mergeados; las diez migraciones están aplicadas y producción quedó verificada. El worker frecuente usa un único job `lule-whatsapp-worker-every-minute` de `pg_cron` (`* * * * *`) que invoca mediante `pg_net` la URL y el `CRON_SECRET` cifrados en Supabase Vault. Vercel Production fija `META_GRAPH_API_VERSION=v25.0`; el preflight read-only devuelve 200 y sólo códigos cerrados. `enforce_roles` y `require_mfa_for_sensitive_actions` están activos: existe una cuenta `owner` y una `doctor`, ambas con MFA verificado; dos cuentas deliberadamente sin rol quedan bloqueadas. El `owner` decidió operar sin segundo autenticador, por lo que perder el único factor requiere recuperación administrativa. CIMEL Lanús, Hospital Británico y Swiss Medical Lomas están activas y tienen evidencia individual vigente. `ALERT_WHATSAPP_TO` está configurado como sensible; `alerta_interna_derivacion` sigue `pendiente_meta`. Gates externos: aprobar el template en Meta, completar revisión legal y disponer de staging.
 - 2026-07-16 (runbook de acceso): al activar el flag MFA, el gate central exige AAL2 antes de todo el CRM porque RLS protege también lecturas PII. Recuperación sin endpoint público: verificar identidad fuera de banda, eliminar el factor por Supabase Admin/Dashboard y reenrolar; nunca imprimir ni copiar secretos TOTP o PII. Ver `docs/WHATSAPP_SECURITY_ROLES_RETENTION.md`.
 - 2026-06-11: Setup inicial del proyecto. MVP Fase 1 en construcción.
@@ -2277,7 +2282,8 @@ plano, sin cookies, que siempre autentica como `service_role` real.
 - **Servicios**: Consulta cardiológica, Ecocardiograma
 - **Ubicaciones**:
   - CIMEL Lanús
-  - Hospital Británico
+  - Hospital Británico Lanús
+  - Hospital Británico Central
   - Swiss Medical Lomas
   El bot solo puede comunicar direcciones, horarios, coberturas y canales marcados como verificados
   en la configuración vigente; no tomar los valores históricos de este documento como fuente operativa.

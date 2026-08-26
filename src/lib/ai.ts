@@ -478,7 +478,7 @@ Podés mencionar esta fuente de forma general si es relevante, pero el contenido
   return `Sos la Dra. Lucía Chahin, cardióloga, y escribís vos misma el contenido de tu cuenta para Instagram y Google Business.
 
 CONTEXTO:
-- Atendés martes en CIMEL Lanús (Tucumán 1314), miércoles en Hospital Británico (Central) (Perdriel 74, CABA) y viernes en Swiss Medical Lomas
+- Atendés en CIMEL Lanús martes 13:00–15:00, jueves y viernes 13:00–16:00; realizás ecocardiogramas en Hospital Británico Lanús los martes 16:00–19:30; atendés en Hospital Británico Central los miércoles 17:00–19:45 y en Swiss Medical Lomas los viernes 17:00–20:00
 - La app NO reserva turnos ni da diagnósticos
 - Objetivo: educar, generar conciencia cardiovascular e invitar a pedir turno
 
@@ -1080,7 +1080,7 @@ Reglas:
 - No uses mensajes alarmistas ni asumas que el lector tiene una condicion.
 - Ante sintomas de alarma, indica guardia o atencion medica inmediata.
 - El objetivo es educar e invitar puntualmente a pedir turno con vos, nunca con un "medico de confianza" generico ni derivando a otro profesional.
-- Atendés martes en CIMEL Lanús, miércoles en Hospital Británico (Central) y viernes en Swiss Medical Lomas.
+- Atendés en CIMEL Lanús martes, jueves y viernes; realizás ecocardiogramas en Hospital Británico Lanús los martes; atendés en Hospital Británico Central los miércoles y en Swiss Medical Lomas los viernes.
 - NUNCA inventes telefonos, direcciones web, nombres de apps ni otros canales de contacto que no te hayan sido provistos explicitamente en el pedido. Si no tenes un link de turnos, usa "link en la bio" nada mas.
 - Gemini resolvera despues la placa final e integrara el titular y subtitulo.
 ${PLAIN_TEXT_RULES}
@@ -1814,7 +1814,7 @@ export async function proposeAutoDraftCategories(input: {
     json: true,
     purpose: "auto_draft_category",
     cacheSystem: true,
-    system: `Sos la Dra. Lucía Chahin, cardióloga (CIMEL Lanús martes, Hospital Británico miércoles, Swiss Medical Lomas viernes; servicios reales: consulta cardiológica y ecocardiograma), pensando qué temas conviene cubrir a continuación en el contenido de Instagram/Google Business de tu consultorio.
+    system: `Sos la Dra. Lucía Chahin, cardióloga (CIMEL Lanús martes, jueves y viernes; ecocardiogramas en Hospital Británico Lanús los martes; Hospital Británico Central los miércoles; Swiss Medical Lomas los viernes; servicios reales: consulta cardiológica y ecocardiograma), pensando qué temas conviene cubrir a continuación en el contenido de Instagram/Google Business de tu consultorio.
 
 Te van a pasar la lista de categorías ya establecidas en la cuenta y el historial reciente de piezas
 (publicadas, aprobadas o en borrador, con hace cuántos días se creó cada una). Tu tarea es proponer N
@@ -1923,7 +1923,7 @@ export async function generateGooglePost(topic: string): Promise<string> {
     cacheSystem: true,
     system: `Sos la Dra. Lucia Chahin, cardiologa, y escribis vos misma tu publicacion para Google Business Profile en primera persona (ej: "atiendo los martes", nunca "la Dra. Chahin atiende").
 Tono profesional y claro. Maximo 1500 caracteres. Sin promesas medicas.
-Siempre inclui donde atendes (CIMEL Lanús los martes, Hospital Británico (Central) los miércoles, Swiss Medical Lomas los viernes).
+Siempre inclui donde atendes (CIMEL Lanús los martes, jueves y viernes; ecocardiogramas en Hospital Británico Lanús los martes; Hospital Británico Central los miércoles; Swiss Medical Lomas los viernes).
 NUNCA incluyas numeros de telefono en el texto: Google Business Profile bloquea o rechaza publicaciones que contienen telefonos. Si hay que decir como pedir turno, remiti al perfil, a la app de la institucion o al link de la bio.
 ${PLAIN_TEXT_RULES}
 Solo devolve el texto de la publicacion.`,
