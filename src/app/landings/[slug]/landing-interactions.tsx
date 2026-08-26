@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo, useRef } from "react"
 import { MapPin, Clock, ChevronDown, ChevronUp, Phone, Map, MessageCircle, CalendarCheck } from "lucide-react"
 import { buildWhatsAppUrl } from "@/lib/public-landings"
 import { trackLandingEvent } from "@/lib/landing-track"
@@ -25,6 +25,7 @@ export interface SedeAction {
 
 function useUtmParams(onReady?: (utms: Record<string, string>) => void) {
   const [utms, setUtms] = useState<Record<string, string>>({})
+  const [ready, setReady] = useState(false)
   useEffect(() => {
     const sp = new URLSearchParams(window.location.search)
     const result: Record<string, string> = {}
@@ -34,10 +35,11 @@ function useUtmParams(onReady?: (utms: Record<string, string>) => void) {
     }
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setUtms(result)
+    setReady(true)
     onReady?.(result)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
-  return utms
+  return { utms, ready }
 }
 
 // ─── Card de sede con CTA persistente ──────────────────────────────────────────
@@ -192,10 +194,23 @@ export function LandingInteractions({
 }) {
   const [expandedKey, setExpandedKey] = useState<string | null>(null)
   const [engagedKeys, setEngagedKeys] = useState<Set<string>>(new Set())
-  const variantExtra = heroVariant ? { variant: heroVariant } : undefined
-  const utms = useUtmParams(freshUtms =>
+  const sectionRef = useRef<HTMLElement>(null)
+  const variantExtra = useMemo(() => heroVariant ? { variant: heroVariant } : undefined, [heroVariant])
+  const { utms, ready: utmsReady } = useUtmParams(freshUtms =>
     trackLandingEvent("page_view", slug, { ...variantExtra, ...freshUtms })
   )
+
+  useEffect(() => {
+    if (!utmsReady || !sectionRef.current) return
+    const section = sectionRef.current
+    const observer = new IntersectionObserver(entries => {
+      if (!entries.some(entry => entry.isIntersecting)) return
+      trackLandingEvent("view_booking_options", slug, { ...utms, ...variantExtra })
+      observer.disconnect()
+    }, { threshold: 0.01, rootMargin: "0px 0px -25% 0px" })
+    observer.observe(section)
+    return () => observer.disconnect()
+  }, [slug, utms, utmsReady, variantExtra])
 
   function engage(sede: SedeAction) {
     if (engagedKeys.has(sede.key)) return
@@ -216,7 +231,7 @@ export function LandingInteractions({
   }
 
   return (
-    <section id="pedir-turno" className="scroll-mt-20 py-12 px-4">
+    <section ref={sectionRef} id="pedir-turno" className="scroll-mt-20 py-12 px-4">
       <div className="max-w-2xl mx-auto space-y-4">
         <h2 className="font-display mb-2 text-center text-2xl font-semibold text-ink">Pedir turno</h2>
         <p className="mb-4 text-center text-sm text-ink-soft">

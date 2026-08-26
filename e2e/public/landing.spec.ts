@@ -33,6 +33,14 @@ test.describe("Landing principal (/dra-lucia-chahin)", () => {
     await expect(page.locator('a[href^="tel:"]').first()).toBeAttached()
     await expect(page.locator('a[href="#pedir-turno"]').first()).toBeAttached()
   })
+
+  test("muestra las opciones concretas de turno antes del contenido institucional", async ({ page }) => {
+    await page.goto("/dra-lucia-chahin")
+    const booking = page.getByRole("heading", { name: "Pedir turno", level: 2 })
+    const about = page.getByRole("heading", { name: "Sobre la Dra. Lucía Chahin", level: 2 })
+    await expect(booking).toBeVisible()
+    expect(await booking.evaluate((node, other) => Boolean(node.compareDocumentPosition(other as Node) & Node.DOCUMENT_POSITION_FOLLOWING), await about.elementHandle())).toBe(true)
+  })
 })
 
 for (const slug of SEO_LANDING_SLUGS) {

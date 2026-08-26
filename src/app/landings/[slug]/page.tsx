@@ -2,19 +2,17 @@ import type { Metadata } from "next"
 import Image from "next/image"
 import Link from "next/link"
 import { notFound } from "next/navigation"
-import { cookies } from "next/headers"
 import {
-  MapPin, Clock, AlertTriangle, Phone, Map, CalendarCheck, Shield, Star,
+  MapPin, Clock, AlertTriangle, Phone, CalendarCheck, Shield, Star,
   Stethoscope, HeartPulse, ClipboardCheck, Heart, type LucideIcon,
 } from "lucide-react"
 import {
   LANDING_DATA, PUBLIC_LANDING_SLUGS, WHATSAPP_MESSAGES, whatsAppKeyForLocation, SERVICE_MICROCOPY,
-  RELATED_LANDING_SLUGS, buildWhatsAppUrl, resolvesToBotNumber, type PublicLandingLocation,
+  RELATED_LANDING_SLUGS, resolvesToBotNumber, type PublicLandingLocation,
 } from "@/lib/public-landings"
-import { withReferralCode, withGeneralFallbackCode } from "@/lib/landing-referral-codes"
+import { withReferralCode } from "@/lib/landing-referral-codes"
 import { getServiceDb } from "@/lib/supabase/service"
 import { getGooglePlaceReviews } from "@/lib/google-places"
-import { HERO_VARIANT_COOKIE } from "@/lib/landing-track"
 import { buildMedicalClinicJsonLd, PHYSICIAN_SCHEMA_FRAGMENT } from "@/lib/public-schema"
 import { GoogleAnalytics } from "@/components/google-analytics"
 import { AnalyticsConsentBanner } from "@/components/analytics-consent-banner"
@@ -76,14 +74,6 @@ const SEDE_ACCENT_BG: Record<"blue" | "teal" | "britanico", string> = {
   teal: "bg-teal-600",
   britanico: "bg-britanico",
 }
-// Nombres de clase completos y literales a propósito: Tailwind no genera CSS para
-// clases armadas con template strings en runtime (necesita verlas enteras en el código fuente).
-const SEDE_ACCENT_HOVER_TEXT: Record<"blue" | "teal" | "britanico", string> = {
-  blue: "hover:text-blue-600",
-  teal: "hover:text-teal-600",
-  britanico: "hover:text-britanico",
-}
-
 const SERVICE_ICONS: Record<string, LucideIcon> = {
   "Consulta cardiológica": Stethoscope,
   "Ecocardiograma": HeartPulse,
@@ -164,14 +154,6 @@ function buildSubpageFaq(data: (typeof LANDING_DATA)[string]) {
     },
     { q: "¿Puedo atenderme en otra sede?", a: `Sí, la Dra. Lucía Chahin también atiende en ${otherSedesText}.` },
   ]
-}
-
-// Test A/B del hero (2026-07-07): variante "b" invierte el orden/enfasis de los dos botones
-// del hero principal (Pedir turno / Ver sedes y horarios), asignada 50/50 por cookie en
-// middleware.ts. Solo aplica a la landing principal, que es la unica con ambos botones.
-async function getHeroVariant(): Promise<"a" | "b"> {
-  const cookieStore = await cookies()
-  return cookieStore.get(HERO_VARIANT_COOKIE)?.value === "b" ? "b" : "a"
 }
 
 async function getConfigLocations(): Promise<ConfigLocation[]> {
@@ -319,7 +301,8 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
   if (!data) notFound()
 
   const isMain = slug === "dra-lucia-chahin"
-  const heroVariant = isMain ? await getHeroVariant() : undefined
+  // La prueba A/B histórica terminó: "Pedir turno" queda como acción principal para todo el tráfico.
+  const heroVariant = isMain ? "a" as const : undefined
   const [configLocations, configDoctor, placeReviews, instagramUsername] = await Promise.all([
     getConfigLocations(),
     getConfigDoctor(),
@@ -461,16 +444,16 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
 
       {/* Hero */}
       {isMain ? (
-        <section className="bg-paper px-4 pb-2 pt-14">
+        <section className="bg-paper px-4 pb-2 pt-8 sm:pt-14">
           <div className="mx-auto max-w-3xl">
-            <div className="flex flex-col gap-10 sm:flex-row sm:items-center">
+            <div className="flex flex-col gap-6 sm:flex-row sm:items-center sm:gap-10">
               <div className="shrink-0 self-center">
-                <div className="relative h-56 w-56 overflow-hidden rounded-full shadow-[0_18px_40px_-16px_rgba(22,36,44,0.35)] ring-1 ring-ink/10 sm:h-72 sm:w-72">
+                <div className="relative h-40 w-40 overflow-hidden rounded-full shadow-[0_18px_40px_-16px_rgba(22,36,44,0.35)] ring-1 ring-ink/10 sm:h-72 sm:w-72">
                   <Image
                     src="/lucia-chahin.jpg"
                     alt="Dra. Lucía Chahin — Cardióloga"
                     fill
-                    sizes="(min-width: 640px) 288px, 224px"
+                    sizes="(min-width: 640px) 288px, 160px"
                     className="object-cover object-top"
                     preload
                   />
@@ -478,13 +461,37 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
               </div>
               <div className="w-full min-w-0 text-center sm:text-left">
                 <p className="font-display text-sm font-medium italic text-cardiac">Cardióloga y Ecocardiografista</p>
-                <h1 className="font-display mt-1 text-4xl font-semibold leading-[1.1] text-ink sm:text-5xl">{data.h1.replace(" — Cardióloga", "")}</h1>
+                <h1 className="font-display mt-1 text-3xl font-semibold leading-[1.1] text-ink sm:text-5xl">{data.h1.replace(" — Cardióloga", "")}</h1>
                 {configDoctor.matricula && (
                   <p className="mt-2 text-xs text-ink-soft">Matrícula {configDoctor.matricula}</p>
                 )}
-                <p className="mt-4 leading-relaxed text-ink-soft sm:max-w-md">{data.intro}</p>
+                <div className="mt-5 flex flex-wrap justify-center gap-3 sm:justify-start">
+                  <HeroCtaLink
+                    href="#pedir-turno"
+                    slug={slug}
+                    variant="a"
+                    position="primary"
+                    className="inline-flex items-center gap-2 rounded-full bg-ink px-6 py-3 text-sm font-semibold text-paper transition-colors hover:bg-ink-soft"
+                  >
+                    <CalendarCheck className="h-4 w-4" />
+                    Pedir turno
+                  </HeroCtaLink>
+                  <HeroCtaLink
+                    href="#sedes"
+                    slug={slug}
+                    variant="a"
+                    position="secondary"
+                    className="inline-flex items-center gap-2 rounded-full border border-line px-6 py-3 text-sm font-semibold text-ink transition-colors hover:bg-paper-dim"
+                  >
+                    Ver sedes y horarios
+                  </HeroCtaLink>
+                </div>
+
+                <p className="mt-5 leading-relaxed text-ink-soft sm:max-w-md">
+                  Elegí dónde querés atenderte y abrí el canal oficial de la institución para pedir turno.
+                </p>
                 <p className="mt-2 text-sm text-ink-soft/80">
-                  Consultas cardiológicas y ecocardiogramas · {isMain ? "Lanús, CABA y Lomas de Zamora" : "Lanús y Lomas de Zamora"}
+                  Consultas cardiológicas y ecocardiogramas · Lanús, CABA y Lomas de Zamora
                 </p>
 
                 {instagramUsername && (
@@ -493,42 +500,7 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
                   </div>
                 )}
 
-                <div className="mt-6 flex flex-wrap justify-center gap-3 sm:justify-start">
-                  {/* Test A/B del hero: variante "b" invierte cual boton es primario. Ver getHeroVariant arriba. */}
-                  {(() => {
-                    const variant = heroVariant ?? "a"
-                    const primaryClass = "inline-flex items-center gap-2 rounded-full bg-ink px-6 py-3 text-sm font-semibold text-paper transition-colors hover:bg-ink-soft"
-                    const secondaryClass = "inline-flex items-center gap-2 rounded-full border border-line px-6 py-3 text-sm font-semibold text-ink transition-colors hover:bg-paper-dim"
-                    const pedirTurno = (
-                      <HeroCtaLink
-                        key="pedir-turno"
-                        href="#pedir-turno"
-                        slug={slug}
-                        variant={variant}
-                        position={variant === "b" ? "secondary" : "primary"}
-                        className={variant === "b" ? secondaryClass : primaryClass}
-                      >
-                        <CalendarCheck className="h-4 w-4" />
-                        Pedir turno
-                      </HeroCtaLink>
-                    )
-                    const verSedes = (
-                      <HeroCtaLink
-                        key="ver-sedes"
-                        href="#sedes"
-                        slug={slug}
-                        variant={variant}
-                        position={variant === "b" ? "primary" : "secondary"}
-                        className={variant === "b" ? primaryClass : secondaryClass}
-                      >
-                        Ver sedes y horarios
-                      </HeroCtaLink>
-                    )
-                    return variant === "b" ? <>{verSedes}{pedirTurno}</> : <>{pedirTurno}{verSedes}</>
-                  })()}
-                </div>
-
-                <div className="mt-5 flex flex-wrap justify-center gap-2 sm:justify-start">
+                <div className="mt-5 hidden flex-wrap justify-center gap-2 sm:flex sm:justify-start">
                   {["CIMEL Lanús", "Hospital Británico Lanús", "Hospital Británico Central", "Swiss Medical Lomas", "Ecocardiograma"].map(chip => (
                     <span key={chip} className="rounded-full border border-line bg-white px-3 py-1 text-xs font-medium text-ink-soft">
                       {chip}
@@ -538,7 +510,7 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
               </div>
             </div>
           </div>
-          <EcgDivider animated className="mx-auto mt-10 max-w-3xl" />
+          <EcgDivider animated className="mx-auto mt-8 max-w-3xl" />
         </section>
       ) : (
         <section className="bg-paper px-4 pb-2 pt-16">
@@ -563,6 +535,9 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
           <EcgDivider animated className="mx-auto mt-8 max-w-2xl" />
         </section>
       )}
+
+      {/* La elección concreta aparece antes del contenido informativo para acortar el camino a turnos. */}
+      <LandingInteractions slug={slug} locations={sedeActions} heroVariant={heroVariant} />
 
       {isMain && (
         <section className="px-4 py-12">
@@ -630,13 +605,10 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
 
                 {sede.address && <p className="text-sm text-ink-soft">{sede.address}</p>}
                 {sede.phone && (
-                  <a
-                    href={`tel:${sede.phone.replace(/[\s-]/g, "")}`}
-                    className={`mt-1 flex items-center gap-1.5 text-sm text-ink-soft ${SEDE_ACCENT_HOVER_TEXT[sede.color]}`}
-                  >
+                  <p className="mt-1 flex items-center gap-1.5 text-sm text-ink-soft">
                     <Phone className="h-3.5 w-3.5" />
                     {sede.phone}
-                  </a>
+                  </p>
                 )}
 
                 <div className="mt-3 flex flex-wrap items-center gap-3">
@@ -647,17 +619,6 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
                     <CalendarCheck className="h-4 w-4" />
                     Pedir turno en esta sede →
                   </a>
-                  {sede.mapsUrl && (
-                    <a
-                      href={sede.mapsUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1.5 text-sm font-medium text-ink-soft hover:text-ink"
-                    >
-                      <Map className="h-4 w-4" />
-                      Ver en Google Maps
-                    </a>
-                  )}
                 </div>
               </div>
             ))}
@@ -823,24 +784,13 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
               ) : (
                 <p className="mx-auto max-w-md text-center text-sm text-ink-soft">
                   Cada sede acepta distintas coberturas médicas. Para confirmar si tu obra social o prepaga tiene
-                  convenio, comunicate directamente con la sede elegida o{" "}
-                  <a
-                    href={buildWhatsAppUrl(withGeneralFallbackCode(WHATSAPP_MESSAGES.general))}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="font-medium text-cardiac hover:underline"
-                  >
-                    consultanos por WhatsApp
-                  </a>.
+                  convenio, elegí una sede en la sección de turnos y comunicate por uno de sus canales oficiales.
                 </p>
               )}
             </div>
           </section>
         )
       })()}
-
-      {/* Pedir turno + formulario */}
-      <LandingInteractions slug={slug} locations={sedeActions} heroVariant={heroVariant} />
 
       {/* Mapa HTML de landings: navegación útil y enlaces rastreables desde la página principal. */}
       {isMain && (

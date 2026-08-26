@@ -1,3 +1,12 @@
+# CERRADO (2026-08-26) — conversión de la landing y seguimiento por sede
+
+- [x] Auditar el enlace publicitario, la medición de sesiones y el recorrido real en celular.
+- [x] Mostrar el paso visita → interés → salida a un canal y desglosar las acciones por sede.
+- [x] Acercar la elección de sede y los canales de turno al inicio de la landing.
+- [x] Validar 3 migraciones, lint, 123 suites/1097 tests, build, 23 E2E públicos y experiencia móvil.
+
+---
+
 # CERRADO (2026-08-26) — detalle del dashboard más claro por canal
 
 - [x] Auditar la sección actual y separar información ejecutiva de datos técnicos.

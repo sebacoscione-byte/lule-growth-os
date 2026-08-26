@@ -1,12 +1,9 @@
-// Cookie de asignacion del test A/B del hero — misma constante usada por middleware.ts (donde se
-// asigna) y por landings/[slug]/page.tsx (donde se lee) para evitar un typo silencioso entre los dos.
-export const HERO_VARIANT_COOKIE = "lule_hero_variant"
 const LANDING_SESSION_STORAGE_KEY = "lule_landing_session_id"
 
 export type LandingEventType =
   | "cta_cimel" | "cta_swiss" | "cta_britanico"
   | "instructions_viewed" | "form_started" | "form_submitted"
-  | "page_view"
+  | "page_view" | "view_booking_options"
   | "click_booking" | "click_call" | "click_whatsapp" | "click_maps"
   | "click_hero_primary" | "click_hero_secondary" | "click_instagram"
 
