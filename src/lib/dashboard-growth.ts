@@ -53,6 +53,22 @@ export interface ActionPerformance {
   engagedVisits: number
 }
 
+export interface CampaignPerformance {
+  source: string
+  medium: string
+  campaign: string
+  content: string | null
+  visits: number
+  engagedVisits: number
+  leads: number
+  confirmed: number
+  visitToActionRate: number
+  visitToLeadRate: number
+  leadToConfirmedRate: number
+  firstSeen: string | null
+  lastSeen: string | null
+}
+
 export interface InstagramDashboardMetrics {
   available: boolean
   followers: number | null
@@ -85,6 +101,7 @@ export interface DashboardGrowthData {
   summary: GrowthPeriodSummary
   channels: ChannelPerformance[]
   actions: ActionPerformance[]
+  campaigns: CampaignPerformance[]
   instagram: InstagramDashboardMetrics
   google: GoogleDashboardMetrics
 }
@@ -207,6 +224,36 @@ async function readActions(supabase: SupabaseClient, period: DashboardPeriod): P
   }))
 }
 
+export function buildCampaignPerformance(row: Record<string, unknown>): CampaignPerformance {
+  const visits = Number(row.visits) || 0
+  const engagedVisits = Math.min(visits, Number(row.engaged_visits) || 0)
+  const leads = Number(row.leads) || 0
+  const confirmed = Math.min(leads, Number(row.confirmed) || 0)
+  const content = String(row.content ?? "").trim()
+
+  return {
+    source: String(row.source ?? "direct"),
+    medium: String(row.medium ?? "sin_medium"),
+    campaign: String(row.campaign ?? "sin_campana"),
+    content: content && content !== "sin_contenido" ? content : null,
+    visits,
+    engagedVisits,
+    leads,
+    confirmed,
+    visitToActionRate: rate(engagedVisits, visits),
+    visitToLeadRate: rate(leads, visits),
+    leadToConfirmedRate: rate(confirmed, leads),
+    firstSeen: typeof row.first_seen === "string" ? row.first_seen : null,
+    lastSeen: typeof row.last_seen === "string" ? row.last_seen : null,
+  }
+}
+
+async function readCampaigns(supabase: SupabaseClient, period: DashboardPeriod): Promise<CampaignPerformance[]> {
+  const { data, error } = await supabase.rpc("dashboard_campaign_performance", { p_days: period })
+  if (error) throw error
+  return (data ?? []).map((row: Record<string, unknown>) => buildCampaignPerformance(row))
+}
+
 async function readInstagram(supabase: SupabaseClient, period: DashboardPeriod): Promise<InstagramDashboardMetrics> {
   try {
     const { data, error } = await supabase
@@ -316,10 +363,11 @@ export async function getDashboardGrowthData(
   supabase: SupabaseClient,
   period: DashboardPeriod
 ): Promise<DashboardGrowthData> {
-  const [trendResult, channelsResult, actionsResult, instagram, google] = await Promise.all([
+  const [trendResult, channelsResult, actionsResult, campaignsResult, instagram, google] = await Promise.all([
     readTrend(supabase, period).then(value => ({ ok: true as const, value })).catch(() => ({ ok: false as const })),
     readChannels(supabase, period).then(value => ({ ok: true as const, value })).catch(() => ({ ok: false as const })),
     readActions(supabase, period).then(value => ({ ok: true as const, value })).catch(() => ({ ok: false as const })),
+    readCampaigns(supabase, period).then(value => ({ ok: true as const, value })).catch(() => ({ ok: false as const })),
     readInstagram(supabase, period),
     readGoogle(supabase, period),
   ])
@@ -333,6 +381,7 @@ export async function getDashboardGrowthData(
       : emptySummary(),
     channels: channelsResult.ok ? channelsResult.value : [],
     actions: actionsResult.ok ? actionsResult.value : [],
+    campaigns: campaignsResult.ok ? campaignsResult.value : [],
     instagram,
     google,
   }

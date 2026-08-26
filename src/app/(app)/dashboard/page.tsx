@@ -6,6 +6,7 @@ import {
   MapPin, Camera, Search, MessageSquare, Globe, Lightbulb, Eye,
   MousePointerClick, TrendingUp, ArrowUpRight, ArrowDownRight, Minus,
   CalendarDays, PhoneCall, Navigation, Star, BarChart3, AlertTriangle,
+  Megaphone, DollarSign,
 } from "lucide-react"
 import { STATUS_LABELS, STATUS_COLORS, type Lead } from "@/types"
 import { timeAgo } from "@/lib/utils"
@@ -34,6 +35,7 @@ import {
   type DashboardPeriod,
   type PeriodValue,
 } from "@/lib/dashboard-growth"
+import { getMetaAdsDashboardMetrics, type MetaAdsStatus } from "@/lib/meta-ads"
 
 const CHANNEL_ICON: Record<RecommendationChannel, typeof Globe> = {
   web: Globe, whatsapp: MessageSquare, instagram: Camera, google: MapPin,
@@ -427,6 +429,7 @@ async function getDashboardData(period: DashboardPeriod) {
     weeklyReports,
     growth,
     contentPerformance,
+    metaAds,
   ] = await Promise.all([
     getLandingRanking(supabase, period),
     getHeroVariantResults(supabase, period),
@@ -437,13 +440,14 @@ async function getDashboardData(period: DashboardPeriod) {
     getWeeklyReports(supabase),
     getDashboardGrowthData(supabase, period),
     getContentPerformance(supabase, period),
+    getMetaAdsDashboardMetrics(period),
   ])
   const growthRecommendations = await getGrowthRecommendationsData(supabase, landingRanking.rows, heroVariantResults.rows, period)
 
   return {
     metrics, recentLeads: (recentLeads ?? []) as Lead[],
     landingRanking, heroVariantResults, referralFunnel, clicksByLocation, instagramWebClicks,
-    whatsappCostSummary, growthRecommendations, weeklyReports, growth, contentPerformance,
+    whatsappCostSummary, growthRecommendations, weeklyReports, growth, contentPerformance, metaAds,
   }
 }
 
@@ -611,6 +615,37 @@ const ACTION_META: Record<string, { label: string; icon: typeof Globe; className
   click_maps: { label: "Cómo llegar", icon: Navigation, className: "bg-amber-50 text-amber-700" },
 }
 
+const META_ADS_STATUS_COPY: Record<Exclude<MetaAdsStatus, "available">, string> = {
+  not_configured: "La atribución web ya está activa. Falta habilitar la lectura de la cuenta publicitaria de Meta para sumar inversión, alcance, impresiones y clics.",
+  invalid_configuration: "La configuración de Meta Ads está incompleta o tiene un identificador inválido.",
+  provider_rejected: "Meta rechazó la credencial publicitaria. Hay que renovarla o revisar el permiso ads_read.",
+  provider_unavailable: "Meta Ads no respondió a tiempo. La atribución propia sigue funcionando y se volverá a intentar al recargar.",
+  invalid_provider_response: "Meta devolvió una respuesta que no se pudo validar. La atribución propia sigue disponible.",
+}
+
+const META_PLATFORM_LABEL: Record<string, string> = {
+  instagram: "Instagram",
+  facebook: "Facebook",
+  messenger: "Messenger",
+  audience_network: "Audience Network",
+  sin_desglose: "Sin desglose",
+}
+
+function readableTrackingValue(value: string): string {
+  if (value === "sin_medium") return "Sin medio"
+  return value
+    .replace(/[_-]+/g, " ")
+    .replace(/\b\w/g, letter => letter.toUpperCase())
+}
+
+function formatAdsMoney(amount: number, currency: string | null): string {
+  return new Intl.NumberFormat("es-AR", {
+    style: "currency",
+    currency: currency || "USD",
+    maximumFractionDigits: 2,
+  }).format(amount)
+}
+
 export default async function DashboardPage({
   searchParams,
 }: {
@@ -621,6 +656,7 @@ export default async function DashboardPage({
     metrics, recentLeads, landingRanking,
     heroVariantResults, referralFunnel, clicksByLocation, instagramWebClicks,
     whatsappCostSummary, growthRecommendations, weeklyReports, growth, contentPerformance,
+    metaAds,
   } = await getDashboardData(period)
 
   const maxFunnel = Math.max(growth.summary.visits.current, 1)
@@ -773,6 +809,147 @@ export default async function DashboardPage({
           </CardContent>
         </Card>
       )}
+
+      <SectionHeader icon={Megaphone} title="Campañas y publicidad" />
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Megaphone className="h-4 w-4 text-fuchsia-600" />
+            Resultados atribuidos por campaña
+          </CardTitle>
+          <p className="text-xs text-gray-500">
+            Usa los UTM guardados por la landing para seguir visita → acción → lead → turno. Incluye
+            datos históricos de la campaña actual aunque este panel se haya agregado después de publicarla.
+          </p>
+        </CardHeader>
+        <CardContent>
+          {growth.campaigns.length === 0 ? (
+            <p className="text-sm text-gray-400">
+              Todavía no hay visitas con <span className="font-mono">utm_campaign</span> en este período.
+            </p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[920px] text-sm">
+                <thead>
+                  <tr className="border-b text-left text-xs text-gray-500">
+                    <th className="pb-3 font-medium">Campaña / contenido</th>
+                    <th className="pb-3 font-medium">Origen</th>
+                    <th className="pb-3 text-right font-medium">Visitas</th>
+                    <th className="pb-3 text-right font-medium">Con acción</th>
+                    <th className="pb-3 text-right font-medium">Leads</th>
+                    <th className="pb-3 text-right font-medium">Visita → lead</th>
+                    <th className="pb-3 text-right font-medium">Turnos</th>
+                    <th className="pb-3 text-right font-medium">Lead → turno</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {growth.campaigns.map(row => (
+                    <tr
+                      key={`${row.source}:${row.medium}:${row.campaign}:${row.content ?? ""}`}
+                      className="border-b border-gray-50 last:border-0"
+                    >
+                      <td className="py-3 pr-4">
+                        <p className="font-semibold text-gray-900">{readableTrackingValue(row.campaign)}</p>
+                        <p className="mt-0.5 text-xs text-gray-400">
+                          {row.content ? readableTrackingValue(row.content) : "Sin variante de contenido"}
+                          {row.firstSeen && row.lastSeen ? ` · ${new Date(`${row.firstSeen}T12:00:00`).toLocaleDateString("es-AR")}–${new Date(`${row.lastSeen}T12:00:00`).toLocaleDateString("es-AR")}` : ""}
+                        </p>
+                      </td>
+                      <td className="py-3 pr-4">
+                        <p className="font-medium text-gray-700">{readableTrackingValue(row.source)}</p>
+                        <p className="text-xs text-gray-400">{readableTrackingValue(row.medium)}</p>
+                      </td>
+                      <td className="py-3 text-right text-gray-700">{row.visits}</td>
+                      <td className="py-3 text-right text-cyan-700">
+                        <span className="font-semibold">{row.engagedVisits}</span>
+                        <span className="ml-1 text-xs text-gray-400">({row.visitToActionRate}%)</span>
+                      </td>
+                      <td className="py-3 text-right font-semibold text-violet-700">{row.leads}</td>
+                      <td className="py-3 text-right text-gray-700">{row.visitToLeadRate}%</td>
+                      <td className="py-3 text-right font-semibold text-emerald-700">{row.confirmed}</td>
+                      <td className="py-3 text-right text-gray-700">{row.leadToConfirmedRate}%</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+          <p className="mt-3 text-[11px] text-gray-400">
+            “Con acción” cuenta visitas únicas que tocaron turno online, llamada, WhatsApp o cómo llegar;
+            no suma varias veces a la misma pestaña. Un enlace con <span className="font-mono">utm_source=instagram</span>
+            se atribuye a Instagram aunque Meta lo haya mostrado también en Facebook.
+          </p>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <DollarSign className="h-4 w-4 text-emerald-600" />
+            Métricas de la cuenta publicitaria de Meta
+          </CardTitle>
+          <p className="text-xs text-gray-500">
+            Datos directos de Meta para el mismo período: inversión, impresiones y clics separados por
+            campaña y plataforma. No se envían datos de pacientes a Meta.
+          </p>
+        </CardHeader>
+        <CardContent>
+          {metaAds.status !== "available" ? (
+            <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+              <p className="font-semibold">Integración publicitaria pendiente</p>
+              <p className="mt-1">{META_ADS_STATUS_COPY[metaAds.status]}</p>
+              <p className="mt-2 text-xs text-amber-700">
+                Esto no afecta la campaña en circulación ni el seguimiento UTM de la tabla anterior.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+                <MetricTile label="Inversión" value={formatAdsMoney(metaAds.totals.spend, metaAds.currency)} helper={metaAds.accountName ?? "Cuenta de Meta Ads"} />
+                <MetricTile label="Impresiones" value={metaAds.totals.impressions.toLocaleString("es-AR")} />
+                <MetricTile label="Clics en enlace" value={metaAds.totals.linkClicks.toLocaleString("es-AR")} helper={`CTR ${metaAds.totals.linkCtr}%`} />
+                <MetricTile label="Costo por clic" value={metaAds.totals.costPerLinkClick === null ? null : formatAdsMoney(metaAds.totals.costPerLinkClick, metaAds.currency)} />
+              </div>
+
+              {metaAds.campaigns.length === 0 ? (
+                <p className="text-sm text-gray-400">Meta no registró actividad publicitaria en este período.</p>
+              ) : (
+                <div className="overflow-x-auto border-t border-gray-100 pt-4">
+                  <table className="w-full min-w-[860px] text-sm">
+                    <thead>
+                      <tr className="border-b text-left text-xs text-gray-500">
+                        <th className="pb-3 font-medium">Campaña</th>
+                        <th className="pb-3 font-medium">Plataforma</th>
+                        <th className="pb-3 text-right font-medium">Inversión</th>
+                        <th className="pb-3 text-right font-medium">Impresiones</th>
+                        <th className="pb-3 text-right font-medium">Alcance</th>
+                        <th className="pb-3 text-right font-medium">Clics</th>
+                        <th className="pb-3 text-right font-medium">CTR enlace</th>
+                        <th className="pb-3 text-right font-medium">Costo/clic</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {metaAds.campaigns.map(row => (
+                        <tr key={`${row.campaignId}:${row.platform}`} className="border-b border-gray-50 last:border-0">
+                          <td className="py-3 pr-4 font-medium text-gray-900">{row.campaignName}</td>
+                          <td className="py-3 pr-4 text-gray-700">{META_PLATFORM_LABEL[row.platform] ?? readableTrackingValue(row.platform)}</td>
+                          <td className="py-3 text-right font-semibold text-gray-900">{formatAdsMoney(row.spend, metaAds.currency)}</td>
+                          <td className="py-3 text-right text-gray-700">{row.impressions.toLocaleString("es-AR")}</td>
+                          <td className="py-3 text-right text-gray-700">{row.reach.toLocaleString("es-AR")}</td>
+                          <td className="py-3 text-right text-gray-700">{row.linkClicks.toLocaleString("es-AR")}</td>
+                          <td className="py-3 text-right text-gray-700">{row.linkCtr}%</td>
+                          <td className="py-3 text-right text-gray-700">{row.costPerLinkClick === null ? "—" : formatAdsMoney(row.costPerLinkClick, metaAds.currency)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Recomendaciones de crecimiento */}
       {growthRecommendations.available && growthRecommendations.recommendations.length > 0 && (

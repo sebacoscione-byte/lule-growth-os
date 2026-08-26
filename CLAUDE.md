@@ -1,6 +1,15 @@
 ﻿# Lule Growth OS — Contexto para Claude
 
 ## Estado actual
+- 2026-08-26 (campañas pagas y Meta Ads): `/dashboard` agrega un embudo por dimensiones UTM
+  (`source`/`medium`/`campaign`/`content`) con visitas únicas, visitas con acción, leads y turnos;
+  recupera datos históricos ya guardados, incluida `presentacion_doctora_agosto_2026`. Se sumó un
+  lector server-only fail-soft de Marketing API que, al configurar `META_AD_ACCOUNT_ID` y
+  `META_ADS_ACCESS_TOKEN` con `ads_read`, muestra inversión, impresiones, alcance, clics, CTR y costo
+  por clic por campaña/plataforma. El token viaja únicamente por Bearer y nunca se devuelve ni se
+  registra. Sin credencial, el panel UTM sigue operativo y la UI muestra el pendiente externo. No se
+  agregaron crons, Pixel/CAPI, envío de datos de pacientes, lógica médica ni cambios a WhatsApp. Ver
+  `docs/META_ADS_ANALYTICS.md`.
 - 2026-08-24 (bug real: de 2 historias evergreen salió solo la primera): reconstruido contra Meta,
   Supabase y logs de Vercel. El cron comenzó a las 18:43 ART y Meta publicó **"TU CONTROL
   CARDIOVASCULAR, SIN POSTERGACIONES"** a las 18:44, pero Vercel terminó la ruta

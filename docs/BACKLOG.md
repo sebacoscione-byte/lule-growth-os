@@ -1,5 +1,41 @@
 # Backlog — Lule Growth OS
-**Actualizado:** 2026-08-24 | **Basado en:** PRD Estrategia de Captación v2.1
+**Actualizado:** 2026-08-26 | **Basado en:** PRD Estrategia de Captación v2.1
+
+---
+
+## [ACCIÓN DE SEBA] Habilitar lectura de Meta Ads en producción (2026-08-26)
+
+El código ya puede mostrar en `/dashboard` inversión, impresiones, alcance, clics en enlace, CTR y
+costo por clic por campaña, con desglose Instagram/Facebook. También quedó resuelto el embudo propio
+por UTM (visita → acción → lead → turno), que funciona sin Meta y recupera retroactivamente la campaña
+`presentacion_doctora_agosto_2026`.
+
+Para que aparezcan las métricas publicitarias nativas falta una acción externa con acceso al portfolio:
+
+1. En **Configuración del negocio → Cuentas → Cuentas publicitarias**, confirmar que la cuenta usada
+   para promocionar el post pertenece al portfolio **Dra Lucia Chahin** y que Sebastián tiene acceso.
+2. En Meta for Developers, habilitar Marketing API para la app/negocio y generar una credencial de
+   servidor con permiso de lectura `ads_read` sobre esa cuenta. Meta puede exigir verificación del
+   negocio o revisión del permiso según el tipo/estado de la app.
+3. Cargar únicamente en Vercel Production, nunca en el repositorio ni en un chat:
+   `META_AD_ACCOUNT_ID` y `META_ADS_ACCESS_TOKEN`. `META_GRAPH_API_VERSION` ya existe y se reutiliza.
+4. Redeployar y abrir `/dashboard?period=7`: la tarjeta “Métricas de la cuenta publicitaria de Meta”
+   debe pasar de “Integración pendiente” a los resultados reales.
+
+Guía operativa y controles de privacidad: `docs/META_ADS_ANALYTICS.md`.
+
+### [BACKLOG] Decisiones externas posteriores
+
+- Para próximas campañas creadas en Ads Manager, decidir si se usan parámetros dinámicos de Meta
+  para que `utm_source` identifique la plataforma real. La promoción vigente usa un enlace estático
+  con `utm_source=instagram`; por eso la atribución web la agrupa en Instagram aunque el anuncio se
+  muestre también en Facebook. El nuevo panel de Meta sí separa ambas plataformas.
+- Meta Pixel / Conversions API queda deliberadamente sin implementar hasta definir con asesoría de
+  privacidad qué eventos genéricos son aceptables para un sitio médico. Nunca se deberán enviar
+  síntomas, diagnósticos, estudio solicitado, sede, teléfono, correo, mensajes ni identificadores de
+  pacientes. El tracking UTM propio no depende de Pixel/CAPI.
+- Publicación automática en la página de Facebook queda como integración opcional. No es necesaria
+  para medir ni operar la campaña actual; requiere permisos y token de Página adicionales.
 
 ---
 
