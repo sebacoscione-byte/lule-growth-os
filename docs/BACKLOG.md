@@ -1210,6 +1210,11 @@ Herramientas internas de la app para gestionar leads, contenido y seguimiento.
 
 ## Etapa 2 — Web pública: /dra-lucia-chahin
 
+- [x] **Cronograma ampliado (2026-08-26):** la web pública muestra CIMEL Lanús martes, jueves y
+  viernes; Hospital Británico Lanús para ecocardiogramas los martes; Hospital Británico Central
+  los miércoles y Swiss Medical Lomas los viernes. La landing `ecocardiograma-lanus` deriva al
+  Hospital Británico Lanús y los textos del Estudio de contenido usan el mismo cronograma.
+
 La página pública principal. Activo central de captación — punto de llegada desde
 Google Maps, Instagram, WhatsApp y búsqueda orgánica.
 

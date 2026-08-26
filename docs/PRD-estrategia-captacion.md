@@ -20,9 +20,10 @@ Los turnos los dan CIMEL, el Hospital Británico y Swiss Medical por sus canales
 
 | Sede | Dirección | Día |
 |---|---|---|
-| CIMEL Lanús | Tucumán 1314, Lanús | Martes |
-| Hospital Británico | Perdriel 74, CABA | Miércoles |
-| Swiss Medical Lomas | Lomas de Zamora | Viernes |
+| CIMEL Lanús | Tucumán 1314, Lanús | Martes 13:00–15:00; jueves y viernes 13:00–16:00 |
+| Hospital Británico Lanús | Av. Hipólito Yrigoyen 4429, Lanús | Ecocardiogramas: martes 16:00–19:30 |
+| Hospital Británico Central | Perdriel 74, CABA | Miércoles 17:00–19:45 |
+| Swiss Medical Lomas | Oliden 141, Lomas de Zamora | Viernes 17:00–20:00 |
 
 **Servicios:** Consulta cardiológica · Ecocardiograma · Control cardiológico
 
@@ -63,8 +64,8 @@ Esta página es el activo público principal de captación. Debe funcionar para 
 1. Quién es la Dra. Lucía Chahin.
 2. Especialidad: cardiología.
 3. Servicios: consulta cardiológica, ecocardiograma, control cardiovascular y evaluación cardiovascular.
-4. Lugares de atención: CIMEL Lanús, Hospital Británico y Swiss Medical Lomas.
-5. Días de atención: martes en CIMEL Lanús, miércoles en Hospital Británico y viernes en Swiss Medical Lomas.
+4. Lugares de atención: CIMEL Lanús, Hospital Británico Lanús y Central, y Swiss Medical Lomas.
+5. Días de atención: martes, jueves y viernes en CIMEL Lanús; ecocardiogramas los martes en Hospital Británico Lanús; miércoles en Hospital Británico Central y viernes en Swiss Medical Lomas.
 6. Cómo pedir turno en cada institución.
 7. Aviso claro: la web no da turnos, no reserva horarios y no confirma disponibilidad.
 8. Aviso médico y urgencias.
@@ -75,9 +76,9 @@ Esta página es el activo público principal de captación. Debe funcionar para 
 
 1. **Hero**: nombre, especialidad, intro breve
 2. **Servicios**: consulta cardiológica, ecocardiograma, control cardiológico, evaluación cardiovascular
-3. **Cómo pedir turno**: tres botones expandibles
-   - Pedir turno en CIMEL Lanús (martes) → muestra 3 pasos
-   - Pedir turno en Hospital Británico (miércoles) → muestra los canales de contacto
+3. **Cómo pedir turno**: cuatro botones expandibles
+   - Pedir turno en CIMEL Lanús (martes, jueves o viernes) → muestra 3 pasos
+   - Pedir turno en Hospital Británico Lanús (ecocardiograma los martes) o Central (miércoles) → muestra los canales de contacto
    - Pedir turno en Swiss Medical Lomas (viernes) → muestra 3 pasos
 4. **¿No pudiste pedir turno?**: formulario de captura de lead
 5. **Aviso médico**: este sitio no reemplaza una consulta ni debe usarse para urgencias
@@ -132,7 +133,7 @@ Todas las páginas incluyen el aviso: **"No se otorgan turnos desde esta web. Pa
 | Servicios | Consulta cardiológica · Ecocardiograma · Control cardiológico |
 | Sitio web | `/dra-lucia-chahin` ← **prioritario** |
 | Ubicación | CIMEL Lanús, Tucumán 1314, Lanús |
-| Horarios | Martes (CIMEL) |
+| Horarios | Martes 13:00–15:00; jueves y viernes 13:00–16:00 (CIMEL) |
 
 **Regla de nombre:** NO usar "Dra. Lucía Chahin Cardióloga Lanús" ni keywords artificiales. Google lo penaliza.
 
@@ -156,8 +157,9 @@ Dirección confirmada: Oliden 141, Lomas de Zamora (2026-07-05). Trabajar con la
 ```
 Dra. Lucía Chahin
 Cardióloga | Ecocardiogramas
-Martes: CIMEL Lanús
-Miércoles: Hospital Británico
+Martes, jueves y viernes: CIMEL Lanús
+Martes: ecocardiogramas en Hospital Británico Lanús
+Miércoles: Hospital Británico Central
 Viernes: Swiss Medical Lomas
 👇 Cómo pedir turno
 ```
@@ -175,8 +177,9 @@ Viernes: Swiss Medical Lomas
 - Sedes donde se puede pedir
 
 **Post 3 — Dónde atiende**
-- Martes en CIMEL Lanús
-- Miércoles en Hospital Británico
+- Martes, jueves y viernes en CIMEL Lanús
+- Martes para ecocardiogramas en Hospital Británico Lanús
+- Miércoles en Hospital Británico Central
 - Viernes en Swiss Medical Lomas
 
 ### Historias destacadas
@@ -207,7 +210,7 @@ La destacada "Turnos" explica el proceso de 4 pasos sin sonar alarmista.
 ### Usar
 - "Para solicitar turno con la Dra. Lucía Chahin, ingresá al link de la bio y elegí la sede donde querés atenderte."
 - "¿Buscás consulta cardiológica o ecocardiograma? En el link de la bio te explicamos cómo pedir turno."
-- "La Dra. Lucía Chahin atiende los martes en CIMEL Lanús, los miércoles en el Hospital Británico y los viernes en Swiss Medical Lomas."
+- "La Dra. Lucía Chahin atiende los martes, jueves y viernes en CIMEL Lanús, realiza ecocardiogramas los martes en Hospital Británico Lanús, atiende los miércoles en Hospital Británico Central y los viernes en Swiss Medical Lomas."
 - "Escribí CARDIO y te pasamos cómo solicitar turno."
 - "Escribí ECO si necesitás información sobre ecocardiograma."
 

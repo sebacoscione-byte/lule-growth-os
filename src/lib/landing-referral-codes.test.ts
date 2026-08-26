@@ -7,7 +7,7 @@ describe("getReferralCode", () => {
   it("devuelve el código correcto para una combinación real de landing+sede", () => {
     expect(getReferralCode("cardiologa-lanus", "cimel")?.code).toBe("LAN-CARD-01")
     expect(getReferralCode("cardiologa-lomas", "swiss")?.code).toBe("LOM-CARD-01")
-    expect(getReferralCode("ecocardiograma-lanus", "cimel")?.code).toBe("LAN-ECO-01")
+    expect(getReferralCode("ecocardiograma-lanus", "britanico")?.code).toBe("LAN-ECO-01")
     expect(getReferralCode("google-maps", null)?.code).toBe("MAPS-GRAL-01")
   })
 
@@ -75,7 +75,7 @@ describe("withReferralCode / withGeneralFallbackCode", () => {
   })
 
   it("un mensaje con referencia, al extraerse, vuelve al texto original", () => {
-    const original = "Hola, me gustaría pedir turno con la Dra. Lucía Chahin en CIMEL Lanús (martes). ¿Me pueden ayudar?"
+    const original = "Hola, me gustaría pedir turno con la Dra. Lucía Chahin en CIMEL Lanús (martes, jueves o viernes). ¿Me pueden ayudar?"
     const withRef = withReferralCode(original, "cardiologa-lanus", "cimel")
     const { code, cleanedText } = extractReferralCode(withRef)
     expect(code).toBe("LAN-CARD-01")

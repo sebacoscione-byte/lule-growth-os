@@ -284,7 +284,7 @@ const CHECKLIST_META: Record<string, { label: string; description: string; prior
   },
   horario_real: {
     label: "Horarios configurados",
-    description: "Solo los días reales: martes (CIMEL Lanús). No cargar viernes si Swiss no tiene perfil propio.",
+    description: "Solo los días reales de esta ubicación: martes, jueves y viernes (CIMEL Lanús). No cargar horarios de Hospital Británico o Swiss si no corresponden a esta ficha.",
   },
   servicios_cargados: {
     label: "Servicios cargados",

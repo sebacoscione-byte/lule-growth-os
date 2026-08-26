@@ -41,9 +41,9 @@ export async function POST(request: Request) {
     .limit(20)
 
   const location =
-    lead?.preferred_location === "cimel_lanus" ? "CIMEL Lanús (martes)" :
+    lead?.preferred_location === "cimel_lanus" ? "CIMEL Lanús (martes, jueves y viernes)" :
     lead?.preferred_location === "swiss_lomas" ? "Swiss Medical Lomas (viernes)" :
-    lead?.preferred_location === "hospital_britanico" ? "Hospital Británico (miércoles)" :
+    lead?.preferred_location === "hospital_britanico" ? "Hospital Británico (Lanús los martes para ecocardiogramas o Central los miércoles)" :
     "CIMEL Lanús, Hospital Británico o Swiss Medical Lomas"
 
   const leadContext = `Lead: ${lead.name ?? "anónimo"}. Canal: ${lead.origin_channel}. Servicio buscado: ${lead.requested_service}. Sede preferida: ${location}. Estado actual: ${lead.status}.`
