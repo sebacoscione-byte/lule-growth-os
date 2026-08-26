@@ -1,6 +1,13 @@
 ﻿# Lule Growth OS — Contexto para Claude
 
 ## Estado actual
+- 2026-08-26 (resumen semanal integral): `/dashboard` abre por defecto en “Esta semana”, definida
+  como la semana calendario argentina de lunes a domingo y acumulada hasta el día actual. El bloque
+  inicial ya no resume sólo web/publicidad: combina recorrido de pacientes, variación de seguidores
+  de Instagram, inversión/clics de Meta Ads, reseñas de Google y consultas/clics de WhatsApp. La
+  comparación de los cuatro indicadores principales usa los mismos días de la semana anterior, para
+  no comparar un miércoles parcial contra una semana completa. Los períodos de 30/90 días y un año
+  siguen disponibles. No se tocaron crons, lógica médica, WhatsApp transaccional, RLS ni secretos.
 - 2026-08-26 (dashboard simple para Lucía y Seba): la vista inicial ahora prioriza un resumen escrito
   en lenguaje común, las tareas que requieren atención y cuatro números explicados (personas que
   llegaron, intentos de contacto, consultas registradas y turnos confirmados). El recorrido completo,

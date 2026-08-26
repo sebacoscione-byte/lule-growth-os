@@ -62,7 +62,8 @@ que revele síntomas, diagnósticos, servicio o sede consultada, datos de contac
 
 Configuración completada y validada en producción el 2026-08-26. Para controles posteriores:
 
-1. Abrir `/dashboard?period=7`.
+1. Abrir `/dashboard` o `/dashboard?period=7`. La vista semanal consulta desde el lunes de la semana
+   argentina actual hasta hoy; el domingo aparece como cierre de la semana.
 2. Confirmar que la tarjeta de Meta muestra la moneda correcta y actividad de la cuenta esperada.
 3. Comparar “Clics en enlace” de Meta con “Visitas” UTM. No tienen que ser idénticos: una persona
    puede tocar el anuncio y no terminar de cargar la landing, repetir el clic o bloquear el tracking.

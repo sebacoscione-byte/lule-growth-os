@@ -28,7 +28,12 @@ test("un usuario autorizado puede entrar al dashboard", async () => {
   await page.goto("/dashboard")
   await expect(page).not.toHaveURL(/\/login/)
   await expect(page.getByRole("heading", { name: "Dashboard", level: 1 })).toBeVisible()
-  await expect(page.getByText(/En pocas palabras/)).toBeVisible()
+  await expect(page.getByText(/Resumen general · Semana del/)).toBeVisible()
+  await expect(page.getByRole("link", { name: "Esta semana" })).toBeVisible()
+  await expect(page.getByRole("heading", { name: "Instagram", exact: true })).toBeVisible()
+  await expect(page.getByRole("heading", { name: "Publicidad", exact: true })).toBeVisible()
+  await expect(page.getByRole("heading", { name: "Google", exact: true })).toBeVisible()
+  await expect(page.getByRole("heading", { name: "WhatsApp", exact: true })).toBeVisible()
   await expect(page.getByText("Publicidad en Facebook e Instagram", { exact: true })).toBeVisible()
 
   const journey = page.locator("details").filter({ hasText: "Cómo avanzan las personas hasta pedir turno" }).first()

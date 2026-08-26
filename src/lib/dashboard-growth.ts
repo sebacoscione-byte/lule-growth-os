@@ -5,7 +5,71 @@ export type DashboardPeriod = typeof DASHBOARD_PERIODS[number]
 
 export function parseDashboardPeriod(value: string | string[] | undefined): DashboardPeriod {
   const parsed = Number(Array.isArray(value) ? value[0] : value)
-  return DASHBOARD_PERIODS.includes(parsed as DashboardPeriod) ? parsed as DashboardPeriod : 30
+  return DASHBOARD_PERIODS.includes(parsed as DashboardPeriod) ? parsed as DashboardPeriod : 7
+}
+
+export interface DashboardDateRange {
+  currentStart: string
+  currentEnd: string
+  displayEnd: string
+  previousStart: string
+  previousEnd: string
+  calendarWeek: boolean
+}
+
+const ARGENTINA_TIME_ZONE = "America/Argentina/Buenos_Aires"
+
+function argentinaDateParts(now: Date): { year: number; month: number; day: number } {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: ARGENTINA_TIME_ZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(now)
+  const value = (type: "year" | "month" | "day") => Number(parts.find(part => part.type === type)?.value)
+  return { year: value("year"), month: value("month"), day: value("day") }
+}
+
+function dateKey(date: Date): string {
+  return date.toISOString().slice(0, 10)
+}
+
+function addDays(date: Date, days: number): Date {
+  return new Date(date.getTime() + days * 24 * 60 * 60 * 1000)
+}
+
+/**
+ * La vista de 7 días representa la semana calendario argentina en curso: lunes hasta hoy, con el
+ * domingo como fin visible. Los demás períodos siguen siendo ventanas móviles inclusivas.
+ */
+export function getDashboardDateRange(period: DashboardPeriod, now = new Date()): DashboardDateRange {
+  const parts = argentinaDateParts(now)
+  const today = new Date(Date.UTC(parts.year, parts.month - 1, parts.day))
+
+  if (period === 7) {
+    const daysSinceMonday = (today.getUTCDay() + 6) % 7
+    const currentStart = addDays(today, -daysSinceMonday)
+    const previousStart = addDays(currentStart, -7)
+    return {
+      currentStart: dateKey(currentStart),
+      currentEnd: dateKey(today),
+      displayEnd: dateKey(addDays(currentStart, 6)),
+      previousStart: dateKey(previousStart),
+      previousEnd: dateKey(addDays(previousStart, daysSinceMonday)),
+      calendarWeek: true,
+    }
+  }
+
+  const currentStart = addDays(today, -(period - 1))
+  const previousEnd = addDays(currentStart, -1)
+  return {
+    currentStart: dateKey(currentStart),
+    currentEnd: dateKey(today),
+    displayEnd: dateKey(today),
+    previousStart: dateKey(addDays(previousEnd, -(period - 1))),
+    previousEnd: dateKey(previousEnd),
+    calendarWeek: false,
+  }
 }
 
 export interface GrowthTrendPoint {
@@ -182,10 +246,14 @@ function emptySummary(): GrowthPeriodSummary {
   }
 }
 
-async function readTrend(supabase: SupabaseClient, period: DashboardPeriod) {
+function inDateRange(date: string, start: string, end: string): boolean {
+  return date >= start && date <= end
+}
+
+async function readTrend(supabase: SupabaseClient, period: DashboardPeriod, range: DashboardDateRange) {
   const { data, error } = await supabase.rpc("dashboard_growth_timeseries", { p_days: period })
   if (error) throw error
-  const rows = (data ?? []).map((row: Record<string, unknown>): GrowthTrendPoint => ({
+  const rows: GrowthTrendPoint[] = (data ?? []).map((row: Record<string, unknown>): GrowthTrendPoint => ({
     date: String(row.metric_date),
     visits: Number(row.visits),
     engagedVisits: Number(row.engaged_visits),
@@ -194,8 +262,8 @@ async function readTrend(supabase: SupabaseClient, period: DashboardPeriod) {
     confirmed: Number(row.confirmed),
   }))
   return {
-    current: rows.slice(-period),
-    previous: rows.slice(-period * 2, -period),
+    current: rows.filter(row => inDateRange(row.date, range.currentStart, range.currentEnd)),
+    previous: rows.filter(row => inDateRange(row.date, range.previousStart, range.previousEnd)),
   }
 }
 
@@ -254,7 +322,7 @@ async function readCampaigns(supabase: SupabaseClient, period: DashboardPeriod):
   return (data ?? []).map((row: Record<string, unknown>) => buildCampaignPerformance(row))
 }
 
-async function readInstagram(supabase: SupabaseClient, period: DashboardPeriod): Promise<InstagramDashboardMetrics> {
+async function readInstagram(supabase: SupabaseClient, range: DashboardDateRange): Promise<InstagramDashboardMetrics> {
   try {
     const { data, error } = await supabase
       .from("instagram_follower_snapshots")
@@ -276,9 +344,10 @@ async function readInstagram(supabase: SupabaseClient, period: DashboardPeriod):
         linkTaps: null, totalInteractions: null, series: [], firstSnapshotAt: null,
       }
     }
-    const rows = allRows.slice(0, period).reverse()
-    const latest = allRows[0]
-    const first = rows[0]
+    const chronological = [...allRows].reverse()
+    const rows = chronological.filter(row => inDateRange(row.captured_on, range.currentStart, range.currentEnd))
+    const latest = [...chronological].reverse().find(row => row.captured_on <= range.currentEnd) ?? allRows[0]
+    const baseline = [...chronological].reverse().find(row => row.captured_on < range.currentStart) ?? rows[0]
     const nullableSum = (field: "reach" | "profile_views" | "link_taps" | "total_interactions") => {
       const values = rows.map(row => row[field]).filter((value): value is number => value !== null)
       return values.length > 0 ? values.reduce((total, value) => total + value, 0) : null
@@ -286,7 +355,7 @@ async function readInstagram(supabase: SupabaseClient, period: DashboardPeriod):
     return {
       available: true,
       followers: latest.followers_count,
-      followersDelta: rows.length > 1 ? latest.followers_count - first.followers_count : null,
+      followersDelta: baseline ? latest.followers_count - baseline.followers_count : null,
       reach: nullableSum("reach"),
       profileViews: nullableSum("profile_views"),
       linkTaps: nullableSum("link_taps"),
@@ -302,7 +371,7 @@ async function readInstagram(supabase: SupabaseClient, period: DashboardPeriod):
   }
 }
 
-async function readGoogle(supabase: SupabaseClient, period: DashboardPeriod): Promise<GoogleDashboardMetrics> {
+async function readGoogle(supabase: SupabaseClient, range: DashboardDateRange): Promise<GoogleDashboardMetrics> {
   try {
     const { data, error } = await supabase
       .from("google_business_snapshots")
@@ -328,13 +397,15 @@ async function readGoogle(supabase: SupabaseClient, period: DashboardPeriod): Pr
         reviewCount: null, reviewDelta: null, series: [],
       }
     }
-    const rows = allRows.slice(0, period).reverse()
-    const latest = allRows[0]
+    const chronological = [...allRows].reverse()
+    const rows = chronological.filter(row => inDateRange(row.captured_on, range.currentStart, range.currentEnd))
+    const latest = [...chronological].reverse().find(row => row.captured_on <= range.currentEnd) ?? allRows[0]
     const sumNullable = (field: "impressions_search" | "impressions_maps" | "website_clicks" | "call_clicks" | "direction_requests") => {
       const values = rows.map(row => row[field]).filter((value): value is number => value !== null)
       return values.length > 0 ? values.reduce((total, value) => total + value, 0) : null
     }
     const reviewRows = rows.filter(row => row.review_count !== null)
+    const reviewBaseline = [...chronological].reverse().find(row => row.captured_on < range.currentStart && row.review_count !== null)
     return {
       available: true,
       status: latest.performance_status,
@@ -345,8 +416,8 @@ async function readGoogle(supabase: SupabaseClient, period: DashboardPeriod): Pr
       directionRequests: sumNullable("direction_requests"),
       rating: latest.rating === null ? null : Number(latest.rating),
       reviewCount: latest.review_count,
-      reviewDelta: reviewRows.length > 1
-        ? (reviewRows.at(-1)?.review_count ?? 0) - (reviewRows[0].review_count ?? 0)
+      reviewDelta: reviewBaseline && latest.review_count !== null
+        ? latest.review_count - (reviewBaseline.review_count ?? 0)
         : null,
       series: reviewRows.map(row => ({ date: row.captured_on, reviews: row.review_count! })),
     }
@@ -361,15 +432,17 @@ async function readGoogle(supabase: SupabaseClient, period: DashboardPeriod): Pr
 
 export async function getDashboardGrowthData(
   supabase: SupabaseClient,
-  period: DashboardPeriod
+  period: DashboardPeriod,
+  now = new Date(),
 ): Promise<DashboardGrowthData> {
+  const range = getDashboardDateRange(period, now)
   const [trendResult, channelsResult, actionsResult, campaignsResult, instagram, google] = await Promise.all([
-    readTrend(supabase, period).then(value => ({ ok: true as const, value })).catch(() => ({ ok: false as const })),
+    readTrend(supabase, period, range).then(value => ({ ok: true as const, value })).catch(() => ({ ok: false as const })),
     readChannels(supabase, period).then(value => ({ ok: true as const, value })).catch(() => ({ ok: false as const })),
     readActions(supabase, period).then(value => ({ ok: true as const, value })).catch(() => ({ ok: false as const })),
     readCampaigns(supabase, period).then(value => ({ ok: true as const, value })).catch(() => ({ ok: false as const })),
-    readInstagram(supabase, period),
-    readGoogle(supabase, period),
+    readInstagram(supabase, range),
+    readGoogle(supabase, range),
   ])
 
   const trend = trendResult.ok ? trendResult.value.current : []

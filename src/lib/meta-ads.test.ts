@@ -34,7 +34,7 @@ describe("Meta Ads dashboard metrics", () => {
       }
       if (!url.searchParams.has("after")) {
         expect(JSON.parse(url.searchParams.get("time_range") ?? "{}")).toEqual({
-          since: "2026-08-20",
+          since: "2026-08-24",
           until: "2026-08-26",
         })
         return response({
