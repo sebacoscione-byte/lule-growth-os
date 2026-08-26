@@ -97,12 +97,14 @@ async function getLandingRanking(
 type ClicksByLocationRow = {
   locationKey: "cimel" | "swiss" | "britanico"
   locationLabel: string
+  clickBooking: number
   clickCall: number
   clickWhatsapp: number
+  clickMaps: number
 }
 
 const CLICK_LOCATION_LABEL: Record<string, string> = {
-  cimel: "CIMEL Lanús", swiss: "Swiss Medical Lomas", britanico: "Hospital Británico",
+  cimel: "CIMEL Lanús", swiss: "Swiss Medical Lomas", britanico: "Hospital Británico (Lanús y Central)",
 }
 
 // Reemplaza la vieja card "Métricas de landings" (cta_cimel/cta_swiss/cta_britanico/form_submitted),
@@ -113,33 +115,105 @@ const CLICK_LOCATION_LABEL: Record<string, string> = {
 // contacto externo (Swity, o el teléfono/central de turnos del Británico) terminó en un turno.
 async function getClicksByLocation(
   supabase: Awaited<ReturnType<typeof createClient>>,
-  period: DashboardPeriod
+  range: DashboardDateRange,
 ): Promise<{ rows: ClicksByLocationRow[]; available: boolean }> {
   try {
-    const { data, error } = await supabase.rpc("landing_clicks_by_location", { p_days: period })
+    const { data, error } = await supabase.rpc("dashboard_site_actions_by_location", {
+      p_start: range.currentStart,
+      p_end: range.currentEnd,
+    })
     if (error) throw error
 
-    const byLocation = new Map<string, { call: number; whatsapp: number }>()
+    const byLocation = new Map<string, { booking: number; call: number; whatsapp: number; maps: number }>()
     for (const row of (data ?? []) as { location_key: string; event_type: string; event_count: number | string }[]) {
-      const entry = byLocation.get(row.location_key) ?? { call: 0, whatsapp: 0 }
-      if (row.event_type === "click_call") entry.call = Number(row.event_count)
+      const entry = byLocation.get(row.location_key) ?? { booking: 0, call: 0, whatsapp: 0, maps: 0 }
+      if (row.event_type === "click_booking") entry.booking = Number(row.event_count)
+      else if (row.event_type === "click_call") entry.call = Number(row.event_count)
       else if (row.event_type === "click_whatsapp") entry.whatsapp = Number(row.event_count)
+      else if (row.event_type === "click_maps") entry.maps = Number(row.event_count)
       byLocation.set(row.location_key, entry)
     }
 
     const rows: ClicksByLocationRow[] = (["cimel", "swiss", "britanico"] as const).map(locationKey => {
-      const entry = byLocation.get(locationKey) ?? { call: 0, whatsapp: 0 }
+      const entry = byLocation.get(locationKey) ?? { booking: 0, call: 0, whatsapp: 0, maps: 0 }
       return {
         locationKey,
         locationLabel: CLICK_LOCATION_LABEL[locationKey],
+        clickBooking: entry.booking,
         clickCall: entry.call,
         clickWhatsapp: entry.whatsapp,
+        clickMaps: entry.maps,
       }
     })
 
     return { rows, available: true }
   } catch {
     return { rows: [], available: false }
+  }
+}
+
+type SiteJourneyRow = {
+  source: string
+  medium: string
+  campaign: string
+  content: string | null
+  visits: number
+  heroVisits: number
+  contactVisits: number
+  bookingVisits: number
+  callVisits: number
+  whatsappVisits: number
+  mapsVisits: number
+  instagramVisits: number
+}
+
+type SiteJourney = {
+  rows: SiteJourneyRow[]
+  totals: Omit<SiteJourneyRow, "source" | "medium" | "campaign" | "content">
+  available: boolean
+}
+
+async function getSiteJourney(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  range: DashboardDateRange,
+): Promise<SiteJourney> {
+  const emptyTotals = {
+    visits: 0, heroVisits: 0, contactVisits: 0, bookingVisits: 0,
+    callVisits: 0, whatsappVisits: 0, mapsVisits: 0, instagramVisits: 0,
+  }
+  try {
+    const { data, error } = await supabase.rpc("dashboard_site_journey", {
+      p_start: range.currentStart,
+      p_end: range.currentEnd,
+    })
+    if (error) throw error
+    const rows = ((data ?? []) as Array<Record<string, unknown>>).map(row => ({
+      source: String(row.source ?? "direct"),
+      medium: String(row.medium ?? "sin_medium"),
+      campaign: String(row.campaign ?? "sin_campana"),
+      content: row.content === "sin_contenido" ? null : String(row.content ?? "") || null,
+      visits: Number(row.visits) || 0,
+      heroVisits: Number(row.hero_visits) || 0,
+      contactVisits: Number(row.contact_visits) || 0,
+      bookingVisits: Number(row.booking_visits) || 0,
+      callVisits: Number(row.call_visits) || 0,
+      whatsappVisits: Number(row.whatsapp_visits) || 0,
+      mapsVisits: Number(row.maps_visits) || 0,
+      instagramVisits: Number(row.instagram_visits) || 0,
+    }))
+    const totals = rows.reduce((sum, row) => ({
+      visits: sum.visits + row.visits,
+      heroVisits: sum.heroVisits + row.heroVisits,
+      contactVisits: sum.contactVisits + row.contactVisits,
+      bookingVisits: sum.bookingVisits + row.bookingVisits,
+      callVisits: sum.callVisits + row.callVisits,
+      whatsappVisits: sum.whatsappVisits + row.whatsappVisits,
+      mapsVisits: sum.mapsVisits + row.mapsVisits,
+      instagramVisits: sum.instagramVisits + row.instagramVisits,
+    }), emptyTotals)
+    return { rows, totals, available: true }
+  } catch {
+    return { rows: [], totals: emptyTotals, available: false }
   }
 }
 
@@ -469,11 +543,12 @@ async function getDashboardData(period: DashboardPeriod) {
     contentPerformance,
     metaAds,
     periodChannelOverview,
+    siteJourney,
   ] = await Promise.all([
     getLandingRanking(supabase, period),
     getHeroVariantResults(supabase, period),
     getReferralFunnel(supabase, period),
-    getClicksByLocation(supabase, period),
+    getClicksByLocation(supabase, range),
     getInstagramWebClicks(supabase, period),
     getWhatsAppCostSummary(supabase),
     getWeeklyReports(supabase),
@@ -481,6 +556,7 @@ async function getDashboardData(period: DashboardPeriod) {
     getContentPerformance(supabase, period),
     getMetaAdsDashboardMetrics(period),
     getPeriodChannelOverview(supabase, range),
+    getSiteJourney(supabase, range),
   ])
   const growthRecommendations = await getGrowthRecommendationsData(supabase, landingRanking.rows, heroVariantResults.rows, period)
 
@@ -488,7 +564,7 @@ async function getDashboardData(period: DashboardPeriod) {
     metrics, recentLeads: (recentLeads ?? []) as Lead[],
     landingRanking, heroVariantResults, referralFunnel, clicksByLocation, instagramWebClicks,
     whatsappCostSummary, growthRecommendations, weeklyReports, growth, contentPerformance, metaAds,
-    periodChannelOverview,
+    periodChannelOverview, siteJourney,
   }
 }
 
@@ -853,7 +929,7 @@ export default async function DashboardPage({
     metrics, recentLeads, landingRanking,
     heroVariantResults, referralFunnel, clicksByLocation, instagramWebClicks,
     whatsappCostSummary, growthRecommendations, weeklyReports, growth, contentPerformance,
-    metaAds, periodChannelOverview,
+    metaAds, periodChannelOverview, siteJourney,
   } = await getDashboardData(period)
 
   const maxFunnel = Math.max(growth.summary.visits.current, 1)
@@ -870,6 +946,10 @@ export default async function DashboardPage({
     return totals
   }, {})
   const platformClickRows = Object.entries(platformClicks).sort((a, b) => b[1] - a[1])
+  const topJourneyCampaign = siteJourney.rows.find(row => row.campaign !== "sin_campana")
+  const siteContactRate = siteJourney.totals.visits > 0
+    ? Math.round((siteJourney.totals.contactVisits / siteJourney.totals.visits) * 1000) / 10
+    : 0
 
   return (
     <div className="space-y-5 bg-gray-50/60 p-4 text-gray-950 md:space-y-7 md:p-6">
@@ -1480,6 +1560,104 @@ export default async function DashboardPage({
         </CardContent>
       </Card>
 
+      {siteJourney.available && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Qué hicieron después de entrar</CardTitle>
+            <p className="text-xs text-gray-500">
+              Se cuentan personas distintas por pestaña durante {periodLabel.toLocaleLowerCase("es-AR")}; un clic del anuncio no siempre termina en una visita medida.
+            </p>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              {[
+                { label: "Llegaron al sitio", value: siteJourney.totals.visits, helper: "La página cargó correctamente", className: "bg-indigo-50 text-indigo-700" },
+                { label: "Vieron cómo pedir turno", value: siteJourney.totals.heroVisits, helper: "Llegaron a las opciones de sede", className: "bg-blue-50 text-blue-700" },
+                { label: "Abrieron un canal oficial", value: siteJourney.totals.contactVisits, helper: `${siteContactRate}% de las visitas`, className: "bg-cyan-50 text-cyan-700" },
+                { label: "Quedaron como consulta", value: growth.summary.leads.current, helper: "Personas identificadas para seguimiento", className: "bg-violet-50 text-violet-700" },
+              ].map((step, index) => (
+                <div key={step.label} className="rounded-xl border border-gray-100 p-4">
+                  <span className={`mb-3 flex h-8 w-8 items-center justify-center rounded-full text-xs font-bold ${step.className}`}>{index + 1}</span>
+                  <p className="text-2xl font-bold text-gray-950">{step.value}</p>
+                  <p className="text-sm font-semibold text-gray-700">{step.label}</p>
+                  <p className="mt-1 text-xs text-gray-400">{step.helper}</p>
+                </div>
+              ))}
+            </div>
+
+            {siteJourney.totals.visits >= 50 && siteContactRate < 2 && (
+              <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm leading-relaxed text-amber-900">
+                <p className="font-semibold">La principal caída ocurre antes de elegir un canal</p>
+                <p className="mt-1">
+                  La página recibe tráfico, pero menos del 2% abre turnos, teléfono, WhatsApp o Maps. Esto apunta a una dificultad en el recorrido o a visitantes con baja intención, no a un enlace roto.
+                </p>
+              </div>
+            )}
+
+            {topJourneyCampaign && (
+              <div className="rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm leading-relaxed text-blue-950">
+                <p className="font-semibold">Campaña con más visitas: {readableTrackingValue(topJourneyCampaign.campaign)}</p>
+                <p className="mt-1">
+                  <strong>{topJourneyCampaign.visits}</strong> llegaron, <strong>{topJourneyCampaign.heroVisits}</strong> vieron las opciones de sede y <strong>{topJourneyCampaign.contactVisits}</strong> abrieron un canal oficial
+                  {topJourneyCampaign.contactVisits > 0 && (
+                    <> ({[
+                      topJourneyCampaign.bookingVisits > 0 && `${topJourneyCampaign.bookingVisits} turno online`,
+                      topJourneyCampaign.whatsappVisits > 0 && `${topJourneyCampaign.whatsappVisits} WhatsApp`,
+                      topJourneyCampaign.callVisits > 0 && `${topJourneyCampaign.callVisits} llamada`,
+                      topJourneyCampaign.mapsVisits > 0 && `${topJourneyCampaign.mapsVisits} cómo llegar`,
+                    ].filter(Boolean).join(" · ")})</>
+                  )}.
+                </p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {clicksByLocation.available && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">A qué sede intentaron dirigirse</CardTitle>
+            <p className="text-xs text-gray-500">
+              Cada salida se asocia con el botón de la sede elegida. Hospital Británico agrupa Lanús y Central porque hoy ambos usan la misma etiqueta de medición.
+            </p>
+          </CardHeader>
+          <CardContent>
+            {clicksByLocation.rows.every(row => row.clickBooking === 0 && row.clickCall === 0 && row.clickWhatsapp === 0 && row.clickMaps === 0) ? (
+              <p className="text-sm text-gray-400">Todavía nadie abrió un canal desde una sede en este período.</p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[620px] text-sm">
+                  <thead>
+                    <tr className="border-b text-left text-xs text-gray-500">
+                      <th className="pb-2 font-medium">Sede</th>
+                      <th className="pb-2 font-medium text-right">Turno online</th>
+                      <th className="pb-2 font-medium text-right">WhatsApp</th>
+                      <th className="pb-2 font-medium text-right">Llamada</th>
+                      <th className="pb-2 font-medium text-right">Cómo llegar</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {clicksByLocation.rows.map(row => (
+                      <tr key={row.locationKey} className="border-b border-gray-50 last:border-0">
+                        <td className="py-3 pr-2 font-medium text-gray-900">{row.locationLabel}</td>
+                        <td className="py-3 text-right text-gray-700">{row.clickBooking}</td>
+                        <td className="py-3 text-right text-gray-700">{row.clickWhatsapp}</td>
+                        <td className="py-3 text-right text-gray-700">{row.clickCall}</td>
+                        <td className="py-3 text-right text-gray-700">{row.clickMaps}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+            <p className="mt-3 text-[11px] leading-relaxed text-gray-400">
+              La app puede medir qué canal se abrió, pero Swiss y Hospital Británico administran sus propios turnos: no podemos confirmar desde aquí si la persona terminó la gestión.
+            </p>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Ranking de landings */}
       {landingRanking.available && (
         <Card>
@@ -1530,47 +1708,6 @@ export default async function DashboardPage({
       )}
 
       <AdvancedSiteDisclosure>
-
-      {/* Clicks por sede: llamada y WhatsApp (incluye Swiss y Británico, que no pasan por el bot) */}
-      {clicksByLocation.available && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Intentos de contacto por sede</CardTitle>
-            <p className="text-xs text-gray-500">
-              Clics en llamar o WhatsApp durante los últimos {period}{" "}días. Incluye Swiss Medical y Hospital Británico aunque ninguna de las dos
-              sedes pase por el bot de WhatsApp de Lucía (Swiss usa su propio WhatsApp, &quot;Swity&quot;;
-              Británico deriva a teléfono/central de turnos) — se puede medir el clic, pero no si ese
-              contacto externo terminó en un turno confirmado.
-            </p>
-          </CardHeader>
-          <CardContent>
-            {clicksByLocation.rows.every(row => row.clickCall === 0 && row.clickWhatsapp === 0) ? (
-              <p className="text-sm text-gray-400">Todavía no hay clicks registrados en esta ventana.</p>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b text-left text-xs text-gray-500">
-                      <th className="pb-2 font-medium">Sede</th>
-                      <th className="pb-2 font-medium text-right">Llamar</th>
-                      <th className="pb-2 font-medium text-right">WhatsApp</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {clicksByLocation.rows.map(row => (
-                      <tr key={row.locationKey} className="border-b border-gray-50 last:border-0">
-                        <td className="py-2 pr-2 text-gray-900">{row.locationLabel}</td>
-                        <td className="py-2 text-right text-gray-700">{row.clickCall}</td>
-                        <td className="py-2 text-right text-gray-700">{row.clickWhatsapp}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      )}
 
       {/* Clicks al link de confianza de Instagram desde la web (PR #104, sin card hasta ahora) */}
       {instagramWebClicks.available && (
