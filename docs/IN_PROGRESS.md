@@ -1430,7 +1430,7 @@ y sin publicarlo automáticamente en la landing ni mezclarlo con cuentas de acce
 - No se agregan teléfonos, direcciones ni horarios generales a Facebook desde esta tarea.
 
 ---
-# EN CURSO (2026-08-27) — detalle navegable de intentos de contacto
+# CERRADO (2026-08-27) — detalle navegable de intentos de contacto
 
 ## Objetivo
 
@@ -1443,7 +1443,23 @@ por fecha, canal abierto, sede elegida y campaña de origen, conservando el per�
 - [x] Crear una RPC privada que no exponga sesiones ni datos de pacientes.
 - [x] Enlazar la tarjeta y abrir automáticamente las secciones necesarias.
 - [x] Diseñar el detalle para escritorio y celular.
-- [ ] Ejecutar migración, lint, tests, build y validación visual.
-- [ ] Abrir PR, verificar preview y mergear.
+- [x] Ejecutar migración, lint, tests, build y E2E autenticado.
+- [x] Abrir PR #247, verificar preview y mergear.
+
+## Validación final
+
+- `npm run lint`: sin errores.
+- `npm test -- --runInBand`: 124 suites y 1.104 tests aprobados.
+- `npm run build`: compilación, TypeScript y 85 páginas generadas correctamente.
+- E2E autenticado: el clic conserva el período, abre las dos secciones y muestra el detalle real.
+- Migración validada con rollback y aplicada en una única transacción.
+- Preview de Vercel y E2E público aprobados; login respondió 200 y el dashboard protegido redirigió
+  correctamente conservando los parámetros del detalle.
+
+## Alcance y seguridad
+
+- La RPC sólo entrega agregados anónimos; no expone identificadores de sesión ni datos personales.
+- No se modificaron lógica médica, webhooks de WhatsApp, cron jobs ni políticas RLS.
+- Un intento representa la apertura de un canal externo, no la confirmación de un turno.
 
 ---
