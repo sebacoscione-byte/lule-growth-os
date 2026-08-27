@@ -20,6 +20,41 @@ export interface PublicLandingData {
   locations: PublicLandingLocation[]
 }
 
+type PublicLocationWhatsAppConfig = {
+  name: string
+  whatsapp?: string | null
+}
+
+function normalizedLocationName(value: string): string {
+  return value
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .toLowerCase()
+    .trim()
+}
+
+/**
+ * Hospital Británico usa un único WhatsApp institucional para Central y Lanús. La dirección,
+ * el horario, el teléfono y las instrucciones siguen resolviéndose por sede: solamente se
+ * comparte este canal de contacto.
+ */
+export function resolvePublicLocationWhatsApp(
+  publicLocationName: string,
+  configLocations: PublicLocationWhatsAppConfig[],
+  exactLocationWhatsapp?: string | null,
+): string | undefined {
+  const exact = exactLocationWhatsapp?.trim()
+  if (exact) return exact
+
+  const publicName = normalizedLocationName(publicLocationName)
+  if (!publicName.includes("hospital britanico")) return undefined
+
+  return configLocations.find(location =>
+    normalizedLocationName(location.name).includes("hospital britanico")
+    && Boolean(location.whatsapp?.trim())
+  )?.whatsapp?.trim()
+}
+
 const CIMEL = {
   key: "cimel",
   trackingKey: "cimel" as const,

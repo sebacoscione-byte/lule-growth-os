@@ -8,7 +8,7 @@ import {
 } from "lucide-react"
 import {
   LANDING_DATA, PUBLIC_LANDING_SLUGS, WHATSAPP_MESSAGES, whatsAppKeyForLocation, SERVICE_MICROCOPY,
-  RELATED_LANDING_SLUGS, resolvesToBotNumber, type PublicLandingLocation,
+  RELATED_LANDING_SLUGS, resolvePublicLocationWhatsApp, resolvesToBotNumber, type PublicLandingLocation,
 } from "@/lib/public-landings"
 import { withReferralCode } from "@/lib/landing-referral-codes"
 import { getServiceDb } from "@/lib/supabase/service"
@@ -221,6 +221,7 @@ function buildSedeActions(locations: PublicLandingLocation[], configLocations: C
     const cfg = matchConfigLocation(loc.name, configLocations)
     const trackingKey = loc.trackingKey ?? whatsAppKeyForLocation(loc.name)
     const key = loc.key ?? trackingKey
+    const whatsapp = resolvePublicLocationWhatsApp(loc.name, configLocations, cfg?.whatsapp)
     return {
       key,
       trackingKey,
@@ -240,10 +241,10 @@ function buildSedeActions(locations: PublicLandingLocation[], configLocations: C
       // propio WhatsApp cargado (cfg?.whatsapp, ej. "Swity" de Swiss Medical), ese mensaje nunca
       // llega a nuestro webhook -- el código no se podría leer nunca, y solo ensuciaría el mensaje
       // que ve la recepción de esa institución.
-      whatsappMessage: resolvesToBotNumber(cfg?.whatsapp)
+      whatsappMessage: resolvesToBotNumber(whatsapp)
         ? withReferralCode(WHATSAPP_MESSAGES[trackingKey], slug, trackingKey)
         : WHATSAPP_MESSAGES[trackingKey],
-      whatsapp: cfg?.whatsapp || undefined,
+      whatsapp,
       color: SEDE_COLOR[trackingKey] ?? "blue",
       preferredLocationValue: PREFERRED_LOCATION_BY_KEY[trackingKey] ?? "sin_definir",
     }

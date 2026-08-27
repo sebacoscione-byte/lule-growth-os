@@ -1,4 +1,9 @@
-import { LANDING_DATA, resolvesToBotNumber, WHATSAPP_NUMBER } from "./public-landings"
+import {
+  LANDING_DATA,
+  resolvePublicLocationWhatsApp,
+  resolvesToBotNumber,
+  WHATSAPP_NUMBER,
+} from "./public-landings"
 
 describe("resolvesToBotNumber (GROWTH-01)", () => {
   it("es true sin rawNumber (usa el número del bot por default)", () => {
@@ -51,5 +56,23 @@ describe("cronograma público vigente", () => {
       trackingKey: "britanico",
       name: "Hospital Británico Lanús",
     }))
+  })
+})
+
+describe("WhatsApp compartido del Hospital Británico", () => {
+  const locations = [
+    { name: "Hospital Británico", whatsapp: "11 2345-6789" },
+    { name: "Swiss Medical Lomas", whatsapp: "11 9876-5432" },
+  ]
+
+  it("usa el mismo WhatsApp institucional en Central y Lanús", () => {
+    expect(resolvePublicLocationWhatsApp("Hospital Británico (Central)", locations)).toBe("11 2345-6789")
+    expect(resolvePublicLocationWhatsApp("Hospital Británico Lanús", locations)).toBe("11 2345-6789")
+  })
+
+  it("prioriza un WhatsApp específico y no comparte números con otras instituciones", () => {
+    expect(resolvePublicLocationWhatsApp("Hospital Británico Lanús", locations, "11 1111-2222"))
+      .toBe("11 1111-2222")
+    expect(resolvePublicLocationWhatsApp("CIMEL Lanús", locations)).toBeUndefined()
   })
 })
