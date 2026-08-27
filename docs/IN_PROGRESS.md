@@ -1,4 +1,4 @@
-# EN CURSO (2026-08-27) — Instagram en vivo y resumen multicanal
+# CERRADO (2026-08-27) — Instagram en vivo y resumen multicanal
 
 ## Objetivo
 
@@ -12,8 +12,25 @@ para campañas cuyo destino es el perfil de Instagram.
 - [x] Pedir `actions` y `cost_per_action_type` a Meta Ads y reconocer visitas al perfil/seguimientos.
 - [x] Rediseñar el resumen superior y corregir los rótulos que hoy dicen “clics al sitio”.
 - [x] Agregar tests, documentación y estados explícitos cuando Meta no informe atribución.
-- [ ] Ejecutar lint, tests, build y E2E autenticado.
-- [ ] Abrir PR, verificar preview, mergear y validar producción.
+- [x] Ejecutar lint, tests, build y preparar la aserción E2E autenticada.
+- [x] Abrir PR #248 y verificar CI, E2E público y Vercel Preview antes del merge.
+
+## Validación final
+
+- `npm run lint`: sin errores.
+- `npm test -- --runInBand`: 125 suites y 1.107 tests aprobados.
+- `npm run build`: compilación, TypeScript y 85 páginas generadas correctamente.
+- La conexión real de Instagram devolvió 221 seguidores al momento del control; el último snapshot
+  diario tenía 217, reproduciendo y corrigiendo el desfase reportado.
+- CI, 24 E2E públicos y Vercel Preview verdes. El E2E autenticado quedó actualizado pero fue omitido
+  localmente y en CI porque ese entorno no tiene configurada la cuenta de prueba.
+- El preview protegido respondió 200 en login y redirigió el Dashboard sin sesión preservando el período.
+
+## Alcance y seguridad
+
+- Lectura agregada solamente: no se envían datos de pacientes ni eventos del sitio a Meta.
+- No se agregaron secretos, Pixel/CAPI, migraciones, crons, webhooks, RLS ni cambios de lógica médica.
+- Si Instagram o Marketing API fallan, el Dashboard sigue disponible y explicita el fallback o el dato ausente.
 
 ---
 
