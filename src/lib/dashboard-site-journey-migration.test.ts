@@ -17,6 +17,10 @@ const detailSql = readFileSync(
   resolve(process.cwd(), "supabase/migrations/20260827_dashboard_site_journey_detail.sql"),
   "utf8",
 )
+const contactDetailSql = readFileSync(
+  resolve(process.cwd(), "supabase/migrations/20260827_dashboard_contact_attempt_details.sql"),
+  "utf8",
+)
 
 describe("dashboard site journey migration", () => {
   it("counts unique anonymous sessions through the important website steps", () => {
@@ -55,5 +59,17 @@ describe("dashboard site journey migration", () => {
     expect(locationSql).toContain("create or replace function dashboard_site_actions_by_location")
     expect(locationSql).toContain("between least(p_start, p_end) and greatest(p_start, p_end)")
     expect(locationSql).toContain("revoke all on function dashboard_site_actions_by_location(date, date) from public, anon")
+  })
+
+  it("provides an anonymous contact drill-down by date, destination and campaign", () => {
+    expect(contactDetailSql).toContain("create or replace function dashboard_contact_attempt_details")
+    expect(contactDetailSql).toContain("event_date date")
+    expect(contactDetailSql).toContain("location_key text")
+    expect(contactDetailSql).toContain("event_type text")
+    expect(contactDetailSql).toContain("count(distinct visit_key) as sessions")
+    expect(contactDetailSql).toContain("revoke all on function dashboard_contact_attempt_details(date, date) from public, anon")
+    expect(contactDetailSql).toContain("grant execute on function dashboard_contact_attempt_details(date, date) to authenticated")
+    expect(contactDetailSql).not.toContain("phone")
+    expect(contactDetailSql).not.toContain("email")
   })
 })

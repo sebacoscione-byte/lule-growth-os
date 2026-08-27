@@ -4,9 +4,11 @@
 - 2026-08-27 (detalle de uso web por campaña): `/dashboard` muestra, dentro de “Sitio y pacientes”,
   una tabla por campaña con sesiones y porcentaje para entrada, abandono sin otra acción, llegada a
   las opciones de sede, clic en el CTA superior “Pedir turno”, WhatsApp, llamada, turno online,
-  Google Maps y consultas registradas. `dashboard_site_journey` agrega esos pasos por sesión y UTM,
-  sin exponer eventos individuales ni datos de pacientes. La vista usa tabla en escritorio y filas
-  compactas en celular. No se agregaron cookies, Pixel/CAPI, crons ni cambios de lógica médica.
+  Google Maps y consultas registradas. `dashboard_site_journey` agrega esos pasos por sesión y UTM
+  sin exponer eventos individuales ni datos de pacientes. `dashboard_contact_attempt_details`
+  permite abrir desde el KPI un desglose anónimo por fecha, canal, sede y campaña, sin exponer
+  identificadores de sesión. La vista usa tabla en escritorio y filas compactas en celular. No se
+  agregaron cookies, Pixel/CAPI, crons ni cambios de lógica médica.
 - 2026-08-26 (resumen semanal integral): `/dashboard` abre por defecto en “Esta semana”, definida
   como la semana calendario argentina de lunes a domingo y acumulada hasta el día actual. El bloque
   inicial ya no resume sólo web/publicidad: combina recorrido de pacientes, variación de seguidores

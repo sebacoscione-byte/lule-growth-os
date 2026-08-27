@@ -104,6 +104,46 @@ type ClicksByLocationRow = {
   clickMaps: number
 }
 
+type ContactAttemptDetailRow = {
+  eventDate: string
+  locationKey: string
+  eventType: string
+  source: string
+  medium: string
+  campaign: string
+  content: string | null
+  sessions: number
+}
+
+async function getContactAttemptDetails(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  range: DashboardDateRange,
+): Promise<{ rows: ContactAttemptDetailRow[]; available: boolean }> {
+  try {
+    const { data, error } = await supabase.rpc("dashboard_contact_attempt_details", {
+      p_start: range.currentStart,
+      p_end: range.currentEnd,
+    })
+    if (error) throw error
+
+    return {
+      rows: ((data ?? []) as Array<Record<string, unknown>>).map(row => ({
+        eventDate: String(row.event_date),
+        locationKey: String(row.location_key ?? "sin_sede"),
+        eventType: String(row.event_type),
+        source: String(row.source ?? "direct"),
+        medium: String(row.medium ?? "sin_medium"),
+        campaign: String(row.campaign ?? "sin_campana"),
+        content: row.content === "sin_contenido" ? null : String(row.content ?? "") || null,
+        sessions: Number(row.sessions) || 0,
+      })),
+      available: true,
+    }
+  } catch {
+    return { rows: [], available: false }
+  }
+}
+
 const CLICK_LOCATION_LABEL: Record<string, string> = {
   cimel: "CIMEL Lanús", swiss: "Swiss Medical Lomas", britanico: "Hospital Británico (Lanús y Central)",
 }
@@ -547,6 +587,7 @@ async function getDashboardData(period: DashboardPeriod) {
     heroVariantResults,
     referralFunnel,
     clicksByLocation,
+    contactAttemptDetails,
     instagramWebClicks,
     whatsappCostSummary,
     weeklyReports,
@@ -560,6 +601,7 @@ async function getDashboardData(period: DashboardPeriod) {
     getHeroVariantResults(supabase, period),
     getReferralFunnel(supabase, period),
     getClicksByLocation(supabase, range),
+    getContactAttemptDetails(supabase, range),
     getInstagramWebClicks(supabase, period),
     getWhatsAppCostSummary(supabase),
     getWeeklyReports(supabase),
@@ -573,7 +615,7 @@ async function getDashboardData(period: DashboardPeriod) {
 
   return {
     metrics, recentLeads: (recentLeads ?? []) as Lead[],
-    landingRanking, heroVariantResults, referralFunnel, clicksByLocation, instagramWebClicks,
+    landingRanking, heroVariantResults, referralFunnel, clicksByLocation, contactAttemptDetails, instagramWebClicks,
     whatsappCostSummary, growthRecommendations, weeklyReports, growth, contentPerformance, metaAds,
     periodChannelOverview, siteJourney,
   }
@@ -627,14 +669,16 @@ function DashboardDisclosure({
   title,
   description,
   children,
+  defaultOpen = false,
 }: {
   icon: typeof Globe
   title: string
   description: string
   children: ReactNode
+  defaultOpen?: boolean
 }) {
   return (
-    <details className="group overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
+    <details open={defaultOpen} className="group overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
       <summary className="flex cursor-pointer list-none items-center justify-between gap-4 p-4 marker:hidden md:p-5">
         <div className="flex min-w-0 items-start gap-3">
           <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gray-100 text-gray-600">
@@ -686,14 +730,16 @@ function ChannelDisclosure({
   title,
   description,
   children,
+  defaultOpen = false,
 }: {
   icon: typeof Globe
   title: string
   description: string
   children: ReactNode
+  defaultOpen?: boolean
 }) {
   return (
-    <details className="group/channel overflow-hidden rounded-xl border border-gray-200 bg-white">
+    <details open={defaultOpen} className="group/channel overflow-hidden rounded-xl border border-gray-200 bg-white">
       <summary className="flex cursor-pointer list-none items-center justify-between gap-4 p-4 marker:hidden">
         <div className="flex min-w-0 items-start gap-3">
           <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-gray-100 text-gray-600">
@@ -798,6 +844,7 @@ function KpiCard({
   note,
   rate = false,
   comparisonLabel = "vs. período anterior",
+  href,
 }: {
   title: string
   value: number | string
@@ -807,9 +854,10 @@ function KpiCard({
   note?: string
   rate?: boolean
   comparisonLabel?: string
+  href?: string
 }) {
-  return (
-    <Card className="overflow-hidden">
+  const card = (
+    <Card className={`h-full overflow-hidden ${href ? "transition hover:-translate-y-0.5 hover:border-cyan-200 hover:shadow-md" : ""}`}>
       <CardContent className="p-3 md:p-4">
         <div className="mb-2 flex items-start justify-between gap-2 md:mb-4 md:gap-3">
           <p className="text-sm font-medium text-gray-600">{title}</p>
@@ -826,9 +874,25 @@ function KpiCard({
               <span className="ml-1 text-xs text-gray-400">{comparisonLabel}</span>
             </div>
           )}
+          {href && (
+            <span className="inline-flex items-center gap-1 text-xs font-semibold text-cyan-700">
+              Ver detalle <ArrowUpRight className="h-3 w-3" />
+            </span>
+          )}
         </div>
       </CardContent>
     </Card>
+  )
+
+  if (!href) return card
+  return (
+    <Link
+      href={href}
+      aria-label={`Ver detalle: ${title}`}
+      className="block h-full rounded-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-600 focus-visible:ring-offset-2"
+    >
+      {card}
+    </Link>
   )
 }
 
@@ -942,12 +1006,15 @@ function WeeklySummaryItem({
 export default async function DashboardPage({
   searchParams,
 }: {
-  searchParams: Promise<{ period?: string | string[] }>
+  searchParams: Promise<{ period?: string | string[]; detail?: string | string[] }>
 }) {
-  const period = parseDashboardPeriod((await searchParams).period)
+  const resolvedSearchParams = await searchParams
+  const period = parseDashboardPeriod(resolvedSearchParams.period)
+  const detail = Array.isArray(resolvedSearchParams.detail) ? resolvedSearchParams.detail[0] : resolvedSearchParams.detail
+  const showContactAttempts = detail === "contacts"
   const {
     metrics, recentLeads, landingRanking,
-    heroVariantResults, referralFunnel, clicksByLocation, instagramWebClicks,
+    heroVariantResults, referralFunnel, clicksByLocation, contactAttemptDetails, instagramWebClicks,
     whatsappCostSummary, growthRecommendations, weeklyReports, growth, contentPerformance,
     metaAds, periodChannelOverview, siteJourney,
   } = await getDashboardData(period)
@@ -1086,7 +1153,7 @@ export default async function DashboardPage({
       {/* KPIs principales */}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <KpiCard title="Llegaron al sitio" value={growth.available ? growth.summary.visits.current : "—"} comparison={growth.available ? growth.summary.visits : undefined} comparisonLabel={comparisonLabel} note="Personas que abrieron alguna página pública." icon={Eye} iconClass="bg-indigo-50 text-indigo-700" />
-        <KpiCard title="Intentaron contactarse" value={growth.available ? growth.summary.engagedVisits.current : "—"} comparison={growth.available ? growth.summary.engagedVisits : undefined} comparisonLabel={comparisonLabel} note="Tocaron turno, WhatsApp, llamada o cómo llegar." icon={MousePointerClick} iconClass="bg-cyan-50 text-cyan-700" />
+        <KpiCard title="Intentaron contactarse" value={growth.available ? growth.summary.engagedVisits.current : "—"} comparison={growth.available ? growth.summary.engagedVisits : undefined} comparisonLabel={comparisonLabel} note="Tocaron turno, WhatsApp, llamada o cómo llegar." icon={MousePointerClick} iconClass="bg-cyan-50 text-cyan-700" href={`/dashboard?period=${period}&detail=contacts#contact-attempts`} />
         <KpiCard title="Consultas registradas" value={growth.available ? growth.summary.leads.current : "—"} comparison={growth.available ? growth.summary.leads : undefined} comparisonLabel={comparisonLabel} note="Personas identificadas para seguimiento." icon={Users} iconClass="bg-violet-50 text-violet-700" />
         <KpiCard title="Turnos confirmados" value={growth.available ? growth.summary.confirmed.current : "—"} comparison={growth.available ? growth.summary.confirmed : undefined} comparisonLabel={comparisonLabel} note="Personas que confirmaron haber solicitado turno." icon={CheckCircle2} iconClass="bg-emerald-50 text-emerald-700" />
       </div>
@@ -1415,6 +1482,7 @@ export default async function DashboardPage({
         icon={BarChart3}
         title="Ver información detallada por canal"
         description="Primero, una lectura rápida. Abrí un canal sólo cuando necesites entender de dónde salió cada número."
+        defaultOpen={showContactAttempts}
       >
       <div>
         <p className="text-xs font-semibold uppercase tracking-[0.14em] text-gray-500">Vista rápida por canal · {periodLabel}</p>
@@ -1470,6 +1538,7 @@ export default async function DashboardPage({
         icon={Globe}
         title="Sitio y pacientes"
         description="Visitas, intentos de contacto, consultas, turnos y páginas que generan más interés."
+        defaultOpen={showContactAttempts}
       >
       <SectionHeader icon={Users} title="Consultas y pacientes" />
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
@@ -1561,12 +1630,16 @@ export default async function DashboardPage({
       <SectionHeader icon={Globe} title="Sitio web y páginas" />
 
       {/* Acciones web del período */}
-      <Card>
+      <Card
+        id="contact-attempts"
+        data-testid="contact-attempt-details"
+        className={`scroll-mt-6 ${showContactAttempts ? "ring-2 ring-cyan-200" : ""}`}
+      >
         <CardHeader>
             <CardTitle className="text-base">Cómo intentaron contactarse desde el sitio</CardTitle>
-            <p className="text-xs text-gray-500">Clics en los botones para pedir turno durante el período seleccionado. Una misma persona puede usar más de un botón.</p>
+            <p className="text-xs text-gray-500">Clics en los botones para pedir turno durante {periodLabel.toLocaleLowerCase("es-AR")}. Una misma persona puede usar más de un botón.</p>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-5">
           <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
             {Object.entries(ACTION_META).map(([eventType, meta]) => {
               const row = growth.actions.find(action => action.eventType === eventType)
@@ -1581,6 +1654,81 @@ export default async function DashboardPage({
               )
             })}
           </div>
+
+          <section className="border-t border-gray-100 pt-5" aria-labelledby="contact-attempt-list-title">
+            <div>
+              <h3 id="contact-attempt-list-title" className="text-sm font-semibold text-gray-950">Detalle de cada intento</h3>
+              <p className="mt-1 text-xs leading-relaxed text-gray-500">
+                Muestra la fecha, el canal que abrieron, la sede elegida y desde qué campaña llegaron. Son datos anónimos: un clic indica intención, no confirma que hayan conseguido turno.
+              </p>
+            </div>
+
+            {!contactAttemptDetails.available ? (
+              <p className="mt-4 rounded-lg bg-amber-50 p-3 text-sm text-amber-800">
+                El detalle todavía no está disponible. El resumen superior sigue siendo válido.
+              </p>
+            ) : contactAttemptDetails.rows.length === 0 ? (
+              <p className="mt-4 text-sm text-gray-400">No hubo intentos de contacto durante este período.</p>
+            ) : (
+              <>
+                <div className="mt-4 divide-y divide-gray-100 sm:hidden">
+                  {contactAttemptDetails.rows.map((row, index) => {
+                    const action = ACTION_META[row.eventType]
+                    const destination = CLICK_LOCATION_LABEL[row.locationKey] ?? "Sin sede identificada"
+                    return (
+                      <article key={`${row.eventDate}-${row.locationKey}-${row.eventType}-${row.source}-${row.campaign}-${row.content ?? ""}-${index}`} className="py-3 first:pt-0 last:pb-0">
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <p className="text-sm font-semibold text-gray-900">{destination}</p>
+                            <p className="mt-0.5 text-xs text-gray-500">{action?.label ?? readableTrackingValue(row.eventType)}</p>
+                          </div>
+                          <div className="shrink-0 text-right">
+                            <p className="text-sm font-semibold text-gray-950">{row.sessions}</p>
+                            <p className="text-[11px] text-gray-400">{row.sessions === 1 ? "persona" : "personas"}</p>
+                          </div>
+                        </div>
+                        <p className="mt-2 text-xs text-gray-500">
+                          {formatDateKey(row.eventDate, { day: "numeric", month: "short", year: "numeric" })} · {readableTrackingValue(row.source)} / {readableTrackingValue(row.medium)}
+                        </p>
+                        <p className="mt-0.5 text-xs text-gray-500">
+                          Campaña: {readableTrackingValue(row.campaign)}{row.content ? ` · ${readableTrackingValue(row.content)}` : ""}
+                        </p>
+                      </article>
+                    )
+                  })}
+                </div>
+
+                <div className="mt-4 hidden overflow-x-auto sm:block">
+                  <table className="w-full min-w-[760px] text-sm">
+                    <thead>
+                      <tr className="border-b text-left text-xs text-gray-500">
+                        <th className="pb-2 font-medium">Fecha</th>
+                        <th className="pb-2 font-medium">Destino</th>
+                        <th className="pb-2 font-medium">Canal</th>
+                        <th className="pb-2 font-medium">Origen</th>
+                        <th className="pb-2 font-medium">Campaña</th>
+                        <th className="pb-2 text-right font-medium">Personas</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {contactAttemptDetails.rows.map((row, index) => (
+                        <tr key={`${row.eventDate}-${row.locationKey}-${row.eventType}-${row.source}-${row.campaign}-${row.content ?? ""}-${index}`} className="border-b border-gray-50 last:border-0">
+                          <td className="py-3 pr-3 text-gray-600">{formatDateKey(row.eventDate, { day: "numeric", month: "short", year: "numeric" })}</td>
+                          <td className="py-3 pr-3 font-medium text-gray-900">{CLICK_LOCATION_LABEL[row.locationKey] ?? "Sin sede identificada"}</td>
+                          <td className="py-3 pr-3 text-gray-700">{ACTION_META[row.eventType]?.label ?? readableTrackingValue(row.eventType)}</td>
+                          <td className="py-3 pr-3 text-gray-600">{readableTrackingValue(row.source)} · {readableTrackingValue(row.medium)}</td>
+                          <td className="py-3 pr-3 text-gray-600">
+                            {readableTrackingValue(row.campaign)}{row.content ? <span className="block text-[11px] text-gray-400">{readableTrackingValue(row.content)}</span> : null}
+                          </td>
+                          <td className="py-3 text-right font-semibold text-gray-950">{row.sessions}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </>
+            )}
+          </section>
         </CardContent>
       </Card>
 
