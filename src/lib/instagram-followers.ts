@@ -11,6 +11,40 @@ export interface InstagramFollowerSnapshotResult {
   error?: string
 }
 
+export interface LiveInstagramAccountMetrics {
+  followersCount: number
+  reach: number | null
+  profileViews: number | null
+  linkTaps: number | null
+  totalInteractions: number | null
+  fetchedAt: string
+}
+
+/**
+ * Lectura en vivo para superficies internas como el dashboard. No persiste ni expone el token y
+ * permite que la UI use el snapshot diario como respaldo si Meta no responde.
+ */
+export async function getLiveInstagramAccountMetrics(
+  supabase: SupabaseClient,
+  now = new Date(),
+): Promise<LiveInstagramAccountMetrics | null> {
+  const token = await getValidToken(supabase)
+  if (!token) return null
+
+  const [followersCount, insights] = await Promise.all([
+    getFollowerCount(token),
+    getInstagramAccountInsights(token),
+  ])
+  return {
+    followersCount,
+    reach: insights.reach,
+    profileViews: insights.profileViews,
+    linkTaps: insights.linkTaps,
+    totalInteractions: insights.totalInteractions,
+    fetchedAt: now.toISOString(),
+  }
+}
+
 /**
  * Guarda un snapshot diario de seguidores de Instagram (upsert por captured_on, corre dentro del
  * cron de daily-maintenance -- ver route.ts). "skipped" es el estado normal si Instagram todavía no

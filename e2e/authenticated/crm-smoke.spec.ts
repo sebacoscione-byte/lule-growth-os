@@ -29,6 +29,8 @@ test("un usuario autorizado puede entrar al dashboard", async () => {
   await expect(page).not.toHaveURL(/\/login/)
   await expect(page.getByRole("heading", { name: "Dashboard", level: 1 })).toBeVisible()
   await expect(page.getByText(/Resumen general · Semana del/)).toBeVisible()
+  await expect(page.getByRole("heading", { name: /seguidores en Instagram/ })).toBeVisible()
+  await expect(page.getByText(/Actualizado al abrir el dashboard/).first()).toBeVisible()
   await expect(page.getByRole("link", { name: "Esta semana" })).toBeVisible()
   await expect(page.getByRole("heading", { name: "Instagram", exact: true })).toBeVisible()
   await expect(page.getByRole("heading", { name: "Publicidad", exact: true })).toBeVisible()

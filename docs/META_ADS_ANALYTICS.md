@@ -8,7 +8,12 @@ El dashboard separa dos fuentes para no confundir un clic publicitario con una c
    con una acción de contacto, consultas registradas y turnos confirmados por `utm_source`, `utm_medium`,
    `utm_campaign` y `utm_content`.
 2. **Entrega publicitaria de Meta**: se consulta en modo lectura desde Marketing API. Mide inversión,
-   impresiones, alcance, clics en enlace, CTR y costo por clic por campaña y plataforma.
+   impresiones, alcance y las acciones agregadas que Meta atribuya a cada campaña y plataforma. Para
+   campañas hacia Instagram, prioriza visitas al perfil y seguimientos; si Meta no los informa,
+   conserva los clics en enlace como referencia secundaria.
+3. **Estado actual de Instagram**: al abrir el dashboard se consulta el total de seguidores y los
+   insights diarios de la cuenta profesional. Si la API no responde dentro de seis segundos, se usa
+   el snapshot diario y se muestra cuándo fue actualizado.
 
 La primera funciona aunque Meta no esté conectado. La segunda falla de forma no bloqueante: un error
 o vencimiento de la credencial nunca impide abrir el dashboard ni borra la atribución propia.
@@ -44,10 +49,14 @@ Para el período seleccionado en `/dashboard`, el servidor consulta:
 
 - Metadatos mínimos de la cuenta: nombre y moneda.
 - Insights a nivel campaña con desglose `publisher_platform`.
-- Campos: campaña, gasto, impresiones, alcance, clics internos en enlace y fechas.
+- Campos: campaña, gasto, impresiones, alcance, clics internos en enlace, acciones atribuidas,
+  costo por tipo de acción y fechas.
 
 El CTR de enlace y el costo por clic se calculan localmente sobre `inline_link_clicks`; no se mezclan
 con clics sociales, reacciones u otras interacciones que Meta pueda incluir en su CTR general.
+Las visitas al perfil y los seguimientos se muestran sólo cuando aparecen en `actions`; un campo
+ausente se presenta como “No informado” y no se convierte en cero. El crecimiento total de la cuenta
+se calcula contra snapshots propios y nunca se atribuye automáticamente a la publicidad.
 
 ## Privacidad
 
@@ -68,10 +77,13 @@ Configuración completada y validada en producción el 2026-08-26. Para controle
 3. Comparar “Clics en enlace” de Meta con “Visitas” UTM. No tienen que ser idénticos: una persona
    puede tocar el anuncio y no terminar de cargar la landing, repetir el clic o bloquear el tracking.
 4. Comparar luego visitas con acción, consultas y turnos para evaluar calidad, no sólo volumen.
+5. Confirmar que Instagram diga “Actualizado al abrir el dashboard”. Si muestra la antigüedad de un
+   corte, la lectura en vivo falló y el panel activó correctamente el respaldo diario.
 
 ## Implementación
 
 - Migración: `supabase/migrations/20260826_dashboard_campaign_performance.sql`
 - Atribución y tipos: `src/lib/dashboard-growth.ts`
 - Cliente de lectura de Meta: `src/lib/meta-ads.ts`
+- Lectura en vivo y fallback diario: `src/lib/instagram-followers.ts`, `src/lib/dashboard-growth.ts`
 - Presentación: `src/app/(app)/dashboard/page.tsx`

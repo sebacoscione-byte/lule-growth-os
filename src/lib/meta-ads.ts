@@ -22,8 +22,19 @@ export interface MetaAdsCampaignMetric {
   linkClicks: number
   linkCtr: number
   costPerLinkClick: number | null
+  profileVisits: number | null
+  costPerProfileVisit: number | null
+  follows: number | null
+  costPerFollow: number | null
+  actions: MetaAdsActionMetric[]
   dateStart: string
   dateStop: string
+}
+
+export interface MetaAdsActionMetric {
+  actionType: string
+  value: number
+  cost: number | null
 }
 
 export interface MetaAdsDashboardMetrics {
@@ -38,6 +49,10 @@ export interface MetaAdsDashboardMetrics {
     linkClicks: number
     linkCtr: number
     costPerLinkClick: number | null
+    profileVisits: number | null
+    costPerProfileVisit: number | null
+    follows: number | null
+    costPerFollow: number | null
   }
 }
 
@@ -59,7 +74,10 @@ function emptyMetrics(
     accountName: null,
     currency: null,
     campaigns: [],
-    totals: { spend: 0, impressions: 0, linkClicks: 0, linkCtr: 0, costPerLinkClick: null },
+    totals: {
+      spend: 0, impressions: 0, linkClicks: 0, linkCtr: 0, costPerLinkClick: null,
+      profileVisits: null, costPerProfileVisit: null, follows: null, costPerFollow: null,
+    },
   }
 }
 
@@ -74,6 +92,58 @@ function roundedRate(numerator: number, denominator: number): number {
 
 function roundedMoney(value: number): number {
   return Math.round(value * 100) / 100
+}
+
+function parseActionList(actions: unknown, costs: unknown): MetaAdsActionMetric[] {
+  if (!Array.isArray(actions)) return []
+  const costByType = new Map<string, number>()
+  if (Array.isArray(costs)) {
+    for (const item of costs) {
+      if (!item || typeof item !== "object") continue
+      const row = item as Record<string, unknown>
+      if (typeof row.action_type !== "string") continue
+      costByType.set(row.action_type, finiteNumber(row.value))
+    }
+  }
+  return actions.flatMap(item => {
+    if (!item || typeof item !== "object") return []
+    const row = item as Record<string, unknown>
+    if (typeof row.action_type !== "string") return []
+    return [{
+      actionType: row.action_type.slice(0, 160),
+      value: finiteNumber(row.value),
+      cost: costByType.has(row.action_type) ? roundedMoney(costByType.get(row.action_type)!) : null,
+    }]
+  })
+}
+
+function isInstagramProfileVisit(actionType: string): boolean {
+  const normalized = actionType.toLowerCase()
+  return [
+    "visit_instagram_profile",
+    "instagram_profile_visit",
+    "instagram_profile_visits",
+    "profile_visit_view",
+  ].includes(normalized)
+    || (normalized.includes("instagram") && normalized.includes("profile") && /visit|view/.test(normalized))
+}
+
+function isInstagramFollow(actionType: string): boolean {
+  const normalized = actionType.toLowerCase()
+  return ["follow", "follows", "instagram_follow", "instagram_follows"].includes(normalized)
+    || (normalized.includes("instagram") && normalized.includes("follow"))
+}
+
+function actionResult(
+  actions: MetaAdsActionMetric[],
+  predicate: (actionType: string) => boolean,
+): { value: number | null; cost: number | null } {
+  const matches = actions.filter(action => predicate(action.actionType))
+  if (matches.length === 0) return { value: null, cost: null }
+  const value = matches.reduce((total, action) => total + action.value, 0)
+  const directCosts = matches.filter(action => action.cost !== null)
+  const cost = directCosts.length === 1 ? directCosts[0].cost : null
+  return { value, cost }
 }
 
 function classifyProviderFailure(status: number): MetaAdsStatus {
@@ -111,6 +181,9 @@ function parseInsightRow(value: unknown): MetaAdsCampaignMetric | null {
   const impressions = finiteNumber(row.impressions)
   const linkClicks = finiteNumber(row.inline_link_clicks)
   const spend = finiteNumber(row.spend)
+  const actions = parseActionList(row.actions, row.cost_per_action_type)
+  const profileVisits = actionResult(actions, isInstagramProfileVisit)
+  const follows = actionResult(actions, isInstagramFollow)
   return {
     campaignId: row.campaign_id.slice(0, 100),
     campaignName: row.campaign_name.slice(0, 300),
@@ -123,6 +196,11 @@ function parseInsightRow(value: unknown): MetaAdsCampaignMetric | null {
     linkClicks,
     linkCtr: roundedRate(linkClicks, impressions),
     costPerLinkClick: linkClicks > 0 ? roundedMoney(spend / linkClicks) : null,
+    profileVisits: profileVisits.value,
+    costPerProfileVisit: profileVisits.cost ?? (profileVisits.value && profileVisits.value > 0 ? roundedMoney(spend / profileVisits.value) : null),
+    follows: follows.value,
+    costPerFollow: follows.cost ?? (follows.value && follows.value > 0 ? roundedMoney(spend / follows.value) : null),
+    actions,
     dateStart: row.date_start,
     dateStop: row.date_stop,
   }
@@ -176,7 +254,7 @@ export async function getMetaAdsDashboardMetrics(
       const insightsUrl = new URL(`${base}/${config.accountId}/insights`)
       insightsUrl.searchParams.set(
         "fields",
-        "campaign_id,campaign_name,spend,impressions,reach,inline_link_clicks,date_start,date_stop",
+        "campaign_id,campaign_name,spend,impressions,reach,inline_link_clicks,actions,cost_per_action_type,date_start,date_stop",
       )
       insightsUrl.searchParams.set("level", "campaign")
       insightsUrl.searchParams.set("breakdowns", "publisher_platform")
@@ -207,6 +285,16 @@ export async function getMetaAdsDashboardMetrics(
     const spend = roundedMoney(campaigns.reduce((total, row) => total + row.spend, 0))
     const impressions = campaigns.reduce((total, row) => total + row.impressions, 0)
     const linkClicks = campaigns.reduce((total, row) => total + row.linkClicks, 0)
+    const profileVisitRows = campaigns.filter(row => row.profileVisits !== null)
+    const followRows = campaigns.filter(row => row.follows !== null)
+    const profileVisits = profileVisitRows.length > 0
+      ? profileVisitRows.reduce((total, row) => total + (row.profileVisits ?? 0), 0)
+      : null
+    const follows = followRows.length > 0
+      ? followRows.reduce((total, row) => total + (row.follows ?? 0), 0)
+      : null
+    const profileVisitSpend = profileVisitRows.reduce((total, row) => total + row.spend, 0)
+    const followSpend = followRows.reduce((total, row) => total + row.spend, 0)
     return {
       status: "available",
       missing: [],
@@ -219,6 +307,10 @@ export async function getMetaAdsDashboardMetrics(
         linkClicks,
         linkCtr: roundedRate(linkClicks, impressions),
         costPerLinkClick: linkClicks > 0 ? roundedMoney(spend / linkClicks) : null,
+        profileVisits,
+        costPerProfileVisit: profileVisits && profileVisits > 0 ? roundedMoney(profileVisitSpend / profileVisits) : null,
+        follows,
+        costPerFollow: follows && follows > 0 ? roundedMoney(followSpend / follows) : null,
       },
     }
   } catch {

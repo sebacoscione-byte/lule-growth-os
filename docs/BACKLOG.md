@@ -3,6 +3,20 @@
 
 ---
 
+## [RESUELTO] ✅ Instagram en vivo y campañas hacia el perfil (2026-08-27)
+
+- El Dashboard consulta el total actual de seguidores al abrirse y deja el snapshot diario como
+  respaldo visible si Instagram no responde.
+- El resumen superior combina sitio, Instagram, inversión publicitaria, contactos y consultas; ya
+  no presenta únicamente el embudo web.
+- Meta Ads solicita resultados y costos por tipo de acción. Muestra visitas al perfil o seguimientos
+  sólo cuando Meta los atribuye; “No informado” no se interpreta como cero.
+- El crecimiento total de la cuenta permanece separado de la atribución publicitaria para no adjudicar
+  a una campaña seguidores orgánicos o provenientes de otros canales.
+- No se agregaron Pixel/CAPI, crons, eventos de pacientes ni permisos de escritura.
+
+---
+
 ## [RESUELTO] ✅ Detalle de uso de la web por campaña (2026-08-27)
 
 - El Dashboard muestra el recorrido completo de cada campaña identificada por UTM: entrada,

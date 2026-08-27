@@ -1,6 +1,7 @@
 import {
   buildGrowthPeriodSummary,
   buildCampaignPerformance,
+  buildInstagramDashboardMetrics,
   combineChannelPerformance,
   getDashboardDateRange,
   normalizeDashboardChannel,
@@ -51,6 +52,29 @@ describe("dashboard growth", () => {
       previousEnd: "2026-07-27",
       calendarWeek: false,
     })
+  })
+
+  it("superpone seguidores en vivo al snapshot diario y conserva la base semanal", () => {
+    const range = getDashboardDateRange(7, new Date("2026-08-27T17:00:00.000Z"))
+    const metrics = buildInstagramDashboardMetrics([
+      { captured_on: "2026-08-23", followers_count: 212, reach: 10, profile_views: 2, link_taps: 0, total_interactions: 1, created_at: "2026-08-23T11:00:00.000Z" },
+      { captured_on: "2026-08-24", followers_count: 213, reach: 20, profile_views: 3, link_taps: 1, total_interactions: 2, created_at: "2026-08-24T11:00:00.000Z" },
+      { captured_on: "2026-08-27", followers_count: 217, reach: 30, profile_views: 4, link_taps: 1, total_interactions: 3, created_at: "2026-08-27T11:00:00.000Z" },
+    ], range, {
+      followersCount: 221,
+      reach: 35,
+      profileViews: 8,
+      linkTaps: 2,
+      totalInteractions: 5,
+      fetchedAt: "2026-08-27T17:00:00.000Z",
+    })
+
+    expect(metrics.followers).toBe(221)
+    expect(metrics.followersDelta).toBe(9)
+    expect(metrics.profileViews).toBe(11)
+    expect(metrics.series.at(-1)).toEqual({ date: "2026-08-27", followers: 221 })
+    expect(metrics.followersLive).toBe(true)
+    expect(metrics.followersUpdatedAt).toBe("2026-08-27T17:00:00.000Z")
   })
 
   it("compara el embudo actual con el periodo anterior", () => {

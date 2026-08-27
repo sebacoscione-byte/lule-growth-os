@@ -37,7 +37,11 @@ import {
   type DashboardPeriod,
   type PeriodValue,
 } from "@/lib/dashboard-growth"
-import { getMetaAdsDashboardMetrics, type MetaAdsStatus } from "@/lib/meta-ads"
+import {
+  getMetaAdsDashboardMetrics,
+  type MetaAdsCampaignMetric,
+  type MetaAdsStatus,
+} from "@/lib/meta-ads"
 import { buildWebsiteJourneySteps, websiteJourneyPercentage } from "@/lib/site-journey"
 import type { ReactNode } from "react"
 
@@ -964,6 +968,25 @@ function formatAdsMoney(amount: number, currency: string | null): string {
   }).format(amount)
 }
 
+function followerDeltaLabel(delta: number | null, periodLabel: string): string {
+  if (delta === null) return "Sin comparación todavía"
+  if (delta === 0) return `Sin cambios durante ${periodLabel.toLocaleLowerCase("es-AR")}`
+  return `${delta > 0 ? "+" : ""}${delta} durante ${periodLabel.toLocaleLowerCase("es-AR")}`
+}
+
+function primaryAdsResult(metric: Pick<
+  MetaAdsCampaignMetric,
+  "profileVisits" | "costPerProfileVisit" | "follows" | "costPerFollow" | "linkClicks" | "costPerLinkClick"
+>): { label: string; value: number; cost: number | null; attributed: boolean } {
+  if (metric.profileVisits !== null) {
+    return { label: "Visitas al perfil", value: metric.profileVisits, cost: metric.costPerProfileVisit, attributed: true }
+  }
+  if (metric.follows !== null) {
+    return { label: "Seguimientos atribuidos", value: metric.follows, cost: metric.costPerFollow, attributed: true }
+  }
+  return { label: "Clics en enlace", value: metric.linkClicks, cost: metric.costPerLinkClick, attributed: false }
+}
+
 function formatDateKey(dateKey: string, options: Intl.DateTimeFormatOptions): string {
   return new Intl.DateTimeFormat("es-AR", { timeZone: "UTC", ...options })
     .format(new Date(`${dateKey}T12:00:00.000Z`))
@@ -1041,6 +1064,19 @@ export default async function DashboardPage({
   const siteContactRate = siteJourney.totals.visits > 0
     ? Math.round((siteJourney.totals.contactVisits / siteJourney.totals.visits) * 1000) / 10
     : 0
+  const instagramFreshness = growth.instagram.followersLive
+    ? "Actualizado al abrir el dashboard"
+    : growth.instagram.followersUpdatedAt
+      ? `Último dato ${timeAgo(growth.instagram.followersUpdatedAt)}`
+      : "Sin actualización disponible"
+  const adsPrimaryResult = metaAds.status === "available" ? primaryAdsResult(metaAds.totals) : null
+  const generalSummary = [
+    growth.available ? `${growth.summary.visits.current} visitas al sitio` : null,
+    growth.instagram.followers !== null ? `${growth.instagram.followers} seguidores en Instagram` : null,
+    metaAds.status === "available" ? `${formatAdsMoney(metaAds.totals.spend, metaAds.currency)} invertidos` : null,
+    growth.available ? `${growth.summary.engagedVisits.current} intentos de contacto` : null,
+    growth.available ? `${growth.summary.leads.current} consultas registradas` : null,
+  ].filter((value): value is string => Boolean(value))
 
   return (
     <div className="space-y-5 bg-gray-50/60 p-4 text-gray-950 md:space-y-7 md:p-6">
@@ -1066,14 +1102,9 @@ export default async function DashboardPage({
       <section className="overflow-hidden rounded-2xl bg-gray-950 p-4 text-white shadow-sm md:p-6" aria-labelledby="resumen-title">
         <p className="text-xs font-semibold uppercase tracking-[0.16em] text-indigo-300">Resumen general · {periodLabel}</p>
         <h2 id="resumen-title" className="mt-2 max-w-4xl text-lg font-semibold leading-snug md:text-2xl">
-          {growth.available ? (
-            <>
-              <strong>{growth.summary.visits.current}</strong> personas llegaron al sitio, <strong>{growth.summary.engagedVisits.current}</strong> hicieron
-              una acción para contactarse, <strong>{growth.summary.leads.current}</strong> consultas quedaron registradas y <strong>{growth.summary.confirmed.current}</strong> confirmaron que pidieron turno.
-            </>
-          ) : (
-            <>El seguimiento de visitas todavía no está disponible; la información operativa y publicitaria continúa funcionando.</>
-          )}
+          {generalSummary.length > 0
+            ? `${generalSummary.join(" · ")}.`
+            : "Todavía no hay información disponible para armar el resumen."}
         </h2>
         {period === 7 && (
           <p className="mt-3 text-xs text-gray-400">
@@ -1084,14 +1115,10 @@ export default async function DashboardPage({
           <WeeklySummaryItem
             icon={Camera}
             title="Instagram"
-            headline={growth.instagram.followersDelta === null
-              ? growth.instagram.followers === null ? "Sin datos todavía" : `${growth.instagram.followers} seguidores`
-              : growth.instagram.followersDelta > 0 ? `+${growth.instagram.followersDelta} seguidores`
-              : growth.instagram.followersDelta < 0 ? `${growth.instagram.followersDelta} seguidores`
-              : "Sin cambios en seguidores"}
+            headline={growth.instagram.followers === null ? "Sin datos todavía" : `${growth.instagram.followers} seguidores`}
             detail={growth.instagram.followers === null
               ? "La cuenta está conectada, pero todavía falta una comparación diaria."
-              : `${growth.instagram.followers} seguidores totales${growth.instagram.profileViews === null ? "" : ` · ${growth.instagram.profileViews} visitas al perfil`}.`}
+              : `${followerDeltaLabel(growth.instagram.followersDelta, periodLabel)} · ${instagramFreshness}${growth.instagram.profileViews === null ? "" : ` · ${growth.instagram.profileViews} visitas al perfil`}.`}
           />
           <WeeklySummaryItem
             icon={Megaphone}
@@ -1100,7 +1127,7 @@ export default async function DashboardPage({
               ? `${formatAdsMoney(metaAds.totals.spend, metaAds.currency)} invertidos`
               : "Sin datos publicitarios"}
             detail={metaAds.status === "available"
-              ? `${metaAds.totals.linkClicks} clics al sitio · ${metaAds.totals.impressions.toLocaleString("es-AR")} impresiones.`
+              ? `${adsPrimaryResult?.value ?? 0} ${adsPrimaryResult?.label.toLocaleLowerCase("es-AR") ?? "resultados"}${metaAds.totals.follows === null ? "" : ` · ${metaAds.totals.follows} seguimientos atribuidos`} · ${metaAds.totals.impressions.toLocaleString("es-AR")} impresiones.`
               : "El resto del resumen sigue funcionando aunque Meta no responda."}
           />
           <WeeklySummaryItem
@@ -1351,7 +1378,7 @@ export default async function DashboardPage({
             Publicidad en Facebook e Instagram
           </CardTitle>
           <p className="text-xs text-gray-500">
-            Cuánto se gastó y cuántas visitas generaron los anuncios durante {periodLabel.toLocaleLowerCase("es-AR")}.
+            Cuánto se gastó y qué resultado informó Meta durante {periodLabel.toLocaleLowerCase("es-AR")}.
           </p>
         </CardHeader>
         <CardContent>
@@ -1368,17 +1395,29 @@ export default async function DashboardPage({
               <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
                 <MetricTile label="Gastado" value={formatAdsMoney(metaAds.totals.spend, metaAds.currency)} helper="Inversión acumulada en el período" />
                 <MetricTile label="Veces que se mostró" value={metaAds.totals.impressions.toLocaleString("es-AR")} helper="Una persona puede verlo más de una vez" />
-                <MetricTile label="Clics hacia el sitio" value={metaAds.totals.linkClicks.toLocaleString("es-AR")} helper="No equivale todavía a una consulta" />
-                <MetricTile label="Costo por clic" value={metaAds.totals.costPerLinkClick === null ? null : formatAdsMoney(metaAds.totals.costPerLinkClick, metaAds.currency)} helper="Promedio pagado por cada clic" />
+                <MetricTile label={adsPrimaryResult?.label ?? "Resultado principal"} value={(adsPrimaryResult?.value ?? 0).toLocaleString("es-AR")} helper={adsPrimaryResult?.attributed ? "Resultado atribuido por Meta" : "Meta no informó visitas al perfil; se muestran clics en enlace"} />
+                <MetricTile label="Costo por resultado" value={adsPrimaryResult?.cost === null || adsPrimaryResult?.cost === undefined ? null : formatAdsMoney(adsPrimaryResult.cost, metaAds.currency)} helper={`Promedio por ${adsPrimaryResult?.label.toLocaleLowerCase("es-AR") ?? "resultado"}`} />
               </div>
 
-              {metaAds.totals.linkClicks > 0 && (
+              {metaAds.totals.follows !== null && (
+                <div className="rounded-xl border border-pink-200 bg-pink-50 p-4 text-sm text-pink-900">
+                  <p className="font-semibold">Seguimientos atribuidos por Meta: {metaAds.totals.follows}</p>
+                  <p className="mt-1 text-xs text-pink-800">
+                    {metaAds.totals.costPerFollow === null
+                      ? "Meta informó el resultado, pero no un costo específico."
+                      : `Costo promedio: ${formatAdsMoney(metaAds.totals.costPerFollow, metaAds.currency)} por seguimiento.`}
+                    {growth.instagram.followersDelta === null ? "" : ` El crecimiento total de la cuenta en el período es ${growth.instagram.followersDelta >= 0 ? "+" : ""}${growth.instagram.followersDelta}; no se atribuye automáticamente todo a publicidad.`}
+                  </p>
+                </div>
+              )}
+
+              {adsPrimaryResult && adsPrimaryResult.value > 0 && (
                 <div className="rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm leading-relaxed text-blue-900">
                   <p className="font-semibold">Lectura rápida</p>
                   <p className="mt-1">
-                    Meta registró <strong>{metaAds.totals.linkClicks} clics</strong> con una inversión de <strong>{formatAdsMoney(metaAds.totals.spend, metaAds.currency)}</strong>.
-                    {platformClickRows.length > 1 && (
-                      <> {META_PLATFORM_LABEL[platformClickRows[0][0]] ?? readableTrackingValue(platformClickRows[0][0])} aportó {platformClickRows[0][1]} clics y {META_PLATFORM_LABEL[platformClickRows[1][0]] ?? readableTrackingValue(platformClickRows[1][0])} {platformClickRows[1][1]}.</>
+                    Meta registró <strong>{adsPrimaryResult.value} {adsPrimaryResult.label.toLocaleLowerCase("es-AR")}</strong> con una inversión de <strong>{formatAdsMoney(metaAds.totals.spend, metaAds.currency)}</strong>.
+                    {!adsPrimaryResult.attributed && platformClickRows.length > 1 && (
+                      <> {META_PLATFORM_LABEL[platformClickRows[0][0]] ?? readableTrackingValue(platformClickRows[0][0])} aportó {platformClickRows[0][1]} clics en enlace y {META_PLATFORM_LABEL[platformClickRows[1][0]] ?? readableTrackingValue(platformClickRows[1][0])} {platformClickRows[1][1]}.</>
                     )}
                     {growth.available && <> Más arriba podés comparar esos clics con las <strong>{growth.summary.leads.current} consultas registradas</strong> y los <strong>{growth.summary.confirmed.current} turnos confirmados</strong>.</>}
                   </p>
@@ -1394,7 +1433,7 @@ export default async function DashboardPage({
                     <ChevronDown className="h-4 w-4 text-gray-400 transition-transform group-open:rotate-180" />
                   </summary>
                 <div className="overflow-x-auto border-t border-gray-100 p-4">
-                  <table className="w-full min-w-[860px] text-sm">
+                  <table className="w-full min-w-[940px] text-sm">
                     <thead>
                       <tr className="border-b text-left text-xs text-gray-500">
                         <th className="pb-3 font-medium">Campaña</th>
@@ -1402,31 +1441,36 @@ export default async function DashboardPage({
                         <th className="pb-3 text-right font-medium">Inversión</th>
                         <th className="pb-3 text-right font-medium">Impresiones</th>
                         <th className="pb-3 text-right font-medium">Alcance</th>
-                        <th className="pb-3 text-right font-medium">Clics</th>
-                        <th className="pb-3 text-right font-medium">CTR enlace</th>
-                        <th className="pb-3 text-right font-medium">Costo/clic</th>
+                        <th className="pb-3 text-right font-medium">Resultado principal</th>
+                        <th className="pb-3 text-right font-medium">Costo/resultado</th>
+                        <th className="pb-3 text-right font-medium">Seguimientos</th>
+                        <th className="pb-3 text-right font-medium">Clics en enlace</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {metaAds.campaigns.map(row => (
+                      {metaAds.campaigns.map(row => {
+                        const result = primaryAdsResult(row)
+                        return (
                         <tr key={`${row.campaignId}:${row.platform}`} className="border-b border-gray-50 last:border-0">
                           <td className="py-3 pr-4 font-medium text-gray-900">{row.campaignName}</td>
                           <td className="py-3 pr-4 text-gray-700">{META_PLATFORM_LABEL[row.platform] ?? readableTrackingValue(row.platform)}</td>
                           <td className="py-3 text-right font-semibold text-gray-900">{formatAdsMoney(row.spend, metaAds.currency)}</td>
                           <td className="py-3 text-right text-gray-700">{row.impressions.toLocaleString("es-AR")}</td>
                           <td className="py-3 text-right text-gray-700">{row.reach.toLocaleString("es-AR")}</td>
+                          <td className="py-3 text-right text-gray-700"><span className="font-semibold text-gray-900">{result.value.toLocaleString("es-AR")}</span><span className="block text-[11px] text-gray-400">{result.label}</span></td>
+                          <td className="py-3 text-right text-gray-700">{result.cost === null ? "—" : formatAdsMoney(result.cost, metaAds.currency)}</td>
+                          <td className="py-3 text-right text-gray-700">{row.follows === null ? "No informado" : row.follows.toLocaleString("es-AR")}</td>
                           <td className="py-3 text-right text-gray-700">{row.linkClicks.toLocaleString("es-AR")}</td>
-                          <td className="py-3 text-right text-gray-700">{row.linkCtr}%</td>
-                          <td className="py-3 text-right text-gray-700">{row.costPerLinkClick === null ? "—" : formatAdsMoney(row.costPerLinkClick, metaAds.currency)}</td>
                         </tr>
-                      ))}
+                        )
+                      })}
                     </tbody>
                   </table>
                 </div>
                 </details>
               )}
               <p className="text-[11px] leading-relaxed text-gray-400">
-                Los datos publicitarios vienen directamente de Meta. La app sólo lee resultados agregados y no envía información de pacientes.
+                Los datos publicitarios vienen directamente de Meta. “No informado” significa que la API no devolvió esa atribución; no equivale a cero. La app sólo lee resultados agregados y no envía información de pacientes.
               </p>
             </div>
           )}
@@ -1499,14 +1543,10 @@ export default async function DashboardPage({
           <ChannelSummaryCard
             icon={Camera}
             title="Instagram"
-            headline={growth.instagram.followersDelta === null
-              ? growth.instagram.followers === null ? "Sin datos todavía" : `${growth.instagram.followers} seguidores`
-              : growth.instagram.followersDelta > 0 ? `+${growth.instagram.followersDelta} seguidores`
-              : growth.instagram.followersDelta < 0 ? `${growth.instagram.followersDelta} seguidores`
-              : "Sin cambios"}
+            headline={growth.instagram.followers === null ? "Sin datos todavía" : `${growth.instagram.followers} seguidores`}
             detail={growth.instagram.followers === null
               ? "Todavía falta una comparación diaria."
-              : `${growth.instagram.followers} seguidores totales · ${instagramChannel?.leads ?? 0} consultas identificadas desde Instagram.`}
+              : `${followerDeltaLabel(growth.instagram.followersDelta, periodLabel)} · ${instagramFreshness} · ${instagramChannel?.leads ?? 0} consultas identificadas.`}
             className="bg-pink-50 text-pink-700"
           />
           <ChannelSummaryCard
@@ -2198,7 +2238,7 @@ export default async function DashboardPage({
             ) : (
               <div className="grid gap-5 xl:grid-cols-[minmax(0,1.35fr)_minmax(320px,0.65fr)]">
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-                  <MetricTile label="Seguidores" value={growth.instagram.followers} helper={growth.instagram.followersDelta === null ? "sin comparación todavía" : `${growth.instagram.followersDelta >= 0 ? "+" : ""}${growth.instagram.followersDelta} en el período`} />
+                  <MetricTile label="Seguidores actuales" value={growth.instagram.followers} helper={`${followerDeltaLabel(growth.instagram.followersDelta, periodLabel)} · ${instagramFreshness}`} />
                   <MetricTile label="Alcance" value={growth.instagram.reach} helper="cuentas alcanzadas" />
                   <MetricTile label="Visitas al perfil" value={growth.instagram.profileViews} />
                   <MetricTile label="Toques en el enlace" value={growth.instagram.linkTaps} helper="informado por Instagram" />
@@ -2214,6 +2254,9 @@ export default async function DashboardPage({
                 />
               </div>
             )}
+            <p className="text-[11px] leading-relaxed text-gray-400">
+              El cambio de seguidores representa el total de la cuenta. Sólo se atribuye a publicidad cuando Meta Ads devuelve explícitamente ese resultado.
+            </p>
             {contentPerformance.available && contentPerformance.rows.length > 0 && (
               <div className="border-t border-gray-100 pt-4">
                 <div className="mb-3 flex items-center justify-between gap-3">

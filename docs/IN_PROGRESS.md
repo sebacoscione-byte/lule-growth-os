@@ -1,3 +1,22 @@
+# EN CURSO (2026-08-27) — Instagram en vivo y resumen multicanal
+
+## Objetivo
+
+Evitar que el dashboard muestre un snapshot viejo de seguidores, convertir el titular superior en
+un resumen real de web + Instagram + publicidad y leer resultados/costos por acción de Meta Ads
+para campañas cuyo destino es el perfil de Instagram.
+
+## Plan
+
+- [x] Incorporar seguidores e insights de cuenta en vivo con fallback al snapshot diario.
+- [x] Pedir `actions` y `cost_per_action_type` a Meta Ads y reconocer visitas al perfil/seguimientos.
+- [x] Rediseñar el resumen superior y corregir los rótulos que hoy dicen “clics al sitio”.
+- [x] Agregar tests, documentación y estados explícitos cuando Meta no informe atribución.
+- [ ] Ejecutar lint, tests, build y E2E autenticado.
+- [ ] Abrir PR, verificar preview, mergear y validar producción.
+
+---
+
 # CERRADO (2026-08-27) — seguimiento detallado del uso de la web
 
 - [x] Auditar el tracking y los bloques existentes del dashboard.
@@ -1461,5 +1480,3 @@ por fecha, canal abierto, sede elegida y campaña de origen, conservando el per�
 - La RPC sólo entrega agregados anónimos; no expone identificadores de sesión ni datos personales.
 - No se modificaron lógica médica, webhooks de WhatsApp, cron jobs ni políticas RLS.
 - Un intento representa la apertura de un canal externo, no la confirmación de un turno.
-
----
