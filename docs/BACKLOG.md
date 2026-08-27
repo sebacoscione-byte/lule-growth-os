@@ -3,6 +3,20 @@
 
 ---
 
+## [RESUELTO] ✅ Historias ya publicadas tratadas como nuevas (2026-08-27)
+
+- En la corrida real había tres historias publicadas externamente con repetición infinita, pero dos
+  seguían como `approved` en la Biblioteca; por eso `items_per_run=1` dejó una fuera y el cron informó
+  correctamente `published:2/2`.
+- La historia pendiente se publicó manualmente mediante el flujo oficial y quedó sincronizada con su
+  nuevo media ID de Instagram.
+- Activar repetición sobre una pieza aprobada ahora obliga a elegir si todavía no salió o si ya fue
+  publicada. La segunda opción marca `published` y activa la repetición atómicamente.
+- La API rechaza activaciones ambiguas y la UI permite reparar piezas legacy sin republicarlas.
+- No se modificaron el cron, sus horarios, secretos, contenido médico ni conexiones de Meta.
+
+---
+
 ## [RESUELTO] ✅ Instagram en vivo y campañas hacia el perfil (2026-08-27)
 
 - El Dashboard consulta el total actual de seguidores al abrirse y deja el snapshot diario como

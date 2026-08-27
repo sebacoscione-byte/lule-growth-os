@@ -41,6 +41,10 @@ import { CONTENT_OBJECTIVE_GOALS, CONTENT_OBJECTIVE_LABELS, WEEKDAY_OPTIONS } fr
 
 const IS_MANUAL_MODE = process.env.NEXT_PUBLIC_AI_MODE !== "gemini_api"
 
+type ContentItemPatch = Partial<ContentItem> & {
+  repeat_activation_mode?: "after_first_publication" | "already_published"
+}
+
 const OBJECTIVES: { value: ContentObjective; label: string }[] = [
   { value: "conversion", label: CONTENT_OBJECTIVE_LABELS.conversion },
   { value: "educacion", label: CONTENT_OBJECTIVE_LABELS.educacion },
@@ -1314,7 +1318,7 @@ export default function ContentStudioPage() {
     await saveGeneratedItem(parsed)
   }
 
-  async function updateItem(item: ContentItem, changes: Partial<ContentItem>) {
+  async function updateItem(item: ContentItem, changes: ContentItemPatch) {
     setWorking(item.id)
     setError(null)
     try {
@@ -2257,7 +2261,7 @@ function Editor({
   generatedVisual: { itemId: string; url: string } | null
   onGeneratedVisual: (visual: { itemId: string; url: string } | null) => void
   onChange: (item: ContentItem) => void
-  onSave: (changes: Partial<ContentItem>) => Promise<void>
+  onSave: (changes: ContentItemPatch) => Promise<void>
   onCopy: () => void
   onPublishInstagram: () => void
   onPublishNow: () => void
@@ -2313,6 +2317,11 @@ function Editor({
   const carruselImagesReady = !isCarrusel || Boolean(
     item.visual_url && (item.slides ?? []).length > 0 && (item.slides ?? []).every(slide => Boolean(slide.visual_url))
   )
+
+  async function confirmAlreadyPublishedForRepeat() {
+    if (!window.confirm("Confirmá sólo si esta pieza ya fue publicada en Instagram. Esto no la publica ahora: sincroniza el estado de la Biblioteca y activa sus próximas repeticiones automáticas. ¿Continuar?")) return
+    await onSave({ repeat_activation_mode: "already_published" })
+  }
   const reelVideoReady = !isReel || Boolean(item.video_url)
   const approvalReady = Boolean(
     (isHistoria || (item.hook.trim() && item.caption.trim())) &&
@@ -3620,16 +3629,55 @@ function Editor({
             <div className="flex flex-col gap-2 rounded-md border border-dashed border-gray-300 p-3 text-sm text-gray-700">
               <div className="flex flex-wrap items-center gap-3">
                 <span className="font-medium text-gray-900">Repetir esta pieza automáticamente</span>
-                <Button
-                  type="button"
-                  variant={item.repeat_interval_days ? "default" : "outline"}
-                  size="sm"
-                  disabled={busy}
-                  onClick={() => onSave({ repeat_interval_days: item.repeat_interval_days ? null : 1 })}
-                >
-                  {item.repeat_interval_days ? "Activada" : "Desactivada"}
-                </Button>
+                {(item.repeat_interval_days || item.status === "published") && (
+                  <Button
+                    type="button"
+                    variant={item.repeat_interval_days ? "default" : "outline"}
+                    size="sm"
+                    disabled={busy}
+                    onClick={() => onSave({ repeat_interval_days: item.repeat_interval_days ? null : 1 })}
+                  >
+                    {item.repeat_interval_days ? "Activada" : "Desactivada"}
+                  </Button>
+                )}
               </div>
+              {item.status === "approved" && !item.repeat_interval_days && (
+                <div className="space-y-2 rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-950">
+                  <p className="font-semibold">Antes de activarla, elegí cuál es el estado real en Instagram:</p>
+                  <p>
+                    Esta diferencia determina si la próxima salida es la primera publicación o una repetición
+                    adicional que no ocupa un lugar del &ldquo;Publicar de a N&rdquo;.
+                  </p>
+                  <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      disabled={busy}
+                      onClick={() => onSave({
+                        repeat_interval_days: 1,
+                        repeat_activation_mode: "after_first_publication",
+                      })}
+                    >
+                      Todavía no salió: publicar y después repetir
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      disabled={busy}
+                      onClick={async () => {
+                        if (!window.confirm("Confirmá sólo si esta pieza ya fue publicada en Instagram. Esto no la publica ahora: sincroniza el estado de la Biblioteca y activa sus próximas repeticiones automáticas. ¿Continuar?")) return
+                        await onSave({
+                          repeat_interval_days: 1,
+                          repeat_activation_mode: "already_published",
+                        })
+                      }}
+                    >
+                      Ya salió: marcar publicada y repetir
+                    </Button>
+                  </div>
+                </div>
+              )}
               {item.repeat_interval_days ? (
                 <>
                   <p className="text-xs text-gray-500">
@@ -3641,9 +3689,23 @@ function Editor({
                       ? "Sale como reel en el feed. "
                       : "Sale como post en el feed. "}
                     Los días y cuántas veces por semana sale los decide el cronograma de auto-publicación
-                    de este formato — no hace falta configurarlos acá. Sale <strong>además</strong> de
-                    las piezas nuevas: no ocupa un lugar del &ldquo;Publicar de a N&rdquo;, se publica aparte.
+                    de este formato — no hace falta configurarlos acá. {item.status === "published" ? (
+                      <>Las próximas salidas son repeticiones: salen <strong>además</strong> de las piezas nuevas y no ocupan un lugar del &ldquo;Publicar de a N&rdquo;.</>
+                    ) : (
+                      <>Todavía figura <strong>pendiente de su primera publicación</strong>: esa primera salida sí ocupa un lugar del &ldquo;Publicar de a N&rdquo;; recién las siguientes cuentan como repeticiones adicionales.</>
+                    )}
                   </p>
+                  {item.status === "approved" && (
+                    <div className="flex flex-col gap-2 rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-950 sm:flex-row sm:items-center sm:justify-between">
+                      <p>
+                        <strong>La app todavía la considera sin publicar.</strong> Si ya salió en Instagram,
+                        corregí el estado para que el cron la trate como repetición.
+                      </p>
+                      <Button type="button" size="sm" disabled={busy} onClick={confirmAlreadyPublishedForRepeat}>
+                        Ya salió: corregir estado
+                      </Button>
+                    </div>
+                  )}
                   <div className="flex flex-wrap items-center gap-2">
                     <span>Parar después de</span>
                     <Input
