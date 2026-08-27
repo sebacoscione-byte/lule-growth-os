@@ -83,18 +83,100 @@ describe("PATCH /api/content/items — limpiar resultado de publicacion viejo", 
     expect(written?.[0].auto_publish_result).toEqual({})
   })
 
-  it("conserva auto_publish_result cuando el cambio no es de contenido (no revierte a borrador)", async () => {
+  it("limpia cualquier resultado viejo al programar la primera publicación y sus repeticiones", async () => {
     ;(readContentItemsSnapshot as jest.Mock).mockResolvedValue({
       items: [item({ status: "approved" })],
+      version: "2026-08-24T10:00:00.000Z",
+    })
+
+    const response = await PATCH(patch({
+      id: "carrusel-1",
+      repeat_interval_days: 1,
+      repeat_activation_mode: "after_first_publication",
+    }))
+    const data = await response.json()
+
+    expect(response.status).toBe(200)
+    expect(data.item.status).toBe("approved")
+    expect(data.item.repeat_interval_days).toBe(1)
+    expect(data.item.repeat_count).toBe(0)
+    expect(data.item.auto_publish_result).toEqual({})
+  })
+
+  it("rechaza una repetición ambigua sobre una pieza aprobada", async () => {
+    ;(readContentItemsSnapshot as jest.Mock).mockResolvedValue({
+      items: [item({ status: "approved", repeat_interval_days: null, auto_publish_result: {} })],
       version: "2026-08-24T10:00:00.000Z",
     })
 
     const response = await PATCH(patch({ id: "carrusel-1", repeat_interval_days: 1 }))
     const data = await response.json()
 
+    expect(response.status).toBe(400)
+    expect(data.code).toBe("repeat_publication_state_required")
+    expect(compareAndSwapContentItems).not.toHaveBeenCalled()
+  })
+
+  it("marca como publicada y repetitiva en una sola escritura si ya salió en Instagram", async () => {
+    ;(readContentItemsSnapshot as jest.Mock).mockResolvedValue({
+      items: [item({
+        status: "approved",
+        repeat_interval_days: null,
+        repeat_count: undefined,
+        auto_publish_result: {},
+        published_at: undefined,
+      })],
+      version: "2026-08-24T10:00:00.000Z",
+    })
+
+    const response = await PATCH(patch({
+      id: "carrusel-1",
+      repeat_interval_days: 1,
+      repeat_activation_mode: "already_published",
+    }))
+    const data = await response.json()
+
     expect(response.status).toBe(200)
-    expect(data.item.status).toBe("approved")
-    expect(data.item.auto_publish_result).toEqual({ instagram: "published" })
+    expect(data.item).toEqual(expect.objectContaining({
+      status: "published",
+      repeat_interval_days: 1,
+      repeat_count: 0,
+      auto_publish_result: { instagram: "published" },
+      manual_publish_note: expect.objectContaining({ trial_reel: false }),
+      published_at: expect.any(String),
+    }))
+    expect(written?.[0]).toEqual(expect.objectContaining({
+      status: "published",
+      repeat_interval_days: 1,
+      auto_publish_result: { instagram: "published" },
+    }))
+  })
+
+  it("repara una repetición legacy que ya estaba activa pero seguía aprobada", async () => {
+    ;(readContentItemsSnapshot as jest.Mock).mockResolvedValue({
+      items: [item({
+        status: "approved",
+        repeat_interval_days: 1,
+        repeat_count: 0,
+        auto_publish_result: {},
+        published_at: undefined,
+      })],
+      version: "2026-08-24T10:00:00.000Z",
+    })
+
+    const response = await PATCH(patch({
+      id: "carrusel-1",
+      repeat_activation_mode: "already_published",
+    }))
+    const data = await response.json()
+
+    expect(response.status).toBe(200)
+    expect(data.item).toEqual(expect.objectContaining({
+      status: "published",
+      repeat_interval_days: 1,
+      auto_publish_result: { instagram: "published" },
+      published_at: expect.any(String),
+    }))
   })
 
   it("devuelve conflicto y no pisa una edición concurrente", async () => {

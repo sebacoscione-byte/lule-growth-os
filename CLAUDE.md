@@ -1,6 +1,14 @@
 ﻿# Lule Growth OS — Contexto para Claude
 
 ## Estado actual
+- 2026-08-27 (historias evergreen ya publicadas tratadas como nuevas): la corrida de las 18:38 ART
+  terminó `published:2/2` sin error, pero Seba esperaba tres. La Biblioteca tenía una evergreen real
+  como `published` y dos historias publicadas externamente como `approved` + repetición activa; con
+  `items_per_run=1`, el selector tomó una como pieza nueva y la evergreen adicional, dejando la otra
+  aprobada. La pendiente se publicó y persistió correctamente. Fix preventivo: al activar repetición
+  sobre una pieza aprobada, la UI obliga a elegir “todavía no salió” o “ya salió”; la API exige ese
+  modo y, en el segundo caso, marca publicación manual + repetición atómicamente. Las piezas legacy
+  ambiguas muestran una reparación explícita. No se tocaron cron, horario, secretos ni lógica médica.
 - 2026-08-27 (Instagram en vivo y resumen multicanal): `/dashboard` ya no depende del snapshot diario
   para el total actual de seguidores: consulta Instagram al abrirse, suma los insights del día al
   período y usa el último corte sólo como fallback explícito. El titular integra web, seguidores,

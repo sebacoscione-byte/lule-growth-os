@@ -1,3 +1,20 @@
+# EN CURSO (2026-08-27) — estado correcto de historias evergreen
+
+## Objetivo
+
+Evitar que una historia ya publicada externamente quede como “aprobada repetitiva”, asegurar que la
+UI explique y resuelva ese estado antes del cron y recuperar la historia omitida en la corrida de hoy.
+
+## Plan
+
+- [x] Publicar la historia pendiente y verificar que Instagram + Biblioteca queden sincronizados.
+- [x] Corregir el flujo de activación de repetición para piezas aprobadas ya publicadas.
+- [x] Agregar pruebas de regresión y actualizar la documentación operativa.
+- [x] Validar lint, tests y build.
+- [ ] Abrir PR, verificar preview, mergear y validar producción.
+
+---
+
 # CERRADO (2026-08-27) — Instagram en vivo y resumen multicanal
 
 ## Objetivo

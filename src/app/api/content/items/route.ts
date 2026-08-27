@@ -102,7 +102,10 @@ export async function POST(request: NextRequest) {
 export async function PATCH(request: NextRequest) {
   try {
     const supabase = await authenticatedClient()
-    const body = await request.json() as Partial<ContentItem> & { id: string }
+    const body = await request.json() as Partial<ContentItem> & {
+      id: string
+      repeat_activation_mode?: "after_first_publication" | "already_published"
+    }
     const snapshot = await readContentItemsSnapshot(supabase)
     const items = snapshot.items
     const current = items.find(item => item.id === body.id)
@@ -138,6 +141,10 @@ export async function PATCH(request: NextRequest) {
     }
     if (body.repeat_limit != null && (typeof body.repeat_limit !== "number" || body.repeat_limit < 1 || body.repeat_limit > 365)) {
       return NextResponse.json({ error: "Limite de repeticiones invalido" }, { status: 400 })
+    }
+    if (body.repeat_activation_mode !== undefined &&
+      !["after_first_publication", "already_published"].includes(body.repeat_activation_mode)) {
+      return NextResponse.json({ error: "Modo de activacion de repeticion invalido" }, { status: 400 })
     }
     if (body.trial_reel !== undefined && typeof body.trial_reel !== "boolean") {
       return NextResponse.json({ error: "Reel de prueba invalido" }, { status: 400 })
@@ -262,17 +269,42 @@ export async function PATCH(request: NextRequest) {
     // desde esta activacion y no arrastre reposteos de una tanda anterior. repeat_count lo maneja el
     // sistema (cron), nunca el cliente directo.
     const enablingRepeat = body.repeat_interval_days != null && body.repeat_interval_days > 0 && !current.repeat_interval_days
+    // Una pieza aprobada puede ser realmente nueva o una pieza que ya salio manualmente en Instagram.
+    // Obligar a explicitar esa diferencia evita el incidente 2026-08-27: tres historias eran evergreen
+    // en la realidad, pero dos seguian como "approved" en la Biblioteca y el cupo de piezas nuevas dejo
+    // una afuera. El modo "already_published" repara el estado en la misma escritura atomica.
+    if (enablingRepeat && current.status === "approved" && !body.repeat_activation_mode && body.status !== "published") {
+      return NextResponse.json({
+        error: "Antes de activar la repeticion, indica si la pieza todavia no salio o si ya fue publicada en Instagram",
+        code: "repeat_publication_state_required",
+      }, { status: 400 })
+    }
+    const markingPublishedForRepeat = current.status === "approved" &&
+      body.repeat_activation_mode === "already_published" &&
+      (enablingRepeat || Boolean(current.repeat_interval_days))
+    const schedulingFirstPublication = enablingRepeat && current.status === "approved" &&
+      body.repeat_activation_mode === "after_first_publication"
+    if (body.repeat_activation_mode === "already_published" && !markingPublishedForRepeat) {
+      return NextResponse.json({ error: "La pieza no tiene una repeticion pendiente de confirmar" }, { status: 400 })
+    }
     const nextItem = {
       ...current,
       ...changes,
       ...(enablingRepeat ? { repeat_count: 0 } : {}),
+      ...(schedulingFirstPublication ? { auto_publish_result: {} } : {}),
+      ...(markingPublishedForRepeat ? {
+        status: "published" as const,
+        auto_publish_result: { ...current.auto_publish_result, instagram: "published" as const },
+        manual_publish_note: { trial_reel: Boolean(current.trial_reel), marked_at: now },
+        published_at: now,
+      } : {}),
       // Al editar el CONTENIDO de una pieza aprobada/publicada, vuelve a borrador -- y su
       // auto_publish_result queda viejo (describe la publicacion de un contenido que ya no existe). Si no
       // se limpia, al reaprobar y tocar "Publicar ahora", resolveChannelsToPublish saltea el canal por
       // creerlo ya publicado y la pieza no se publica nunca (queda en aprobados). Mismo criterio que ya
       // usan "Deshacer publicacion" y la republicacion evergreen del cron.
       ...(resetApproval ? { status: "draft" as const, auto_publish_result: {} } : {}),
-      ...(body.status === "published" && current.status !== "published"
+      ...(body.status === "published" && current.status !== "published" && !markingPublishedForRepeat
         ? { published_at: body.manual_publish_note?.marked_at ?? now }
         : {}),
       updated_at: now,

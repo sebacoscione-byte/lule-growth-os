@@ -238,6 +238,12 @@ track — tener ambas cosas se pisaba). Los campos viven en el JSON de la pieza 
   Que dias y cuantas veces por semana sale lo controla enteramente el cronograma del track (post/historia/
   carrusel), no la pieza. Apagado = `null` (se publica una sola vez, comportamiento de siempre). Valores `>1`
   son legado (cadencia propia en dias desde `updated_at`); `isRepeatDue` los sigue respetando.
+- En una pieza `approved`, activar la repeticion exige elegir explicitamente entre **"Todavia no salio"**
+  (la primera salida queda pendiente y ocupa cupo) y **"Ya salio en Instagram"** (se marca `published`
+  y se activa la repeticion en la misma escritura). La API rechaza una activacion ambigua sin ese modo.
+  Una pieza legacy que ya tenia repeticion activa pero seguia aprobada muestra una alerta y permite
+  corregir el estado sin volver a publicarla. Esto evita que contenido publicado manualmente se trate
+  por error como una pieza nueva limitada por `items_per_run`.
 - `repeat_limit` (opcional): tope de repeticiones automaticas. Vacio/`null` = sin limite (se repite hasta
   apagarlo). Al alcanzarlo, `isRepeatDue` deja de darla por vencida y la pieza no vuelve a salir sola.
 - `repeat_count`: cuantas veces la republico el cron. Lo maneja **solo el sistema** (se incrementa en el cron
@@ -248,6 +254,8 @@ track — tener ambas cosas se pisaba). Los campos viven en el JSON de la pieza 
   (`pickNextPublishableItems` = `[...aprobadas.slice(0, count), ...evergreenVencidas]`). Ej: con "Publicar de a
   1" y una pieza fija marcada para repetirse, cada día programado salen 2 publicaciones — la nueva del cupo y
   la fija aparte. Una pieza fija nunca le quita el lugar a una nueva ni al revés.
+  Esta regla aplica una vez que la Biblioteca la registra como `published`; si permanece `approved`, su
+  primera salida todavía es nueva y sí ocupa cupo. La UI muestra esa diferencia de forma explícita.
 - Dentro de una misma corrida, dos piezas con el mismo formato, hook y caption no se publican una detrás
   de otra. Se publica la primera según el orden de cola y las copias permanecen aprobadas para que el
   equipo las diferencie o archive; el sistema no borra contenido automáticamente.
