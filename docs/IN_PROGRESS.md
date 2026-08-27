@@ -1,3 +1,17 @@
+# CERRADO (2026-08-27) — seguimiento detallado del uso de la web
+
+- [x] Auditar el tracking y los bloques existentes del dashboard.
+- [x] Agregar un recorrido legible por campaña con sesiones, abandono y acciones concretas.
+- [x] Cubrir la agregación con pruebas y actualizar la documentación afectada.
+- [x] Validar migración, lint, tests, build y experiencia responsive.
+- [ ] Abrir PR, verificar preview y mergear a `main`.
+
+Resultado local: migración validada con rollback y aplicada atómicamente en producción; lint sin
+errores; 124 suites/1.103 tests y build aprobados; 8 E2E autenticados verdes; tabla revisada en
+escritorio y celular con la campaña real `presentacion_doctora_agosto_2026`.
+
+---
+
 # CERRADO (2026-08-26) — WhatsApp compartido del Hospital Británico
 
 - [x] Confirmar que Central ya tiene configurado el WhatsApp institucional y aislar la causa en la landing.

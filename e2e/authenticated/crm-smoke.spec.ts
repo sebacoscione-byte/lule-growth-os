@@ -50,6 +50,7 @@ test("un usuario autorizado puede entrar al dashboard", async () => {
   const siteDetails = channels.locator("details").filter({ hasText: "Sitio y pacientes" }).first()
   await siteDetails.locator(":scope > summary").click()
   await expect(siteDetails.getByText("Consultas recientes", { exact: true })).toBeVisible()
+  await expect(siteDetails.getByTestId("website-campaign-journey")).toBeVisible()
   await expect(siteDetails.getByText("Análisis avanzado del sitio", { exact: true })).toBeVisible()
   await expect(siteDetails.getByText("Prueba de los botones principales del sitio", { exact: true })).not.toBeVisible()
 })

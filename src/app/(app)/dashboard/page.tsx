@@ -38,6 +38,7 @@ import {
   type PeriodValue,
 } from "@/lib/dashboard-growth"
 import { getMetaAdsDashboardMetrics, type MetaAdsStatus } from "@/lib/meta-ads"
+import { buildWebsiteJourneySteps, websiteJourneyPercentage } from "@/lib/site-journey"
 import type { ReactNode } from "react"
 
 const CHANNEL_ICON: Record<RecommendationChannel, typeof Globe> = {
@@ -158,7 +159,10 @@ type SiteJourneyRow = {
   campaign: string
   content: string | null
   visits: number
+  activeVisits: number
   heroVisits: number
+  bookingOptionsVisits: number
+  heroBookingVisits: number
   contactVisits: number
   bookingVisits: number
   callVisits: number
@@ -178,7 +182,8 @@ async function getSiteJourney(
   range: DashboardDateRange,
 ): Promise<SiteJourney> {
   const emptyTotals = {
-    visits: 0, heroVisits: 0, contactVisits: 0, bookingVisits: 0,
+    visits: 0, activeVisits: 0, heroVisits: 0, bookingOptionsVisits: 0,
+    heroBookingVisits: 0, contactVisits: 0, bookingVisits: 0,
     callVisits: 0, whatsappVisits: 0, mapsVisits: 0, instagramVisits: 0,
   }
   try {
@@ -193,7 +198,10 @@ async function getSiteJourney(
       campaign: String(row.campaign ?? "sin_campana"),
       content: row.content === "sin_contenido" ? null : String(row.content ?? "") || null,
       visits: Number(row.visits) || 0,
+      activeVisits: Number(row.active_visits) || 0,
       heroVisits: Number(row.hero_visits) || 0,
+      bookingOptionsVisits: Number(row.booking_options_visits) || 0,
+      heroBookingVisits: Number(row.hero_booking_visits) || 0,
       contactVisits: Number(row.contact_visits) || 0,
       bookingVisits: Number(row.booking_visits) || 0,
       callVisits: Number(row.call_visits) || 0,
@@ -203,7 +211,10 @@ async function getSiteJourney(
     }))
     const totals = rows.reduce((sum, row) => ({
       visits: sum.visits + row.visits,
+      activeVisits: sum.activeVisits + row.activeVisits,
       heroVisits: sum.heroVisits + row.heroVisits,
+      bookingOptionsVisits: sum.bookingOptionsVisits + row.bookingOptionsVisits,
+      heroBookingVisits: sum.heroBookingVisits + row.heroBookingVisits,
       contactVisits: sum.contactVisits + row.contactVisits,
       bookingVisits: sum.bookingVisits + row.bookingVisits,
       callVisits: sum.callVisits + row.callVisits,
@@ -872,6 +883,15 @@ function readableTrackingValue(value: string): string {
     .replace(/\b\w/g, letter => letter.toUpperCase())
 }
 
+function trackingDimensionsKey(row: {
+  source: string
+  medium: string
+  campaign: string
+  content: string | null
+}): string {
+  return [row.source, row.medium, row.campaign, row.content ?? ""].join("\u001f")
+}
+
 function formatAdsMoney(amount: number, currency: string | null): string {
   return new Intl.NumberFormat("es-AR", {
     style: "currency",
@@ -947,6 +967,10 @@ export default async function DashboardPage({
   }, {})
   const platformClickRows = Object.entries(platformClicks).sort((a, b) => b[1] - a[1])
   const topJourneyCampaign = siteJourney.rows.find(row => row.campaign !== "sin_campana")
+  const campaignJourneyRows = siteJourney.rows.filter(row => row.campaign !== "sin_campana" && row.visits > 0)
+  const campaignPerformanceByTracking = new Map(
+    growth.campaigns.map(row => [trackingDimensionsKey(row), row] as const),
+  )
   const siteContactRate = siteJourney.totals.visits > 0
     ? Math.round((siteJourney.totals.contactVisits / siteJourney.totals.visits) * 1000) / 10
     : 0
@@ -1572,7 +1596,7 @@ export default async function DashboardPage({
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
               {[
                 { label: "Llegaron al sitio", value: siteJourney.totals.visits, helper: "La página cargó correctamente", className: "bg-indigo-50 text-indigo-700" },
-                { label: "Vieron cómo pedir turno", value: siteJourney.totals.heroVisits, helper: "Llegaron a las opciones de sede", className: "bg-blue-50 text-blue-700" },
+                { label: "Vieron cómo pedir turno", value: siteJourney.totals.bookingOptionsVisits, helper: "Llegaron a las opciones de sede", className: "bg-blue-50 text-blue-700" },
                 { label: "Abrieron un canal oficial", value: siteJourney.totals.contactVisits, helper: `${siteContactRate}% de las visitas`, className: "bg-cyan-50 text-cyan-700" },
                 { label: "Quedaron como consulta", value: growth.summary.leads.current, helper: "Personas identificadas para seguimiento", className: "bg-violet-50 text-violet-700" },
               ].map((step, index) => (
@@ -1598,7 +1622,7 @@ export default async function DashboardPage({
               <div className="rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm leading-relaxed text-blue-950">
                 <p className="font-semibold">Campaña con más visitas: {readableTrackingValue(topJourneyCampaign.campaign)}</p>
                 <p className="mt-1">
-                  <strong>{topJourneyCampaign.visits}</strong> llegaron, <strong>{topJourneyCampaign.heroVisits}</strong> vieron las opciones de sede y <strong>{topJourneyCampaign.contactVisits}</strong> abrieron un canal oficial
+                  <strong>{topJourneyCampaign.visits}</strong> llegaron, <strong>{topJourneyCampaign.bookingOptionsVisits}</strong> vieron las opciones de sede y <strong>{topJourneyCampaign.contactVisits}</strong> abrieron un canal oficial
                   {topJourneyCampaign.contactVisits > 0 && (
                     <> ({[
                       topJourneyCampaign.bookingVisits > 0 && `${topJourneyCampaign.bookingVisits} turno online`,
@@ -1608,6 +1632,78 @@ export default async function DashboardPage({
                     ].filter(Boolean).join(" · ")})</>
                   )}.
                 </p>
+              </div>
+            )}
+
+            {campaignJourneyRows.length > 0 && (
+              <div data-testid="website-campaign-journey" className="space-y-4 border-t border-gray-100 pt-4">
+                <div>
+                  <h3 className="text-sm font-semibold text-gray-950">Detalle del uso por campaña</h3>
+                  <p className="mt-1 text-xs text-gray-500">
+                    Muestra en qué paso se detuvieron las visitas y qué botón tocaron. Los porcentajes se calculan sobre las sesiones que entraron desde cada campaña.
+                  </p>
+                </div>
+
+                {campaignJourneyRows.map(row => {
+                  const campaignPerformance = campaignPerformanceByTracking.get(trackingDimensionsKey(row))
+                  const steps = buildWebsiteJourneySteps(row, campaignPerformance?.leads ?? 0)
+
+                  return (
+                    <section
+                      key={trackingDimensionsKey(row)}
+                      className="overflow-hidden rounded-xl border border-gray-200 bg-white"
+                    >
+                      <div className="flex flex-col gap-1 border-b border-gray-100 bg-gray-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+                        <p className="text-sm text-gray-700">
+                          Campaña: <span className="font-semibold text-gray-950">{readableTrackingValue(row.campaign)}</span>
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          {readableTrackingValue(row.source)} · {readableTrackingValue(row.medium)}
+                          {row.content ? ` · ${readableTrackingValue(row.content)}` : ""}
+                        </p>
+                      </div>
+                      <div className="divide-y divide-gray-100 sm:hidden">
+                        {steps.map(step => (
+                          <div key={step.key} className="flex items-center justify-between gap-3 px-4 py-3">
+                            <p className={`min-w-0 text-sm ${step.key === "inactive" ? "font-medium text-amber-800" : "text-gray-700"}`}>
+                              {step.label}
+                            </p>
+                            <div className="shrink-0 text-right">
+                              <p className="text-sm font-semibold text-gray-950">{step.sessions}</p>
+                              <p className="text-xs text-gray-500">
+                                {websiteJourneyPercentage(step.sessions, row.visits).toLocaleString("es-AR", { maximumFractionDigits: 1 })}%
+                              </p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                      <div className="hidden overflow-x-auto sm:block">
+                        <table className="w-full min-w-[560px] text-sm">
+                          <thead>
+                            <tr className="border-b text-left text-xs text-gray-500">
+                              <th className="px-4 py-3 font-medium">Recorrido</th>
+                              <th className="px-4 py-3 text-right font-medium">Sesiones</th>
+                              <th className="px-4 py-3 text-right font-medium">Porcentaje</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {steps.map(step => (
+                              <tr key={step.key} className="border-b border-gray-50 last:border-0">
+                                <td className={`px-4 py-3 ${step.key === "inactive" ? "font-medium text-amber-800" : "text-gray-700"}`}>
+                                  {step.label}
+                                </td>
+                                <td className="px-4 py-3 text-right font-semibold text-gray-950">{step.sessions}</td>
+                                <td className="px-4 py-3 text-right text-gray-600">
+                                  {websiteJourneyPercentage(step.sessions, row.visits).toLocaleString("es-AR", { maximumFractionDigits: 1 })}%
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </section>
+                  )
+                })}
               </div>
             )}
           </CardContent>

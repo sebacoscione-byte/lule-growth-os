@@ -13,6 +13,10 @@ const bookingViewSql = readFileSync(
   resolve(process.cwd(), "supabase/migrations/20260826_landing_booking_options_view.sql"),
   "utf8",
 )
+const detailSql = readFileSync(
+  resolve(process.cwd(), "supabase/migrations/20260827_dashboard_site_journey_detail.sql"),
+  "utf8",
+)
 
 describe("dashboard site journey migration", () => {
   it("counts unique anonymous sessions through the important website steps", () => {
@@ -27,6 +31,17 @@ describe("dashboard site journey migration", () => {
     expect(bookingViewSql).toContain("'page_view', 'view_booking_options', 'click_booking'")
     expect(bookingViewSql).toContain("'view_booking_options', 'click_hero_primary', 'click_hero_secondary'")
     expect(bookingViewSql).toContain("revoke all on function dashboard_site_journey(date, date) from public, anon")
+  })
+
+  it("separates passive sessions, the booking CTA and every outbound channel", () => {
+    expect(detailSql).toContain("active_visits bigint")
+    expect(detailSql).toContain("booking_options_visits bigint")
+    expect(detailSql).toContain("hero_booking_visits bigint")
+    expect(detailSql).toContain("event_type <> 'page_view'")
+    expect(detailSql).toContain("event_type = 'click_hero_primary' and variant = 'a'")
+    expect(detailSql).toContain("event_type = 'click_hero_secondary' and variant = 'b'")
+    expect(detailSql).not.toContain("phone")
+    expect(detailSql).not.toContain("email")
   })
 
   it("keeps the aggregate private from public and anonymous callers", () => {
