@@ -1,4 +1,4 @@
-# EN CURSO (2026-08-27) — estado correcto de historias evergreen
+# CERRADO (2026-08-27) — estado correcto de historias evergreen
 
 ## Objetivo
 
@@ -11,7 +11,22 @@ UI explique y resuelva ese estado antes del cron y recuperar la historia omitida
 - [x] Corregir el flujo de activación de repetición para piezas aprobadas ya publicadas.
 - [x] Agregar pruebas de regresión y actualizar la documentación operativa.
 - [x] Validar lint, tests y build.
-- [ ] Abrir PR, verificar preview, mergear y validar producción.
+- [x] Abrir PR #249, verificar CI, E2E público y Vercel Preview antes del merge.
+
+## Validación final
+
+- La historia pendiente se publicó correctamente en Instagram y quedó sincronizada en la Biblioteca.
+- `npm run lint`: sin errores.
+- `npm test -- --runInBand`: 125 suites y 1.110 tests aprobados.
+- `npm run build`: compilación, TypeScript y 85 páginas generadas correctamente.
+- CI, 24 E2E públicos y Vercel Preview verdes; el E2E autenticado fue omitido porque ese entorno no
+  tiene configurada la cuenta de prueba.
+
+## Alcance y seguridad
+
+- No se modificaron cron jobs, webhooks, RLS, secretos ni lógica médica.
+- El cambio evita estados ambiguos antes de la publicación automática y conserva el límite configurado
+  de piezas nuevas por corrida.
 
 ---
 
