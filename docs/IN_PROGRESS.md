@@ -4,11 +4,13 @@
 - [x] Agregar un recorrido legible por campaña con sesiones, abandono y acciones concretas.
 - [x] Cubrir la agregación con pruebas y actualizar la documentación afectada.
 - [x] Validar migración, lint, tests, build y experiencia responsive.
-- [ ] Abrir PR, verificar preview y mergear a `main`.
+- [x] Publicar como PR #246 y verificar CI, E2E público y Vercel Preview antes del merge.
 
 Resultado local: migración validada con rollback y aplicada atómicamente en producción; lint sin
 errores; 124 suites/1.103 tests y build aprobados; 8 E2E autenticados verdes; tabla revisada en
 escritorio y celular con la campaña real `presentacion_doctora_agosto_2026`.
+El preview protegido respondió correctamente: `/login` HTTP 200 y `/dashboard` redirigió al login
+sin sesión; la experiencia autenticada completa se verificó localmente contra los datos reales.
 
 ---
 
