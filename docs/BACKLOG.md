@@ -1,5 +1,18 @@
 # Backlog — Lule Growth OS
-**Actualizado:** 2026-08-26 | **Basado en:** PRD Estrategia de Captación v2.1
+**Actualizado:** 2026-08-27 | **Basado en:** PRD Estrategia de Captación v2.1
+
+---
+
+## [RESUELTO] ✅ Detalle de uso de la web por campaña (2026-08-27)
+
+- El Dashboard muestra el recorrido completo de cada campaña identificada por UTM: entrada,
+  abandono, visualización de sedes, CTA superior y salida por cada canal oficial.
+- Cada paso informa sesiones únicas y porcentaje sobre las visitas de esa campaña; las consultas se
+  cruzan con la atribución existente sin mostrar datos personales.
+- La agregación se ejecuta en PostgreSQL y la vista es responsive, con tabla en escritorio y filas
+  compactas en celular.
+- No se enviaron eventos a Meta ni se agregó Pixel/CAPI; el seguimiento continúa siendo propio y
+  anónimo hasta que una persona inicia voluntariamente una consulta.
 
 ---
 
