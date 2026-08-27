@@ -1,4 +1,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
+import {
+  getLiveInstagramAccountMetrics,
+  type LiveInstagramAccountMetrics,
+} from "@/lib/instagram-followers"
 
 export const DASHBOARD_PERIODS = [7, 30, 90, 365] as const
 export type DashboardPeriod = typeof DASHBOARD_PERIODS[number]
@@ -143,6 +147,18 @@ export interface InstagramDashboardMetrics {
   totalInteractions: number | null
   series: Array<{ date: string; followers: number }>
   firstSnapshotAt: string | null
+  followersLive: boolean
+  followersUpdatedAt: string | null
+}
+
+export interface InstagramFollowerSnapshotRow {
+  captured_on: string
+  followers_count: number
+  reach: number | null
+  profile_views: number | null
+  link_taps: number | null
+  total_interactions: number | null
+  created_at: string | null
 }
 
 export interface GoogleDashboardMetrics {
@@ -322,53 +338,81 @@ async function readCampaigns(supabase: SupabaseClient, period: DashboardPeriod):
   return (data ?? []).map((row: Record<string, unknown>) => buildCampaignPerformance(row))
 }
 
-async function readInstagram(supabase: SupabaseClient, range: DashboardDateRange): Promise<InstagramDashboardMetrics> {
-  try {
-    const { data, error } = await supabase
-      .from("instagram_follower_snapshots")
-      .select("captured_on, followers_count, reach, profile_views, link_taps, total_interactions")
-      .order("captured_on", { ascending: false })
-      .limit(366)
-    if (error) throw error
-    const allRows = (data ?? []) as Array<{
-      captured_on: string
-      followers_count: number
-      reach: number | null
-      profile_views: number | null
-      link_taps: number | null
-      total_interactions: number | null
-    }>
-    if (allRows.length === 0) {
-      return {
-        available: true, followers: null, followersDelta: null, reach: null, profileViews: null,
-        linkTaps: null, totalInteractions: null, series: [], firstSnapshotAt: null,
-      }
+export function buildInstagramDashboardMetrics(
+  snapshotRows: InstagramFollowerSnapshotRow[],
+  range: DashboardDateRange,
+  live: LiveInstagramAccountMetrics | null,
+): InstagramDashboardMetrics {
+  const chronological = [...snapshotRows].sort((a, b) => a.captured_on.localeCompare(b.captured_on))
+
+  if (live) {
+    const todayIndex = chronological.findIndex(row => row.captured_on === range.currentEnd)
+    const existing = todayIndex >= 0 ? chronological[todayIndex] : null
+    const liveRow: InstagramFollowerSnapshotRow = {
+      captured_on: range.currentEnd,
+      followers_count: live.followersCount,
+      reach: live.reach ?? existing?.reach ?? null,
+      profile_views: live.profileViews ?? existing?.profile_views ?? null,
+      link_taps: live.linkTaps ?? existing?.link_taps ?? null,
+      total_interactions: live.totalInteractions ?? existing?.total_interactions ?? null,
+      created_at: live.fetchedAt,
     }
-    const chronological = [...allRows].reverse()
-    const rows = chronological.filter(row => inDateRange(row.captured_on, range.currentStart, range.currentEnd))
-    const latest = [...chronological].reverse().find(row => row.captured_on <= range.currentEnd) ?? allRows[0]
-    const baseline = [...chronological].reverse().find(row => row.captured_on < range.currentStart) ?? rows[0]
-    const nullableSum = (field: "reach" | "profile_views" | "link_taps" | "total_interactions") => {
-      const values = rows.map(row => row[field]).filter((value): value is number => value !== null)
-      return values.length > 0 ? values.reduce((total, value) => total + value, 0) : null
-    }
+    if (todayIndex >= 0) chronological[todayIndex] = liveRow
+    else chronological.push(liveRow)
+  }
+
+  if (chronological.length === 0) {
     return {
-      available: true,
-      followers: latest.followers_count,
-      followersDelta: baseline ? latest.followers_count - baseline.followers_count : null,
-      reach: nullableSum("reach"),
-      profileViews: nullableSum("profile_views"),
-      linkTaps: nullableSum("link_taps"),
-      totalInteractions: nullableSum("total_interactions"),
-      series: rows.map(row => ({ date: row.captured_on, followers: row.followers_count })),
-      firstSnapshotAt: allRows.at(-1)?.captured_on ?? null,
+      available: true, followers: null, followersDelta: null, reach: null, profileViews: null,
+      linkTaps: null, totalInteractions: null, series: [], firstSnapshotAt: null,
+      followersLive: false, followersUpdatedAt: null,
     }
-  } catch {
+  }
+
+  const rows = chronological.filter(row => inDateRange(row.captured_on, range.currentStart, range.currentEnd))
+  const latest = [...chronological].reverse().find(row => row.captured_on <= range.currentEnd) ?? chronological.at(-1)!
+  const baseline = [...chronological].reverse().find(row => row.captured_on < range.currentStart) ?? rows[0]
+  const nullableSum = (field: "reach" | "profile_views" | "link_taps" | "total_interactions") => {
+    const values = rows.map(row => row[field]).filter((value): value is number => value !== null)
+    return values.length > 0 ? values.reduce((total, value) => total + value, 0) : null
+  }
+  return {
+    available: true,
+    followers: latest.followers_count,
+    followersDelta: baseline ? latest.followers_count - baseline.followers_count : null,
+    reach: nullableSum("reach"),
+    profileViews: nullableSum("profile_views"),
+    linkTaps: nullableSum("link_taps"),
+    totalInteractions: nullableSum("total_interactions"),
+    series: rows.map(row => ({ date: row.captured_on, followers: row.followers_count })),
+    firstSnapshotAt: chronological[0]?.captured_on ?? null,
+    followersLive: Boolean(live),
+    followersUpdatedAt: live?.fetchedAt ?? latest.created_at,
+  }
+}
+
+async function readInstagram(supabase: SupabaseClient, range: DashboardDateRange): Promise<InstagramDashboardMetrics> {
+  const [snapshotResult, live] = await Promise.all([
+    supabase
+      .from("instagram_follower_snapshots")
+      .select("captured_on, followers_count, reach, profile_views, link_taps, total_interactions, created_at")
+      .order("captured_on", { ascending: false })
+      .limit(366),
+    getLiveInstagramAccountMetrics(supabase).catch(() => null),
+  ])
+
+  if (snapshotResult.error && !live) {
     return {
       available: false, followers: null, followersDelta: null, reach: null, profileViews: null,
       linkTaps: null, totalInteractions: null, series: [], firstSnapshotAt: null,
+      followersLive: false, followersUpdatedAt: null,
     }
   }
+  return buildInstagramDashboardMetrics(
+    (snapshotResult.data ?? []) as InstagramFollowerSnapshotRow[],
+    range,
+    live,
+  )
 }
 
 async function readGoogle(supabase: SupabaseClient, range: DashboardDateRange): Promise<GoogleDashboardMetrics> {

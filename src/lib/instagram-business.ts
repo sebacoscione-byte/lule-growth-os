@@ -6,6 +6,7 @@ import { getServiceDb } from "@/lib/supabase/service"
 const OAUTH_TOKEN_URL = "https://api.instagram.com/oauth/access_token"
 const GRAPH_BASE = "https://graph.instagram.com"
 const LONG_LIVED_MIN_AGE_MS = 24 * 60 * 60 * 1000 // Meta exige >24h antes de poder refrescar
+const INSTAGRAM_READ_TIMEOUT_MS = 6_000
 
 // ─── Token management (guardados en app_config, mismo patron que Google) ────
 
@@ -134,7 +135,7 @@ export async function getProfile(token: string) {
  */
 export async function getFollowerCount(token: string): Promise<number> {
   const url = `${GRAPH_BASE}/me?fields=followers_count&access_token=${encodeURIComponent(token)}`
-  const res = await fetch(url)
+  const res = await fetch(url, { signal: AbortSignal.timeout(INSTAGRAM_READ_TIMEOUT_MS) })
   const data = await res.json() as { followers_count?: number; error?: { message: string } }
   if (!res.ok || data.error) throw new Error(data.error?.message || `IG followers_count error ${res.status}`)
   if (typeof data.followers_count !== "number") {
@@ -181,7 +182,9 @@ async function getAccountInsightMetric(
     period: "day",
     access_token: token,
   })
-  const res = await fetch(`${GRAPH_BASE}/me/insights?${params}`)
+  const res = await fetch(`${GRAPH_BASE}/me/insights?${params}`, {
+    signal: AbortSignal.timeout(INSTAGRAM_READ_TIMEOUT_MS),
+  })
   const data = await res.json() as InstagramInsightResponse
   if (!res.ok || data.error) {
     throw new Error(data.error?.message || `IG account insights error ${res.status}`)

@@ -32,6 +32,7 @@ describe("Meta Ads dashboard metrics", () => {
       if (!url.pathname.endsWith("/insights")) {
         return response({ id: "act_123456789", name: "Dra. Lucía Chahin", currency: "USD" })
       }
+      expect(url.searchParams.get("fields")).toContain("actions,cost_per_action_type")
       if (!url.searchParams.has("after")) {
         expect(JSON.parse(url.searchParams.get("time_range") ?? "{}")).toEqual({
           since: "2026-08-24",
@@ -46,6 +47,14 @@ describe("Meta Ads dashboard metrics", () => {
             impressions: "1000",
             reach: "800",
             inline_link_clicks: "25",
+            actions: [
+              { action_type: "visit_instagram_profile", value: "10" },
+              { action_type: "instagram_follow", value: "3" },
+            ],
+            cost_per_action_type: [
+              { action_type: "visit_instagram_profile", value: "1.25" },
+              { action_type: "instagram_follow", value: "4.17" },
+            ],
             date_start: "2026-08-20",
             date_stop: "2026-08-26",
           }],
@@ -84,11 +93,21 @@ describe("Meta Ads dashboard metrics", () => {
         linkClicks: 30,
         linkCtr: 2,
         costPerLinkClick: 0.67,
+        profileVisits: 10,
+        costPerProfileVisit: 1.25,
+        follows: 3,
+        costPerFollow: 4.17,
       },
     }))
     expect(result.campaigns).toEqual([
-      expect.objectContaining({ platform: "instagram", linkCtr: 2.5, costPerLinkClick: 0.5 }),
-      expect.objectContaining({ platform: "facebook", linkCtr: 1, costPerLinkClick: 1.5 }),
+      expect.objectContaining({
+        platform: "instagram", linkCtr: 2.5, costPerLinkClick: 0.5,
+        profileVisits: 10, costPerProfileVisit: 1.25, follows: 3, costPerFollow: 4.17,
+      }),
+      expect.objectContaining({
+        platform: "facebook", linkCtr: 1, costPerLinkClick: 1.5,
+        profileVisits: null, follows: null,
+      }),
     ])
   })
 

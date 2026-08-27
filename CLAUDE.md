@@ -1,6 +1,14 @@
 ﻿# Lule Growth OS — Contexto para Claude
 
 ## Estado actual
+- 2026-08-27 (Instagram en vivo y resumen multicanal): `/dashboard` ya no depende del snapshot diario
+  para el total actual de seguidores: consulta Instagram al abrirse, suma los insights del día al
+  período y usa el último corte sólo como fallback explícito. El titular integra web, seguidores,
+  inversión, intentos de contacto y consultas. Marketing API solicita `actions` y
+  `cost_per_action_type`, prioriza visitas al perfil/seguimientos atribuidos y conserva clics en
+  enlace como fallback; un resultado ausente se muestra como “No informado”, nunca como cero. El
+  crecimiento total de la cuenta no se atribuye automáticamente a una campaña. Hay timeouts de
+  lectura y no se agregaron secretos, Pixel/CAPI, crons, datos de pacientes ni cambios médicos.
 - 2026-08-27 (detalle de uso web por campaña): `/dashboard` muestra, dentro de “Sitio y pacientes”,
   una tabla por campaña con sesiones y porcentaje para entrada, abandono sin otra acción, llegada a
   las opciones de sede, clic en el CTA superior “Pedir turno”, WhatsApp, llamada, turno online,
