@@ -57,7 +57,7 @@ test("un usuario autorizado puede entrar al dashboard", async () => {
 test("Configuración aclara que el WhatsApp del Hospital Británico se comparte entre sedes", async () => {
   await page.goto("/configuracion")
 
-  await expect(page.getByText("Hospital Británico", { exact: true })).toBeVisible()
+  await expect(page.getByRole("heading", { name: "Hospital Británico (central)", level: 3 })).toBeVisible()
   await expect(page.getByText("WhatsApp Central y Lanús", { exact: true })).toBeVisible()
 })
 
