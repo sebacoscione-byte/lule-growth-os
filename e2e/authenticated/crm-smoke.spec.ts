@@ -36,6 +36,14 @@ test("un usuario autorizado puede entrar al dashboard", async () => {
   await expect(page.getByRole("heading", { name: "WhatsApp", exact: true })).toBeVisible()
   await expect(page.getByText("Publicidad en Facebook e Instagram", { exact: true })).toBeVisible()
 
+  const contactAttemptsLink = page.getByRole("link", { name: "Ver detalle: Intentaron contactarse" })
+  await expect(contactAttemptsLink).toBeVisible()
+  await contactAttemptsLink.click()
+  await expect(page).toHaveURL(/period=7&detail=contacts#contact-attempts$/)
+  await expect(page.getByTestId("contact-attempt-details")).toBeVisible()
+  await expect(page.getByRole("heading", { name: "Detalle de cada intento", exact: true })).toBeVisible()
+  await expect(page.getByText("El detalle todavía no está disponible.")).toHaveCount(0)
+
   const journey = page.locator("details").filter({ hasText: "Cómo avanzan las personas hasta pedir turno" }).first()
   await expect(journey.locator("summary")).toBeVisible()
   await expect(journey.getByText("Evolución del recorrido", { exact: true })).not.toBeVisible()
@@ -43,12 +51,11 @@ test("un usuario autorizado puede entrar al dashboard", async () => {
   await expect(journey.getByText("Evolución del recorrido", { exact: true })).toBeVisible()
 
   const channels = page.locator("details").filter({ hasText: "Ver información detallada por canal" }).first()
-  await channels.locator(":scope > summary").click()
+  await expect(channels).toHaveAttribute("open", "")
   await expect(channels.getByText(/Vista rápida por canal/)).toBeVisible()
-  await expect(channels.getByText("Consultas recientes", { exact: true })).not.toBeVisible()
 
   const siteDetails = channels.locator("details").filter({ hasText: "Sitio y pacientes" }).first()
-  await siteDetails.locator(":scope > summary").click()
+  await expect(siteDetails).toHaveAttribute("open", "")
   await expect(siteDetails.getByText("Consultas recientes", { exact: true })).toBeVisible()
   await expect(siteDetails.getByTestId("website-campaign-journey")).toBeVisible()
   await expect(siteDetails.getByText("Análisis avanzado del sitio", { exact: true })).toBeVisible()

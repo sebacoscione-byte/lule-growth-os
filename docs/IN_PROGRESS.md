@@ -1430,3 +1430,20 @@ y sin publicarlo automáticamente en la landing ni mezclarlo con cuentas de acce
 - No se agregan teléfonos, direcciones ni horarios generales a Facebook desde esta tarea.
 
 ---
+# EN CURSO (2026-08-27) — detalle navegable de intentos de contacto
+
+## Objetivo
+
+Hacer navegable la tarjeta “Intentaron contactarse” del dashboard y mostrar un desglose anónimo
+por fecha, canal abierto, sede elegida y campaña de origen, conservando el período seleccionado.
+
+## Plan
+
+- [x] Relevar los agregados y secciones existentes del dashboard.
+- [x] Crear una RPC privada que no exponga sesiones ni datos de pacientes.
+- [x] Enlazar la tarjeta y abrir automáticamente las secciones necesarias.
+- [x] Diseñar el detalle para escritorio y celular.
+- [ ] Ejecutar migración, lint, tests, build y validación visual.
+- [ ] Abrir PR, verificar preview y mergear.
+
+---

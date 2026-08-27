@@ -2000,3 +2000,8 @@ tanto el origen probable como el daño observado.
       y mergeado como PR #209; migraciones aditivas aplicadas y producción verificada.
 
 ---
+# Nota 2026-08-27 — intentos de contacto navegables
+
+- La tarjeta “Intentaron contactarse” abre el detalle del mismo período con fecha, canal, sede y
+  atribución UTM. El desglose es agregado y anónimo; mide la apertura del canal externo, no la
+  finalización del turno en sistemas de terceros.
