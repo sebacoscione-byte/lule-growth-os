@@ -1003,11 +1003,14 @@ export default function ConfiguracionPage() {
                     <Field label="Teléfono para turnos">
                       <Input value={locationDraft.phone} onChange={e => updateLocationDraft({ phone: e.target.value })} placeholder="011 4xxx-xxxx" />
                     </Field>
-                    <Field label="WhatsApp propio de la institución (opcional)">
+                    <Field label={loc.id === "hospital_britanico"
+                      ? "WhatsApp oficial compartido (Central y Lanús)"
+                      : "WhatsApp propio de la institución (opcional)"}>
                       <Input value={locationDraft.whatsapp} onChange={e => updateLocationDraft({ whatsapp: e.target.value })} placeholder="Ej: 11 5051-9982" />
                       <p className="text-xs text-gray-400 mt-1">
-                        Solo si la institución tiene su propio WhatsApp para turnos (ej: Swity de Swiss Medical).
-                        Si lo dejás vacío, no se muestra ningún botón de WhatsApp para esta sede en la landing.
+                        {loc.id === "hospital_britanico"
+                          ? "Este mismo número se muestra para Hospital Británico Central y Hospital Británico Lanús. Los demás datos continúan separados por sede."
+                          : "Solo si la institución tiene su propio WhatsApp para turnos (ej: Swity de Swiss Medical). Si lo dejás vacío, no se muestra ningún botón de WhatsApp para esta sede en la landing."}
                       </p>
                     </Field>
                     <Field label="Días y horarios">
@@ -1128,7 +1131,11 @@ export default function ConfiguracionPage() {
                     <InfoRow icon={<Phone className="h-3.5 w-3.5 text-gray-400" />} label="Teléfono" value={loc.phone} />
                   )}
                   {loc.whatsapp && (
-                    <InfoRow icon={<Phone className="h-3.5 w-3.5 text-green-500" />} label="WhatsApp propio" value={loc.whatsapp} />
+                    <InfoRow
+                      icon={<Phone className="h-3.5 w-3.5 text-green-500" />}
+                      label={loc.id === "hospital_britanico" ? "WhatsApp Central y Lanús" : "WhatsApp propio"}
+                      value={loc.whatsapp}
+                    />
                   )}
                   {loc.google_maps_link && (
                     <div className="flex items-start gap-2">

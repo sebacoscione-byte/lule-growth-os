@@ -41,6 +41,16 @@ test.describe("Landing principal (/dra-lucia-chahin)", () => {
     await expect(booking).toBeVisible()
     expect(await booking.evaluate((node, other) => Boolean(node.compareDocumentPosition(other as Node) & Node.DOCUMENT_POSITION_FOLLOWING), await about.elementHandle())).toBe(true)
   })
+
+  test("comparte el WhatsApp oficial entre Hospital Británico Lanús y Central", async ({ page }) => {
+    await page.goto("/dra-lucia-chahin")
+    const lanusWhatsApp = page.locator('#sede-britanico-lanus a[href^="https://wa.me/"]')
+    const centralWhatsApp = page.locator('#sede-britanico-central a[href^="https://wa.me/"]')
+
+    await expect(lanusWhatsApp).toBeAttached()
+    await expect(centralWhatsApp).toBeAttached()
+    expect(await lanusWhatsApp.getAttribute("href")).toBe(await centralWhatsApp.getAttribute("href"))
+  })
 })
 
 for (const slug of SEO_LANDING_SLUGS) {

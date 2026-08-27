@@ -54,6 +54,13 @@ test("un usuario autorizado puede entrar al dashboard", async () => {
   await expect(siteDetails.getByText("Prueba de los botones principales del sitio", { exact: true })).not.toBeVisible()
 })
 
+test("Configuración aclara que el WhatsApp del Hospital Británico se comparte entre sedes", async () => {
+  await page.goto("/configuracion")
+
+  await expect(page.getByText("Hospital Británico", { exact: true })).toBeVisible()
+  await expect(page.getByText("WhatsApp Central y Lanús", { exact: true })).toBeVisible()
+})
+
 test("la planificación reproduce agenda e ingresos del organigrama", async () => {
   await page.goto("/planificacion")
 

@@ -1,3 +1,12 @@
+# EN CURSO (2026-08-26) — WhatsApp compartido del Hospital Británico
+
+- [x] Confirmar que Central ya tiene configurado el WhatsApp institucional y aislar la causa en la landing.
+- [x] Compartir únicamente ese WhatsApp con Lanús, sin copiar dirección, horario, teléfono ni instrucciones.
+- [x] Aclarar en Configuración que el número del Hospital Británico aplica a Central y Lanús.
+- [ ] Validar pruebas unitarias/E2E, build, landing pública, Configuración autenticada y producción.
+
+---
+
 # CERRADO (2026-08-26) — conversión de la landing y seguimiento por sede
 
 - [x] Auditar el enlace publicitario, la medición de sesiones y el recorrido real en celular.
