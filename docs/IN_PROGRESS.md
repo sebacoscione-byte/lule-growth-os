@@ -1,4 +1,4 @@
-# EN PROGRESO (2026-08-28) — recuperación durable de todos los crons
+# CERRADO (2026-08-28) — recuperación durable de todos los crons
 
 ## Objetivo
 
@@ -9,9 +9,21 @@ mantenimiento o reportes, sin duplicar efectos cuando el cron primario y el resp
 
 - [x] Auditar los cinco crons de Vercel y el `pg_cron` durable de WhatsApp.
 - [x] Agregar un ledger atómico por tarea/fecha con lease, reintentos y estados terminales.
-- [x] Preparar un scheduler de recuperación independiente en Supabase dentro de cada ventana.
+- [x] Configurar un scheduler de recuperación independiente en Supabase dentro de cada ventana.
 - [x] Cubrir concurrencia, reintentos, fallos parciales y autorización con pruebas.
-- [ ] Validar migración, lint, tests, build, PR, preview y producción.
+- [x] Validar migración, lint, tests, build, PR, preview y producción.
+
+## Validación final
+
+- `npm run lint`: sin errores.
+- `npm test -- --runInBand`: 128 suites y 1.131 tests aprobados.
+- `npm run build`: compilación, TypeScript y 85 páginas generadas correctamente.
+- La migración se validó con rollback, se aplicó atómicamente y se probó el claim, completion,
+  fencing, deduplicación y aislamiento RLS contra Supabase real.
+- PR #251: build, E2E público y Vercel Preview verdes; `/login` respondió 200 y un cron sin
+  credencial respondió 401. El E2E autenticado se omitió por falta de cuenta de prueba en CI.
+- Producción quedó `Ready`; los cinco jobs de recuperación están activos con sus horarios exactos,
+  comandos sin secretos embebidos y el worker cada minuto de WhatsApp preservado.
 
 ## Alcance y seguridad
 
