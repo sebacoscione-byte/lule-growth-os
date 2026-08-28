@@ -1,6 +1,13 @@
 ﻿# Lule Growth OS — Contexto para Claude
 
 ## Estado actual
+- 2026-08-28 (recuperación durable de todos los crons): los cinco jobs de Vercel ahora comparten un
+  ledger atómico por tarea/fecha argentina, con lease de 240 s, fencing token, estados terminales y
+  HTTP 500 real para fallos reintentables. Supabase `pg_cron` actúa como scheduler independiente a
+  los minutos 40/45/50/55 de cada ventana usando URL y `CRON_SECRET` desde Vault; si Vercel ya corrió,
+  el respaldo queda en no-op. También se habilitó recuperación de publicaciones parciales, guardado
+  progresivo de borradores y deduplicación diaria del recordatorio de handoffs. El worker de WhatsApp
+  por minuto conserva su arquitectura separada. Detalle operativo en `docs/CRON_RELIABILITY.md`.
 - 2026-08-27 (Hospital Británico separado por sede en analítica web): los nuevos clics de la landing
   guardan `britanico_lanus` o `britanico_central`, aunque ambas sedes sigan compartiendo el WhatsApp
   institucional y la etiqueta operativa `britanico`. El dashboard muestra cada sede física por

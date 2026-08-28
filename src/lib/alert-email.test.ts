@@ -1,4 +1,4 @@
-import { sendCronFailureAlert } from "./alert-email"
+import { sendCronFailureAlert, sendHandoffReminderAlert } from "./alert-email"
 
 describe("sendCronFailureAlert", () => {
   const originalEnv = { ...process.env }
@@ -65,5 +65,16 @@ describe("sendCronFailureAlert", () => {
     global.fetch = jest.fn().mockResolvedValue({ ok: false }) as unknown as typeof fetch
 
     await expect(sendCronFailureAlert("publish-content", "algo falló")).resolves.toBe(false)
+  })
+
+  it("deduplica el recordatorio diario de handoff con una clave estable", async () => {
+    process.env.RESEND_API_KEY = "re_test_key"
+    process.env.ALERT_EMAIL_TO = "seba@example.com"
+    const fetchMock = jest.fn().mockResolvedValue({ ok: true })
+    global.fetch = fetchMock as unknown as typeof fetch
+
+    await sendHandoffReminderAlert("casos pendientes", "2026-08-28")
+
+    expect(fetchMock.mock.calls[0][1].headers["Idempotency-Key"]).toBe("handoff-reminder/2026-08-28")
   })
 })

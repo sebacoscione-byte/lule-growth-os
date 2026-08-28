@@ -5,7 +5,7 @@ const ALERT_EMAIL_TIMEOUT_MS = 5_000
 // todavia no esta cargado RESEND_API_KEY/ALERT_EMAIL_TO, no manda nada y no rompe quien la origino
 // -- mismo patron que Google Analytics/Places API en este proyecto (ver CLAUDE.md). Setup:
 // "Alertas de cron por email".
-async function sendAlertEmail(subject: string, text: string): Promise<boolean> {
+async function sendAlertEmail(subject: string, text: string, idempotencyKey?: string): Promise<boolean> {
   const apiKey = process.env.RESEND_API_KEY
   const to = process.env.ALERT_EMAIL_TO
   if (!apiKey || !to) return false
@@ -18,6 +18,7 @@ async function sendAlertEmail(subject: string, text: string): Promise<boolean> {
       headers: {
         Authorization: `Bearer ${apiKey}`,
         "Content-Type": "application/json",
+        ...(idempotencyKey ? { "Idempotency-Key": idempotencyKey } : {}),
       },
       body: JSON.stringify({ from, to, subject, text }),
       signal: AbortSignal.timeout(ALERT_EMAIL_TIMEOUT_MS),
@@ -42,6 +43,10 @@ export async function sendHandoffAlert(details: string): Promise<void> {
 
 // Respaldo diario (corre dentro del cron ya existente, ver whatsapp-handoff.ts) por si la alerta
 // puntual de arriba se pierde o se ignora -- ver Ola 4 del backlog.
-export async function sendHandoffReminderAlert(details: string): Promise<void> {
-  await sendAlertEmail("[Lule Growth OS] Pacientes esperando respuesta humana", details)
+export async function sendHandoffReminderAlert(details: string, occurrenceKey: string): Promise<void> {
+  await sendAlertEmail(
+    "[Lule Growth OS] Pacientes esperando respuesta humana",
+    details,
+    `handoff-reminder/${occurrenceKey}`,
+  )
 }

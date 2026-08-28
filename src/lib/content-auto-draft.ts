@@ -269,6 +269,12 @@ export async function runAutoDraftGeneration(
         source: null,
         now,
       })
+      // Persistir cada pieza apenas queda lista evita perder un lote entero si Vercel corta la
+      // función cerca de maxDuration. El siguiente retry recalcula la cola y genera sólo lo faltante.
+      await mutateContentItems(supabase, current => [
+        draft,
+        ...current.filter(item => item.id !== draft.id),
+      ].slice(0, 100))
       newItems.push(draft)
       recentTopics.unshift({ category: draft.category, topic: draft.topic, hook: draft.hook })
     } catch (error) {
@@ -278,12 +284,6 @@ export async function runAutoDraftGeneration(
     }
   }
 
-  if (newItems.length > 0) {
-    await mutateContentItems(supabase, current => [
-      ...newItems,
-      ...current.filter(item => !newItems.some(created => created.id === item.id)),
-    ].slice(0, 100))
-  }
   return {
     skipped: false,
     planned: plan.length,

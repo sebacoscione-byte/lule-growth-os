@@ -254,6 +254,22 @@ create table if not exists weekly_reports (
   created_at timestamptz not null default now()
 );
 
+-- Ledger backend-only para coordinar Vercel Cron y el scheduler de recuperación de Supabase.
+create table if not exists cron_run_ledger (
+  job_name text not null,
+  occurrence_key text not null,
+  status text not null,
+  claim_token uuid,
+  attempt_count integer not null default 0,
+  first_started_at timestamptz,
+  last_started_at timestamptz,
+  lease_until timestamptz,
+  completed_at timestamptz,
+  result_summary text,
+  updated_at timestamptz not null default now(),
+  primary key (job_name, occurrence_key)
+);
+
 -- ============================================================
 -- SNAPSHOTS MULTICANAL (cron daily-maintenance)
 -- ============================================================
@@ -500,6 +516,7 @@ create index if not exists landing_events_utm_content_idx on landing_events(utm_
 create index if not exists landing_events_session_id_idx on landing_events(session_id);
 create index if not exists landing_events_created_type_session_idx on landing_events(created_at desc, event_type, session_id);
 create unique index if not exists weekly_reports_week_start_idx on weekly_reports(week_start);
+create index if not exists cron_run_ledger_status_updated_idx on cron_run_ledger(status, updated_at desc);
 create unique index if not exists instagram_follower_snapshots_captured_on_idx on instagram_follower_snapshots(captured_on);
 create unique index if not exists instagram_media_insight_snapshots_media_day_idx on instagram_media_insight_snapshots(instagram_media_id, capture_date);
 create index if not exists instagram_media_insight_snapshots_item_time_idx on instagram_media_insight_snapshots(item_id, captured_at desc);
@@ -589,6 +606,18 @@ create policy "service_role_write_weekly_reports"
 
 create policy "authenticated_read_weekly_reports"
   on weekly_reports for select to authenticated using (true);
+
+alter table cron_run_ledger enable row level security;
+alter table cron_run_ledger force row level security;
+
+create policy "service_role_all_cron_run_ledger"
+  on cron_run_ledger for all to service_role using (true) with check (true);
+
+revoke all on table cron_run_ledger from public, anon, authenticated;
+grant select, insert, update, delete on table cron_run_ledger to service_role;
+
+-- Las RPC con fencing token `claim_cron_run` y `complete_cron_run` están definidas en
+-- `supabase/migrations/20260828_cron_run_ledger.sql`.
 
 alter table instagram_follower_snapshots enable row level security;
 

@@ -316,12 +316,11 @@ describe("runAutoDraftGeneration", () => {
     expect(result.skipped).toBe(false)
     expect(result.planned).toBe(2)
     expect(result.generated).toBe(2)
-    expect(mutateContentItems).toHaveBeenCalledTimes(1)
-    const [, mutation] = (mutateContentItems as jest.Mock).mock.calls[0]
-    const savedItems = mutation([])
-    expect(savedItems).toHaveLength(2)
-    expect(savedItems[0]).toMatchObject({ status: "draft", format: "post", hook: "h", category: "Categoria IA 1" })
-    expect(savedItems[1]).toMatchObject({ status: "draft", format: "post", hook: "h", category: "Categoria IA 2" })
+    expect(mutateContentItems).toHaveBeenCalledTimes(2)
+    const firstMutation = (mutateContentItems as jest.Mock).mock.calls[0][1]
+    const secondMutation = (mutateContentItems as jest.Mock).mock.calls[1][1]
+    expect(firstMutation([])[0]).toMatchObject({ status: "draft", format: "post", hook: "h", category: "Categoria IA 1" })
+    expect(secondMutation([])[0]).toMatchObject({ status: "draft", format: "post", hook: "h", category: "Categoria IA 2" })
   })
 
   it("le pasa a generateContentPlan los temas ya aprobados/publicados a evitar, y los suma a medida que genera dentro de la misma corrida", async () => {
@@ -382,6 +381,26 @@ describe("runAutoDraftGeneration", () => {
     // 1 slot/semana x 1 por corrida x 2 semanas = objetivo 2 por formato; con 1 ya existente cada uno,
     // falta 1 de cada uno.
     expect(result.planned).toBe(2)
+    expect(result.generated).toBe(1)
+    expect(result.error).toBeDefined()
+    expect(mutateContentItems).toHaveBeenCalledTimes(1)
+  })
+
+  it("persiste cada borrador antes de generar el siguiente para sobrevivir a un timeout", async () => {
+    ;(getAiMode as jest.Mock).mockReturnValue("gemini_api")
+    ;(readContentItems as jest.Mock).mockResolvedValue([])
+    ;(readAutoPublishSettings as jest.Mock).mockResolvedValue(makeSettings({
+      post: makeTrack({ enabled: true, schedule_slots: [{ day_of_week: 4, local_time: "19:00" }], items_per_run: 1 }),
+    }))
+    ;(generateContentPlan as jest.Mock)
+      .mockResolvedValueOnce({
+        hook: "primero", caption: "c", google_text: "g", hashtags: "#a",
+        visual_headline: "vh", visual_subtitle: "vs", visual_style: "rose",
+      })
+      .mockRejectedValueOnce(new Error("function_timeout"))
+
+    const result = await runAutoDraftGeneration(supabase, now)
+
     expect(result.generated).toBe(1)
     expect(result.error).toBeDefined()
     expect(mutateContentItems).toHaveBeenCalledTimes(1)

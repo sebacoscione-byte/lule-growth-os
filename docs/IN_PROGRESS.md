@@ -1,3 +1,27 @@
+# EN PROGRESO (2026-08-28) — recuperación durable de todos los crons
+
+## Objetivo
+
+Evitar que una omisión del scheduler de Vercel vuelva a dejar sin ejecutar publicaciones, borradores,
+mantenimiento o reportes, sin duplicar efectos cuando el cron primario y el respaldo coinciden.
+
+## Plan
+
+- [x] Auditar los cinco crons de Vercel y el `pg_cron` durable de WhatsApp.
+- [x] Agregar un ledger atómico por tarea/fecha con lease, reintentos y estados terminales.
+- [x] Preparar un scheduler de recuperación independiente en Supabase dentro de cada ventana.
+- [x] Cubrir concurrencia, reintentos, fallos parciales y autorización con pruebas.
+- [ ] Validar migración, lint, tests, build, PR, preview y producción.
+
+## Alcance y seguridad
+
+- No se modifica lógica médica, guardrails ni mensajes a pacientes.
+- No se agregan credenciales al repositorio: Supabase Vault conserva URL y `CRON_SECRET`.
+- El respaldo usa los mismos endpoints protegidos y la misma lógica de negocio que Vercel.
+- El worker frecuente de WhatsApp conserva su job independiente y su ledger/outbox actual.
+
+---
+
 # CERRADO (2026-08-28) — sedes separadas en analítica web
 
 ## Objetivo

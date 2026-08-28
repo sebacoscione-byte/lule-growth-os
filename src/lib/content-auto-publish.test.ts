@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
-import { getPublishReadinessIssue, runAutoPublishTrack } from "@/lib/content-auto-publish"
+import { getPublishReadinessIssue, runAutoPublishTrack, shouldSkipCompletedTrack } from "@/lib/content-auto-publish"
 import { DEFAULT_AUTO_PUBLISH_SETTINGS } from "@/lib/content-pipeline"
 import type { ContentItem } from "@/types"
 
@@ -68,5 +68,15 @@ describe("runAutoPublishTrack scheduling guards", () => {
     }
     const result = await runAutoPublishTrack(supabase, "post", track, ["instagram"], new Date("2026-08-06T22:40:00.000Z"))
     expect(result.last_run_result).toBe("skipped_already_published")
+  })
+
+  it("permite recuperar en el mismo día una corrida parcial que terminó con error", () => {
+    const track = {
+      ...DEFAULT_AUTO_PUBLISH_SETTINGS.post,
+      enabled: true,
+      last_published_at: "2026-08-06T22:05:00.000Z",
+      last_run_result: "published:1/2 (error: Meta temporalmente no disponible)",
+    }
+    expect(shouldSkipCompletedTrack(track, new Date("2026-08-06T22:40:00.000Z"))).toBe(false)
   })
 })
