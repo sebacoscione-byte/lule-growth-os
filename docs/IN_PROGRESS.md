@@ -1,4 +1,4 @@
-# EN CURSO (2026-08-27) — sedes separadas en analítica web
+# CERRADO (2026-08-28) — sedes separadas en analítica web
 
 ## Objetivo
 
@@ -12,7 +12,22 @@ sólo enumera fechas con actividad.
 - [x] Registrar una clave analítica independiente por sede física.
 - [x] Actualizar el dashboard, las pruebas y la documentación.
 - [x] Validar lint, tests y build.
-- [ ] Abrir PR, verificar preview, mergear y validar producción.
+- [x] Abrir PR #250 y verificar CI, E2E público y Vercel Preview antes del merge.
+
+## Validación final
+
+- `npm run lint`: sin errores.
+- `npm test -- --runInBand`: 125 suites y 1.114 tests aprobados.
+- `npm run build`: compilación, TypeScript y 85 páginas generadas correctamente.
+- La migración se validó primero con rollback y luego se aplicó atómicamente en producción.
+- CI, E2E público y Vercel Preview verdes; el E2E autenticado se omitió porque ese entorno no tiene
+  configurada la cuenta de prueba.
+
+## Alcance y seguridad
+
+- La migración sólo amplía los valores admitidos por `landing_events.location_key`; no reescribe
+  eventos históricos ni modifica RLS.
+- No se cambiaron webhooks, cron jobs, secretos, datos personales ni lógica médica.
 
 ---
 
