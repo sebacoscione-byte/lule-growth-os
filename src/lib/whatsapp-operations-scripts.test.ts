@@ -9,6 +9,10 @@ const schedulerScript = readFileSync(
   resolve(process.cwd(), "scripts/configure-whatsapp-worker.mjs"),
   "utf8",
 )
+const recoverySchedulerScript = readFileSync(
+  resolve(process.cwd(), "scripts/configure-cron-recovery.mjs"),
+  "utf8",
+)
 
 describe("WhatsApp production operation scripts", () => {
   it("keeps the production audit read-only and aggregate-only", () => {
@@ -52,5 +56,18 @@ describe("WhatsApp production operation scripts", () => {
         expect.objectContaining({ path: "/api/internal/whatsapp-worker" }),
       ]),
     )
+  })
+
+  it("backs up every Vercel cron through Vault without embedding credentials", () => {
+    const vercel = JSON.parse(readFileSync(resolve(process.cwd(), "vercel.json"), "utf8"))
+    for (const cron of vercel.crons) {
+      expect(recoverySchedulerScript).toContain(cron.path)
+    }
+    expect(recoverySchedulerScript).toContain("vault.create_secret($1, $2, $3)")
+    expect(recoverySchedulerScript).toContain("vault.update_secret($1::uuid, $2, $3, $4)")
+    expect(recoverySchedulerScript).toContain("vault.decrypted_secrets")
+    expect(recoverySchedulerScript).not.toContain("${cronSecret}")
+    expect(recoverySchedulerScript).toContain('process.argv.includes("--apply")')
+    expect(recoverySchedulerScript).toContain('await client.query("rollback")')
   })
 })

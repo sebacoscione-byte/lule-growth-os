@@ -1,5 +1,4 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
-import { sendCronFailureAlert } from "@/lib/alert-email"
 import { snapshotContentInsights } from "@/lib/content-insights"
 import { snapshotGoogleBusinessMetrics } from "@/lib/google-performance"
 import { checkWhatsAppCloudApiConfiguration } from "@/lib/whatsapp"
@@ -55,8 +54,6 @@ export async function runDailyMaintenance(supabase: SupabaseClient, now: Date) {
     failures.push(`Cola WhatsApp: ${whatsappQueueHealth.dueCount} evento(s) vencido(s) pendiente(s)`)
   }
   if (!whatsappMetaPreflight.ok) failures.push(`WhatsApp Meta: preflight_${whatsappMetaPreflight.code}`)
-  if (failures.length > 0) await sendCronFailureAlert("daily-maintenance", failures.join("\n"))
-
   return {
     whatsappFollowup,
     instagramFollowers,
@@ -66,5 +63,6 @@ export async function runDailyMaintenance(supabase: SupabaseClient, now: Date) {
     whatsappQueue,
     whatsappQueueHealth,
     whatsappMetaPreflight,
+    failures,
   }
 }

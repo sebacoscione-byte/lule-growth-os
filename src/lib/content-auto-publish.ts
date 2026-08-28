@@ -21,6 +21,10 @@ import type { AutoPublishSettings, AutoPublishTrackSettings, ContentChannel, Con
 
 export type AutoPublishRunResults = Partial<Record<AutoPublishFormat, AutoPublishTrackSettings>>
 
+export function shouldSkipCompletedTrack(track: AutoPublishTrackSettings, now: Date): boolean {
+  return alreadyPublishedToday(track, now) && !track.last_run_result?.includes("(error:")
+}
+
 export function getPublishReadinessIssue(item: ContentItem, format: AutoPublishFormat): string | null {
   if (format === "carrusel") {
     const missingSlideImages = (item.slides ?? []).some(slide => !slide.visual_url)
@@ -45,7 +49,12 @@ export async function runAutoPublishTrack(
   if (track.schedule_slots.length === 0) return { ...attempted, last_run_result: "skipped_no_slots" }
   if (!isTodayScheduledDay(track, now)) return { ...attempted, last_run_result: "skipped_not_scheduled_day" }
   if (!isWithinScheduledWindow(track, now)) return { ...attempted, last_run_result: "skipped_outside_window" }
-  if (alreadyPublishedToday(track, now)) return { ...attempted, last_run_result: "skipped_already_published" }
+  // Si una corrida publicó una pieza y otra falló, `last_published_at` ya es de hoy. El comportamiento
+  // anterior bloqueaba todo reintento y dejaba la pieza fallida hasta la próxima fecha del cronograma.
+  // Sólo cerramos el día cuando la última corrida no terminó con un error recuperable.
+  if (shouldSkipCompletedTrack(track, now)) {
+    return { ...attempted, last_run_result: "skipped_already_published" }
+  }
 
   const items = await readContentItems(supabase)
   const candidates = pickNextPublishableItems(items, format, track.items_per_run, now)

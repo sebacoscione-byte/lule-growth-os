@@ -1,5 +1,17 @@
 # Backlog — Lule Growth OS
-**Actualizado:** 2026-08-27 | **Basado en:** PRD Estrategia de Captación v2.1
+**Actualizado:** 2026-08-28 | **Basado en:** PRD Estrategia de Captación v2.1
+
+---
+
+## [RESUELTO] ✅ Recuperación durable de todos los crons (2026-08-28)
+
+- Se confirmó que `publish-feed` no había sido invocado por Vercel el 26 ni el 27 de agosto, aunque
+  estaba habilitado y tenía contenido listo.
+- Los cinco crons tienen ledger atómico, lease y reintentos desde Supabase dentro de cada ventana.
+- Los fallos transitorios devuelven HTTP 500; cuotas agotadas quedan como advertencia terminal.
+- Publicaciones parciales retoman sólo pendientes, los borradores se guardan progresivamente y los
+  recordatorios de handoff no se duplican al reintentar.
+- No se agregaron crons de Vercel ni secretos al repositorio; el respaldo usa Supabase Vault.
 
 ---
 

@@ -1,54 +1,32 @@
-import { NextResponse } from "next/server"
 import type { SupabaseClient } from "@supabase/supabase-js"
-import { getServiceDb } from "@/lib/supabase/service"
-import { sendCronFailureAlert } from "@/lib/alert-email"
+import { handleCronRequest } from "@/lib/cron-runner"
 import { runDataRetentionSweep } from "@/lib/data-retention"
 
-export const maxDuration = 60
+export const maxDuration = 180
 
-function isAuthorized(request: Request): boolean {
-  const secret = process.env.CRON_SECRET
-  if (!secret) return false // fail-closed: sin secreto configurado, no se ejecuta nada
-  return request.headers.get("authorization") === `Bearer ${secret}`
-}
-
-async function countLeads(supabase: SupabaseClient, from: string, to: string, filter: Record<string, string | boolean> = {}) {
+async function countLeads(
+  supabase: SupabaseClient,
+  from: string,
+  to: string,
+  filter: Record<string, string | boolean> = {}
+) {
   let query = supabase.from("leads").select("id", { count: "exact", head: true })
     .gte("created_at", from).lt("created_at", to)
-  for (const [key, value] of Object.entries(filter)) {
-    query = query.eq(key, value)
-  }
-  const { count } = await query
+  for (const [key, value] of Object.entries(filter)) query = query.eq(key, value)
+  const { count, error } = await query
+  if (error) throw error
   return count ?? 0
 }
 
 async function countEvents(supabase: SupabaseClient, from: string, to: string, eventTypes: string[]) {
-  const { count } = await supabase.from("landing_events").select("id", { count: "exact", head: true })
+  const { count, error } = await supabase.from("landing_events").select("id", { count: "exact", head: true })
     .gte("created_at", from).lt("created_at", to)
     .in("event_type", eventTypes)
+  if (error) throw error
   return count ?? 0
 }
 
-// Genera un snapshot semanal (leads nuevos, conversion, canales, sedes, visitas de landing) y lo
-// guarda en weekly_reports para verlo en el Dashboard. El contenido del reporte no se manda por
-// WhatsApp/email de forma proactiva -- ese canal no existe todavia para WhatsApp (requeriria un
-// template aprobado por Meta, ver CLAUDE.md), asi que el reporte queda disponible en la app en vez
-// de enviarse solo. Si el cron en si falla, sí manda un email de alerta (ver alert-email.ts).
-export async function GET(request: Request) {
-  if (!isAuthorized(request)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-
-  try {
-    return await buildAndSaveWeeklyReport()
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error)
-    await sendCronFailureAlert("weekly-report", `Excepción no controlada: ${message}`)
-    return NextResponse.json({ error: message }, { status: 500 })
-  }
-}
-
-async function buildAndSaveWeeklyReport() {
-  const supabase = getServiceDb()
-  const now = new Date()
+export async function buildAndSaveWeeklyReport(supabase: SupabaseClient, now: Date) {
   const weekStart = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
   const from = weekStart.toISOString()
   const to = now.toISOString()
@@ -92,24 +70,32 @@ async function buildAndSaveWeeklyReport() {
     week_end: now.toISOString().slice(0, 10),
     metrics,
   }, { onConflict: "week_start" })
+  if (error) throw error
 
-  if (error) {
-    await sendCronFailureAlert("weekly-report", error.message)
-    return NextResponse.json({ error: error.message }, { status: 500 })
-  }
-
-  // Barrida de retención de datos (DATA-02) — corre acá adentro para no sumar un tercer cron job
-  // de Vercel (el plan Hobby limita a 2, ver whatsapp-followup.ts para el mismo patrón). Cadencia
-  // semanal de sobra para un umbral de 24 meses de inactividad.
   let retention: Awaited<ReturnType<typeof runDataRetentionSweep>> | { errors: string[] }
   try {
     retention = await runDataRetentionSweep(supabase)
   } catch {
     retention = { errors: ["retention_sweep_failed"] }
   }
-  if (retention.errors.length > 0) {
-    await sendCronFailureAlert("weekly-report", `Barrida de retención de datos: ${retention.errors.join("; ")}`)
-  }
 
-  return NextResponse.json({ ok: true, metrics, retention })
+  return { metrics, retention }
+}
+
+// El snapshot semanal usa upsert por semana y la barrida de retención es idempotente. Por eso una
+// falla parcial puede reintentarse de forma segura desde el scheduler de respaldo.
+export async function GET(request: Request) {
+  return handleCronRequest(request, {
+    jobName: "weekly-report",
+    task: async (supabase, now) => {
+      const result = await buildAndSaveWeeklyReport(supabase, now)
+      return {
+        status: result.retention.errors.length > 0 ? "failed" : "succeeded",
+        payload: { ok: result.retention.errors.length === 0, ...result },
+        summary: result.retention.errors.length > 0
+          ? `Barrida de retención: ${result.retention.errors.join("; ")}`
+          : "Reporte semanal y retención completados",
+      }
+    },
+  })
 }

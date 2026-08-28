@@ -1,24 +1,21 @@
-import { NextResponse } from "next/server"
-import { sendCronFailureAlert } from "@/lib/alert-email"
 import { runAutoPublishFormats } from "@/lib/content-auto-publish"
-import { isAuthorizedCronRequest } from "@/lib/cron-auth"
-import { getServiceDb } from "@/lib/supabase/service"
+import { handleCronRequest } from "@/lib/cron-runner"
 
 export const maxDuration = 180
 
 export async function GET(request: Request) {
-  if (!isAuthorizedCronRequest(request)) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-  }
-
-  try {
-    const results = await runAutoPublishFormats(getServiceDb(), ["historia"], new Date())
-    const result = results.historia?.last_run_result ?? "skipped_unknown"
-    if (result.includes("(error:")) await sendCronFailureAlert("publish-stories", `Historias: ${result}`)
-    return NextResponse.json({ historia: result })
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error)
-    await sendCronFailureAlert("publish-stories", `Excepción no controlada: ${message}`)
-    return NextResponse.json({ error: message }, { status: 500 })
-  }
+  return handleCronRequest(request, {
+    jobName: "publish-stories",
+    task: async (supabase, now) => {
+      const results = await runAutoPublishFormats(supabase, ["historia"], now)
+      const result = results.historia?.last_run_result ?? "skipped_unknown"
+      return {
+        status: result.includes("(error:") || result === "skipped_unknown" || result === "skipped_outside_window"
+          ? "failed"
+          : result.includes("quota_exceeded") ? "warning" : "succeeded",
+        payload: { historia: result },
+        summary: `Historias: ${result}`,
+      }
+    },
+  })
 }

@@ -1,31 +1,29 @@
-import { NextResponse } from "next/server"
-import { sendCronFailureAlert } from "@/lib/alert-email"
 import { runAutoPublishFormats } from "@/lib/content-auto-publish"
-import { isAuthorizedCronRequest } from "@/lib/cron-auth"
-import { getServiceDb } from "@/lib/supabase/service"
+import { handleCronRequest } from "@/lib/cron-runner"
 
 export const maxDuration = 180
 
 export async function GET(request: Request) {
-  if (!isAuthorizedCronRequest(request)) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-  }
-
-  try {
-    const results = await runAutoPublishFormats(getServiceDb(), ["post", "carrusel", "reel"], new Date())
-    const response = {
-      post: results.post?.last_run_result ?? "skipped_unknown",
-      carrusel: results.carrusel?.last_run_result ?? "skipped_unknown",
-      reel: results.reel?.last_run_result ?? "skipped_unknown",
-    }
-    const failures = Object.entries(response)
-      .filter(([, result]) => result.includes("(error:"))
-      .map(([format, result]) => `${format}: ${result}`)
-    if (failures.length > 0) await sendCronFailureAlert("publish-feed", failures.join("\n"))
-    return NextResponse.json(response)
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error)
-    await sendCronFailureAlert("publish-feed", `Excepción no controlada: ${message}`)
-    return NextResponse.json({ error: message }, { status: 500 })
-  }
+  return handleCronRequest(request, {
+    jobName: "publish-feed",
+    task: async (supabase, now) => {
+      const results = await runAutoPublishFormats(supabase, ["post", "carrusel", "reel"], now)
+      const payload = {
+        post: results.post?.last_run_result ?? "skipped_unknown",
+        carrusel: results.carrusel?.last_run_result ?? "skipped_unknown",
+        reel: results.reel?.last_run_result ?? "skipped_unknown",
+      }
+      const failures = Object.entries(payload)
+        .filter(([, result]) => result.includes("(error:") || result === "skipped_unknown" || result === "skipped_outside_window")
+        .map(([format, result]) => `${format}: ${result}`)
+      const warnings = Object.entries(payload)
+        .filter(([, result]) => result.includes("quota_exceeded"))
+        .map(([format, result]) => `${format}: ${result}`)
+      return {
+        status: failures.length > 0 ? "failed" : warnings.length > 0 ? "warning" : "succeeded",
+        payload,
+        summary: [...failures, ...warnings].join("\n") || "Feed procesado sin errores",
+      }
+    },
+  })
 }

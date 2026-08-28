@@ -184,6 +184,11 @@ Ademas del boton manual "Publicar en Instagram"/"Publicar en Google" y de "Publi
 `/api/cron/publish-stories` para historias y `/api/cron/publish-feed` para posts, carruseles y reels.
 El mantenimiento tecnico corre separado en `/api/cron/daily-maintenance`.
 
+Cada cron editorial tiene un respaldo independiente en Supabase que reintenta dentro de la misma
+ventana. Un ledger atomico por tarea/fecha evita que Vercel y el respaldo publiquen dos veces. Si una
+corrida publica algunas piezas y otra falla, el retry retoma solo las pendientes; ver
+`docs/CRON_RELIABILITY.md`.
+
 - **Cuatro cronogramas por formato**: `app_config.auto_publish_settings` tiene `channels` y los tracks
   `post`/`historia`/`carrusel`/`reel`. Cada track guarda `enabled`, `timezone`, `schedule_slots`,
   `items_per_run`, `starts_at`, `last_published_at`, `last_run_at` y `last_run_result`. La cantidad de

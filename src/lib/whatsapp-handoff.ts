@@ -380,7 +380,7 @@ export async function runHandoffReminderCheck(now: Date): Promise<HandoffReminde
     const lines = stale.map(([leadId, h]) =>
       `- Caso ${leadId.slice(0, 8)} — esperando ${timeAgo(h.createdAt)} — ${HANDOFF_REASON_LABELS[h.reason]} — ${PUBLIC_SITE_ORIGIN}/inbox?lead_id=${leadId}`
     )
-    await sendHandoffReminderAlert(lines.join("\n"))
+    await sendHandoffReminderAlert(lines.join("\n"), now.toISOString().slice(0, 10))
     return { pending: stale.length }
   } catch {
     return { pending: 0, error: "handoff_reminder_failed" }
