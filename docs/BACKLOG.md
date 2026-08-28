@@ -3,6 +3,15 @@
 
 ---
 
+## [RESUELTO] ✅ Separación analítica de Hospital Británico Lanús y Central (2026-08-27)
+
+- Las dos sedes comparten WhatsApp institucional, pero eso no debe unificar su atribución analítica.
+- Los nuevos clics se guardarán con una clave por sede física; los anteriores conservarán la etiqueta
+  de sede no identificada porque el dato original no permite reconstruirla con certeza.
+- El detalle semanal aclarará que omite los días sin intentos de contacto.
+
+---
+
 ## [RESUELTO] ✅ Historias ya publicadas tratadas como nuevas (2026-08-27)
 
 - En la corrida real había tres historias publicadas externamente con repetición infinita, pero dos

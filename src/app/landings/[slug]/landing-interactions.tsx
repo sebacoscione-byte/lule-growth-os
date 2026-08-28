@@ -2,13 +2,18 @@
 
 import { useState, useEffect, useMemo, useRef } from "react"
 import { MapPin, Clock, ChevronDown, ChevronUp, Phone, Map, MessageCircle, CalendarCheck } from "lucide-react"
-import { buildWhatsAppUrl } from "@/lib/public-landings"
+import {
+  buildWhatsAppUrl,
+  PUBLIC_ANALYTICS_LOCATION_KEYS,
+  type PublicAnalyticsLocationKey,
+} from "@/lib/public-landings"
 import { trackLandingEvent } from "@/lib/landing-track"
 import { withContentAttribution } from "@/lib/landing-referral-codes"
 
 export interface SedeAction {
   key: string
   trackingKey: "cimel" | "swiss" | "britanico" | "general"
+  analyticsKey: PublicAnalyticsLocationKey | "general"
   name: string
   day: string
   hours?: string
@@ -183,6 +188,12 @@ function isTrackedKey(key: string): key is TrackedSedeKey {
   return TRACKED_KEYS.has(key as TrackedSedeKey)
 }
 
+type AnalyticsLocationKey = Exclude<SedeAction["analyticsKey"], "general">
+const ANALYTICS_LOCATION_KEYS = new Set<AnalyticsLocationKey>(PUBLIC_ANALYTICS_LOCATION_KEYS)
+function isAnalyticsLocationKey(key: string): key is AnalyticsLocationKey {
+  return ANALYTICS_LOCATION_KEYS.has(key as AnalyticsLocationKey)
+}
+
 export function LandingInteractions({
   slug,
   locations,
@@ -221,11 +232,11 @@ export function LandingInteractions({
   }
 
   function trackClick(sede: SedeAction, action: CtaClickAction) {
-    if (isTrackedKey(sede.trackingKey)) {
+    if (isAnalyticsLocationKey(sede.analyticsKey)) {
       trackLandingEvent(`click_${action}`, slug, {
         ...utms,
         ...variantExtra,
-        location_key: sede.trackingKey,
+        location_key: sede.analyticsKey,
       })
     }
   }

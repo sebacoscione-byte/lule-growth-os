@@ -229,7 +229,9 @@ create table if not exists landing_events (
       'click_hero_primary', 'click_hero_secondary'
     )),
   slug text not null,
-  location_key text check (location_key is null or location_key in ('cimel', 'swiss', 'britanico')),
+  location_key text check (location_key is null or location_key in (
+    'cimel', 'swiss', 'britanico', 'britanico_lanus', 'britanico_central'
+  )),
   variant text check (variant is null or variant in ('a', 'b')),
   -- UUID aleatorio por pestaña/sesión (sessionStorage), sin cookie ni PII. Permite deduplicar
   -- varias acciones de una misma visita en las tasas del dashboard.

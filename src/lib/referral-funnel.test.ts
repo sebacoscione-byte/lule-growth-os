@@ -4,7 +4,8 @@ describe("referral funnel", () => {
   it("muestra las visitas de una landing una sola vez y desglosa el avance por sede", () => {
     const rows = buildReferralLandingFunnels([
       { slug: "dra-lucia-chahin", location_key: null, event_type: "page_view", event_count: 152 },
-      { slug: "dra-lucia-chahin", location_key: "britanico", event_type: "click_whatsapp", event_count: 2 },
+      { slug: "dra-lucia-chahin", location_key: "britanico_lanus", event_type: "click_whatsapp", event_count: 1 },
+      { slug: "dra-lucia-chahin", location_key: "britanico_central", event_type: "click_whatsapp", event_count: 1 },
       { slug: "dra-lucia-chahin", location_key: "swiss", event_type: "click_whatsapp", event_count: 1 },
     ], [
       { utm_content: "CABA-GRAL-01", confirmed_booked: false },

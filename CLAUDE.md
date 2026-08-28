@@ -1,6 +1,13 @@
 ﻿# Lule Growth OS — Contexto para Claude
 
 ## Estado actual
+- 2026-08-27 (Hospital Británico separado por sede en analítica web): los nuevos clics de la landing
+  guardan `britanico_lanus` o `britanico_central`, aunque ambas sedes sigan compartiendo el WhatsApp
+  institucional y la etiqueta operativa `britanico`. El dashboard muestra cada sede física por
+  separado y conserva los eventos históricos con clave genérica como “sede no identificada”, sin
+  inferir una ubicación. El detalle semanal aclara que sólo lista días con actividad. La restricción
+  de `landing_events` admite las claves nuevas sin reescribir datos previos; no cambian RLS, crons,
+  webhooks, datos personales ni lógica médica.
 - 2026-08-27 (historias evergreen ya publicadas tratadas como nuevas): la corrida de las 18:38 ART
   terminó `published:2/2` sin error, pero Seba esperaba tres. La Biblioteca tenía una evergreen real
   como `published` y dos historias publicadas externamente como `approved` + repetición activa; con

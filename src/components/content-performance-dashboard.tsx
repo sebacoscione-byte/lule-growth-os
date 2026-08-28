@@ -24,7 +24,9 @@ const DAY_LABELS = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viern
 const LOCATION_LABELS: Record<Exclude<ContentLocationKey, "sin_atribuir">, string> = {
   cimel: "CIMEL Lanús",
   swiss: "Swiss Medical Lomas",
-  britanico: "Hospital Británico",
+  britanico_lanus: "Hospital Británico Lanús",
+  britanico_central: "Hospital Británico Central",
+  britanico: "Hospital Británico — sede no identificada (registro anterior)",
 }
 const WINDOW_LABELS: Record<InstagramInsightWindow, string> = { "24h": "24 h", "72h": "72 h", "7d": "7 días" }
 
@@ -45,7 +47,7 @@ function rate(value: number | null): string {
   return value == null ? "No disponible" : `${value.toLocaleString("es-AR")} / 1.000`
 }
 
-function downstreamTotal(row: ContentPerformanceRow, location: "all" | "cimel" | "swiss" | "britanico") {
+function downstreamTotal(row: ContentPerformanceRow, location: "all" | Exclude<ContentLocationKey, "sin_atribuir">) {
   return metricsForLocation(row, location)
 }
 
@@ -61,7 +63,7 @@ export function ContentPerformanceDashboard() {
   const [hour, setHour] = useState("all")
   const [category, setCategory] = useState("all")
   const [objective, setObjective] = useState("all")
-  const [location, setLocation] = useState<"all" | "cimel" | "swiss" | "britanico">("all")
+  const [location, setLocation] = useState<"all" | Exclude<ContentLocationKey, "sin_atribuir">>("all")
   const [itemId, setItemId] = useState("all")
 
   const load = useCallback(async () => {

@@ -21,6 +21,10 @@ const contactDetailSql = readFileSync(
   resolve(process.cwd(), "supabase/migrations/20260827_dashboard_contact_attempt_details.sql"),
   "utf8",
 )
+const splitBritanicoSql = readFileSync(
+  resolve(process.cwd(), "supabase/migrations/20260827_split_britanico_location_keys.sql"),
+  "utf8",
+)
 
 describe("dashboard site journey migration", () => {
   it("counts unique anonymous sessions through the important website steps", () => {
@@ -71,5 +75,12 @@ describe("dashboard site journey migration", () => {
     expect(contactDetailSql).toContain("grant execute on function dashboard_contact_attempt_details(date, date) to authenticated")
     expect(contactDetailSql).not.toContain("phone")
     expect(contactDetailSql).not.toContain("email")
+  })
+
+  it("accepts separate physical keys for Hospital Británico without rewriting historical rows", () => {
+    expect(splitBritanicoSql).toContain("'britanico_lanus'")
+    expect(splitBritanicoSql).toContain("'britanico_central'")
+    expect(splitBritanicoSql).toContain("'britanico'")
+    expect(splitBritanicoSql).not.toMatch(/update\s+landing_events/i)
   })
 })

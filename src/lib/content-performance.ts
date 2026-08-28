@@ -5,7 +5,13 @@ import type {
   InstagramMediaInsightSnapshot,
 } from "@/types"
 
-export type ContentLocationKey = "cimel" | "swiss" | "britanico" | "sin_atribuir"
+export type ContentLocationKey =
+  | "cimel"
+  | "swiss"
+  | "britanico_lanus"
+  | "britanico_central"
+  | "britanico"
+  | "sin_atribuir"
 
 export interface ContentAttributionMetrics {
   visits: number
@@ -122,7 +128,11 @@ export function buildContentPerformanceRows(
       confirmed: number(raw.confirmed),
     }
     totals.set(raw.item_id, addMetrics(totals.get(raw.item_id) ?? EMPTY_METRICS, metrics))
-    const location = raw.location_key === "cimel" || raw.location_key === "swiss" || raw.location_key === "britanico"
+    const location = raw.location_key === "cimel"
+      || raw.location_key === "swiss"
+      || raw.location_key === "britanico_lanus"
+      || raw.location_key === "britanico_central"
+      || raw.location_key === "britanico"
       ? raw.location_key
       : "sin_atribuir"
     const itemLocations = byLocation.get(raw.item_id) ?? {}

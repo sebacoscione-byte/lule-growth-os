@@ -221,10 +221,12 @@ function buildSedeActions(locations: PublicLandingLocation[], configLocations: C
     const cfg = matchConfigLocation(loc.name, configLocations)
     const trackingKey = loc.trackingKey ?? whatsAppKeyForLocation(loc.name)
     const key = loc.key ?? trackingKey
+    const analyticsKey = loc.analyticsKey ?? (trackingKey === "britanico" ? "general" : trackingKey)
     const whatsapp = resolvePublicLocationWhatsApp(loc.name, configLocations, cfg?.whatsapp)
     return {
       key,
       trackingKey,
+      analyticsKey,
       name: loc.name,
       day: loc.day,
       // El cronograma confirmado por la doctora es la fuente pública; la configuración puede
