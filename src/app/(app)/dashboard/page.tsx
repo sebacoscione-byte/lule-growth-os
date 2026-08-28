@@ -100,7 +100,7 @@ async function getLandingRanking(
 }
 
 type ClicksByLocationRow = {
-  locationKey: "cimel" | "swiss" | "britanico"
+  locationKey: "cimel" | "swiss" | "britanico_lanus" | "britanico_central" | "britanico"
   locationLabel: string
   clickBooking: number
   clickCall: number
@@ -149,7 +149,11 @@ async function getContactAttemptDetails(
 }
 
 const CLICK_LOCATION_LABEL: Record<string, string> = {
-  cimel: "CIMEL Lanús", swiss: "Swiss Medical Lomas", britanico: "Hospital Británico (Lanús y Central)",
+  cimel: "CIMEL Lanús",
+  swiss: "Swiss Medical Lomas",
+  britanico_lanus: "Hospital Británico Lanús",
+  britanico_central: "Hospital Británico Central",
+  britanico: "Hospital Británico — sede no identificada (registro anterior)",
 }
 
 // Reemplaza la vieja card "Métricas de landings" (cta_cimel/cta_swiss/cta_britanico/form_submitted),
@@ -179,7 +183,12 @@ async function getClicksByLocation(
       byLocation.set(row.location_key, entry)
     }
 
-    const rows: ClicksByLocationRow[] = (["cimel", "swiss", "britanico"] as const).map(locationKey => {
+    const locationKeys: ClicksByLocationRow["locationKey"][] = [
+      "cimel", "britanico_lanus", "britanico_central", "swiss",
+    ]
+    if (byLocation.has("britanico")) locationKeys.push("britanico")
+
+    const rows: ClicksByLocationRow[] = locationKeys.map(locationKey => {
       const entry = byLocation.get(locationKey) ?? { booking: 0, call: 0, whatsapp: 0, maps: 0 }
       return {
         locationKey,
@@ -1699,7 +1708,7 @@ export default async function DashboardPage({
             <div>
               <h3 id="contact-attempt-list-title" className="text-sm font-semibold text-gray-950">Detalle de cada intento</h3>
               <p className="mt-1 text-xs leading-relaxed text-gray-500">
-                Muestra la fecha, el canal que abrieron, la sede elegida y desde qué campaña llegaron. Son datos anónimos: un clic indica intención, no confirma que hayan conseguido turno.
+                Muestra sólo los días con actividad, junto con el canal que abrieron, la sede elegida y desde qué campaña llegaron. Son datos anónimos: un clic indica intención, no confirma que hayan conseguido turno.
               </p>
             </div>
 
@@ -1903,7 +1912,7 @@ export default async function DashboardPage({
           <CardHeader>
             <CardTitle className="text-base">A qué sede intentaron dirigirse</CardTitle>
             <p className="text-xs text-gray-500">
-              Cada salida se asocia con el botón de la sede elegida. Hospital Británico agrupa Lanús y Central porque hoy ambos usan la misma etiqueta de medición.
+              Cada salida nueva se asocia con la sede exacta elegida. Los registros anteriores que sólo dicen Hospital Británico no se atribuyen a Lanús ni a Central sin evidencia.
             </p>
           </CardHeader>
           <CardContent>

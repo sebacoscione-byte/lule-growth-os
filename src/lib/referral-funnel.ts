@@ -88,7 +88,11 @@ export function buildReferralLandingFunnels(
     }
     const leadTotals = leadsByCode.get(info.code) ?? { total: 0, confirmed: 0 }
     const whatsappClicks = info.locationKey
-      ? clicksBySlugLocation.get(`${info.landingSlug}:${info.locationKey}`) ?? 0
+      ? info.locationKey === "britanico"
+        ? (clicksBySlugLocation.get(`${info.landingSlug}:britanico`) ?? 0)
+          + (clicksBySlugLocation.get(`${info.landingSlug}:britanico_lanus`) ?? 0)
+          + (clicksBySlugLocation.get(`${info.landingSlug}:britanico_central`) ?? 0)
+        : clicksBySlugLocation.get(`${info.landingSlug}:${info.locationKey}`) ?? 0
       : 0
 
     landing.whatsappClicks += whatsappClicks

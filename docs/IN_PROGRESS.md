@@ -1,3 +1,21 @@
+# EN CURSO (2026-08-27) — sedes separadas en analítica web
+
+## Objetivo
+
+Separar Hospital Británico Lanús de Hospital Británico Central en cada nuevo intento de contacto,
+preservar sin inventar la atribución de registros anteriores y aclarar por qué el detalle semanal
+sólo enumera fechas con actividad.
+
+## Plan
+
+- [x] Identificar la causa en la clave institucional compartida por ambas sedes.
+- [x] Registrar una clave analítica independiente por sede física.
+- [x] Actualizar el dashboard, las pruebas y la documentación.
+- [x] Validar lint, tests y build.
+- [ ] Abrir PR, verificar preview, mergear y validar producción.
+
+---
+
 # CERRADO (2026-08-27) — estado correcto de historias evergreen
 
 ## Objetivo

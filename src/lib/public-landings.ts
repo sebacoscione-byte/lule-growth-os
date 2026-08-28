@@ -1,7 +1,14 @@
+export const PUBLIC_ANALYTICS_LOCATION_KEYS = [
+  "cimel", "swiss", "britanico_lanus", "britanico_central",
+] as const
+export type PublicAnalyticsLocationKey = typeof PUBLIC_ANALYTICS_LOCATION_KEYS[number]
+
 export interface PublicLandingLocation {
   /** Clave única de UI/SEO. `trackingKey` agrupa sedes de una misma institución. */
   key?: string
   trackingKey?: "cimel" | "swiss" | "britanico"
+  /** Clave analítica de la sede física. No se comparte aunque dos sedes usen el mismo canal. */
+  analyticsKey?: PublicAnalyticsLocationKey
   name: string
   address?: string
   day: string
@@ -58,6 +65,7 @@ export function resolvePublicLocationWhatsApp(
 const CIMEL = {
   key: "cimel",
   trackingKey: "cimel" as const,
+  analyticsKey: "cimel" as const,
   name: "CIMEL Lanús",
   address: "Tucumán 1314, Lanús",
   day: "martes, jueves y viernes",
@@ -69,6 +77,7 @@ const CIMEL = {
 const SWISS = {
   key: "swiss",
   trackingKey: "swiss" as const,
+  analyticsKey: "swiss" as const,
   name: "Swiss Medical Lomas",
   address: "Oliden 141, Lomas de Zamora",
   day: "viernes",
@@ -80,6 +89,7 @@ const SWISS = {
 const BRITANICO_CENTRAL = {
   key: "britanico-central",
   trackingKey: "britanico" as const,
+  analyticsKey: "britanico_central" as const,
   name: "Hospital Británico (Central)",
   address: "Perdriel 74, CABA",
   day: "miércoles",
@@ -91,6 +101,7 @@ const BRITANICO_CENTRAL = {
 const BRITANICO_LANUS = {
   key: "britanico-lanus",
   trackingKey: "britanico" as const,
+  analyticsKey: "britanico_lanus" as const,
   name: "Hospital Británico Lanús",
   address: "Av. Hipólito Yrigoyen 4429, Lanús",
   day: "martes",

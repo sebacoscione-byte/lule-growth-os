@@ -46,6 +46,21 @@ describe("POST /api/public/click", () => {
     expect(insert).toHaveBeenCalledTimes(1)
   })
 
+  it.each(["britanico_lanus", "britanico_central"])(
+    "acepta y conserva la sede física %s",
+    async locationKey => {
+      const insert = mockSupabaseInsert()
+      const res = await POST(makeRequest({
+        event_type: "click_call",
+        slug: PUBLIC_LANDING_SLUGS[0],
+        location_key: locationKey,
+      }))
+
+      expect(res.status).toBe(200)
+      expect(insert).toHaveBeenCalledWith(expect.objectContaining({ location_key: locationKey }))
+    }
+  )
+
   it("no inserta el evento en un preview deploy de Vercel (VERCEL_ENV=preview)", async () => {
     process.env.VERCEL_ENV = "preview"
     const insert = mockSupabaseInsert()

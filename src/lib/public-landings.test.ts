@@ -36,12 +36,14 @@ describe("cronograma público vigente", () => {
       expect.objectContaining({
         key: "britanico-lanus",
         trackingKey: "britanico",
+        analyticsKey: "britanico_lanus",
         address: "Av. Hipólito Yrigoyen 4429, Lanús",
         hours: "Martes 16:00–19:30 · Ecocardiogramas",
       }),
       expect.objectContaining({
         key: "britanico-central",
         trackingKey: "britanico",
+        analyticsKey: "britanico_central",
         hours: "Miércoles 17:00–19:45",
       }),
       expect.objectContaining({ key: "swiss", hours: "Viernes 17:00–20:00" }),
@@ -54,6 +56,7 @@ describe("cronograma público vigente", () => {
     expect(landing.locations[0]).toEqual(expect.objectContaining({
       key: "britanico-lanus",
       trackingKey: "britanico",
+      analyticsKey: "britanico_lanus",
       name: "Hospital Británico Lanús",
     }))
   })

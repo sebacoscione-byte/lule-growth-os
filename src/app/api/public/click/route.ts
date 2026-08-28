@@ -3,7 +3,7 @@ import { NextResponse } from "next/server"
 import { z } from "zod"
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit"
 import { parseJsonBody, formatZodError } from "@/lib/api-validation"
-import { PUBLIC_LANDING_SLUGS } from "@/lib/public-landings"
+import { PUBLIC_ANALYTICS_LOCATION_KEYS, PUBLIC_LANDING_SLUGS } from "@/lib/public-landings"
 
 const EVENT_TYPES = [
   "cta_cimel", "cta_swiss", "cta_britanico", "instructions_viewed", "form_started", "form_submitted",
@@ -14,7 +14,9 @@ const EVENT_TYPES = [
 const clickEventSchema = z.object({
   event_type: z.enum(EVENT_TYPES),
   slug: z.enum(PUBLIC_LANDING_SLUGS as [string, ...string[]]),
-  location_key: z.enum(["cimel", "swiss", "britanico"]).optional().nullable(),
+  // `britanico` se conserva únicamente para aceptar clientes anteriores al despliegue que separa
+  // las dos sedes; las landings nuevas mandan siempre una clave física de la lista compartida.
+  location_key: z.enum([...PUBLIC_ANALYTICS_LOCATION_KEYS, "britanico"]).optional().nullable(),
   variant: z.enum(["a", "b"]).optional().nullable(),
   utm_source: z.string().trim().max(200).optional().nullable(),
   utm_medium: z.string().trim().max(200).optional().nullable(),

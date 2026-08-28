@@ -46,6 +46,21 @@ describe("content performance", () => {
     expect(metricsForLocation(rows[0], "cimel")).toMatchObject({ visits: 4, clicks: 2, conversations: 1, leads: 0 })
   })
 
+  it("mantiene separadas las sedes Lanús y Central del Hospital Británico", () => {
+    const attribution: ContentAttributionAggregateRow[] = [
+      { item_id: "piece-1", location_key: "britanico_lanus", visits: 0, clicks: 2, whatsapp_clicks: 0, conversations: 0, leads: 0, confirmed: 0 },
+      { item_id: "piece-1", location_key: "britanico_central", visits: 0, clicks: 1, whatsapp_clicks: 0, conversations: 0, leads: 0, confirmed: 0 },
+    ]
+    const [row] = buildContentPerformanceRows(
+      [item("piece-1", "2026-08-04T22:00:00Z")],
+      { "piece-1": { "7d": snapshot("piece-1", 100) } },
+      attribution,
+    )
+
+    expect(metricsForLocation(row, "britanico_lanus").clicks).toBe(2)
+    expect(metricsForLocation(row, "britanico_central").clicks).toBe(1)
+  })
+
   it("no recomienda con menos de tres piezas por franja", () => {
     const items = [
       item("mon-1", "2026-07-06T22:00:00Z"), item("mon-2", "2026-07-13T22:00:00Z"),
