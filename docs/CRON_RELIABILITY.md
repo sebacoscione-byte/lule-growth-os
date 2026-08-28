@@ -53,6 +53,7 @@ Validación sin cambios:
 ```bash
 npm run migrate -- --dry-run --from=20260828_cron_run_ledger.sql
 npm run configure:cron-recovery
+npm run configure:cron-recovery -- --verify-only
 ```
 
 Aplicación, después de desplegar el código:

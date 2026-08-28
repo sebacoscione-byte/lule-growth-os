@@ -9,6 +9,8 @@ import { randomUUID } from "node:crypto"
 
 const require = createRequire(import.meta.url)
 const apply = process.argv.includes("--apply")
+const verifyOnly = process.argv.includes("--verify-only")
+if (apply && verifyOnly) throw new Error("choose_apply_or_verify_only")
 const urlArg = process.argv.find(argument => argument.startsWith("--url="))
 const baseUrl = urlArg?.slice("--url=".length) || "https://draluciachahin.ar"
 const URL_SECRET_NAME = "lule_cron_recovery_base_url"
@@ -138,6 +140,38 @@ async function verifyPrerequisites(client) {
   }
 }
 
+async function verifyScheduledJobs(client, cronSecret) {
+  const { rows } = await client.query(
+    "select jobname, schedule, active, command from cron.job where jobname = any($1::text[])",
+    [JOBS.map(job => job.name)]
+  )
+  if (rows.length !== JOBS.length) throw new Error("cron_recovery_job_count_failed")
+
+  for (const expected of JOBS) {
+    const configured = rows.find(row => row.jobname === expected.name)
+    if (
+      !configured?.active ||
+      configured.schedule !== expected.schedule ||
+      !configured.command.includes(expected.path) ||
+      !configured.command.includes(URL_SECRET_NAME) ||
+      !configured.command.includes(TOKEN_SECRET_NAME) ||
+      configured.command.includes(baseUrl) ||
+      configured.command.includes(cronSecret)
+    ) {
+      throw new Error("cron_recovery_job_verification_failed")
+    }
+  }
+
+  const { rows: workerRows } = await client.query(`
+    select count(*)::integer as active_workers
+      from cron.job
+     where jobname = 'lule-whatsapp-worker-every-minute'
+       and active
+       and command like '%/api/internal/whatsapp-worker%'
+  `)
+  if (workerRows[0]?.active_workers !== 1) throw new Error("whatsapp_worker_verification_failed")
+}
+
 const env = loadLocalEnvironment()
 const dbPassword = env.SUPABASE_DB_PASSWORD
 const cronSecret = env.CRON_SECRET
@@ -183,31 +217,38 @@ try {
   await client.query("revoke all on table vault.decrypted_secrets from public, anon, authenticated")
   await verifyPrerequisites(client)
 
-  const urlSecretAction = await upsertVaultSecret(
-    client,
-    URL_SECRET_NAME,
-    recoveryBaseUrl,
-    "Base URL pública del respaldo de crons de Lule Growth OS"
-  )
-  const tokenSecretAction = await upsertVaultSecret(
-    client,
-    TOKEN_SECRET_NAME,
-    cronSecret,
-    "Bearer token del respaldo de crons de Lule Growth OS"
-  )
-
-  for (const job of JOBS) {
-    const { rows: existingJobs } = await client.query("select jobid from cron.job where jobname = $1", [job.name])
-    for (const row of existingJobs) await client.query("select cron.unschedule($1::bigint)", [row.jobid])
-    await client.query("select cron.schedule($1, $2, $3)", [job.name, job.schedule, cronCommand(job.path)])
-  }
-
-  if (apply) {
-    await client.query("commit")
-    console.log(`recovery_scheduler: applied; jobs=${JOBS.length}; url_secret=${urlSecretAction}; token_secret=${tokenSecretAction}`)
-  } else {
+  if (verifyOnly) {
+    await verifyScheduledJobs(client, cronSecret)
     await client.query("rollback")
-    console.log(`recovery_scheduler: dry_run_complete; jobs=${JOBS.length}; transaction_rolled_back=true`)
+    console.log(`recovery_scheduler: verified; jobs=${JOBS.length}; whatsapp_worker_preserved=true`)
+  } else {
+    const urlSecretAction = await upsertVaultSecret(
+      client,
+      URL_SECRET_NAME,
+      recoveryBaseUrl,
+      "Base URL pública del respaldo de crons de Lule Growth OS"
+    )
+    const tokenSecretAction = await upsertVaultSecret(
+      client,
+      TOKEN_SECRET_NAME,
+      cronSecret,
+      "Bearer token del respaldo de crons de Lule Growth OS"
+    )
+
+    for (const job of JOBS) {
+      const { rows: existingJobs } = await client.query("select jobid from cron.job where jobname = $1", [job.name])
+      for (const row of existingJobs) await client.query("select cron.unschedule($1::bigint)", [row.jobid])
+      await client.query("select cron.schedule($1, $2, $3)", [job.name, job.schedule, cronCommand(job.path)])
+    }
+    await verifyScheduledJobs(client, cronSecret)
+
+    if (apply) {
+      await client.query("commit")
+      console.log(`recovery_scheduler: applied; jobs=${JOBS.length}; whatsapp_worker_preserved=true; url_secret=${urlSecretAction}; token_secret=${tokenSecretAction}`)
+    } else {
+      await client.query("rollback")
+      console.log(`recovery_scheduler: dry_run_complete; jobs=${JOBS.length}; whatsapp_worker_preserved=true; transaction_rolled_back=true`)
+    }
   }
 } catch {
   await client.query("rollback").catch(() => undefined)
