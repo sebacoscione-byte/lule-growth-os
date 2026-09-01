@@ -28,6 +28,20 @@ function canonicalLocation(overrides: Record<string, unknown> = {}) {
 }
 
 describe("parseWhatsAppLocations", () => {
+  it("acepta cartillas institucionales completas de hasta 100 coberturas", () => {
+    const coverages = Array.from({ length: 75 }, (_, index) => `Cobertura ${index + 1}`)
+    const result = parseWhatsAppLocations([{
+      id: "hospital_britanico",
+      name: "Hospital Británico",
+      obras_sociales: coverages,
+      active: true,
+      services: ["Consulta cardiológica"],
+    }])
+
+    expect(result.success).toBe(true)
+    expect(result.data[0]?.obras_sociales).toEqual(coverages)
+  })
+
   it("acepta la forma canónica y conserva `services` como única fuente", () => {
     const result = parseWhatsAppLocations([canonicalLocation()])
 
