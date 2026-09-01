@@ -756,13 +756,24 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
 
       {/* Obras sociales y formas de atención */}
       {(() => {
-        const withCoverage = sedeActions
-          .map(sede => {
-            const cfg = matchConfigLocation(sede.name, configLocations)
-            const obras = (cfg?.obras_sociales ?? []).map(o => o.trim()).filter(Boolean)
-            return { name: sede.name, obras }
+        const coverageByInstitution = new Map<string, { name: string; obras: string[] }>()
+        for (const sede of sedeActions) {
+          const cfg = matchConfigLocation(sede.name, configLocations)
+          const obras = (cfg?.obras_sociales ?? []).map(o => o.trim()).filter(Boolean)
+          if (obras.length === 0) continue
+
+          const isBritanico = sede.name.toLowerCase().includes("hospital británico")
+            || sede.name.toLowerCase().includes("hospital britanico")
+          const isSwiss = sede.name.toLowerCase().includes("swiss medical")
+          const name = isBritanico ? "Hospital Británico" : isSwiss ? "Swiss Medical" : sede.name
+          const key = isBritanico ? "hospital-britanico" : isSwiss ? "swiss-medical" : sede.name
+          const current = coverageByInstitution.get(key)
+          coverageByInstitution.set(key, {
+            name,
+            obras: [...new Set([...(current?.obras ?? []), ...obras])],
           })
-          .filter(s => s.obras.length > 0)
+        }
+        const withCoverage = [...coverageByInstitution.values()]
 
         return (
           <section id="obras-sociales" className="scroll-mt-16 bg-paper-dim px-4 py-12">
