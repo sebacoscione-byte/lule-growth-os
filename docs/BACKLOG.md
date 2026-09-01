@@ -1,5 +1,36 @@
 # Backlog — Lule Growth OS
-**Actualizado:** 2026-08-28 | **Basado en:** PRD Estrategia de Captación v2.1
+**Actualizado:** 2026-09-01 | **Basado en:** PRD Estrategia de Captación v2.1
+
+---
+
+## [PENDIENTE EN PC] Aplicar cartilla completa del Hospital Británico (2026-09-01)
+
+**Contexto ya resuelto en código:** PR #253 mergeado a `main` (commit `cba6dc4`). CI, E2E y
+Vercel Preview aprobaron el cambio. La migración ya existe en:
+`supabase/migrations/20260901_hospital_britanico_coberturas_completas.sql`.
+
+### Qué falta hacer desde la PC
+
+1. Actualizar el repositorio local desde `main`.
+2. Ejecutar `npm run migrate` con `SUPABASE_DB_PASSWORD` configurada.
+3. Verificar en **Configuración → Lugares de atención → Hospital Británico** que figure la cartilla
+   completa informada (72 coberturas) y que PAMI conserve la aclaración restrictiva para pacientes
+   trasplantados o en lista de espera de trasplante hepático.
+4. Verificar en la landing pública principal y las landings del Británico que el bloque de obras
+   sociales muestre todas las coberturas.
+5. Confirmar que únicamente dentro del bloque/listado de coberturas se vea **Hospital Británico** sin
+   “Central” ni “Lanús”, y **Swiss Medical** sin “Lomas”. En horarios, direcciones, turnos,
+   contenidos, derivación y métricas deben seguir figurando las sedes completas: Hospital Británico
+   Lanús, Hospital Británico Central y Swiss Medical Lomas.
+6. Comprobar la página pública en celular para confirmar que la cartilla extensa sea legible.
+7. Si todo está correcto, marcar este ítem como resuelto. No crear otra migración ni duplicar la lista.
+
+### Validación esperada
+
+- La app y la web consumen la misma fuente: `app_config.locations`.
+- No se modifican horarios, teléfonos, servicios, verificación ni canales de turnos.
+- No se modifica lógica médica, webhooks, cron jobs, autenticación ni RLS.
+- Si la migración ya figura aplicada, no repetir cambios manuales: verificar el estado y cerrar la tarea.
 
 ---
 
