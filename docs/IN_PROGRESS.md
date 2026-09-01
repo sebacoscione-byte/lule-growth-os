@@ -1598,3 +1598,34 @@ por fecha, canal abierto, sede elegida y campaña de origen, conservando el per�
 - La RPC sólo entrega agregados anónimos; no expone identificadores de sesión ni datos personales.
 - No se modificaron lógica médica, webhooks de WhatsApp, cron jobs ni políticas RLS.
 - Un intento representa la apertura de un canal externo, no la confirmación de un turno.
+# EN CURSO (2026-09-01) — cartilla completa del Hospital Británico
+
+## Objetivo
+
+Incluir en la app y la web pública todas las obras sociales y prepagas informadas para el
+Hospital Británico. En los bloques de coberturas se usa el nombre de la institución sin
+“Central”/“Lanús”; el resto de la experiencia conserva las sedes físicas completas.
+
+## Plan
+
+- [x] Relevar la fuente de configuración compartida por app, bot y landing.
+- [x] Incorporar la cartilla completa mediante una migración preservativa.
+- [x] Agrupar exclusivamente el bloque público de coberturas por institución.
+- [x] Ejecutar lint, tests y build.
+- [ ] Abrir PR, verificar preview, aplicar la migración y mergear.
+
+## Alcance y seguridad
+
+- No se modifica lógica médica, disponibilidad, horarios, direcciones ni canales de turnos.
+- La condición limitada de PAMI queda visible en el nombre para evitar una promesa incorrecta.
+- No se modifican webhooks, cron jobs, autenticación ni RLS.
+
+## Validación local
+
+- `npm run lint`: sin errores.
+- `TZ=America/Argentina/Buenos_Aires npm test -- --runInBand`: 128 suites y 1.132 tests aprobados.
+- `npm run build`: compilación, TypeScript y 85 páginas generadas correctamente.
+- La corrida sin TZ explícita expuso un test histórico dependiente del huso horario del executor;
+  la suite completa pasa usando el huso operativo de la aplicación (ART).
+
+---
