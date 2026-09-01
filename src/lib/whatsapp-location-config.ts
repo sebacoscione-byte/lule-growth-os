@@ -24,7 +24,10 @@ const optionalUrl = z
 const optionalTimestamp = z
   .union([z.string().datetime({ offset: true }), z.null()])
   .optional()
-const stringList = z.array(boundedText(120)).max(30)
+// Algunas instituciones publican cartillas amplias (Hospital Británico supera las 70
+// coberturas). El límite sigue siendo acotado para validar la configuración, pero no debe
+// truncar una cartilla oficial completa.
+const stringList = z.array(boundedText(120)).max(100)
 
 const editableLocationFields = {
   name: boundedText(120),
