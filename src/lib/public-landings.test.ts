@@ -1,5 +1,6 @@
 import {
   LANDING_DATA,
+  resolveHospitalBritanicoInstitutionConfig,
   resolvePublicLocationWhatsApp,
   resolvesToBotNumber,
   WHATSAPP_NUMBER,
@@ -77,5 +78,23 @@ describe("WhatsApp compartido del Hospital Británico", () => {
     expect(resolvePublicLocationWhatsApp("Hospital Británico Lanús", locations, "11 1111-2222"))
       .toBe("11 1111-2222")
     expect(resolvePublicLocationWhatsApp("CIMEL Lanús", locations)).toBeUndefined()
+  })
+})
+
+describe("configuración institucional compartida del Hospital Británico", () => {
+  const locations = [
+    { name: "Hospital Británico", obras_sociales: ["AMFFA", "PAMI (condición restringida)"] },
+    { name: "Swiss Medical Lomas", obras_sociales: ["Swiss Medical"] },
+  ]
+
+  it("comparte la cartilla institucional con las landings de Central y Lanús", () => {
+    expect(resolveHospitalBritanicoInstitutionConfig("Hospital Británico (Central)", locations))
+      .toBe(locations[0])
+    expect(resolveHospitalBritanicoInstitutionConfig("Hospital Británico Lanús", locations))
+      .toBe(locations[0])
+  })
+
+  it("no comparte la configuración con otras instituciones", () => {
+    expect(resolveHospitalBritanicoInstitutionConfig("CIMEL Lanús", locations)).toBeUndefined()
   })
 })

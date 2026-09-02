@@ -8,7 +8,8 @@ import {
 } from "lucide-react"
 import {
   LANDING_DATA, PUBLIC_LANDING_SLUGS, WHATSAPP_MESSAGES, whatsAppKeyForLocation, SERVICE_MICROCOPY,
-  RELATED_LANDING_SLUGS, resolvePublicLocationWhatsApp, resolvesToBotNumber, type PublicLandingLocation,
+  RELATED_LANDING_SLUGS, resolveHospitalBritanicoInstitutionConfig, resolvePublicLocationWhatsApp,
+  resolvesToBotNumber, type PublicLandingLocation,
 } from "@/lib/public-landings"
 import { withReferralCode } from "@/lib/landing-referral-codes"
 import { getServiceDb } from "@/lib/supabase/service"
@@ -759,6 +760,7 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
         const coverageByInstitution = new Map<string, { name: string; obras: string[] }>()
         for (const sede of sedeActions) {
           const cfg = matchConfigLocation(sede.name, configLocations)
+            ?? resolveHospitalBritanicoInstitutionConfig(sede.name, configLocations)
           const obras = (cfg?.obras_sociales ?? []).map(o => o.trim()).filter(Boolean)
           if (obras.length === 0) continue
 

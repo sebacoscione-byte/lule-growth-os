@@ -32,12 +32,32 @@ type PublicLocationWhatsAppConfig = {
   whatsapp?: string | null
 }
 
+type PublicLocationInstitutionConfig = {
+  name: string
+}
+
 function normalizedLocationName(value: string): string {
   return value
     .normalize("NFD")
     .replace(/\p{Diacritic}/gu, "")
     .toLowerCase()
     .trim()
+}
+
+/**
+ * Hospital Británico comparte datos institucionales entre Central y Lanús. Este fallback es sólo
+ * para campos comunes, como coberturas; dirección, horarios y teléfonos se resuelven por sede.
+ */
+export function resolveHospitalBritanicoInstitutionConfig<T extends PublicLocationInstitutionConfig>(
+  publicLocationName: string,
+  configLocations: T[],
+): T | undefined {
+  const publicName = normalizedLocationName(publicLocationName)
+  if (!publicName.includes("hospital britanico")) return undefined
+
+  return configLocations.find(location =>
+    normalizedLocationName(location.name).includes("hospital britanico")
+  )
 }
 
 /**
