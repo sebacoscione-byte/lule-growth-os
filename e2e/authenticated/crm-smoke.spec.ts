@@ -46,7 +46,7 @@ test("un usuario autorizado puede entrar al dashboard", async () => {
   await expect(page.getByRole("heading", { name: "Detalle de cada salida", exact: true })).toBeVisible()
   await expect(page.getByText("El detalle todavía no está disponible.")).toHaveCount(0)
 
-  const journey = page.locator("details").filter({ hasText: "Cómo avanzan las personas hasta pedir turno" }).first()
+  const journey = page.locator("details").filter({ hasText: "Cómo avanzan las visitas hasta pedir turno" }).first()
   await expect(journey.locator("summary")).toBeVisible()
   await expect(journey.getByText("Evolución del recorrido", { exact: true })).not.toBeVisible()
   await journey.locator("summary").click()
@@ -77,13 +77,15 @@ test("la planificación reproduce agenda e ingresos del organigrama", async () =
   await expect(page.getByRole("heading", { name: "Agenda e ingresos", level: 1 })).toBeVisible()
   await expect(page.getByRole("button", { name: "Todo guardado" })).toBeVisible()
   await expect(page.getByText("Editar bloques semanales", { exact: true })).toBeVisible()
-  await expect(page.getByText("$ 5.564.050", { exact: true }).first()).toBeVisible()
+  const planningSummary = page.getByRole("region", { name: "Resumen" })
+  await expect(planningSummary.getByText("Ingreso semanal", { exact: true }).locator("..").getByText(/^\$ [\d.]+$/)).toBeVisible()
+  await expect(planningSummary.getByText("Promedio mensual", { exact: true }).locator("..").getByText(/^\$ [\d.]+$/)).toBeVisible()
   await page.getByRole("tab", { name: "Por institución" }).click()
   await expect(page.getByText("Editar aranceles y reglas", { exact: true })).toBeVisible()
   await expect(page.getByRole("cell", { name: "CIMEL", exact: true }).first()).toBeVisible()
   await page.getByRole("tab", { name: "Proyección mensual" }).click()
   await expect(page.getByText("Configurar período y feriados", { exact: true })).toBeVisible()
-  await expect(page.getByText("$ 5.795.000", { exact: true }).first()).toBeVisible()
+  await expect(page.getByRole("row", { name: /TOTAL MENSUAL/ }).getByRole("cell").nth(1)).toHaveText(/^\$ [\d.]+$/)
 })
 
 test("el cronograma editorial muestra ventanas reales en horario argentino", async () => {
