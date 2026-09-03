@@ -38,10 +38,10 @@ const NAV_ITEMS = [
 ] as const
 
 const MOBILE_NAV_ITEMS = [
-  { href: "/dashboard", label: "Inicio", icon: LayoutDashboard },
-  { href: "/leads", label: "Leads", icon: Users },
-  { href: "/inbox", label: "Inbox", icon: MessageSquare },
-  { href: "/google-local", label: "Google", icon: MapPin },
+  { href: "/planificacion", label: "Agenda", icon: CalendarRange },
+  { href: "/contenido/instagram", label: "Contenido", icon: Camera },
+  { href: "/configuracion", label: "Configuración", icon: Settings },
+  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
 ] as const
 
 function isActive(pathname: string, href: string) {

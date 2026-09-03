@@ -1,3 +1,24 @@
+# EN CURSO (2026-09-02) — accesos prioritarios en la navegación mobile
+
+## Objetivo
+
+Reemplazar los cuatro accesos directos de la barra inferior mobile por las secciones de uso más
+frecuente: Agenda e ingresos, Contenido, Configuración y Dashboard, conservando “Más” para el resto.
+
+## Plan
+
+- [x] Identificar la fuente única de la navegación desktop y mobile.
+- [x] Reordenar únicamente los accesos directos mobile.
+- [x] Verificar el orden en navegador mobile real y validar lint, tests y build.
+- [ ] Abrir PR, verificar el preview y mergear.
+
+## Alcance y seguridad
+
+- No se modifican permisos, autenticación, RLS, datos de pacientes, webhooks, crons ni lógica médica.
+- La navegación de escritorio y el contenido completo del menú “Más” se conservan.
+
+---
+
 # CERRADO (2026-08-28) — recuperación durable de todos los crons
 
 ## Objetivo
