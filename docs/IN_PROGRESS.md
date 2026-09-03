@@ -1662,3 +1662,27 @@ Hospital Británico. En los bloques de coberturas se usa el nombre de la institu
   los nombres institucionales abreviados únicamente dentro del bloque de coberturas.
 
 ---
+# EN CURSO (2026-09-03) — métricas de contacto coherentes
+
+## Objetivo
+
+Corregir las discrepancias del dashboard semanal entre sesiones, clics y filas de detalle, y
+explicar con claridad qué resultados dejan de ser observables cuando una persona abre un canal
+externo de una institución.
+
+## Plan
+
+- [ ] Alinear todos los agregados de acciones con el período exacto seleccionado.
+- [ ] Excluir “Cómo llegar” del indicador de intención de turno sin perder su medición separada.
+- [ ] Diferenciar sesiones anónimas, clics y consultas registradas en la interfaz.
+- [ ] Aclarar la relación entre clics informados por Meta y visitas realmente medidas.
+- [ ] Aplicar la migración y ejecutar lint, tests, build y E2E autenticado.
+- [ ] Abrir PR, verificar preview y mergear.
+
+## Alcance y seguridad
+
+- Los agregados siguen siendo anónimos y no exponen identificadores de sesión ni datos de pacientes.
+- No se modifica lógica médica, webhooks de WhatsApp, cron jobs, autenticación ni RLS.
+- El cambio corrige semántica y períodos históricos del dashboard; no altera los canales públicos.
+
+---

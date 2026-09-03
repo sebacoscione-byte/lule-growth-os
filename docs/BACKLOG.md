@@ -1,5 +1,19 @@
 # Backlog — Lule Growth OS
-**Actualizado:** 2026-09-01 | **Basado en:** PRD Estrategia de Captación v2.1
+**Actualizado:** 2026-09-03 | **Basado en:** PRD Estrategia de Captación v2.1
+
+---
+
+## [RESUELTO] ✅ Métricas de contacto coherentes (2026-09-03)
+
+- Todos los bloques principales del dashboard usan el período exacto seleccionado; la semana
+  calendario ya no arrastra clics ni visitas del fin de semana anterior.
+- “Intentaron pedir turno” cuenta sesiones anónimas que abrieron turno online, llamada o WhatsApp.
+  “Cómo llegar” sigue visible, pero separado para no inflar la intención de turno.
+- El detalle diferencia sesiones, clics y filas agrupadas, y explica que los canales institucionales
+  externos no permiten observar si la persona terminó la gestión.
+- Los clics informados por Meta se distinguen explícitamente de las visitas cargadas en el sitio.
+- Los nuevos RPC continúan siendo agregados privados; no exponen datos personales ni identificadores
+  de sesión. No se modificaron lógica médica, webhooks, crons, autenticación ni RLS.
 
 ---
 

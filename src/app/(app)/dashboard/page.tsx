@@ -70,11 +70,13 @@ type LandingRankingRow = {
 // subestimaba los conteos en silencio sin ningún error visible.
 async function getLandingRanking(
   supabase: Awaited<ReturnType<typeof createClient>>,
-  period: DashboardPeriod
+  range: DashboardDateRange,
 ): Promise<{ rows: LandingRankingRow[]; available: boolean }> {
   try {
-    const since = new Date(Date.now() - period * 24 * 60 * 60 * 1000).toISOString()
-    const { data, error } = await supabase.rpc("landing_events_ranking", { p_since: since })
+    const { data, error } = await supabase.rpc("landing_events_ranking", {
+      p_start: range.currentStart,
+      p_end: range.currentEnd,
+    })
     if (error) throw error
 
     const bySlug = new Map<string, { visits: number; interactions: number }>()
@@ -610,7 +612,7 @@ async function getDashboardData(period: DashboardPeriod) {
     periodChannelOverview,
     siteJourney,
   ] = await Promise.all([
-    getLandingRanking(supabase, period),
+    getLandingRanking(supabase, range),
     getHeroVariantResults(supabase, period),
     getReferralFunnel(supabase, period),
     getClicksByLocation(supabase, range),
@@ -619,7 +621,7 @@ async function getDashboardData(period: DashboardPeriod) {
     getWhatsAppCostSummary(supabase),
     getWeeklyReports(supabase),
     getDashboardGrowthData(supabase, period),
-    getContentPerformance(supabase, period),
+    getContentPerformance(supabase, range),
     getMetaAdsDashboardMetrics(period),
     getPeriodChannelOverview(supabase, range),
     getSiteJourney(supabase, range),
@@ -644,11 +646,14 @@ type ContentPerformanceRow = {
 
 async function getContentPerformance(
   supabase: Awaited<ReturnType<typeof createClient>>,
-  period: DashboardPeriod
+  range: DashboardDateRange,
 ): Promise<{ rows: ContentPerformanceRow[]; available: boolean }> {
   try {
     const [{ data, error }, items] = await Promise.all([
-      supabase.rpc("dashboard_content_performance", { p_days: period }),
+      supabase.rpc("dashboard_content_performance", {
+        p_start: range.currentStart,
+        p_end: range.currentEnd,
+      }),
       readContentItems(supabase),
     ])
     if (error) throw error
@@ -1073,6 +1078,10 @@ export default async function DashboardPage({
   const siteContactRate = siteJourney.totals.visits > 0
     ? Math.round((siteJourney.totals.contactVisits / siteJourney.totals.visits) * 1000) / 10
     : 0
+  const contactActionClicks = growth.actions
+    .filter(action => action.eventType !== "click_maps")
+    .reduce((total, action) => total + action.actions, 0)
+  const mapsClicks = growth.actions.find(action => action.eventType === "click_maps")?.actions ?? 0
   const instagramFreshness = growth.instagram.followersLive
     ? "Actualizado al abrir el dashboard"
     : growth.instagram.followersUpdatedAt
@@ -1083,7 +1092,7 @@ export default async function DashboardPage({
     growth.available ? `${growth.summary.visits.current} visitas al sitio` : null,
     growth.instagram.followers !== null ? `${growth.instagram.followers} seguidores en Instagram` : null,
     metaAds.status === "available" ? `${formatAdsMoney(metaAds.totals.spend, metaAds.currency)} invertidos` : null,
-    growth.available ? `${growth.summary.engagedVisits.current} intentos de contacto` : null,
+    growth.available ? `${growth.summary.engagedVisits.current} visitas abrieron un canal para pedir turno` : null,
     growth.available ? `${growth.summary.leads.current} consultas registradas` : null,
   ].filter((value): value is string => Boolean(value))
 
@@ -1136,7 +1145,7 @@ export default async function DashboardPage({
               ? `${formatAdsMoney(metaAds.totals.spend, metaAds.currency)} invertidos`
               : "Sin datos publicitarios"}
             detail={metaAds.status === "available"
-              ? `${adsPrimaryResult?.value ?? 0} ${adsPrimaryResult?.label.toLocaleLowerCase("es-AR") ?? "resultados"}${metaAds.totals.follows === null ? "" : ` · ${metaAds.totals.follows} seguimientos atribuidos`} · ${metaAds.totals.impressions.toLocaleString("es-AR")} impresiones.`
+              ? `${adsPrimaryResult?.value ?? 0} ${adsPrimaryResult?.label.toLocaleLowerCase("es-AR") ?? "resultados"}${metaAds.totals.follows === null ? "" : ` · ${metaAds.totals.follows} seguimientos atribuidos`} · ${metaAds.totals.impressions.toLocaleString("es-AR")} impresiones. Los clics informados por Meta no equivalen a visitas cargadas en el sitio.`
               : "El resto del resumen sigue funcionando aunque Meta no responda."}
           />
           <WeeklySummaryItem
@@ -1188,8 +1197,8 @@ export default async function DashboardPage({
 
       {/* KPIs principales */}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <KpiCard title="Llegaron al sitio" value={growth.available ? growth.summary.visits.current : "—"} comparison={growth.available ? growth.summary.visits : undefined} comparisonLabel={comparisonLabel} note="Personas que abrieron alguna página pública." icon={Eye} iconClass="bg-indigo-50 text-indigo-700" />
-        <KpiCard title="Intentaron contactarse" value={growth.available ? growth.summary.engagedVisits.current : "—"} comparison={growth.available ? growth.summary.engagedVisits : undefined} comparisonLabel={comparisonLabel} note="Tocaron turno, WhatsApp, llamada o cómo llegar." icon={MousePointerClick} iconClass="bg-cyan-50 text-cyan-700" href={`/dashboard?period=${period}&detail=contacts#contact-attempts`} />
+        <KpiCard title="Llegaron al sitio" value={growth.available ? growth.summary.visits.current : "—"} comparison={growth.available ? growth.summary.visits : undefined} comparisonLabel={comparisonLabel} note="Sesiones anónimas que cargaron una página pública; no son personas identificadas." icon={Eye} iconClass="bg-indigo-50 text-indigo-700" />
+        <KpiCard title="Intentaron pedir turno" value={growth.available ? growth.summary.engagedVisits.current : "—"} comparison={growth.available ? growth.summary.engagedVisits : undefined} comparisonLabel={comparisonLabel} note="Sesiones que abrieron turno online, WhatsApp o llamada. Cómo llegar se mide aparte." icon={MousePointerClick} iconClass="bg-cyan-50 text-cyan-700" href={`/dashboard?period=${period}&detail=contacts#contact-attempts`} />
         <KpiCard title="Consultas registradas" value={growth.available ? growth.summary.leads.current : "—"} comparison={growth.available ? growth.summary.leads : undefined} comparisonLabel={comparisonLabel} note="Personas identificadas para seguimiento." icon={Users} iconClass="bg-violet-50 text-violet-700" />
         <KpiCard title="Turnos confirmados" value={growth.available ? growth.summary.confirmed.current : "—"} comparison={growth.available ? growth.summary.confirmed : undefined} comparisonLabel={comparisonLabel} note="Personas que confirmaron haber solicitado turno." icon={CheckCircle2} iconClass="bg-emerald-50 text-emerald-700" />
       </div>
@@ -1202,7 +1211,7 @@ export default async function DashboardPage({
 
       <DashboardDisclosure
         icon={TrendingUp}
-        title="Cómo avanzan las personas hasta pedir turno"
+        title="Cómo avanzan las visitas hasta pedir turno"
         description="Abrí esta sección para ver la evolución diaria, las tasas y qué canal trae más consultas."
       >
       {/* Evolución + embudo */}
@@ -1217,7 +1226,7 @@ export default async function DashboardPage({
               points={growth.trend}
               series={[
                 { key: "visits", label: "Visitas", color: "#4f46e5" },
-                { key: "engagedVisits", label: "Con acción", color: "#0891b2" },
+                { key: "engagedVisits", label: "Abrieron un canal", color: "#0891b2" },
                 { key: "leads", label: "Consultas", color: "#7c3aed" },
                 { key: "confirmed", label: "Turnos", color: "#059669" },
               ]}
@@ -1227,12 +1236,12 @@ export default async function DashboardPage({
         <Card>
           <CardHeader>
             <CardTitle className="text-base">Recorrido del período</CardTitle>
-            <p className="text-xs text-gray-500">Personas, no cantidad de botones tocados.</p>
+            <p className="text-xs text-gray-500">Sesiones anónimas, no cantidad de botones tocados.</p>
           </CardHeader>
           <CardContent className="space-y-5">
             {[
               { label: "Visitas", value: growth.summary.visits.current, color: "bg-indigo-500" },
-              { label: "Hicieron una acción", value: growth.summary.engagedVisits.current, color: "bg-cyan-500" },
+              { label: "Abrieron un canal para pedir turno", value: growth.summary.engagedVisits.current, color: "bg-cyan-500" },
               { label: "Quedaron como consulta", value: growth.summary.leads.current, color: "bg-violet-500" },
               { label: "Confirmaron que pidieron turno", value: growth.summary.confirmed.current, color: "bg-emerald-500" },
             ].map(item => (
@@ -1333,7 +1342,7 @@ export default async function DashboardPage({
                     <th className="pb-3 font-medium">Campaña / contenido</th>
                     <th className="pb-3 font-medium">Origen</th>
                     <th className="pb-3 text-right font-medium">Visitas</th>
-                    <th className="pb-3 text-right font-medium">Intentaron contactarse</th>
+                    <th className="pb-3 text-right font-medium">Abrieron un canal</th>
                     <th className="pb-3 text-right font-medium">Consultas</th>
                     <th className="pb-3 text-right font-medium">Visita → consulta</th>
                     <th className="pb-3 text-right font-medium">Turnos</th>
@@ -1373,8 +1382,8 @@ export default async function DashboardPage({
             </div>
           )}
           <p className="mt-3 text-[11px] text-gray-400">
-            “Intentaron contactarse” cuenta personas que tocaron turno online, llamada, WhatsApp o cómo llegar;
-            no suma varias veces a la misma visita. El detalle técnico de origen del enlace se conserva para auditoría.
+            “Abrieron un canal” cuenta sesiones que tocaron turno online, llamada o WhatsApp; no suma varias veces
+            la misma sesión. “Cómo llegar” se informa aparte y no se considera un intento de pedir turno.
           </p>
         </CardContent>
       </Card>
@@ -1545,7 +1554,7 @@ export default async function DashboardPage({
             title="Sitio"
             headline={growth.available ? `${growth.summary.visits.current} visitas` : "Sin datos todavía"}
             detail={growth.available
-              ? `${growth.summary.engagedVisits.current} ${growth.summary.engagedVisits.current === 1 ? "persona intentó" : "personas intentaron"} contactarse · ${growth.summary.leads.current} consultas registradas.`
+              ? `${growth.summary.engagedVisits.current} ${growth.summary.engagedVisits.current === 1 ? "sesión abrió" : "sesiones abrieron"} un canal para pedir turno · ${growth.summary.leads.current} consultas registradas.`
               : "El seguimiento del sitio no respondió para este período."}
             className="bg-indigo-50 text-indigo-700"
           />
@@ -1586,7 +1595,7 @@ export default async function DashboardPage({
       <ChannelDisclosure
         icon={Globe}
         title="Sitio y pacientes"
-        description="Visitas, intentos de contacto, consultas, turnos y páginas que generan más interés."
+        description="Sesiones, aperturas de canales, consultas, turnos y páginas que generan más interés."
         defaultOpen={showContactAttempts}
       >
       <SectionHeader icon={Users} title="Consultas y pacientes" />
@@ -1685,10 +1694,15 @@ export default async function DashboardPage({
         className={`scroll-mt-6 ${showContactAttempts ? "ring-2 ring-cyan-200" : ""}`}
       >
         <CardHeader>
-            <CardTitle className="text-base">Cómo intentaron contactarse desde el sitio</CardTitle>
-            <p className="text-xs text-gray-500">Clics en los botones para pedir turno durante {periodLabel.toLocaleLowerCase("es-AR")}. Una misma persona puede usar más de un botón.</p>
+            <CardTitle className="text-base">Cómo intentaron pedir turno desde el sitio</CardTitle>
+            <p className="text-xs text-gray-500">Sesiones y clics del período exacto seleccionado. Una misma sesión puede usar más de un botón; “Cómo llegar” se muestra aparte.</p>
         </CardHeader>
         <CardContent className="space-y-5">
+          <div className="grid gap-3 sm:grid-cols-3">
+            <MetricTile label="Sesiones que abrieron un canal" value={growth.summary.engagedVisits.current} helper="Turno online, WhatsApp o llamada" />
+            <MetricTile label="Clics para pedir turno" value={contactActionClicks} helper="Una sesión puede hacer más de un clic" />
+            <MetricTile label="Clics en cómo llegar" value={mapsClicks} helper="Se miden aparte; no implican pedido de turno" />
+          </div>
           <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
             {Object.entries(ACTION_META).map(([eventType, meta]) => {
               const row = growth.actions.find(action => action.eventType === eventType)
@@ -1698,6 +1712,7 @@ export default async function DashboardPage({
                   <span className={`mb-3 flex h-9 w-9 items-center justify-center rounded-lg ${meta.className}`}><Icon className="h-4 w-4" /></span>
                   <p className="text-2xl font-bold text-gray-950">{row?.actions ?? 0}</p>
                   <p className="text-sm text-gray-600">{meta.label}</p>
+                  <p className="mt-0.5 text-[11px] text-gray-400">clics en el período</p>
                   {row && <div className="mt-1"><Comparison value={{ current: row.actions, previous: row.previousActions }} /></div>}
                 </div>
               )
@@ -1706,9 +1721,9 @@ export default async function DashboardPage({
 
           <section className="border-t border-gray-100 pt-5" aria-labelledby="contact-attempt-list-title">
             <div>
-              <h3 id="contact-attempt-list-title" className="text-sm font-semibold text-gray-950">Detalle de cada intento</h3>
+              <h3 id="contact-attempt-list-title" className="text-sm font-semibold text-gray-950">Detalle de cada salida</h3>
               <p className="mt-1 text-xs leading-relaxed text-gray-500">
-                Muestra sólo los días con actividad, junto con el canal que abrieron, la sede elegida y desde qué campaña llegaron. Son datos anónimos: un clic indica intención, no confirma que hayan conseguido turno.
+                Cada fila agrupa salidas con la misma fecha, canal, sede y origen. El número de filas no es un total de personas ni de clics: la columna “Sesiones” muestra cuántas hubo en cada grupo. Abrir un canal no confirma que hayan escrito, llamado o conseguido turno.
               </p>
             </div>
 
@@ -1717,7 +1732,7 @@ export default async function DashboardPage({
                 El detalle todavía no está disponible. El resumen superior sigue siendo válido.
               </p>
             ) : contactAttemptDetails.rows.length === 0 ? (
-              <p className="mt-4 text-sm text-gray-400">No hubo intentos de contacto durante este período.</p>
+              <p className="mt-4 text-sm text-gray-400">No hubo salidas hacia canales de turno ni Maps durante este período.</p>
             ) : (
               <>
                 <div className="mt-4 divide-y divide-gray-100 sm:hidden">
@@ -1733,7 +1748,7 @@ export default async function DashboardPage({
                           </div>
                           <div className="shrink-0 text-right">
                             <p className="text-sm font-semibold text-gray-950">{row.sessions}</p>
-                            <p className="text-[11px] text-gray-400">{row.sessions === 1 ? "persona" : "personas"}</p>
+                            <p className="text-[11px] text-gray-400">{row.sessions === 1 ? "sesión" : "sesiones"}</p>
                           </div>
                         </div>
                         <p className="mt-2 text-xs text-gray-500">
@@ -1756,7 +1771,7 @@ export default async function DashboardPage({
                         <th className="pb-2 font-medium">Canal</th>
                         <th className="pb-2 font-medium">Origen</th>
                         <th className="pb-2 font-medium">Campaña</th>
-                        <th className="pb-2 text-right font-medium">Personas</th>
+                        <th className="pb-2 text-right font-medium">Sesiones</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -1786,7 +1801,7 @@ export default async function DashboardPage({
           <CardHeader>
             <CardTitle className="text-base">Qué hicieron después de entrar</CardTitle>
             <p className="text-xs text-gray-500">
-              Se cuentan personas distintas por pestaña durante {periodLabel.toLocaleLowerCase("es-AR")}; un clic del anuncio no siempre termina en una visita medida.
+              Se cuentan sesiones anónimas del navegador durante {periodLabel.toLocaleLowerCase("es-AR")}; una misma persona puede abrir más de una pestaña o dispositivo. Un clic del anuncio no siempre termina en una visita medida.
             </p>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -1794,7 +1809,7 @@ export default async function DashboardPage({
               {[
                 { label: "Llegaron al sitio", value: siteJourney.totals.visits, helper: "La página cargó correctamente", className: "bg-indigo-50 text-indigo-700" },
                 { label: "Vieron cómo pedir turno", value: siteJourney.totals.bookingOptionsVisits, helper: "Llegaron a las opciones de sede", className: "bg-blue-50 text-blue-700" },
-                { label: "Abrieron un canal oficial", value: siteJourney.totals.contactVisits, helper: `${siteContactRate}% de las visitas`, className: "bg-cyan-50 text-cyan-700" },
+                { label: "Abrieron un canal para pedir turno", value: siteJourney.totals.contactVisits, helper: `${siteContactRate}% de las sesiones`, className: "bg-cyan-50 text-cyan-700" },
                 { label: "Quedaron como consulta", value: growth.summary.leads.current, helper: "Personas identificadas para seguimiento", className: "bg-violet-50 text-violet-700" },
               ].map((step, index) => (
                 <div key={step.label} className="rounded-xl border border-gray-100 p-4">
@@ -1810,7 +1825,16 @@ export default async function DashboardPage({
               <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm leading-relaxed text-amber-900">
                 <p className="font-semibold">La principal caída ocurre antes de elegir un canal</p>
                 <p className="mt-1">
-                  La página recibe tráfico, pero menos del 2% abre turnos, teléfono, WhatsApp o Maps. Esto apunta a una dificultad en el recorrido o a visitantes con baja intención, no a un enlace roto.
+                  La página recibe tráfico, pero menos del 2% abre turno online, teléfono o WhatsApp. Esto apunta a una dificultad en el recorrido o a visitantes con baja intención, no a un enlace roto.
+                </p>
+              </div>
+            )}
+
+            {siteJourney.totals.contactVisits > 0 && growth.summary.leads.current === 0 && (
+              <div className="rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm leading-relaxed text-blue-950">
+                <p className="font-semibold">El recorrido continúa fuera del sistema</p>
+                <p className="mt-1">
+                  {siteJourney.totals.contactVisits} {siteJourney.totals.contactVisits === 1 ? "sesión abrió" : "sesiones abrieron"} teléfono, WhatsApp o turno online, pero no quedó ninguna consulta identificada. Cuando el canal pertenece a una institución, podemos medir la salida del sitio, no si la persona escribió, llamó o consiguió turno.
                 </p>
               </div>
             )}
@@ -1819,15 +1843,14 @@ export default async function DashboardPage({
               <div className="rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm leading-relaxed text-blue-950">
                 <p className="font-semibold">Campaña con más visitas: {readableTrackingValue(topJourneyCampaign.campaign)}</p>
                 <p className="mt-1">
-                  <strong>{topJourneyCampaign.visits}</strong> llegaron, <strong>{topJourneyCampaign.bookingOptionsVisits}</strong> vieron las opciones de sede y <strong>{topJourneyCampaign.contactVisits}</strong> abrieron un canal oficial
+                  <strong>{topJourneyCampaign.visits}</strong> llegaron, <strong>{topJourneyCampaign.bookingOptionsVisits}</strong> vieron las opciones de sede y <strong>{topJourneyCampaign.contactVisits}</strong> abrieron un canal para pedir turno
                   {topJourneyCampaign.contactVisits > 0 && (
                     <> ({[
                       topJourneyCampaign.bookingVisits > 0 && `${topJourneyCampaign.bookingVisits} turno online`,
                       topJourneyCampaign.whatsappVisits > 0 && `${topJourneyCampaign.whatsappVisits} WhatsApp`,
                       topJourneyCampaign.callVisits > 0 && `${topJourneyCampaign.callVisits} llamada`,
-                      topJourneyCampaign.mapsVisits > 0 && `${topJourneyCampaign.mapsVisits} cómo llegar`,
                     ].filter(Boolean).join(" · ")})</>
-                  )}.
+                  )}{topJourneyCampaign.mapsVisits > 0 ? `; además, ${topJourneyCampaign.mapsVisits} abrieron cómo llegar` : ""}.
                 </p>
               </div>
             )}
@@ -1957,9 +1980,9 @@ export default async function DashboardPage({
           <CardHeader>
             <CardTitle className="text-base">Páginas que más ayudan a iniciar un contacto</CardTitle>
             <p className="text-xs text-gray-500">
-              Visitas e interacciones con los botones de pedir turno (últimos {period}{" "}días). El porcentaje
-              muestra cuántas visitas hicieron clic en pedir turno online, llamar,
-              WhatsApp o cómo llegar — no confirma que hayan pedido turno.
+              Sesiones y aperturas de canales durante {periodLabel.toLocaleLowerCase("es-AR")}. El porcentaje
+              muestra cuántas sesiones abrieron turno online, llamada o WhatsApp. “Cómo llegar” se informa
+              aparte y no confirma que hayan pedido turno.
             </p>
           </CardHeader>
           <CardContent>
@@ -1975,7 +1998,7 @@ export default async function DashboardPage({
                     <tr className="border-b text-left text-xs text-gray-500">
                       <th className="pb-2 font-medium">Landing</th>
                       <th className="pb-2 font-medium text-right">Visitas</th>
-                      <th className="pb-2 font-medium text-right">Intentos de contacto</th>
+                      <th className="pb-2 font-medium text-right">Abrieron un canal</th>
                       <th className="pb-2 font-medium text-right">Porcentaje</th>
                     </tr>
                   </thead>
@@ -2277,7 +2300,7 @@ export default async function DashboardPage({
                 </div>
                 <div className="overflow-x-auto">
                   <table className="w-full min-w-[520px] text-sm">
-                    <thead><tr className="border-b text-left text-xs text-gray-500"><th className="pb-2 font-medium">Contenido</th><th className="pb-2 text-right font-medium">Visitas al sitio</th><th className="pb-2 text-right font-medium">Intentaron contactarse</th><th className="pb-2 text-right font-medium">Porcentaje</th></tr></thead>
+                    <thead><tr className="border-b text-left text-xs text-gray-500"><th className="pb-2 font-medium">Contenido</th><th className="pb-2 text-right font-medium">Visitas al sitio</th><th className="pb-2 text-right font-medium">Abrieron un canal</th><th className="pb-2 text-right font-medium">Porcentaje</th></tr></thead>
                     <tbody>
                       {contentPerformance.rows.map(row => (
                         <tr key={row.itemId} className="border-b border-gray-50 last:border-0">

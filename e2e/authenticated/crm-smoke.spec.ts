@@ -38,12 +38,12 @@ test("un usuario autorizado puede entrar al dashboard", async () => {
   await expect(page.getByRole("heading", { name: "WhatsApp", exact: true })).toBeVisible()
   await expect(page.getByText("Publicidad en Facebook e Instagram", { exact: true })).toBeVisible()
 
-  const contactAttemptsLink = page.getByRole("link", { name: "Ver detalle: Intentaron contactarse" })
+  const contactAttemptsLink = page.getByRole("link", { name: "Ver detalle: Intentaron pedir turno" })
   await expect(contactAttemptsLink).toBeVisible()
   await contactAttemptsLink.click()
   await expect(page).toHaveURL(/period=7&detail=contacts#contact-attempts$/)
   await expect(page.getByTestId("contact-attempt-details")).toBeVisible()
-  await expect(page.getByRole("heading", { name: "Detalle de cada intento", exact: true })).toBeVisible()
+  await expect(page.getByRole("heading", { name: "Detalle de cada salida", exact: true })).toBeVisible()
   await expect(page.getByText("El detalle todavía no está disponible.")).toHaveCount(0)
 
   const journey = page.locator("details").filter({ hasText: "Cómo avanzan las personas hasta pedir turno" }).first()

@@ -15,6 +15,13 @@
   inferir una ubicación. El detalle semanal aclara que sólo lista días con actividad. La restricción
   de `landing_events` admite las claves nuevas sin reescribir datos previos; no cambian RLS, crons,
   webhooks, datos personales ni lógica médica.
+- 2026-09-03 (métricas de contacto coherentes): `/dashboard` alinea acciones, campañas, canales,
+  contenidos y ranking de landings con el período calendario visible. “Intentaron pedir turno”
+  excluye Maps y cuenta sesiones anónimas únicas; el detalle separa 5 sesiones, 7 clics de turno y
+  1 clic de cómo llegar para la semana auditada. La interfaz aclara que una fila es un agregado y
+  que los canales externos de las instituciones no permiten confirmar el resultado posterior. Los
+  clics de Meta se distinguen de las visitas propias. Las RPC nuevas son agregadas y privadas; no se
+  tocaron webhooks, crons, autenticación, RLS, datos personales ni lógica médica.
 - 2026-08-27 (historias evergreen ya publicadas tratadas como nuevas): la corrida de las 18:38 ART
   terminó `published:2/2` sin error, pero Seba esperaba tres. La Biblioteca tenía una evergreen real
   como `published` y dos historias publicadas externamente como `approved` + repetición activa; con
