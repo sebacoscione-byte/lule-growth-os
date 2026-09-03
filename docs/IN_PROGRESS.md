@@ -1662,7 +1662,7 @@ Hospital Británico. En los bloques de coberturas se usa el nombre de la institu
   los nombres institucionales abreviados únicamente dentro del bloque de coberturas.
 
 ---
-# EN CURSO (2026-09-03) — métricas de contacto coherentes
+# CERRADO (2026-09-03) — métricas de contacto coherentes
 
 ## Objetivo
 
@@ -1672,12 +1672,22 @@ externo de una institución.
 
 ## Plan
 
-- [ ] Alinear todos los agregados de acciones con el período exacto seleccionado.
-- [ ] Excluir “Cómo llegar” del indicador de intención de turno sin perder su medición separada.
-- [ ] Diferenciar sesiones anónimas, clics y consultas registradas en la interfaz.
-- [ ] Aclarar la relación entre clics informados por Meta y visitas realmente medidas.
-- [ ] Aplicar la migración y ejecutar lint, tests, build y E2E autenticado.
-- [ ] Abrir PR, verificar preview y mergear.
+- [x] Alinear todos los agregados de acciones con el período exacto seleccionado.
+- [x] Excluir “Cómo llegar” del indicador de intención de turno sin perder su medición separada.
+- [x] Diferenciar sesiones anónimas, clics y consultas registradas en la interfaz.
+- [x] Aclarar la relación entre clics informados por Meta y visitas realmente medidas.
+- [x] Aplicar la migración y ejecutar lint, tests, build y E2E autenticado.
+- [x] Abrir PR #257 y verificar preview antes del merge.
+
+## Validación final
+
+- `npm run lint`: sin errores.
+- `npm test -- --runInBand`: 129 suites y 1.140 tests aprobados.
+- `npm run build`: compilación, TypeScript y 85 páginas generadas correctamente.
+- Las tres migraciones se validaron con rollback y se aplicaron atómicamente.
+- QA autenticado sobre el build final: 45 sesiones, 38 vistas de sedes, 5 aperturas de canal,
+  7 clics para pedir turno, 1 clic en Maps y una tasa de 11,1%.
+- El ranking de landings y el rendimiento por canal quedaron alineados con esas mismas 45 sesiones.
 
 ## Alcance y seguridad
 
