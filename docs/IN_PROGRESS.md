@@ -1,4 +1,4 @@
-# EN CURSO (2026-09-02) — accesos prioritarios en la navegación mobile
+# CERRADO (2026-09-02) — accesos prioritarios en la navegación mobile
 
 ## Objetivo
 
@@ -10,7 +10,17 @@ frecuente: Agenda e ingresos, Contenido, Configuración y Dashboard, conservando
 - [x] Identificar la fuente única de la navegación desktop y mobile.
 - [x] Reordenar únicamente los accesos directos mobile.
 - [x] Verificar el orden en navegador mobile real y validar lint, tests y build.
-- [ ] Abrir PR, verificar el preview y mergear.
+- [x] Abrir PR, verificar el preview y mergear.
+
+## Validación final
+
+- `npm run lint`: sin errores.
+- `npm test -- --runInBand`: 128 suites y 1.134 tests aprobados.
+- `npm run build`: compilación, TypeScript y 85 páginas generadas correctamente.
+- QA responsive en iPhone 15: los cinco accesos se leen completos, “Más” conserva todas las
+  secciones y la consola no registra errores ni warnings.
+- PR #256: build, E2E público y Vercel Preview verdes; `/login` respondió 200 y `/dashboard`
+  redirigió correctamente al login sin sesión.
 
 ## Alcance y seguridad
 
