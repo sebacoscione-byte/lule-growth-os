@@ -17,12 +17,12 @@ const channelSql = readFileSync(
 describe("dashboard contact metrics clarity migration", () => {
   it("defines booking intent without counting Maps as contact", () => {
     expect(sql).toContain("filter (where event_type in ('click_booking', 'click_call', 'click_whatsapp')) as engaged_visits")
-    expect(sql).toContain("event_type in ('click_booking', 'click_call', 'click_whatsapp')\n    ) as contact_visits")
+    expect(sql).toMatch(/event_type in \('click_booking', 'click_call', 'click_whatsapp'\)\s*\) as contact_visits/)
     expect(sql).toContain("event_type = 'click_maps') as maps_visits")
   })
 
   it("uses the exact current and comparison ranges for action cards", () => {
-    expect(sql).toContain("dashboard_action_totals(\n  p_start date")
+    expect(sql).toMatch(/dashboard_action_totals\(\s*p_start date/)
     expect(sql).toContain("p_previous_start date")
     expect(sql).toContain("between least(p_start, p_end) and greatest(p_start, p_end)")
     expect(sql).toContain("between least(p_previous_start, p_previous_end) and greatest(p_previous_start, p_previous_end)")
@@ -56,7 +56,7 @@ describe("dashboard contact metrics clarity migration", () => {
   })
 
   it("uses the exact visible ranges for channel performance", () => {
-    expect(channelSql).toContain("dashboard_channel_performance(\n  p_start date")
+    expect(channelSql).toMatch(/dashboard_channel_performance\(\s*p_start date/)
     expect(channelSql).toContain("p_previous_start date")
     expect(channelSql).toContain("between least(p_start, p_end) and greatest(p_start, p_end)")
     expect(channelSql).toContain("revoke all on function dashboard_channel_performance(date, date, date, date) from public, anon")
