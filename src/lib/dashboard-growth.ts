@@ -283,8 +283,13 @@ async function readTrend(supabase: SupabaseClient, period: DashboardPeriod, rang
   }
 }
 
-async function readChannels(supabase: SupabaseClient, period: DashboardPeriod): Promise<ChannelPerformance[]> {
-  const { data, error } = await supabase.rpc("dashboard_channel_performance", { p_days: period })
+async function readChannels(supabase: SupabaseClient, range: DashboardDateRange): Promise<ChannelPerformance[]> {
+  const { data, error } = await supabase.rpc("dashboard_channel_performance", {
+    p_start: range.currentStart,
+    p_end: range.currentEnd,
+    p_previous_start: range.previousStart,
+    p_previous_end: range.previousEnd,
+  })
   if (error) throw error
   return combineChannelPerformance((data ?? []).map((row: Record<string, unknown>) => ({
       channel: String(row.channel),
@@ -297,8 +302,13 @@ async function readChannels(supabase: SupabaseClient, period: DashboardPeriod): 
   })))
 }
 
-async function readActions(supabase: SupabaseClient, period: DashboardPeriod): Promise<ActionPerformance[]> {
-  const { data, error } = await supabase.rpc("dashboard_action_totals", { p_days: period })
+async function readActions(supabase: SupabaseClient, range: DashboardDateRange): Promise<ActionPerformance[]> {
+  const { data, error } = await supabase.rpc("dashboard_action_totals", {
+    p_start: range.currentStart,
+    p_end: range.currentEnd,
+    p_previous_start: range.previousStart,
+    p_previous_end: range.previousEnd,
+  })
   if (error) throw error
   return (data ?? []).map((row: Record<string, unknown>) => ({
     eventType: String(row.event_type),
@@ -332,8 +342,11 @@ export function buildCampaignPerformance(row: Record<string, unknown>): Campaign
   }
 }
 
-async function readCampaigns(supabase: SupabaseClient, period: DashboardPeriod): Promise<CampaignPerformance[]> {
-  const { data, error } = await supabase.rpc("dashboard_campaign_performance", { p_days: period })
+async function readCampaigns(supabase: SupabaseClient, range: DashboardDateRange): Promise<CampaignPerformance[]> {
+  const { data, error } = await supabase.rpc("dashboard_campaign_performance", {
+    p_start: range.currentStart,
+    p_end: range.currentEnd,
+  })
   if (error) throw error
   return (data ?? []).map((row: Record<string, unknown>) => buildCampaignPerformance(row))
 }
@@ -482,9 +495,9 @@ export async function getDashboardGrowthData(
   const range = getDashboardDateRange(period, now)
   const [trendResult, channelsResult, actionsResult, campaignsResult, instagram, google] = await Promise.all([
     readTrend(supabase, period, range).then(value => ({ ok: true as const, value })).catch(() => ({ ok: false as const })),
-    readChannels(supabase, period).then(value => ({ ok: true as const, value })).catch(() => ({ ok: false as const })),
-    readActions(supabase, period).then(value => ({ ok: true as const, value })).catch(() => ({ ok: false as const })),
-    readCampaigns(supabase, period).then(value => ({ ok: true as const, value })).catch(() => ({ ok: false as const })),
+    readChannels(supabase, range).then(value => ({ ok: true as const, value })).catch(() => ({ ok: false as const })),
+    readActions(supabase, range).then(value => ({ ok: true as const, value })).catch(() => ({ ok: false as const })),
+    readCampaigns(supabase, range).then(value => ({ ok: true as const, value })).catch(() => ({ ok: false as const })),
     readInstagram(supabase, range),
     readGoogle(supabase, range),
   ])

@@ -1662,3 +1662,37 @@ Hospital Británico. En los bloques de coberturas se usa el nombre de la institu
   los nombres institucionales abreviados únicamente dentro del bloque de coberturas.
 
 ---
+# CERRADO (2026-09-03) — métricas de contacto coherentes
+
+## Objetivo
+
+Corregir las discrepancias del dashboard semanal entre sesiones, clics y filas de detalle, y
+explicar con claridad qué resultados dejan de ser observables cuando una persona abre un canal
+externo de una institución.
+
+## Plan
+
+- [x] Alinear todos los agregados de acciones con el período exacto seleccionado.
+- [x] Excluir “Cómo llegar” del indicador de intención de turno sin perder su medición separada.
+- [x] Diferenciar sesiones anónimas, clics y consultas registradas en la interfaz.
+- [x] Aclarar la relación entre clics informados por Meta y visitas realmente medidas.
+- [x] Aplicar la migración y ejecutar lint, tests, build y E2E autenticado.
+- [x] Abrir PR #257 y verificar preview antes del merge.
+
+## Validación final
+
+- `npm run lint`: sin errores.
+- `npm test -- --runInBand`: 129 suites y 1.140 tests aprobados.
+- `npm run build`: compilación, TypeScript y 85 páginas generadas correctamente.
+- Las tres migraciones se validaron con rollback y se aplicaron atómicamente.
+- QA autenticado sobre el build final: 45 sesiones, 38 vistas de sedes, 5 aperturas de canal,
+  7 clics para pedir turno, 1 clic en Maps y una tasa de 11,1%.
+- El ranking de landings y el rendimiento por canal quedaron alineados con esas mismas 45 sesiones.
+
+## Alcance y seguridad
+
+- Los agregados siguen siendo anónimos y no exponen identificadores de sesión ni datos de pacientes.
+- No se modifica lógica médica, webhooks de WhatsApp, cron jobs, autenticación ni RLS.
+- El cambio corrige semántica y períodos históricos del dashboard; no altera los canales públicos.
+
+---
