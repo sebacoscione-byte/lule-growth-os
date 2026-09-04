@@ -59,7 +59,17 @@ test("un usuario autorizado puede entrar al dashboard", async () => {
   const siteDetails = channels.locator("details").filter({ hasText: "Sitio y pacientes" }).first()
   await expect(siteDetails).toHaveAttribute("open", "")
   await expect(siteDetails.getByText("Consultas recientes", { exact: true })).toBeVisible()
-  await expect(siteDetails.getByTestId("website-campaign-journey")).toBeVisible()
+  const campaignJourney = siteDetails.getByTestId("website-campaign-journey")
+  await expect(campaignJourney).toBeVisible()
+  await expect(campaignJourney.getByRole("heading", { name: "Detalle del uso por campaña" })).toBeVisible()
+  const emptyCampaigns = campaignJourney.getByText("No hay visitas de campañas registradas en este período.", { exact: true })
+  const campaignTables = campaignJourney.getByRole("table")
+  if (await emptyCampaigns.isVisible()) {
+    await expect(campaignTables).toHaveCount(0)
+  } else {
+    await expect(campaignTables.first()).toBeVisible()
+    await expect(campaignTables.first().getByRole("cell", { name: "Entraron a la web", exact: true })).toBeVisible()
+  }
   await expect(siteDetails.getByText("Análisis avanzado del sitio", { exact: true })).toBeVisible()
   await expect(siteDetails.getByText("Prueba de los botones principales del sitio", { exact: true })).not.toBeVisible()
 })

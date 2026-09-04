@@ -1855,77 +1855,81 @@ export default async function DashboardPage({
               </div>
             )}
 
-            {campaignJourneyRows.length > 0 && (
-              <div data-testid="website-campaign-journey" className="space-y-4 border-t border-gray-100 pt-4">
-                <div>
-                  <h3 className="text-sm font-semibold text-gray-950">Detalle del uso por campaña</h3>
-                  <p className="mt-1 text-xs text-gray-500">
-                    Muestra en qué paso se detuvieron las visitas y qué botón tocaron. Los porcentajes se calculan sobre las sesiones que entraron desde cada campaña.
-                  </p>
-                </div>
-
-                {campaignJourneyRows.map(row => {
-                  const campaignPerformance = campaignPerformanceByTracking.get(trackingDimensionsKey(row))
-                  const steps = buildWebsiteJourneySteps(row, campaignPerformance?.leads ?? 0)
-
-                  return (
-                    <section
-                      key={trackingDimensionsKey(row)}
-                      className="overflow-hidden rounded-xl border border-gray-200 bg-white"
-                    >
-                      <div className="flex flex-col gap-1 border-b border-gray-100 bg-gray-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-                        <p className="text-sm text-gray-700">
-                          Campaña: <span className="font-semibold text-gray-950">{readableTrackingValue(row.campaign)}</span>
-                        </p>
-                        <p className="text-xs text-gray-500">
-                          {readableTrackingValue(row.source)} · {readableTrackingValue(row.medium)}
-                          {row.content ? ` · ${readableTrackingValue(row.content)}` : ""}
-                        </p>
-                      </div>
-                      <div className="divide-y divide-gray-100 sm:hidden">
-                        {steps.map(step => (
-                          <div key={step.key} className="flex items-center justify-between gap-3 px-4 py-3">
-                            <p className={`min-w-0 text-sm ${step.key === "inactive" ? "font-medium text-amber-800" : "text-gray-700"}`}>
-                              {step.label}
-                            </p>
-                            <div className="shrink-0 text-right">
-                              <p className="text-sm font-semibold text-gray-950">{step.sessions}</p>
-                              <p className="text-xs text-gray-500">
-                                {websiteJourneyPercentage(step.sessions, row.visits).toLocaleString("es-AR", { maximumFractionDigits: 1 })}%
-                              </p>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                      <div className="hidden overflow-x-auto sm:block">
-                        <table className="w-full min-w-[560px] text-sm">
-                          <thead>
-                            <tr className="border-b text-left text-xs text-gray-500">
-                              <th className="px-4 py-3 font-medium">Recorrido</th>
-                              <th className="px-4 py-3 text-right font-medium">Sesiones</th>
-                              <th className="px-4 py-3 text-right font-medium">Porcentaje</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {steps.map(step => (
-                              <tr key={step.key} className="border-b border-gray-50 last:border-0">
-                                <td className={`px-4 py-3 ${step.key === "inactive" ? "font-medium text-amber-800" : "text-gray-700"}`}>
-                                  {step.label}
-                                </td>
-                                <td className="px-4 py-3 text-right font-semibold text-gray-950">{step.sessions}</td>
-                                <td className="px-4 py-3 text-right text-gray-600">
-                                  {websiteJourneyPercentage(step.sessions, row.visits).toLocaleString("es-AR", { maximumFractionDigits: 1 })}%
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    </section>
-                  )
-                })}
+            <div data-testid="website-campaign-journey" className="space-y-4 border-t border-gray-100 pt-4">
+              <div>
+                <h3 className="text-sm font-semibold text-gray-950">Detalle del uso por campaña</h3>
+                <p className="mt-1 text-xs text-gray-500">
+                  Muestra en qué paso se detuvieron las visitas y qué botón tocaron. Los porcentajes se calculan sobre las sesiones que entraron desde cada campaña.
+                </p>
               </div>
-            )}
+
+              {campaignJourneyRows.length === 0 && (
+                <p className="text-sm text-gray-500">
+                  No hay visitas de campañas registradas en este período.
+                </p>
+              )}
+
+              {campaignJourneyRows.map(row => {
+                const campaignPerformance = campaignPerformanceByTracking.get(trackingDimensionsKey(row))
+                const steps = buildWebsiteJourneySteps(row, campaignPerformance?.leads ?? 0)
+
+                return (
+                  <section
+                    key={trackingDimensionsKey(row)}
+                    className="overflow-hidden rounded-xl border border-gray-200 bg-white"
+                  >
+                    <div className="flex flex-col gap-1 border-b border-gray-100 bg-gray-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+                      <p className="text-sm text-gray-700">
+                        Campaña: <span className="font-semibold text-gray-950">{readableTrackingValue(row.campaign)}</span>
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        {readableTrackingValue(row.source)} · {readableTrackingValue(row.medium)}
+                        {row.content ? ` · ${readableTrackingValue(row.content)}` : ""}
+                      </p>
+                    </div>
+                    <div className="divide-y divide-gray-100 sm:hidden">
+                      {steps.map(step => (
+                        <div key={step.key} className="flex items-center justify-between gap-3 px-4 py-3">
+                          <p className={`min-w-0 text-sm ${step.key === "inactive" ? "font-medium text-amber-800" : "text-gray-700"}`}>
+                            {step.label}
+                          </p>
+                          <div className="shrink-0 text-right">
+                            <p className="text-sm font-semibold text-gray-950">{step.sessions}</p>
+                            <p className="text-xs text-gray-500">
+                              {websiteJourneyPercentage(step.sessions, row.visits).toLocaleString("es-AR", { maximumFractionDigits: 1 })}%
+                            </p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="hidden overflow-x-auto sm:block">
+                      <table className="w-full min-w-[560px] text-sm">
+                        <thead>
+                          <tr className="border-b text-left text-xs text-gray-500">
+                            <th className="px-4 py-3 font-medium">Recorrido</th>
+                            <th className="px-4 py-3 text-right font-medium">Sesiones</th>
+                            <th className="px-4 py-3 text-right font-medium">Porcentaje</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {steps.map(step => (
+                            <tr key={step.key} className="border-b border-gray-50 last:border-0">
+                              <td className={`px-4 py-3 ${step.key === "inactive" ? "font-medium text-amber-800" : "text-gray-700"}`}>
+                                {step.label}
+                              </td>
+                              <td className="px-4 py-3 text-right font-semibold text-gray-950">{step.sessions}</td>
+                              <td className="px-4 py-3 text-right text-gray-600">
+                                {websiteJourneyPercentage(step.sessions, row.visits).toLocaleString("es-AR", { maximumFractionDigits: 1 })}%
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </section>
+                )
+              })}
+            </div>
           </CardContent>
         </Card>
       )}

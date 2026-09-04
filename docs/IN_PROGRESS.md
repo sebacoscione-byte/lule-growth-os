@@ -1,3 +1,34 @@
+# EN CURSO (2026-09-04) — E2E del dashboard sin campañas activas
+
+## Objetivo
+
+Evitar el falso fallo del smoke autenticado cuando no hay visitas de campañas en el período.
+El fallo del 31 de agosto exigía una sección que sólo se renderizaba con campañas no vacías.
+
+## Plan
+
+- [x] Revisar los nueve fallos reportados y el arreglo previo #258.
+- [x] Mantener visible el detalle por campaña con un estado vacío explícito.
+- [x] Comprobar en el E2E tanto las tablas como el estado vacío, sin ocultar errores de carga.
+- [x] Validar lint, tests, build y E2E autenticado.
+- [ ] Abrir PR, verificar preview y mergear; comprobar E2E en main.
+
+## Validación local
+
+- Lint sin errores; Jest: 129 suites y 1.140 tests aprobados.
+- Build de producción: TypeScript y 85 páginas generadas correctamente.
+- E2E autenticado contra el build: 8/8 aprobados, incluido crear/editar/borrar el lead de prueba.
+- Renderizado del bloque real con datos controlados: vacío muestra el mensaje sin tablas;
+  con campañas muestra tabla y conserva el encabezado, sin el mensaje vacío.
+
+## Alcance
+
+Sólo presentación del dashboard y pruebas. No cambia consultas, datos, RLS, autenticación,
+webhooks, crons ni lógica médica. La prueba completa existente crea y elimina un lead de prueba
+en la base compartida; las comprobaciones del dashboard son de lectura.
+
+---
+
 # CERRADO (2026-09-02) — accesos prioritarios en la navegación mobile
 
 ## Objetivo
