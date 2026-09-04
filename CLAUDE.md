@@ -2206,6 +2206,8 @@ campañas en el período y muestra un estado vacío explícito; el E2E valida es
 según los datos. Una falla de la consulta no se acepta como estado vacío: `siteJourney.available`
 sigue siendo requisito para renderizar la sección. No fijar importes configurables ni exigir
 actividad real de campañas para aprobar el smoke diario.
+El arranque de ambos jobs espera con `node scripts/wait-for-e2e-server.mjs`: sin la descarga
+dinámica de `npx wait-on`, con 60 segundos de límite y timeout individual de cada request.
 
 `npm run test:e2e` corre **Playwright** contra un server real (no simula el navegador como Jest).
 Viven en `e2e/`, separados en dos proyectos.

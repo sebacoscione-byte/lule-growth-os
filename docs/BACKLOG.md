@@ -949,6 +949,8 @@ deliberado: primero integridad de WhatsApp y datos de pacientes; luego medición
     corrigió importes configurables y texto del embudo; quedaba la suposición de que siempre hay
     campañas con visitas. El detalle ahora muestra un estado vacío explícito y el E2E comprueba
     tablas o ausencia de campañas sin dar por válida una consulta fallida.
+    También se reemplazó la descarga dinámica de `wait-on` en CI por una espera nativa de Node
+    limitada a 60 segundos, después de observar jobs detenidos varios minutos en el arranque.
   - Se sumó **Playwright** (`e2e/`, ver CLAUDE.md → "Tests E2E") en dos proyectos:
     - **`public`** (sin sesión): landing principal, las 6 landings SEO, `/login` (validación de
       campos vacíos + error real de Supabase con credenciales inválidas), y que las rutas del CRM

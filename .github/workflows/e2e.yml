@@ -26,7 +26,7 @@ jobs:
       - run: npx playwright install --with-deps chromium
       - run: npm run build
       - name: Start server
-        run: nohup npm run start > server.log 2>&1 & npx wait-on http://localhost:3000 -t 60000
+        run: nohup npm run start > server.log 2>&1 & node scripts/wait-for-e2e-server.mjs
       - name: Run public E2E
         run: npm run test:e2e:public
       - uses: actions/upload-artifact@v4
@@ -63,7 +63,7 @@ jobs:
       - run: npx playwright install --with-deps chromium
       - run: npm run build
       - name: Start server
-        run: nohup npm run start > server.log 2>&1 & npx wait-on http://localhost:3000 -t 60000
+        run: nohup npm run start > server.log 2>&1 & node scripts/wait-for-e2e-server.mjs
       - name: Run authenticated E2E
         run: npm run test:e2e:authenticated
       - uses: actions/upload-artifact@v4
