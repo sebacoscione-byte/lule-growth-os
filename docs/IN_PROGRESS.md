@@ -1,3 +1,41 @@
+# IMPLEMENTADO (2026-09-04) — E2E del dashboard sin campañas activas
+
+## Objetivo
+
+Evitar el falso fallo del smoke autenticado cuando no hay visitas de campañas en el período.
+El fallo del 31 de agosto exigía una sección que sólo se renderizaba con campañas no vacías.
+
+## Plan
+
+- [x] Revisar los nueve fallos reportados y el arreglo previo #258.
+- [x] Mantener visible el detalle por campaña con un estado vacío explícito.
+- [x] Comprobar en el E2E tanto las tablas como el estado vacío, sin ocultar errores de carga.
+- [x] Reemplazar `npx wait-on` por una espera nativa de Node: los dos jobs quedaban detenidos
+  varios minutos en el arranque, fuera del timeout de la herramienta descargada dinámicamente.
+- [x] Validar lint, tests, build y E2E autenticado.
+- [x] Abrir PR #259 y verificar preview; el merge queda condicionado a los controles de GitHub.
+
+## Validación local
+
+- Lint sin errores; Jest: 129 suites y 1.140 tests aprobados.
+- Build de producción: TypeScript y 85 páginas generadas correctamente.
+- E2E autenticado contra el build: 8/8 aprobados, incluido crear/editar/borrar el lead de prueba.
+- Renderizado del bloque real con datos controlados: vacío muestra el mensaje sin tablas;
+  con campañas muestra tabla y conserva el encabezado, sin el mensaje vacío.
+- Espera nativa: comprobados servidor disponible, ausente, request colgado y parámetro inválido;
+  los casos sin respuesta fallan dentro del límite configurado sin descargar dependencias.
+- Preview de Vercel: `/login` responde 200 con el documento de Lule Growth OS y `/dashboard`
+  redirige a `/login` sin sesión. Comprobado mediante `vercel curl` con el acceso del proyecto.
+- Seguimiento de CI, merge y E2E posterior: https://github.com/sebacoscione-byte/lule-growth-os/pull/259
+
+## Alcance
+
+Sólo presentación del dashboard, pruebas y arranque de los jobs E2E de GitHub. No cambia consultas, datos, RLS, autenticación,
+webhooks, crons ni lógica médica. La prueba completa existente crea y elimina un lead de prueba
+en la base compartida; las comprobaciones del dashboard son de lectura.
+
+---
+
 # CERRADO (2026-09-02) — accesos prioritarios en la navegación mobile
 
 ## Objetivo

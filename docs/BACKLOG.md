@@ -945,6 +945,12 @@ deliberado: primero integridad de WhatsApp y datos de pacientes; luego medición
     deduplicar, la validación de CSV se rompiera, o el logging de un fallo de OAuth desapareciera.
 
 - [x] **QA-02 — Smoke E2E móvil y desktop.** ✅ Resuelto (2026-07-12, actualizado 2026-07-14 y 2026-07-17)
+  - **Actualización 2026-09-04:** revisados los nueve avisos del 31/08 al 03/09. El PR #258
+    corrigió importes configurables y texto del embudo; quedaba la suposición de que siempre hay
+    campañas con visitas. El detalle ahora muestra un estado vacío explícito y el E2E comprueba
+    tablas o ausencia de campañas sin dar por válida una consulta fallida.
+    También se reemplazó la descarga dinámica de `wait-on` en CI por una espera nativa de Node
+    limitada a 60 segundos, después de observar jobs detenidos varios minutos en el arranque.
   - Se sumó **Playwright** (`e2e/`, ver CLAUDE.md → "Tests E2E") en dos proyectos:
     - **`public`** (sin sesión): landing principal, las 6 landings SEO, `/login` (validación de
       campos vacíos + error real de Supabase con credenciales inválidas), y que las rutas del CRM
