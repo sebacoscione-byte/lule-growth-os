@@ -1,4 +1,4 @@
-# EN CURSO (2026-09-04) — E2E del dashboard sin campañas activas
+# IMPLEMENTADO (2026-09-04) — E2E del dashboard sin campañas activas
 
 ## Objetivo
 
@@ -11,7 +11,7 @@ El fallo del 31 de agosto exigía una sección que sólo se renderizaba con camp
 - [x] Mantener visible el detalle por campaña con un estado vacío explícito.
 - [x] Comprobar en el E2E tanto las tablas como el estado vacío, sin ocultar errores de carga.
 - [x] Validar lint, tests, build y E2E autenticado.
-- [ ] Abrir PR, verificar preview y mergear; comprobar E2E en main.
+- [x] Abrir PR #259 y verificar preview; el merge queda condicionado a los controles de GitHub.
 
 ## Validación local
 
@@ -20,6 +20,9 @@ El fallo del 31 de agosto exigía una sección que sólo se renderizaba con camp
 - E2E autenticado contra el build: 8/8 aprobados, incluido crear/editar/borrar el lead de prueba.
 - Renderizado del bloque real con datos controlados: vacío muestra el mensaje sin tablas;
   con campañas muestra tabla y conserva el encabezado, sin el mensaje vacío.
+- Preview de Vercel: `/login` responde 200 con el documento de Lule Growth OS y `/dashboard`
+  redirige a `/login` sin sesión. Comprobado mediante `vercel curl` con el acceso del proyecto.
+- Seguimiento de CI, merge y E2E posterior: https://github.com/sebacoscione-byte/lule-growth-os/pull/259
 
 ## Alcance
 
