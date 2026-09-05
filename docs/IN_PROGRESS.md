@@ -16,15 +16,17 @@ clasifica con IA: evita contestar por error consultas clínicas o datos administ
 - [x] Crear almacenamiento mínimo, RLS, deduplicación y retención de 90 días.
 - [x] Implementar webhook firmado para DMs y comentarios sin respuestas automáticas.
 - [x] Agregar backfill acotado de Meta y bandeja de lectura para el equipo.
-- [ ] Importar el historial descargado, desplegar y completar la suscripción en Meta.
-- [ ] Validar lint, tests, build, preview y producción; abrir y mergear el PR.
+- [x] Importar el historial descargado y desplegar la implementación.
+- [x] Suscribir la cuenta profesional a los campos `messages` y `comments` por API.
+- [ ] Publicar la app y registrar/verificar el callback de producción en el panel de Meta.
+- [x] Validar lint, tests, build, preview y producción; abrir y mergear el PR #261.
 
 ## Alcance y seguridad
 
 - La configuración y sincronización quedan limitadas a `owner` con MFA; la lectura, a los roles
   asistenciales ya autorizados para el Inbox, también con MFA.
 - Se guarda sólo el texto y los identificadores mínimos necesarios; no se conservan payloads crudos
-  ni se descargan adjuntos. El texto se elimina automáticamente después de 30 días.
+  ni se descargan adjuntos. El texto se elimina automáticamente después de 90 días.
 - No se agrega un cron: la limpieza usa la barrida semanal existente.
 - No se modifica lógica médica ni se envían respuestas a Instagram en esta fase.
 
@@ -36,6 +38,10 @@ clasifica con IA: evita contestar por error consultas clínicas o datos administ
 - `npm run lint`: sin errores.
 - `npm test -- --runInBand`: 136 suites y 1.160 tests aprobados.
 - `npm run build`: compilación, TypeScript y 88 páginas generadas correctamente.
+- PR #261 mergeado; GitHub CI, E2E público y Vercel Preview aprobados. Producción quedó `Ready` y
+  `/inbox/instagram` redirige al login sin sesión; el webhook rechaza verificaciones inválidas.
+- La suscripción de cuenta se leyó de vuelta desde Meta con `messages` y `comments`. Sigue pendiente
+  el callback a nivel app: Meta lo exige desde el panel y la app todavía figura sin publicar.
 
 ---
 
