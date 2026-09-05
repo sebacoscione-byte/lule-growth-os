@@ -3,13 +3,15 @@ import sitemap from "./sitemap"
 import { PUBLIC_LANDING_SLUGS } from "@/lib/public-landings"
 
 describe("rutas públicas para buscadores", () => {
-  it("publica todas las landings y privacidad como URLs canónicas", () => {
+  it("publica todas las landings y páginas legales como URLs canónicas", () => {
     const entries = sitemap()
     const paths = entries.map(entry => new URL(entry.url).pathname)
 
     expect(paths).toEqual([
       ...PUBLIC_LANDING_SLUGS.map(slug => `/${slug}`),
       "/privacidad",
+      "/terminos",
+      "/eliminar-datos",
     ])
   })
 
@@ -26,6 +28,8 @@ describe("rutas públicas para buscadores", () => {
     expect(allowed).toEqual(expect.arrayContaining([
       ...PUBLIC_LANDING_SLUGS.map(slug => `/${slug}`),
       "/privacidad",
+      "/terminos",
+      "/eliminar-datos",
     ]))
   })
 })

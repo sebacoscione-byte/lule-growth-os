@@ -23,5 +23,15 @@ export default function sitemap(): MetadataRoute.Sitemap {
       changeFrequency: "yearly" as const,
       priority: 0.3,
     },
+    {
+      url: `${base}/terminos`,
+      changeFrequency: "yearly" as const,
+      priority: 0.2,
+    },
+    {
+      url: `${base}/eliminar-datos`,
+      changeFrequency: "yearly" as const,
+      priority: 0.2,
+    },
   ]
 }

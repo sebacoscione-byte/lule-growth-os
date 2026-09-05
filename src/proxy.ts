@@ -3,6 +3,7 @@ import { NextResponse, type NextRequest } from "next/server"
 import { PUBLIC_LANDING_SLUGS } from "@/lib/public-landings"
 
 const PUBLIC_ROOT_PATHS = new Set(PUBLIC_LANDING_SLUGS.map((slug) => `/${slug}`))
+const PUBLIC_LEGAL_PATHS = new Set(["/privacidad", "/terminos", "/eliminar-datos"])
 
 export async function proxy(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request })
@@ -46,7 +47,7 @@ export async function proxy(request: NextRequest) {
     request.nextUrl.pathname.startsWith("/go/") ||
     request.nextUrl.pathname.startsWith("/api") ||
     request.nextUrl.pathname === "/" ||
-    request.nextUrl.pathname === "/privacidad" ||
+    PUBLIC_LEGAL_PATHS.has(request.nextUrl.pathname) ||
     request.nextUrl.pathname === "/sitemap.xml" ||
     request.nextUrl.pathname === "/robots.txt" ||
     isGoogleSiteVerificationFile ||
