@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef } from "react"
 import { useSearchParams } from "next/navigation"
-import { Send, Loader2, Sparkles, Users, ArrowLeft, CheckCircle2, XCircle, Bot } from "lucide-react"
+import { Send, Loader2, Sparkles, Users, ArrowLeft, CheckCircle2, XCircle, Bot, Camera } from "lucide-react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -217,8 +217,19 @@ export default function InboxPage() {
         md:flex md:w-72
       `}>
         <div className="p-4 border-b border-gray-200">
-          <h2 className="font-semibold text-gray-900">Inbox</h2>
-          <p className="text-xs text-gray-500">{leads.length} leads</p>
+          <div className="flex items-center justify-between gap-2">
+            <div>
+              <h2 className="font-semibold text-gray-900">Inbox</h2>
+              <p className="text-xs text-gray-500">{leads.length} leads</p>
+            </div>
+            <Link
+              href="/inbox/instagram"
+              aria-label="Abrir Inbox de Instagram"
+              className="rounded-md p-2 text-pink-600 hover:bg-pink-50"
+            >
+              <Camera className="h-5 w-5" />
+            </Link>
+          </div>
         </div>
         <div className="flex-1 overflow-y-auto">
           {leads.length === 0 && (

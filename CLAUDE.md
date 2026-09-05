@@ -2367,6 +2367,11 @@ plano, sin cookies, que siempre autentica como `service_role` real.
   en absoluto — no hay sesión de usuario que verificar — así que usan `getServiceDb()` directamente.
 
 ## Doctora y configuración
+- 2026-09-05: Instagram Inbox funciona en modo observación. `/api/webhooks/instagram` verifica
+  `X-Hub-Signature-256`, limita y normaliza el body y persiste sólo DMs/comentarios mínimos en
+  `instagram_inbox_items`; `/inbox/instagram` exige rol asistencial + MFA. Los adjuntos no se
+  descargan, los payloads crudos no se guardan y la barrida semanal elimina datos a los 90 días.
+  No hay respuestas automáticas ni clasificación con IA; el envío sigue en backlog.
 - **Nombre**: Dra. Lucía Chahin
 - **Especialidad**: Cardiología
 - **Servicios**: Consulta cardiológica, Ecocardiograma

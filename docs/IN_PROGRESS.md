@@ -1,10 +1,10 @@
-# EN CURSO (2026-09-05) — permisos de Inbox de Instagram
+# EN CURSO (2026-09-05) — Inbox de Instagram en modo observación
 
 ## Objetivo
 
-Permitir que la próxima reconexión de `@draluciachahin` autorice la lectura de mensajes directos y
-comentarios, conservando publicación e insights. Esta fase sólo amplía el consentimiento OAuth: no
-recibe, almacena ni responde mensajes todavía.
+Recibir y consultar mensajes directos y comentarios de `@draluciachahin`, importar lo recuperable
+del historial y dejar una bandeja segura para evaluar automatizaciones. Esta fase no responde ni
+clasifica con IA: evita contestar por error consultas clínicas o datos administrativos ambiguos.
 
 ## Plan
 
@@ -12,21 +12,30 @@ recibe, almacena ni responde mensajes todavía.
 - [x] Agregar los permisos oficiales de mensajes y comentarios a una constante testeada.
 - [x] Validar lint, tests y build.
 - [x] Abrir PR #260, verificar el preview y mergear.
-- [ ] Reconectar Instagram desde producción y aceptar los permisos nuevos.
+- [x] Reconectar Instagram desde producción y aceptar los permisos nuevos.
+- [x] Crear almacenamiento mínimo, RLS, deduplicación y retención de 90 días.
+- [x] Implementar webhook firmado para DMs y comentarios sin respuestas automáticas.
+- [x] Agregar backfill acotado de Meta y bandeja de lectura para el equipo.
+- [ ] Importar el historial descargado, desplegar y completar la suscripción en Meta.
+- [ ] Validar lint, tests, build, preview y producción; abrir y mergear el PR.
 
 ## Alcance y seguridad
 
-- La autorización sigue limitada al rol `owner` con MFA.
-- No se modifica ningún webhook, cron, RLS, dato de pacientes ni lógica médica.
-- El token actual no cambia hasta que la dueña reconecte la cuenta y acepte los permisos.
+- La configuración y sincronización quedan limitadas a `owner` con MFA; la lectura, a los roles
+  asistenciales ya autorizados para el Inbox, también con MFA.
+- Se guarda sólo el texto y los identificadores mínimos necesarios; no se conservan payloads crudos
+  ni se descargan adjuntos. El texto se elimina automáticamente después de 30 días.
+- No se agrega un cron: la limpieza usa la barrida semanal existente.
+- No se modifica lógica médica ni se envían respuestas a Instagram en esta fase.
 
 ## Validación local
 
+- Migración `20260905_instagram_inbox.sql` validada con rollback y aplicada atómicamente.
+- Descarga histórica: 31 conversaciones; 128 mensajes útiles y 3 comentarios propios importados.
+  No se importaron binarios; las dos copias temporales descomprimidas fueron eliminadas.
 - `npm run lint`: sin errores.
-- `npm test -- --runInBand`: 130 suites y 1.141 tests aprobados.
-- `npm run build`: compilación, TypeScript y 85 páginas generadas correctamente.
-- GitHub CI y E2E público aprobados; Vercel Preview quedó `Ready`.
-- En el preview, `/login` respondió 200 y el inicio OAuth sin sesión redirigió a `/login`.
+- `npm test -- --runInBand`: 136 suites y 1.160 tests aprobados.
+- `npm run build`: compilación, TypeScript y 88 páginas generadas correctamente.
 
 ---
 
