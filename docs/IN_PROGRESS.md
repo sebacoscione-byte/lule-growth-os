@@ -11,7 +11,7 @@ recibe, almacena ni responde mensajes todavía.
 - [x] Auditar los permisos actuales y comprobar la limitación contra la cuenta conectada.
 - [x] Agregar los permisos oficiales de mensajes y comentarios a una constante testeada.
 - [x] Validar lint, tests y build.
-- [ ] Abrir PR, verificar el preview y mergear.
+- [x] Abrir PR #260, verificar el preview y mergear.
 - [ ] Reconectar Instagram desde producción y aceptar los permisos nuevos.
 
 ## Alcance y seguridad
@@ -25,6 +25,8 @@ recibe, almacena ni responde mensajes todavía.
 - `npm run lint`: sin errores.
 - `npm test -- --runInBand`: 130 suites y 1.141 tests aprobados.
 - `npm run build`: compilación, TypeScript y 85 páginas generadas correctamente.
+- GitHub CI y E2E público aprobados; Vercel Preview quedó `Ready`.
+- En el preview, `/login` respondió 200 y el inicio OAuth sin sesión redirigió a `/login`.
 
 ---
 
