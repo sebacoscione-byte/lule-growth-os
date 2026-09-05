@@ -12,6 +12,7 @@ export const SECURITY_AUDIT_RETENTION_MONTHS = 24
 export const WHATSAPP_COST_EVENT_RETENTION_MONTHS = 24
 export const WHATSAPP_ORPHAN_SESSION_RETENTION_DAYS = 30
 export const WHATSAPP_ORPHAN_CONSENT_RETENTION_MONTHS = 24
+export const INSTAGRAM_INBOX_RETENTION_DAYS = 90
 const AUTO_RETENTION_ACTOR = "auto_retention_24m"
 
 export interface RetentionCandidate {
@@ -38,6 +39,7 @@ export interface OperationalRetentionCounts {
   orphan_consents_anonymized: number
   expired_leases_deleted: number
   handoff_messages_deleted: number
+  instagram_inbox_items_deleted: number
 }
 
 export interface DataRetentionSweepResult {
@@ -59,6 +61,7 @@ const EMPTY_OPERATIONAL_COUNTS: OperationalRetentionCounts = {
   orphan_consents_anonymized: 0,
   expired_leases_deleted: 0,
   handoff_messages_deleted: 0,
+  instagram_inbox_items_deleted: 0,
 }
 
 function parseOperationalCounts(data: unknown): OperationalRetentionCounts {
@@ -76,6 +79,7 @@ function parseOperationalCounts(data: unknown): OperationalRetentionCounts {
     orphan_consents_anonymized: Number(row.orphan_consents_anonymized ?? 0),
     expired_leases_deleted: Number(row.expired_leases_deleted ?? 0),
     handoff_messages_deleted: Number(row.handoff_messages_deleted ?? 0),
+    instagram_inbox_items_deleted: Number(row.instagram_inbox_items_deleted ?? 0),
   }
 }
 
@@ -150,6 +154,17 @@ export async function runDataRetentionSweep(supabase: SupabaseClient): Promise<D
   } else {
     const count = Number(handoffDeleted ?? 0)
     operational.handoff_messages_deleted = Number.isFinite(count) ? count : 0
+  }
+
+  const { data: instagramDeleted, error: instagramError } = await supabase.rpc(
+    "run_instagram_inbox_retention",
+    { p_retention_days: INSTAGRAM_INBOX_RETENTION_DAYS }
+  )
+  if (instagramError) {
+    errors.push("instagram_inbox_cleanup_failed")
+  } else {
+    const count = Number(instagramDeleted ?? 0)
+    operational.instagram_inbox_items_deleted = Number.isFinite(count) ? count : 0
   }
 
   return { erased, blocked, operational, errors }

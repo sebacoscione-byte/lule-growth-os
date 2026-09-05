@@ -138,6 +138,11 @@ export default function PrivacidadPage() {
             mensajes de WhatsApp.
           </li>
           <li>
+            <strong>Meta (Instagram)</strong>, para recibir mensajes directos y comentarios de la
+            cuenta profesional. Esta integración se usa inicialmente en modo lectura y no responde
+            de forma automática.
+          </li>
+          <li>
             <strong>Anthropic (Claude) y/o Google (Gemini)</strong>, proveedores de inteligencia
             artificial que podemos usar para clasificar una consulta dentro de categorías
             cerradas. El texto que recibe el paciente sale de un catálogo aprobado: estos
@@ -174,6 +179,11 @@ export default function PrivacidadPage() {
           Los mensajes recibidos mientras una persona del equipo atiende manualmente la conversación
           se eliminan automáticamente después de 30 días. Ese plazo corto permite responder desde el
           Inbox sin convertir WhatsApp en una historia clínica permanente.
+        </p>
+        <p>
+          Los mensajes directos y comentarios recibidos desde Instagram se conservan por un máximo
+          de 90 días en una bandeja restringida. No descargamos adjuntos ni conservamos la notificación
+          técnica completa enviada por Meta.
         </p>
         <p>
           En cualquier momento podés pedirnos el borrado manual de tus datos, sin esperar a que se
@@ -224,8 +234,9 @@ export default function PrivacidadPage() {
           puede ser un dato sensible. El bot no lo solicita, no lo usa para elegir una sede ni para
           elaborar una respuesta médica y evita conservar ese texto en el CRM mientras la atención
           siga automatizada. Si la conversación ya fue tomada por una persona, el texto se muestra
-          únicamente en el Inbox restringido y se elimina a los 30 días. No se envía a la IA, nunca
-          se publica ni se usa con fines comerciales.
+          únicamente en el Inbox restringido y se elimina a los 30 días. En Instagram, el texto puede
+          quedar visible hasta 90 días en la bandeja restringida para su atención manual. No se envía
+          a la IA, nunca se publica ni se usa con fines comerciales.
         </p>
       </Section>
 

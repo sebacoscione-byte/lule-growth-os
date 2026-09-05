@@ -109,6 +109,28 @@ create table if not exists messages (
 );
 
 -- ============================================================
+-- INSTAGRAM INBOX (modo observación; ver migración 20260905)
+-- ============================================================
+create table if not exists instagram_inbox_items (
+  id uuid default uuid_generate_v4() primary key,
+  external_id text not null unique,
+  instagram_account_id text not null,
+  item_type text not null check (item_type in ('message', 'comment')),
+  direction text not null check (direction in ('inbound', 'outbound')),
+  participant_id text,
+  participant_username text,
+  conversation_id text,
+  media_id text,
+  content text check (content is null or char_length(content) <= 4096),
+  attachment_type text,
+  occurred_at timestamptz not null,
+  source text not null default 'webhook' check (source in ('webhook', 'api_backfill', 'export')),
+  expires_at timestamptz not null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+-- ============================================================
 -- GROWTH EXPERIMENTS
 -- ============================================================
 create table if not exists growth_experiments (

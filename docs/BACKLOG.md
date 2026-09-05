@@ -1960,7 +1960,7 @@ independientemente del `break`. Se agregó un comentario en el código (`getRequ
 documentando este gotcha para que una sesión futura no vuelva a sospechar un bug de lógica antes de
 reiniciar el dev server. Ver memoria `reference_gemini_config_gotchas` caso 6.
 
-### [BACKLOG] IA respondiendo DMs/fotos de Instagram — investigado, a backlog (2026-07-20)
+### [BACKLOG] Respuestas automáticas a DMs/comentarios de Instagram — observación implementada, envío pendiente
 Seba preguntó si la IA podría responder mensajes directos (incluyendo fotos) de Instagram, en la
 misma línea que el bot de WhatsApp. Investigado (búsqueda de la documentación oficial vigente, sin
 tocar código): **es técnicamente viable sin el cambio de arquitectura que bloquea Business Discovery**
@@ -1983,9 +1983,14 @@ responder a usuarios que ya escribieron primero (mismo patrón de ventana que Wh
    framework de guardrails médicos del bot de WhatsApp (enums cerrados, catálogo fijo de respuestas,
    nunca texto médico libre) a este canal nuevo, no inventar uno aparte.
 
-Si se retoma: dimensionarlo como un proyecto propio (no una tarea suelta), reusando el diseño ya
-probado del bot de WhatsApp (idempotencia, outbox, guardrails) en vez de construir algo nuevo desde
-cero para Instagram.
+**Avance del 2026-09-05:** ya están implementados los permisos, el webhook firmado, deduplicación,
+almacenamiento mínimo con RLS y retención de 90 días, backfill e Inbox de lectura. También se importó
+la descarga histórica sin adjuntos. Esto permite medir y diseñar respuestas con evidencia real.
+
+Sigue en backlog únicamente el envío automático. Antes de habilitarlo hay que separar reglas
+administrativas verificadas (obra social, sede, valor particular) de cualquier consulta clínica y
+usar outbox/guardrails equivalentes a WhatsApp. No interpretar fotos, estudios ni síntomas, y no
+confirmar disponibilidad o turnos.
 
 ### [TECH] ✅ Resuelto (2026-07-30): texto de ayuda desactualizado en Configuración → Ubicaciones (campo WhatsApp propio)
 `src/app/(app)/configuracion/page.tsx` (~línea 999) decía: *"Si lo dejás vacío, el botón 'Consultar

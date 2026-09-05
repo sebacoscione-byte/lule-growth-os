@@ -11,6 +11,7 @@ import {
   WHATSAPP_PROCESSED_EVENT_RETENTION_DAYS,
   WHATSAPP_OUTBOUND_LEDGER_RETENTION_DAYS,
   WHATSAPP_SHADOW_RETENTION_DAYS,
+  INSTAGRAM_INBOX_RETENTION_DAYS,
   runDataRetentionSweep,
   type RetentionCandidate,
 } from "./data-retention"
@@ -66,6 +67,7 @@ describe("RETENTION_INACTIVITY_MONTHS", () => {
     expect(WHATSAPP_COST_EVENT_RETENTION_MONTHS).toBe(24)
     expect(WHATSAPP_ORPHAN_SESSION_RETENTION_DAYS).toBe(30)
     expect(WHATSAPP_ORPHAN_CONSENT_RETENTION_MONTHS).toBe(24)
+    expect(INSTAGRAM_INBOX_RETENTION_DAYS).toBe(90)
   })
 })
 
@@ -90,6 +92,9 @@ describe("runDataRetentionSweep", () => {
       if (name === "run_whatsapp_handoff_message_retention") {
         return { data: 6, error: null }
       }
+      if (name === "run_instagram_inbox_retention") {
+        return { data: 7, error: null }
+      }
       throw new Error(`rpc inesperada: ${name}`)
     })
     const result = await runDataRetentionSweep({ rpc } as never)
@@ -97,6 +102,7 @@ describe("runDataRetentionSweep", () => {
       queue_processed_deleted: 4,
       shadow_deleted: 3,
       handoff_messages_deleted: 6,
+      instagram_inbox_items_deleted: 7,
     }))
     expect(rpc).toHaveBeenCalledWith("run_whatsapp_operational_retention", expect.objectContaining({
       p_processed_days: 30,
@@ -107,6 +113,9 @@ describe("runDataRetentionSweep", () => {
     }))
     expect(rpc).toHaveBeenCalledWith("run_whatsapp_handoff_message_retention", {
       p_retention_days: 30,
+    })
+    expect(rpc).toHaveBeenCalledWith("run_instagram_inbox_retention", {
+      p_retention_days: 90,
     })
   })
 

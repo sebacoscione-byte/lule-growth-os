@@ -67,7 +67,9 @@ export async function getConnectionInfo(_supabase: SupabaseClient) {
   if (!data?.length) return null
 
   const map: Record<string, string> = {}
-  data.forEach((r: { key: string; value: unknown }) => { map[r.key] = r.value as string })
+  data.forEach((r: { key: string; value: unknown }) => {
+    if (r.value !== null && r.value !== undefined) map[r.key] = String(r.value)
+  })
 
   if (!map.instagram_access_token) return null
   return {
@@ -85,7 +87,9 @@ export async function getValidToken(_supabase: SupabaseClient): Promise<string |
   if (!data?.length) return null
 
   const map: Record<string, string> = {}
-  data.forEach((r: { key: string; value: unknown }) => { map[r.key] = r.value as string })
+  data.forEach((r: { key: string; value: unknown }) => {
+    if (r.value !== null && r.value !== undefined) map[r.key] = String(r.value)
+  })
   if (!map.instagram_access_token) return null
 
   const expiresAt = map.instagram_token_expires_at ? new Date(map.instagram_token_expires_at).getTime() : 0

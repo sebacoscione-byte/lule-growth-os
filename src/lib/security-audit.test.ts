@@ -29,6 +29,7 @@ describe("security audit", () => {
   it("rechaza claves de metadata que podrían contener PII o texto libre", async () => {
     expect(isSafeAuditMetadata({ row_count: 1 })).toBe(true)
     expect(isSafeAuditMetadata({ config_key: "practice_planning" })).toBe(true)
+    expect(isSafeAuditMetadata({ config_key: "instagram_inbox" })).toBe(true)
     expect(isSafeAuditMetadata({ patient_message: "hola" })).toBe(false)
     await expect(recordSecurityAudit({
       actorUserId: "00000000-0000-4000-8000-000000000001",
