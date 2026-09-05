@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server"
 import {
   INSTAGRAM_OAUTH_COOKIE_MAX_AGE,
   INSTAGRAM_OAUTH_REDIRECT_COOKIE,
+  INSTAGRAM_OAUTH_SCOPES,
   INSTAGRAM_OAUTH_STATE_COOKIE,
   createOauthState,
   getInstagramRedirectUri,
@@ -12,12 +13,6 @@ import {
 import { authorizeStaff } from "@/lib/staff-authz"
 
 const INSTAGRAM_OAUTH_ROLES = ["owner"] as const
-
-const SCOPES = [
-  "instagram_business_basic",
-  "instagram_business_content_publish",
-  "instagram_business_manage_insights", // requerido para Business Discovery (consultar datos publicos de otras cuentas)
-].join(",")
 
 export async function GET(request: NextRequest) {
   // Requiere sesión: sin esto, cualquiera con la URL podía iniciar el OAuth con su propia
@@ -41,7 +36,7 @@ export async function GET(request: NextRequest) {
     client_id: appId,
     redirect_uri: redirectUri,
     response_type: "code",
-    scope: SCOPES,
+    scope: INSTAGRAM_OAUTH_SCOPES.join(","),
     state,
   })
 
