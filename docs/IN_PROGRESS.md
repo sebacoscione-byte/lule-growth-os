@@ -18,6 +18,7 @@ clasifica con IA: evita contestar por error consultas clínicas o datos administ
 - [x] Agregar backfill acotado de Meta y bandeja de lectura para el equipo.
 - [x] Importar el historial descargado y desplegar la implementación.
 - [x] Suscribir la cuenta profesional a los campos `messages` y `comments` por API.
+- [x] Publicar URLs propias de términos y eliminación de datos para completar los requisitos de Meta.
 - [ ] Publicar la app y registrar/verificar el callback de producción en el panel de Meta.
 - [x] Validar lint, tests, build, preview y producción; abrir y mergear el PR #261.
 

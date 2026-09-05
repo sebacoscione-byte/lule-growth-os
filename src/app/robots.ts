@@ -18,6 +18,8 @@ export default function robots(): MetadataRoute.Robots {
           ...PUBLIC_LANDING_SLUGS.map((slug) => `/${slug}`),
           "/landings/",
           "/privacidad",
+          "/terminos",
+          "/eliminar-datos",
         ],
         disallow: [
           "/dashboard",
