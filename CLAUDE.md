@@ -1,6 +1,12 @@
 ﻿# Lule Growth OS — Contexto para Claude
 
 ## Estado actual
+- 2026-09-05 (permisos de Inbox de Instagram): el OAuth solicita ahora
+  `instagram_business_manage_messages` y `instagram_business_manage_comments`, además de los
+  permisos existentes de perfil, publicación e insights. Los scopes viven en una constante testeada
+  en `src/lib/instagram-oauth.ts`. El token productivo no obtiene permisos retroactivamente:
+  `@draluciachahin` debe reconectarse una vez desde Contenido > Instagram después del deploy y
+  aceptar el consentimiento. Esta fase no agrega webhooks, persistencia ni respuestas automáticas.
 - 2026-08-28 (recuperación durable de todos los crons): los cinco jobs de Vercel ahora comparten un
   ledger atómico por tarea/fecha argentina, con lease de 240 s, fencing token, estados terminales y
   HTTP 500 real para fallos reintentables. Supabase `pg_cron` actúa como scheduler independiente a

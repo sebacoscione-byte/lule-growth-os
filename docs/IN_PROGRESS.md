@@ -1,3 +1,35 @@
+# EN CURSO (2026-09-05) — permisos de Inbox de Instagram
+
+## Objetivo
+
+Permitir que la próxima reconexión de `@draluciachahin` autorice la lectura de mensajes directos y
+comentarios, conservando publicación e insights. Esta fase sólo amplía el consentimiento OAuth: no
+recibe, almacena ni responde mensajes todavía.
+
+## Plan
+
+- [x] Auditar los permisos actuales y comprobar la limitación contra la cuenta conectada.
+- [x] Agregar los permisos oficiales de mensajes y comentarios a una constante testeada.
+- [x] Validar lint, tests y build.
+- [x] Abrir PR #260, verificar el preview y mergear.
+- [ ] Reconectar Instagram desde producción y aceptar los permisos nuevos.
+
+## Alcance y seguridad
+
+- La autorización sigue limitada al rol `owner` con MFA.
+- No se modifica ningún webhook, cron, RLS, dato de pacientes ni lógica médica.
+- El token actual no cambia hasta que la dueña reconecte la cuenta y acepte los permisos.
+
+## Validación local
+
+- `npm run lint`: sin errores.
+- `npm test -- --runInBand`: 130 suites y 1.141 tests aprobados.
+- `npm run build`: compilación, TypeScript y 85 páginas generadas correctamente.
+- GitHub CI y E2E público aprobados; Vercel Preview quedó `Ready`.
+- En el preview, `/login` respondió 200 y el inicio OAuth sin sesión redirigió a `/login`.
+
+---
+
 # IMPLEMENTADO (2026-09-04) — E2E del dashboard sin campañas activas
 
 ## Objetivo
