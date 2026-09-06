@@ -1983,9 +1983,11 @@ responder a usuarios que ya escribieron primero (mismo patrón de ventana que Wh
    framework de guardrails médicos del bot de WhatsApp (enums cerrados, catálogo fijo de respuestas,
    nunca texto médico libre) a este canal nuevo, no inventar uno aparte.
 
-**Avance del 2026-09-05:** ya están implementados los permisos, el webhook firmado, deduplicación,
+**Avance del 2026-09-06:** ya están implementados los permisos, el webhook firmado, deduplicación,
 almacenamiento mínimo con RLS y retención de 90 días, backfill e Inbox de lectura. También se importó
-la descarga histórica sin adjuntos. Esto permite medir y diseñar respuestas con evidencia real.
+la descarga histórica sin adjuntos. La app de Meta está publicada, el callback productivo quedó
+verificado y una prueba real confirmó la recepción de un DM y un comentario en segundos. Esto permite
+medir y diseñar respuestas con evidencia real.
 
 Sigue en backlog únicamente el envío automático. Antes de habilitarlo hay que separar reglas
 administrativas verificadas (obra social, sede, valor particular) de cualquier consulta clínica y
