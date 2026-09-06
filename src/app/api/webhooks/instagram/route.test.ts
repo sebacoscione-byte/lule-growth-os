@@ -1,10 +1,12 @@
 jest.mock("@/lib/supabase/service", () => ({ getServiceDb: jest.fn(() => ({ db: true })) }))
 jest.mock("@/lib/instagram-webhook-signature", () => ({ isValidInstagramSignature: jest.fn() }))
 jest.mock("@/lib/instagram-inbox", () => ({ persistInstagramInboxItems: jest.fn() }))
+jest.mock("@/lib/instagram-booking-auto-reply", () => ({ processInstagramBookingAutoReplies: jest.fn() }))
 
 import { GET, POST } from "./route"
 import { isValidInstagramSignature } from "@/lib/instagram-webhook-signature"
 import { persistInstagramInboxItems } from "@/lib/instagram-inbox"
+import { processInstagramBookingAutoReplies } from "@/lib/instagram-booking-auto-reply"
 
 const ORIGINAL_ENV = process.env
 
@@ -34,6 +36,9 @@ beforeEach(() => {
   process.env = { ...ORIGINAL_ENV, INSTAGRAM_APP_SECRET: "secret", INSTAGRAM_WEBHOOK_VERIFY_TOKEN: "verify" }
   ;(isValidInstagramSignature as jest.Mock).mockReturnValue(true)
   ;(persistInstagramInboxItems as jest.Mock).mockResolvedValue(1)
+  ;(processInstagramBookingAutoReplies as jest.Mock).mockResolvedValue({
+    eligible: 0, sent: 0, skipped: 0, failed: 0, indeterminate: 0,
+  })
 })
 afterAll(() => { process.env = ORIGINAL_ENV })
 
@@ -51,8 +56,16 @@ describe("POST /api/webhooks/instagram", () => {
   it("verifica, minimiza y persiste antes del 200", async () => {
     const response = await POST(request(payload()))
     expect(response.status).toBe(200)
-    expect(await response.json()).toEqual({ status: "accepted", stored: 1, invalid_events: 0 })
+    expect(await response.json()).toEqual({
+      status: "accepted",
+      stored: 1,
+      invalid_events: 0,
+      auto_replies: { eligible: 0, sent: 0, skipped: 0, failed: 0, indeterminate: 0 },
+    })
     expect(persistInstagramInboxItems).toHaveBeenCalledWith(expect.anything(), [
+      expect.objectContaining({ external_id: "message:mid-1", content: "Hola" }),
+    ])
+    expect(processInstagramBookingAutoReplies).toHaveBeenCalledWith(expect.anything(), [
       expect.objectContaining({ external_id: "message:mid-1", content: "Hola" }),
     ])
   })
@@ -77,5 +90,16 @@ describe("POST /api/webhooks/instagram", () => {
     const response = await POST(request(payload()))
     expect(response.status).toBe(503)
     expect(await response.json()).toEqual({ status: "storage_unavailable" })
+    expect(processInstagramBookingAutoReplies).not.toHaveBeenCalled()
+  })
+
+  it("confirma el webhook aunque el envío automático falle después de persistir", async () => {
+    ;(processInstagramBookingAutoReplies as jest.Mock).mockRejectedValue(new Error("do not expose"))
+    const response = await POST(request(payload()))
+    expect(response.status).toBe(200)
+    expect(await response.json()).toEqual(expect.objectContaining({
+      status: "accepted",
+      auto_replies: { eligible: 0, sent: 0, skipped: 0, failed: 1, indeterminate: 0 },
+    }))
   })
 })

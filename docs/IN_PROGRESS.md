@@ -1,3 +1,39 @@
+# EN CURSO (2026-09-06) — respuesta administrativa de turnos en Instagram
+
+## Objetivo
+
+Responder automáticamente sólo consultas inequívocas para pedir turno recibidas por DM o comentario.
+La respuesta deriva al link de la bio, donde la persona elige sede y usa el WhatsApp o teléfono
+oficial. No agenda, no confirma disponibilidad, no responde contenido médico y no comunica valores
+salvo una futura respuesta explícita sobre consulta particular.
+
+## Plan
+
+- [x] Verificar en la documentación oficial de Meta los envíos a DM y la respuesta privada a comentarios.
+- [x] Implementar clasificación determinística conservadora, límite por persona e idempotencia durable.
+- [x] Integrar el envío al webhook sin almacenar payloads crudos ni exponer tokens.
+- [x] Agregar migración, pruebas y documentación operativa.
+- [x] Validar migración, lint, tests, build y preview; abrir el PR #265.
+- [ ] Realizar una prueba real final desde otra cuenta de Instagram.
+
+## Criterios de seguridad
+
+- Los comentarios reciben una respuesta privada, no una respuesta pública.
+- Mensajes con síntomas, urgencias, estudios, adjuntos o intención ambigua quedan para una persona.
+- Una misma persona no recibe más de una orientación automática dentro de 24 horas.
+- Un reintento del webhook no vuelve a enviar la respuesta.
+
+## Validación
+
+- Migración validada con rollback y aplicada atómicamente en Supabase.
+- `npm run lint`: sin errores.
+- `npm test -- --runInBand`: 138 suites y 1.183 pruebas aprobadas.
+- `npm run build`: compilación, TypeScript y 90 rutas generadas correctamente.
+- PR #265: build, E2E público y Vercel Preview aprobados; el preview devuelve 200 en `/login`,
+  403 ante un token de verificación inválido y 401 ante una firma de webhook inválida.
+
+---
+
 # CERRADO (2026-09-06) — Inbox de Instagram en modo observación
 
 ## Objetivo

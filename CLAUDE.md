@@ -2372,13 +2372,17 @@ plano, sin cookies, que siempre autentica como `service_role` real.
   en absoluto — no hay sesión de usuario que verificar — así que usan `getServiceDb()` directamente.
 
 ## Doctora y configuración
-- 2026-09-05: Instagram Inbox funciona en modo observación. `/api/webhooks/instagram` verifica
-  `X-Hub-Signature-256`, limita y normaliza el body y persiste sólo DMs/comentarios mínimos en
-  `instagram_inbox_items`; `/inbox/instagram` exige rol asistencial + MFA. Los adjuntos no se
-  descargan, los payloads crudos no se guardan y la barrida semanal elimina datos a los 90 días.
-  La app de Meta y el callback quedaron publicados/verificados el 2026-09-06; una prueba real
-  confirmó DMs y comentarios entrantes. No hay respuestas automáticas ni clasificación con IA;
-  el envío sigue en backlog.
+- 2026-09-06: Instagram Inbox recibe DMs y comentarios mediante un webhook firmado. La única
+  respuesta automática habilitada es una plantilla administrativa fija para pedidos inequívocos
+  de turno: indica entrar al link de la bio, elegir sede y usar el WhatsApp o teléfono oficial;
+  aclara que cada institución confirma turnos y disponibilidad. Los comentarios reciben esa
+  orientación por privado. Síntomas, urgencias, estudios, adjuntos, precios, coberturas, cambios o
+  cancelaciones quedan para atención humana. El ledger `instagram_auto_replies` deduplica reintentos
+  y limita una respuesta por persona cada 24 horas; `instagram_auto_reply_settings.enabled` es el
+  corte operativo. No usa IA ni guarda payloads crudos, adjuntos o tokens.
+- 2026-09-06: por decisión de Seba, de los valores de atención sólo puede comunicarse públicamente
+  el de la consulta particular. Los importes de consulta con cobertura y ecocardiograma son internos
+  y no deben aparecer en respuestas de Instagram. La automatización de turnos no informa precios.
 - **Nombre**: Dra. Lucía Chahin
 - **Especialidad**: Cardiología
 - **Servicios**: Consulta cardiológica, Ecocardiograma
