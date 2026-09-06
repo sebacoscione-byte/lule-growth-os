@@ -1,4 +1,4 @@
-# EN CURSO (2026-09-06) — respuesta administrativa de turnos en Instagram
+# CERRADO (2026-09-06) — respuesta administrativa de turnos en Instagram
 
 ## Objetivo
 
@@ -14,7 +14,7 @@ salvo una futura respuesta explícita sobre consulta particular.
 - [x] Integrar el envío al webhook sin almacenar payloads crudos ni exponer tokens.
 - [x] Agregar migración, pruebas y documentación operativa.
 - [x] Validar migración, lint, tests, build y preview; abrir el PR #265.
-- [ ] Realizar una prueba real final desde otra cuenta de Instagram.
+- [x] Realizar una prueba real final desde otra cuenta de Instagram.
 
 ## Criterios de seguridad
 
@@ -34,6 +34,9 @@ salvo una futura respuesta explícita sobre consulta particular.
 - La primera prueba real de envío recibió y clasificó correctamente el DM, pero no respondió porque
   Meta entrega el `user_id` público de la cuenta en el webhook y el `id` scoped de la app en `/me`.
   El ajuste valida ambos como la misma identidad y usa el `id` scoped sólo para Send API.
+- PR #266: regresión, build, E2E público y Vercel Preview aprobados; fix mergeado y producción `Ready`.
+- La misma consulta real se reprocesó una vez después del fix: Meta confirmó `sent`, el webhook recibió
+  el eco saliente y un segundo reprocesamiento fue omitido por el ledger. No hubo errores ni duplicados.
 
 ---
 
