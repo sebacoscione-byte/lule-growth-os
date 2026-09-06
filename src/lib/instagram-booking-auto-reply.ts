@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
-import { getConnectionInfo, getValidToken } from "@/lib/instagram-business"
+import { getConnectionInfo, getProfile, getValidToken } from "@/lib/instagram-business"
 import type { InstagramInboxItemInput } from "@/lib/instagram-webhook-normalizer"
 import { containsSensitiveMedicalContent } from "@/lib/medical-safety"
 
@@ -65,6 +65,7 @@ function sourceTargetId(item: InstagramInboxItemInput): string {
 
 async function sendInstagramBookingReply(
   token: string,
+  senderAccountId: string,
   item: InstagramInboxItemInput
 ): Promise<SendResult> {
   const recipient = item.item_type === "comment"
@@ -75,7 +76,7 @@ async function sendInstagramBookingReply(
   let response: Response
   try {
     response = await fetch(
-      `${GRAPH_BASE}/${encodeURIComponent(item.instagram_account_id)}/messages`,
+      `${GRAPH_BASE}/${encodeURIComponent(senderAccountId)}/messages`,
       {
         method: "POST",
         headers: {
@@ -175,8 +176,22 @@ export async function processInstagramBookingAutoReplies(
     return result
   }
 
+  let profile: Awaited<ReturnType<typeof getProfile>>
+  try {
+    profile = await getProfile(token)
+  } catch {
+    result.failed += candidates.length
+    return result
+  }
+  if (!profile.id || profile.id !== connection.instagram_user_id) {
+    result.failed += candidates.length
+    return result
+  }
+  const acceptedWebhookAccountIds = new Set([profile.id, profile.user_id].filter(Boolean))
+
   await Promise.all(candidates.map(async item => {
-    if (item.instagram_account_id !== connection.instagram_user_id) {
+    // Meta usa `user_id` (ID público) en el webhook y `id` (ID scoped de la app) en /me y Send API.
+    if (!acceptedWebhookAccountIds.has(item.instagram_account_id)) {
       result.skipped += 1
       return
     }
@@ -184,7 +199,7 @@ export async function processInstagramBookingAutoReplies(
       "claim_instagram_booking_auto_reply",
       {
         p_source_external_id: item.external_id,
-        p_instagram_account_id: item.instagram_account_id,
+        p_instagram_account_id: profile.id,
         p_participant_id: item.participant_id,
         p_source_type: item.item_type,
         p_target_id: sourceTargetId(item),
@@ -201,7 +216,7 @@ export async function processInstagramBookingAutoReplies(
     }
 
     try {
-      const sent = await sendInstagramBookingReply(token, item)
+      const sent = await sendInstagramBookingReply(token, profile.id, item)
       await markReply(supabase, claimId, {
         status: "sent",
         meta_message_id: sent.messageId,

@@ -1,9 +1,10 @@
 jest.mock("@/lib/instagram-business", () => ({
   getValidToken: jest.fn(),
   getConnectionInfo: jest.fn(),
+  getProfile: jest.fn(),
 }))
 
-import { getConnectionInfo, getValidToken } from "@/lib/instagram-business"
+import { getConnectionInfo, getProfile, getValidToken } from "@/lib/instagram-business"
 import type { InstagramInboxItemInput } from "@/lib/instagram-webhook-normalizer"
 import {
   INSTAGRAM_BOOKING_REPLY,
@@ -58,6 +59,11 @@ beforeEach(() => {
   jest.clearAllMocks()
   ;(getValidToken as jest.Mock).mockResolvedValue("token")
   ;(getConnectionInfo as jest.Mock).mockResolvedValue({ instagram_user_id: "ig-business" })
+  ;(getProfile as jest.Mock).mockResolvedValue({
+    id: "ig-business",
+    user_id: "ig-public",
+    username: "draluciachahin",
+  })
   global.fetch = jest.fn().mockResolvedValue(new Response(JSON.stringify({ message_id: "sent-1" }), {
     status: 200,
     headers: { "content-type": "application/json" },
@@ -141,6 +147,21 @@ describe("processInstagramBookingAutoReplies", () => {
           message: { text: INSTAGRAM_BOOKING_REPLY },
         }),
       })
+    )
+  })
+
+  it("acepta el user_id público del webhook y envía desde el id scoped de /me", async () => {
+    const store = db()
+    const result = await processInstagramBookingAutoReplies(store.client, [item({
+      instagram_account_id: "ig-public",
+    })])
+    expect(result.sent).toBe(1)
+    expect(store.rpc).toHaveBeenCalledWith("claim_instagram_booking_auto_reply", expect.objectContaining({
+      p_instagram_account_id: "ig-business",
+    }))
+    expect(global.fetch).toHaveBeenCalledWith(
+      "https://graph.instagram.com/v26.0/ig-business/messages",
+      expect.anything()
     )
   })
 
