@@ -1,6 +1,11 @@
 ﻿# Lule Growth OS — Contexto para Claude
 
 ## Estado actual
+- 2026-09-06 (Instagram Inbox en vivo): la app de Meta quedó publicada y el callback productivo
+  `/api/webhooks/instagram` fue verificado desde el panel. La cuenta `@draluciachahin` permanece
+  suscrita por API a `messages` y `comments`; una prueba real desde otra cuenta confirmó la llegada
+  y persistencia de un DM y un comentario como eventos entrantes en pocos segundos. El canal sigue
+  en modo observación: no clasifica con IA ni envía respuestas automáticas.
 - 2026-09-05 (permisos de Inbox de Instagram): el OAuth solicita ahora
   `instagram_business_manage_messages` y `instagram_business_manage_comments`, además de los
   permisos existentes de perfil, publicación e insights. Los scopes viven en una constante testeada
@@ -2371,7 +2376,9 @@ plano, sin cookies, que siempre autentica como `service_role` real.
   `X-Hub-Signature-256`, limita y normaliza el body y persiste sólo DMs/comentarios mínimos en
   `instagram_inbox_items`; `/inbox/instagram` exige rol asistencial + MFA. Los adjuntos no se
   descargan, los payloads crudos no se guardan y la barrida semanal elimina datos a los 90 días.
-  No hay respuestas automáticas ni clasificación con IA; el envío sigue en backlog.
+  La app de Meta y el callback quedaron publicados/verificados el 2026-09-06; una prueba real
+  confirmó DMs y comentarios entrantes. No hay respuestas automáticas ni clasificación con IA;
+  el envío sigue en backlog.
 - **Nombre**: Dra. Lucía Chahin
 - **Especialidad**: Cardiología
 - **Servicios**: Consulta cardiológica, Ecocardiograma

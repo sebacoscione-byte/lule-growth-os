@@ -1,4 +1,4 @@
-# EN CURSO (2026-09-05) — Inbox de Instagram en modo observación
+# CERRADO (2026-09-06) — Inbox de Instagram en modo observación
 
 ## Objetivo
 
@@ -19,7 +19,7 @@ clasifica con IA: evita contestar por error consultas clínicas o datos administ
 - [x] Importar el historial descargado y desplegar la implementación.
 - [x] Suscribir la cuenta profesional a los campos `messages` y `comments` por API.
 - [x] Publicar URLs propias de términos y eliminación de datos para completar los requisitos de Meta.
-- [ ] Publicar la app y registrar/verificar el callback de producción en el panel de Meta.
+- [x] Publicar la app y registrar/verificar el callback de producción en el panel de Meta.
 - [x] Validar lint, tests, build, preview y producción; abrir y mergear el PR #261.
 
 ## Alcance y seguridad
@@ -41,8 +41,10 @@ clasifica con IA: evita contestar por error consultas clínicas o datos administ
 - `npm run build`: compilación, TypeScript y 88 páginas generadas correctamente.
 - PR #261 mergeado; GitHub CI, E2E público y Vercel Preview aprobados. Producción quedó `Ready` y
   `/inbox/instagram` redirige al login sin sesión; el webhook rechaza verificaciones inválidas.
-- La suscripción de cuenta se leyó de vuelta desde Meta con `messages` y `comments`. Sigue pendiente
-  el callback a nivel app: Meta lo exige desde el panel y la app todavía figura sin publicar.
+- La suscripción de cuenta se leyó de vuelta desde Meta con `messages` y `comments`.
+- El 2026-09-06 la app se publicó, Meta verificó el callback productivo y una prueba real desde otra
+  cuenta ingresó por webhook: el DM se persistió como `message/inbound` y el comentario como
+  `comment/inbound`, ambos en segundos y sin guardar el payload crudo.
 
 ---
 
