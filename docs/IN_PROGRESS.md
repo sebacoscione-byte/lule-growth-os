@@ -13,7 +13,7 @@ salvo una futura respuesta explícita sobre consulta particular.
 - [x] Implementar clasificación determinística conservadora, límite por persona e idempotencia durable.
 - [x] Integrar el envío al webhook sin almacenar payloads crudos ni exponer tokens.
 - [x] Agregar migración, pruebas y documentación operativa.
-- [ ] Validar preview y producción; abrir y mergear el PR (migración, lint, tests y build aprobados).
+- [x] Validar migración, lint, tests, build y preview; abrir el PR #265.
 - [ ] Realizar una prueba real final desde otra cuenta de Instagram.
 
 ## Criterios de seguridad
@@ -22,6 +22,15 @@ salvo una futura respuesta explícita sobre consulta particular.
 - Mensajes con síntomas, urgencias, estudios, adjuntos o intención ambigua quedan para una persona.
 - Una misma persona no recibe más de una orientación automática dentro de 24 horas.
 - Un reintento del webhook no vuelve a enviar la respuesta.
+
+## Validación
+
+- Migración validada con rollback y aplicada atómicamente en Supabase.
+- `npm run lint`: sin errores.
+- `npm test -- --runInBand`: 138 suites y 1.183 pruebas aprobadas.
+- `npm run build`: compilación, TypeScript y 90 rutas generadas correctamente.
+- PR #265: build, E2E público y Vercel Preview aprobados; el preview devuelve 200 en `/login`,
+  403 ante un token de verificación inválido y 401 ante una firma de webhook inválida.
 
 ---
 
