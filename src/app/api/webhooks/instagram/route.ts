@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { getServiceDb } from "@/lib/supabase/service"
 import { persistInstagramInboxItems } from "@/lib/instagram-inbox"
+import { processInstagramBookingAutoReplies } from "@/lib/instagram-booking-auto-reply"
 import { isValidInstagramSignature } from "@/lib/instagram-webhook-signature"
 import {
   InvalidInstagramWebhookError,
@@ -72,15 +73,25 @@ export async function POST(request: Request) {
     )
   }
 
+  const supabase = getServiceDb()
   try {
-    await persistInstagramInboxItems(getServiceDb(), normalized.items)
+    await persistInstagramInboxItems(supabase, normalized.items)
   } catch {
     // Meta sólo recibe 200 después de una escritura durable; de otro modo puede reintentar.
     return NextResponse.json({ status: "storage_unavailable" }, { status: 503 })
   }
+  let autoReplies = { eligible: 0, sent: 0, skipped: 0, failed: 0, indeterminate: 0 }
+  try {
+    autoReplies = await processInstagramBookingAutoReplies(supabase, normalized.items)
+  } catch {
+    // El Inbox ya quedó guardado. La automatización falla cerrada y el equipo puede responder a mano.
+    autoReplies.failed = normalized.items.length
+  }
+
   return NextResponse.json({
     status: "accepted",
     stored: normalized.items.length,
     invalid_events: normalized.invalidEventCount,
+    auto_replies: autoReplies,
   })
 }

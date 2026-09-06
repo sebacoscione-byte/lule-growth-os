@@ -1960,7 +1960,7 @@ independientemente del `break`. Se agregó un comentario en el código (`getRequ
 documentando este gotcha para que una sesión futura no vuelva a sospechar un bug de lógica antes de
 reiniciar el dev server. Ver memoria `reference_gemini_config_gotchas` caso 6.
 
-### [BACKLOG] Respuestas automáticas a DMs/comentarios de Instagram — observación implementada, envío pendiente
+### [EN PROGRESO] Respuestas automáticas a DMs/comentarios de Instagram — turno administrativo implementado
 Seba preguntó si la IA podría responder mensajes directos (incluyendo fotos) de Instagram, en la
 misma línea que el bot de WhatsApp. Investigado (búsqueda de la documentación oficial vigente, sin
 tocar código): **es técnicamente viable sin el cambio de arquitectura que bloquea Business Discovery**
@@ -1989,10 +1989,18 @@ la descarga histórica sin adjuntos. La app de Meta está publicada, el callback
 verificado y una prueba real confirmó la recepción de un DM y un comentario en segundos. Esto permite
 medir y diseñar respuestas con evidencia real.
 
-Sigue en backlog únicamente el envío automático. Antes de habilitarlo hay que separar reglas
-administrativas verificadas (obra social, sede, valor particular) de cualquier consulta clínica y
-usar outbox/guardrails equivalentes a WhatsApp. No interpretar fotos, estudios ni síntomas, y no
-confirmar disponibilidad o turnos.
+**Avance del 2026-09-06:** se implementó el primer envío automático, deliberadamente determinístico
+y acotado. Sólo responde pedidos inequívocos de turno con una plantilla fija que deriva al link de
+la bio para elegir sede y abrir el WhatsApp o teléfono oficial. Los comentarios reciben una respuesta
+privada; los DMs, una respuesta dentro de la conversación. El ledger aplica idempotencia y un límite
+de una orientación por persona cada 24 horas. Síntomas, urgencias, estudios, adjuntos, precios,
+coberturas, cancelaciones y casos ambiguos quedan para una persona. No usa IA, no reserva, no confirma
+disponibilidad y no agrega un cron.
+
+Sigue en backlog diseñar y aprobar otras respuestas administrativas. Por decisión de Seba, de los
+valores sólo se puede comunicar el de la consulta particular; los valores con cobertura y de estudios
+deben permanecer internos. Cualquier ampliación que roce contenido clínico requiere los guardrails y
+la pausa de aprobación médica definidos para el proyecto.
 
 ### [TECH] ✅ Resuelto (2026-07-30): texto de ayuda desactualizado en Configuración → Ubicaciones (campo WhatsApp propio)
 `src/app/(app)/configuracion/page.tsx` (~línea 999) decía: *"Si lo dejás vacío, el botón 'Consultar
