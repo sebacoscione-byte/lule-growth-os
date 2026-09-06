@@ -31,6 +31,9 @@ salvo una futura respuesta explícita sobre consulta particular.
 - `npm run build`: compilación, TypeScript y 90 rutas generadas correctamente.
 - PR #265: build, E2E público y Vercel Preview aprobados; el preview devuelve 200 en `/login`,
   403 ante un token de verificación inválido y 401 ante una firma de webhook inválida.
+- La primera prueba real de envío recibió y clasificó correctamente el DM, pero no respondió porque
+  Meta entrega el `user_id` público de la cuenta en el webhook y el `id` scoped de la app en `/me`.
+  El ajuste valida ambos como la misma identidad y usa el `id` scoped sólo para Send API.
 
 ---
 

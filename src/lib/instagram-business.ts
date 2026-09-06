@@ -125,10 +125,10 @@ export async function clearTokens(_supabase: SupabaseClient) {
 // ─── Perfil ───────────────────────────────────────────────────────────────
 
 export async function getProfile(token: string) {
-  const url = `${GRAPH_BASE}/me?fields=id,username&access_token=${encodeURIComponent(token)}`
+  const url = `${GRAPH_BASE}/me?fields=id,user_id,username&access_token=${encodeURIComponent(token)}`
   const res = await fetch(url)
   if (!res.ok) throw new Error(await res.text())
-  return res.json() as Promise<{ id: string; username: string }>
+  return res.json() as Promise<{ id: string; user_id?: string; username: string }>
 }
 
 /**
