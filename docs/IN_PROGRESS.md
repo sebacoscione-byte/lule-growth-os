@@ -1,4 +1,4 @@
-# EN PROGRESO (2026-09-07) — cron editorial y Function Storage de Vercel
+# CERRADO (2026-09-07) — cron editorial y Function Storage de Vercel
 
 ## Objetivo
 
@@ -11,7 +11,7 @@ de deployments que agotó los 10 GB de Function Storage del plan Hobby.
 - [x] Persistir errores sanitizados por canal y propagar el fallo al ledger/reintento del cron.
 - [x] Reducir la retención y limpiar previews antiguos sin borrar producción.
 - [x] Evitar nuevos bundles para cambios exclusivos de documentación.
-- [ ] Validar lint, tests, build, preview y producción; abrir y mergear el PR.
+- [x] Validar lint, tests, build, preview y producción; abrir y mergear el PR #268.
 
 ## Diagnóstico confirmado
 
@@ -24,6 +24,17 @@ de deployments que agotó los 10 GB de Function Storage del plan Hobby.
   producción, y se acortó la retención automática manteniendo al menos 10 deployments.
 - Se probó reemplazar ffmpeg por Sharp para imágenes estáticas, pero el preview demostró que el total
   real de bundles subía de ~216,8 a ~243,2 MB. Ese cambio se descartó antes del merge.
+
+## Validación
+
+- `npm run lint`: sin errores.
+- `npm test -- --runInBand`: 138 suites y 1.188 pruebas aprobadas.
+- `npm run build`: compilación, TypeScript y 90 rutas generadas correctamente.
+- Preview final: build, E2E público y Vercel aprobados; `/login` devuelve 200 y el cron sin secreto 401.
+- Inspección del preview final: 8 bundles únicos, ~216,76 MB. El preview experimental de Sharp
+  (~243,2 MB) fue eliminado después de comprobar la regresión.
+- Retención de previews/producción/cancelados/fallidos configurada en 1 día, conservando al menos 10
+  deployments. Se eliminaron 37 previews antiguos; ninguna versión de producción fue borrada a mano.
 
 ---
 
