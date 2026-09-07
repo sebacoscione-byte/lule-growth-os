@@ -277,6 +277,8 @@ export interface ContentItem {
   updated_at: string
   approved_at: string | null
   auto_publish_result?: Partial<Record<ContentChannel, "published" | "error">>
+  /** Motivo sanitizado del último fallo externo por canal. Nunca guarda tokens ni payloads crudos. */
+  auto_publish_errors?: Partial<Record<ContentChannel, string>>
   /** Estado justo antes de archivar, para poder restaurar a lo que era (no siempre "borrador"). */
   archived_from_status?: ContentStatus
   /** Orden manual dentro de la cola de auto-publicacion de su formato (aprobados). null = todavia no se reordeno a mano, se ordena por approved_at. Se limpia al volver a borrador. */

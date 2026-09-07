@@ -284,6 +284,8 @@ export async function PATCH(request: NextRequest) {
       (enablingRepeat || Boolean(current.repeat_interval_days))
     const schedulingFirstPublication = enablingRepeat && current.status === "approved" &&
       body.repeat_activation_mode === "after_first_publication"
+    const clearingPublishResult = body.auto_publish_result !== undefined &&
+      Object.keys(body.auto_publish_result).length === 0
     if (body.repeat_activation_mode === "already_published" && !markingPublishedForRepeat) {
       return NextResponse.json({ error: "La pieza no tiene una repeticion pendiente de confirmar" }, { status: 400 })
     }
@@ -291,10 +293,13 @@ export async function PATCH(request: NextRequest) {
       ...current,
       ...changes,
       ...(enablingRepeat ? { repeat_count: 0 } : {}),
-      ...(schedulingFirstPublication ? { auto_publish_result: {} } : {}),
+      ...(schedulingFirstPublication ? { auto_publish_result: {}, auto_publish_errors: {} } : {}),
       ...(markingPublishedForRepeat ? {
         status: "published" as const,
         auto_publish_result: { ...current.auto_publish_result, instagram: "published" as const },
+        auto_publish_errors: Object.fromEntries(
+          Object.entries(current.auto_publish_errors ?? {}).filter(([channel]) => channel !== "instagram")
+        ),
         manual_publish_note: { trial_reel: Boolean(current.trial_reel), marked_at: now },
         published_at: now,
       } : {}),
@@ -303,7 +308,8 @@ export async function PATCH(request: NextRequest) {
       // se limpia, al reaprobar y tocar "Publicar ahora", resolveChannelsToPublish saltea el canal por
       // creerlo ya publicado y la pieza no se publica nunca (queda en aprobados). Mismo criterio que ya
       // usan "Deshacer publicacion" y la republicacion evergreen del cron.
-      ...(resetApproval ? { status: "draft" as const, auto_publish_result: {} } : {}),
+      ...(resetApproval ? { status: "draft" as const, auto_publish_result: {}, auto_publish_errors: {} } : {}),
+      ...(clearingPublishResult ? { auto_publish_errors: {} } : {}),
       ...(body.status === "published" && current.status !== "published" && !markingPublishedForRepeat
         ? { published_at: body.manual_publish_note?.marked_at ?? now }
         : {}),
