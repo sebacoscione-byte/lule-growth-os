@@ -645,14 +645,13 @@ function WeekdayPicker({
 }
 
 function AutoPublishTrackCard({
-  title, track, queueText, saving, issue, onToggleEnabled, onChangeDaysOfWeek, onChangeStartsAt,
+  title, track, queueText, saving, onToggleEnabled, onChangeDaysOfWeek, onChangeStartsAt,
   onChangeItemsPerRun,
 }: {
   title: string
   track: AutoPublishTrackSettings
   queueText: string
   saving: boolean
-  issue?: string | null
   onToggleEnabled: () => void
   onChangeDaysOfWeek: (days: number[]) => void
   onChangeStartsAt: (iso: string | null) => void
@@ -722,7 +721,6 @@ function AutoPublishTrackCard({
         <p>Zona horaria: America/Argentina/Buenos_Aires.</p>
         <p className="mt-1">{describeNextWindow(track)}</p>
       </div>
-      {issue && <p className="text-xs font-medium text-red-600">{issue}</p>}
       <div className="flex flex-wrap items-center gap-2 text-sm text-gray-700">
         <span className="text-gray-500 shrink-0">Empezar:</span>
         <Button
@@ -963,25 +961,6 @@ export default function ContentStudioPage() {
     approvedCarrusel: items.filter(item => item.status === "approved" && item.format === "carrusel").length,
     approvedReel: items.filter(item => item.status === "approved" && item.format === "reel").length,
   }), [items])
-
-  const autoPublishIssues = useMemo(() => {
-    const issues = new Map<"post" | "historia" | "carrusel" | "reel", string>()
-    const occupied = new Map<number, "post" | "carrusel" | "reel">()
-    for (const format of ["post", "carrusel", "reel"] as const) {
-      const track = autoPublishSettings[format]
-      if (!track.enabled) continue
-      for (const day of getScheduledDays(track)) {
-        const previous = occupied.get(day)
-        if (previous) {
-          issues.set(format, "Ese día ya tiene otra pieza principal de feed. Elegí noches distintas.")
-          issues.set(previous, "Ese día ya tiene otra pieza principal de feed. Elegí noches distintas.")
-        } else {
-          occupied.set(day, format)
-        }
-      }
-    }
-    return issues
-  }, [autoPublishSettings])
 
   // Posicion (1-indexado) de cada pieza aprobada dentro de la cola de auto-publicacion de su propio
   // formato, y una fecha estimada de cuando saldria segun el cronograma configurado. Se usa tanto para
@@ -1874,7 +1853,8 @@ export default function ContentStudioPage() {
                   <p className="text-xs text-gray-500">
                     Cada formato usa días propios y una ventana editorial real en horario argentino. Las historias corren
                     entre 18:00 y 19:00; posts, carruseles y reels entre 19:00 y 20:00. Vercel puede disparar en cualquier
-                    minuto dentro de esa hora.
+                    minuto dentro de esa hora. Podés elegir la misma noche para más de un formato: se publican uno detrás
+                    de otro dentro de la misma corrida.
                   </p>
                   <div className="flex flex-wrap items-center gap-3 pt-1">
                     <Button
@@ -1897,7 +1877,6 @@ export default function ContentStudioPage() {
                     track={autoPublishSettings.post}
                     queueText={describeAutoPublishQueue("post", counts.approvedPost, autoPublishSettings.post)}
                     saving={savingAutoPublish}
-                    issue={autoPublishIssues.get("post")}
                     onToggleEnabled={() => updateTrackSettings("post", { enabled: !autoPublishSettings.post.enabled })}
                     onChangeDaysOfWeek={days => changeScheduledDays("post", days)}
                     onChangeStartsAt={iso => updateTrackSettings("post", { starts_at: iso })}
@@ -1907,7 +1886,6 @@ export default function ContentStudioPage() {
                     track={autoPublishSettings.historia}
                     queueText={describeAutoPublishQueue("historia", counts.approvedHistoria, autoPublishSettings.historia)}
                     saving={savingAutoPublish}
-                    issue={autoPublishIssues.get("historia")}
                     onToggleEnabled={() => updateTrackSettings("historia", { enabled: !autoPublishSettings.historia.enabled })}
                     onChangeDaysOfWeek={days => changeScheduledDays("historia", days)}
                     onChangeStartsAt={iso => updateTrackSettings("historia", { starts_at: iso })}
@@ -1918,7 +1896,6 @@ export default function ContentStudioPage() {
                     track={autoPublishSettings.carrusel}
                     queueText={describeAutoPublishQueue("carrusel", counts.approvedCarrusel, autoPublishSettings.carrusel)}
                     saving={savingAutoPublish}
-                    issue={autoPublishIssues.get("carrusel")}
                     onToggleEnabled={() => updateTrackSettings("carrusel", { enabled: !autoPublishSettings.carrusel.enabled })}
                     onChangeDaysOfWeek={days => changeScheduledDays("carrusel", days)}
                     onChangeStartsAt={iso => updateTrackSettings("carrusel", { starts_at: iso })}
@@ -1928,7 +1905,6 @@ export default function ContentStudioPage() {
                     track={autoPublishSettings.reel}
                     queueText={describeAutoPublishQueue("reel", counts.approvedReel, autoPublishSettings.reel)}
                     saving={savingAutoPublish}
-                    issue={autoPublishIssues.get("reel")}
                     onToggleEnabled={() => updateTrackSettings("reel", { enabled: !autoPublishSettings.reel.enabled })}
                     onChangeDaysOfWeek={days => changeScheduledDays("reel", days)}
                     onChangeStartsAt={iso => updateTrackSettings("reel", { starts_at: iso })}

@@ -1,5 +1,10 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
-import { getPublishReadinessIssue, runAutoPublishTrack, shouldSkipCompletedTrack } from "@/lib/content-auto-publish"
+import {
+  getPublishReadinessIssue,
+  runAutoPublishFormats,
+  runAutoPublishTrack,
+  shouldSkipCompletedTrack,
+} from "@/lib/content-auto-publish"
 import * as contentPipeline from "@/lib/content-pipeline"
 import { DEFAULT_AUTO_PUBLISH_SETTINGS } from "@/lib/content-pipeline"
 import * as contentPublish from "@/lib/content-publish"
@@ -7,8 +12,10 @@ import type { ContentItem } from "@/types"
 
 jest.mock("@/lib/content-pipeline", () => ({
   ...jest.requireActual("@/lib/content-pipeline"),
+  readAutoPublishSettings: jest.fn(),
   readContentItems: jest.fn(),
   mutateContentItems: jest.fn(),
+  writeAutoPublishSettings: jest.fn(),
 }))
 jest.mock("@/lib/content-publish", () => ({
   ...jest.requireActual("@/lib/content-publish"),
@@ -123,5 +130,57 @@ describe("runAutoPublishTrack scheduling guards", () => {
       "published:0/1 (error: item item-1: instagram: Meta temporalmente no disponible)"
     )
     expect(shouldSkipCompletedTrack(result, new Date("2026-08-06T22:40:00.000Z"))).toBe(false)
+  })
+})
+
+describe("runAutoPublishFormats", () => {
+  const supabase = {} as SupabaseClient
+
+  afterEach(() => {
+    jest.clearAllMocks()
+  })
+
+  it("publica post y reel en secuencia cuando comparten la misma noche", async () => {
+    const post = item({ id: "post-1", visual_url: "https://example.com/post.jpg" })
+    const reel = item({ id: "reel-1", format: "reel", video_url: "https://example.com/reel.mp4" })
+    const settings = structuredClone(DEFAULT_AUTO_PUBLISH_SETTINGS)
+    settings.post = {
+      ...settings.post,
+      enabled: true,
+      schedule_slots: [{ day_of_week: 4, local_time: "19:00" }],
+    }
+    settings.reel = {
+      ...settings.reel,
+      enabled: true,
+      schedule_slots: [{ day_of_week: 4, local_time: "19:00" }],
+    }
+
+    ;(contentPipeline.readAutoPublishSettings as jest.Mock).mockResolvedValue(settings)
+    ;(contentPipeline.readContentItems as jest.Mock).mockResolvedValue([post, reel])
+    ;(contentPipeline.mutateContentItems as jest.Mock).mockResolvedValue([post, reel])
+    ;(contentPublish.publishApprovedItem as jest.Mock).mockImplementation(async (_supabase, candidate) => ({
+      item: { ...candidate, status: "published" },
+      allPublished: true,
+      errors: {},
+    }))
+
+    const results = await runAutoPublishFormats(
+      supabase,
+      ["post", "reel"],
+      new Date("2026-08-06T22:15:00.000Z")
+    )
+
+    expect(contentPublish.publishApprovedItem).toHaveBeenCalledTimes(2)
+    expect((contentPublish.publishApprovedItem as jest.Mock).mock.calls.map(call => call[1].id))
+      .toEqual(["post-1", "reel-1"])
+    expect(results.post?.last_run_result).toBe("published:1/1")
+    expect(results.reel?.last_run_result).toBe("published:1/1")
+    expect(contentPipeline.writeAutoPublishSettings).toHaveBeenCalledWith(
+      supabase,
+      expect.objectContaining({
+        post: expect.objectContaining({ last_run_result: "published:1/1" }),
+        reel: expect.objectContaining({ last_run_result: "published:1/1" }),
+      })
+    )
   })
 })

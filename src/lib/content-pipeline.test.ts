@@ -178,13 +178,13 @@ describe("configuración de slots", () => {
     expect(autoPublishSettingsSchema.safeParse(settings).success).toBe(false)
   })
 
-  it("rechaza dos formatos principales activos la misma noche", () => {
+  it("acepta formatos distintos activos la misma noche", () => {
     const settings = structuredClone(DEFAULT_AUTO_PUBLISH_SETTINGS)
     settings.post.enabled = true
-    settings.carrusel.enabled = true
+    settings.reel.enabled = true
     settings.post.schedule_slots = slots([4])
-    settings.carrusel.schedule_slots = slots([4])
-    expect(autoPublishSettingsSchema.safeParse(settings).success).toBe(false)
+    settings.reel.schedule_slots = slots([4])
+    expect(autoPublishSettingsSchema.safeParse(settings).success).toBe(true)
   })
 
   it("rechaza una hora que el cron desplegado no puede cumplir", () => {

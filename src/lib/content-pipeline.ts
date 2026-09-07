@@ -190,24 +190,7 @@ export const autoPublishSettingsSchema = z.object({
   historia: trackSchema(AUTO_PUBLISH_WINDOW_BY_FORMAT.historia, 10),
   carrusel: trackSchema(AUTO_PUBLISH_WINDOW_BY_FORMAT.carrusel, 1),
   reel: trackSchema(AUTO_PUBLISH_WINDOW_BY_FORMAT.reel, 1),
-}).strict().superRefine((settings, context) => {
-  const occupied = new Map<number, string>()
-  for (const format of ["post", "carrusel", "reel"] as const) {
-    if (!settings[format].enabled) continue
-    for (const [index, slot] of settings[format].schedule_slots.entries()) {
-      const previous = occupied.get(slot.day_of_week)
-      if (previous) {
-        context.addIssue({
-          code: "custom",
-          path: [format, "schedule_slots", index, "day_of_week"],
-          message: `Ya hay una pieza principal de ${previous} esa noche.`,
-        })
-      } else {
-        occupied.set(slot.day_of_week, format)
-      }
-    }
-  }
-})
+}).strict()
 
 type LegacyTrack = Partial<AutoPublishTrackSettings> & {
   days_of_week?: unknown

@@ -100,7 +100,8 @@ export function describeLastAutoPublishRun(track: AutoPublishTrackSettings): str
     skipped_not_scheduled_day: "hoy no es uno de los días elegidos",
     skipped_outside_window: "la corrida llegó fuera de la ventana configurada",
     skipped_already_published: "ya se había publicado una pieza de este formato ese día",
-    skipped_feed_conflict: "ya se había publicado otra pieza principal de feed esa noche",
+    // Compatibilidad de lectura con resultados guardados antes de permitir varios formatos por noche.
+    skipped_feed_conflict: "la configuración anterior omitió este formato porque coincidía con otro",
     skipped_no_item: "no había ninguna pieza aprobada lista para publicar",
   }
   const result = track.last_run_result ?? ""
