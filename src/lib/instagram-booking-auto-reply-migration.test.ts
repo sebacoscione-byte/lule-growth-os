@@ -14,7 +14,7 @@ describe("instagram booking auto reply migration", () => {
     expect(migration).toContain("to service_role")
   })
 
-  it("deduplica por evento y limita una respuesta por persona durante 24 horas", () => {
+  it("la migración inicial deduplica por evento y aplicaba el cooldown original", () => {
     expect(migration).toContain("source_external_id text not null unique")
     expect(migration).toContain("pg_advisory_xact_lock")
     expect(migration).toContain("interval '24 hours'")

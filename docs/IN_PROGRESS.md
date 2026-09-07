@@ -1,3 +1,37 @@
+# EN CURSO (2026-09-07) — respuestas administrativas de Instagram más útiles
+
+## Objetivo
+
+Responder automáticamente consultas claras de turnos y obras sociales que hoy llegan bien al
+webhook pero quedan fuera del detector o bloqueadas por un cooldown demasiado amplio.
+
+## Plan
+
+- [x] Revisar la conversación real y el ledger de respuestas sin exponer credenciales.
+- [x] Ampliar el detector para mensajes breves, preguntas de disponibilidad y coberturas.
+- [x] Mantener fuera síntomas, urgencias, adjuntos, precios, cambios y cancelaciones.
+- [x] Reemplazar el cooldown global de 24 horas por uno corto por respuesta administrativa.
+- [x] Agregar regresiones del webhook y la migración.
+- [ ] Ejecutar lint, tests, build, preview y mergear el PR.
+- [ ] Verificar el comportamiento desplegado en producción.
+
+## Alcance
+
+- El bot seguirá sin reservar turnos, confirmar disponibilidad ni garantizar cobertura.
+- Las respuestas usarán texto administrativo fijo y dirigirán a la información vigente por sede
+  del link de la bio; no se agrega IA ni se modifica `medical-safety.ts`.
+- El cambio toca el webhook de Instagram y una función SQL protegida para `service_role`; no agrega
+  cron jobs ni modifica el webhook de WhatsApp.
+
+## Validación local
+
+- Migración `20260907_instagram_admin_auto_replies.sql` validada contra Supabase con rollback.
+- `npm run lint`: sin errores ni warnings.
+- `npm test -- --runInBand`: 139 suites y 1.200 pruebas aprobadas.
+- `npm run build`: compilación, TypeScript y 90 rutas generadas correctamente.
+
+---
+
 # CERRADO (2026-09-07) — indexación y formatos de feed en la misma noche
 
 ## Objetivo
