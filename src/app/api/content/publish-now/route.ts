@@ -48,14 +48,14 @@ export async function POST(request: Request) {
 
     // getServiceDb() (service role puro), no createServiceClient(): ver nota en instagram-business/publish.
     const service = getServiceDb()
-    const { item: nextItem, allPublished } = await publishApprovedItem(service, item, channelsToPublish)
+    const { item: nextItem, allPublished, errors } = await publishApprovedItem(service, item, channelsToPublish)
     await mutateContentItems(supabase, latestItems =>
       latestItems.map(existing => existing.id === item.id
         ? mergeContentPublicationResult(existing, item, nextItem)
         : existing)
     )
 
-    return NextResponse.json({ item: nextItem, allPublished })
+    return NextResponse.json({ item: nextItem, allPublished, errors })
   } catch (error) {
     console.error(`[content/publish-now] ${error instanceof Error ? error.message : String(error)}`)
     return NextResponse.json({ error: "No se pudo completar la publicación" }, { status: 500 })

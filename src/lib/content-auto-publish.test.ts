@@ -1,7 +1,19 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { getPublishReadinessIssue, runAutoPublishTrack, shouldSkipCompletedTrack } from "@/lib/content-auto-publish"
+import * as contentPipeline from "@/lib/content-pipeline"
 import { DEFAULT_AUTO_PUBLISH_SETTINGS } from "@/lib/content-pipeline"
+import * as contentPublish from "@/lib/content-publish"
 import type { ContentItem } from "@/types"
+
+jest.mock("@/lib/content-pipeline", () => ({
+  ...jest.requireActual("@/lib/content-pipeline"),
+  readContentItems: jest.fn(),
+  mutateContentItems: jest.fn(),
+}))
+jest.mock("@/lib/content-publish", () => ({
+  ...jest.requireActual("@/lib/content-publish"),
+  publishApprovedItem: jest.fn(),
+}))
 
 function item(overrides: Partial<ContentItem> = {}): ContentItem {
   return {
@@ -54,6 +66,10 @@ describe("getPublishReadinessIssue", () => {
 describe("runAutoPublishTrack scheduling guards", () => {
   const supabase = {} as SupabaseClient
 
+  afterEach(() => {
+    jest.clearAllMocks()
+  })
+
   it("no toca la cola fuera de la ventana local", async () => {
     const track = { ...DEFAULT_AUTO_PUBLISH_SETTINGS.post, enabled: true }
     const result = await runAutoPublishTrack(supabase, "post", track, ["instagram"], new Date("2026-08-06T21:30:00.000Z"))
@@ -78,5 +94,34 @@ describe("runAutoPublishTrack scheduling guards", () => {
       last_run_result: "published:1/2 (error: Meta temporalmente no disponible)",
     }
     expect(shouldSkipCompletedTrack(track, new Date("2026-08-06T22:40:00.000Z"))).toBe(false)
+  })
+
+  it("propaga un fallo de canal al resultado que lee el ledger del cron", async () => {
+    const candidate = item({ visual_url: "https://example.com/plate.jpg" })
+    ;(contentPipeline.readContentItems as jest.Mock).mockResolvedValue([candidate])
+    ;(contentPipeline.mutateContentItems as jest.Mock).mockResolvedValue([candidate])
+    ;(contentPublish.publishApprovedItem as jest.Mock).mockResolvedValue({
+      item: {
+        ...candidate,
+        auto_publish_result: { instagram: "error" },
+        auto_publish_errors: { instagram: "Meta temporalmente no disponible" },
+      },
+      allPublished: false,
+      errors: { instagram: "Meta temporalmente no disponible" },
+    })
+
+    const track = { ...DEFAULT_AUTO_PUBLISH_SETTINGS.post, enabled: true }
+    const result = await runAutoPublishTrack(
+      supabase,
+      "post",
+      track,
+      ["instagram"],
+      new Date("2026-08-06T22:15:00.000Z")
+    )
+
+    expect(result.last_run_result).toBe(
+      "published:0/1 (error: item item-1: instagram: Meta temporalmente no disponible)"
+    )
+    expect(shouldSkipCompletedTrack(result, new Date("2026-08-06T22:40:00.000Z"))).toBe(false)
   })
 })

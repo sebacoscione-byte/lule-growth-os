@@ -70,7 +70,7 @@ describe("PATCH /api/content/items — limpiar resultado de publicacion viejo", 
 
   it("limpia auto_publish_result al volver a borrador por editar el contenido", async () => {
     ;(readContentItemsSnapshot as jest.Mock).mockResolvedValue({
-      items: [item()],
+      items: [item({ auto_publish_errors: { instagram: "fallo viejo" } })],
       version: "2026-08-24T10:00:00.000Z",
     })
 
@@ -80,12 +80,14 @@ describe("PATCH /api/content/items — limpiar resultado de publicacion viejo", 
     expect(response.status).toBe(200)
     expect(data.item.status).toBe("draft")
     expect(data.item.auto_publish_result).toEqual({})
+    expect(data.item.auto_publish_errors).toEqual({})
     expect(written?.[0].auto_publish_result).toEqual({})
+    expect(written?.[0].auto_publish_errors).toEqual({})
   })
 
   it("limpia cualquier resultado viejo al programar la primera publicación y sus repeticiones", async () => {
     ;(readContentItemsSnapshot as jest.Mock).mockResolvedValue({
-      items: [item({ status: "approved" })],
+      items: [item({ status: "approved", auto_publish_errors: { instagram: "fallo viejo" } })],
       version: "2026-08-24T10:00:00.000Z",
     })
 
@@ -101,6 +103,7 @@ describe("PATCH /api/content/items — limpiar resultado de publicacion viejo", 
     expect(data.item.repeat_interval_days).toBe(1)
     expect(data.item.repeat_count).toBe(0)
     expect(data.item.auto_publish_result).toEqual({})
+    expect(data.item.auto_publish_errors).toEqual({})
   })
 
   it("rechaza una repetición ambigua sobre una pieza aprobada", async () => {
