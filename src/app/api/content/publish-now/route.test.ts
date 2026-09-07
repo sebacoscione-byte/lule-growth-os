@@ -69,6 +69,7 @@ describe("POST /api/content/publish-now — auto_publish_result viejo", () => {
       async (_db: unknown, source: ContentItem, channels: ContentChannel[]) => ({
         item: { ...source, status: channels.length > 0 ? "published" : source.status },
         allPublished: channels.length > 0,
+        errors: {},
       })
     )
   })

@@ -241,7 +241,7 @@ export interface ContentItem {
    * campo tambien cuenta como v1): Gemini dibuja la placa entera en una sola pasada (foto + texto) --
    * una sola imagen fotografica/editorial, sin corte al medio. "v2" (V2.1 visual; default hasta el
    * 2026-08-06): Gemini genera SOLO la foto full-bleed; la cobertura degradada y el titular/
-   * subtitulo/marca se componen aparte por edicion real (composeContentPlate, ffmpeg) -- ortografia
+   * subtitulo/marca se componen aparte por edicion real (composeContentPlate, Sharp) -- ortografia
    * siempre perfecta, pero se ve como dos partes separadas (texto a un lado, foto al otro) en vez de
    * una sola imagen -- Seba pidio volver a v1 por default el 2026-08-06 (ver docs/BACKLOG.md).
    * Elegible por pieza para poder comparar/regenerar con el otro motor. */
@@ -277,6 +277,8 @@ export interface ContentItem {
   updated_at: string
   approved_at: string | null
   auto_publish_result?: Partial<Record<ContentChannel, "published" | "error">>
+  /** Motivo sanitizado del último fallo externo por canal. Nunca guarda tokens ni payloads crudos. */
+  auto_publish_errors?: Partial<Record<ContentChannel, string>>
   /** Estado justo antes de archivar, para poder restaurar a lo que era (no siempre "borrador"). */
   archived_from_status?: ContentStatus
   /** Orden manual dentro de la cola de auto-publicacion de su formato (aprobados). null = todavia no se reordeno a mano, se ordena por approved_at. Se limpia al volver a borrador. */

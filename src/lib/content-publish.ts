@@ -9,6 +9,20 @@ function carouselImageUrls(item: ContentItem): string[] {
     .filter((url): url is string => Boolean(url))
 }
 
+const MAX_PUBLISH_ERROR_LENGTH = 300
+
+/** Conserva una causa operativa útil sin persistir credenciales que un SDK pueda incluir en el error. */
+export function sanitizeContentPublishError(error: unknown): string {
+  const raw = error instanceof Error ? error.message : String(error)
+  const sanitized = raw
+    .replace(/([?&](?:access_token|api_key|key|token|client_secret)=)[^&\s]+/gi, "$1[redacted]")
+    .replace(/("(?:access_token|api_key|key|token|client_secret)"\s*:\s*")[^"]+("?)/gi, "$1[redacted]$2")
+    .replace(/\bBearer\s+\S+/gi, "Bearer [redacted]")
+    .replace(/\s+/g, " ")
+    .trim()
+  return (sanitized || "external_publish_failed").slice(0, MAX_PUBLISH_ERROR_LENGTH)
+}
+
 /**
  * Publica una pieza aprobada en los canales pedidos, canal por canal de forma independiente
  * (si uno falla, el otro igual se intenta). Usada tanto por el cron de auto-publicacion como por
@@ -19,8 +33,13 @@ export async function publishApprovedItem(
   item: ContentItem,
   channelsToTry: ContentChannel[],
   options: { instagramImageDataUrl?: string } = {}
-): Promise<{ item: ContentItem; allPublished: boolean }> {
+): Promise<{
+  item: ContentItem
+  allPublished: boolean
+  errors: NonNullable<ContentItem["auto_publish_errors"]>
+}> {
   const result: NonNullable<ContentItem["auto_publish_result"]> = { ...item.auto_publish_result }
+  const errors: NonNullable<ContentItem["auto_publish_errors"]> = { ...item.auto_publish_errors }
   let instagramMediaId: string | null | undefined
   let instagramPublishedAt: string | undefined
 
@@ -55,11 +74,13 @@ export async function publishApprovedItem(
         instagramMediaId = published.mediaId
       }
       result.instagram = "published"
+      delete errors.instagram
       instagramPublishedAt = new Date().toISOString()
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error)
+      const message = sanitizeContentPublishError(error)
       console.error(`[content-publish] item=${item.id} canal=instagram: ${message}`)
       result.instagram = "error"
+      errors.instagram = message
     }
   }
 
@@ -67,10 +88,12 @@ export async function publishApprovedItem(
     try {
       await createGoogleBusinessPost(supabase, { summary: item.google_text })
       result.google_business = "published"
+      delete errors.google_business
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error)
+      const message = sanitizeContentPublishError(error)
       console.error(`[content-publish] item=${item.id} canal=google_business: ${message}`)
       result.google_business = "error"
+      errors.google_business = message
     }
   }
 
@@ -79,6 +102,7 @@ export async function publishApprovedItem(
   const nextItem: ContentItem = {
     ...item,
     auto_publish_result: result,
+    auto_publish_errors: errors,
     status: allPublished ? "published" : item.status,
     updated_at: updatedAt,
     // Se guarda el mismo media_id ante una republicación evergreen (repeat_interval_days): siempre
@@ -86,5 +110,5 @@ export async function publishApprovedItem(
     ...(instagramMediaId ? { instagram_media_id: instagramMediaId } : {}),
     ...(instagramPublishedAt ? { published_at: instagramPublishedAt } : {}),
   }
-  return { item: nextItem, allPublished }
+  return { item: nextItem, allPublished, errors }
 }

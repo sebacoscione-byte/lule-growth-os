@@ -1,3 +1,30 @@
+# EN PROGRESO (2026-09-07) — cron editorial y Function Storage de Vercel
+
+## Objetivo
+
+Evitar que el cron editorial registre como exitosa una publicación fallida y reducir el peso de las
+funciones desplegadas que agotó los 10 GB de Function Storage del plan Hobby.
+
+## Plan
+
+- [x] Reconstruir la ejecución fallida del 2026-09-05 y medir los bundles/deployments retenidos.
+- [ ] Persistir errores sanitizados por canal y propagar el fallo al ledger/reintento del cron.
+- [ ] Separar el procesamiento de imágenes estáticas de los binarios pesados de video.
+- [ ] Evitar nuevos bundles para cambios exclusivos de documentación.
+- [ ] Validar lint, tests, build, preview y producción; abrir y mergear el PR.
+
+## Diagnóstico confirmado
+
+- El cron de feed sí corrió el 2026-09-05. Instagram devolvió un error transitorio, pero
+  `publishApprovedItem` lo convirtió en `allPublished=false` sin propagar la causa; la pista quedó
+  como `published:0/1` y el ledger la marcó exitosa. La publicación manual funcionó 36 minutos después.
+- El motivo exacto ya no es recuperable: en Hobby los Runtime Logs sólo se conservan una hora. La
+  corrección guarda una versión sanitizada junto a la pieza y en el resultado del cron.
+- Hay 107 deployments retenidos en 30 días. Los binarios de ffmpeg/ffprobe entran en rutas que sólo
+  procesan imágenes estáticas y multiplican decenas de MB por deployment.
+
+---
+
 # CERRADO (2026-09-06) — respuesta administrativa de turnos en Instagram
 
 ## Objetivo

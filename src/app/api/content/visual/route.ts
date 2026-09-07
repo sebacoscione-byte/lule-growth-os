@@ -3,7 +3,7 @@ import { generateContentVisual, getPublicAiError, regenerateImageDirection } fro
 import { truncateForImagePlate } from "@/lib/content-text"
 import { getImagePromptQualityIssues, recentImagePrompts } from "@/lib/image-prompt-quality"
 import { readContentItems } from "@/lib/content-pipeline"
-import { convertImageToJpeg } from "@/lib/video-caption"
+import { convertImageToJpeg } from "@/lib/image-processing"
 import { createClient } from "@/lib/supabase/server"
 import { getServiceDb } from "@/lib/supabase/service"
 import { authorizeStaff } from "@/lib/staff-authz"
@@ -148,7 +148,7 @@ export async function POST(request: Request) {
     })
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
-    // Sin esto, un fallo de generateContentVisual (ej. composeContentPlate/ffmpeg) queda invisible:
+    // Sin esto, un fallo de generateContentVisual (ej. composeContentPlate) queda invisible:
     // no pasa por logRequest (eso solo cubre las llamadas a Gemini/OpenAI) y route.ts solo devolvia el
     // mensaje generico de getPublicAiError al cliente, sin dejar ningun rastro server-side de la causa
     // real (bug real 2026-08-03: la placa seguia fallando en produccion sin ninguna pista en los logs).
