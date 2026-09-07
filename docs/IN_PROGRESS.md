@@ -1,4 +1,4 @@
-# EN CURSO (2026-09-07) — respuestas administrativas de Instagram más útiles
+# CERRADO (2026-09-07) — respuestas administrativas de Instagram más útiles
 
 ## Objetivo
 
@@ -12,8 +12,8 @@ webhook pero quedan fuera del detector o bloqueadas por un cooldown demasiado am
 - [x] Mantener fuera síntomas, urgencias, adjuntos, precios, cambios y cancelaciones.
 - [x] Reemplazar el cooldown global de 24 horas por uno corto por respuesta administrativa.
 - [x] Agregar regresiones del webhook y la migración.
-- [ ] Ejecutar lint, tests, build, preview y mergear el PR.
-- [ ] Verificar el comportamiento desplegado en producción.
+- [x] Ejecutar lint, tests, build, preview y mergear el PR.
+- [x] Verificar el comportamiento desplegado en producción.
 
 ## Alcance
 
@@ -29,6 +29,9 @@ webhook pero quedan fuera del detector o bloqueadas por un cooldown demasiado am
 - `npm run lint`: sin errores ni warnings.
 - `npm test -- --runInBand`: 139 suites y 1.200 pruebas aprobadas.
 - `npm run build`: compilación, TypeScript y 90 rutas generadas correctamente.
+- PR #271: build, E2E público y Vercel Preview aprobados; `/login` respondió 200, el Inbox conservó
+  el redirect autenticado y el webhook rechazó una firma ausente.
+- La migración se aplicó de forma atómica y producción quedó verificada con el clasificador activo.
 
 ---
 
