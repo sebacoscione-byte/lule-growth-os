@@ -1,4 +1,4 @@
-# EN CURSO (2026-09-07) — indexación y formatos de feed en la misma noche
+# CERRADO (2026-09-07) — indexación y formatos de feed en la misma noche
 
 ## Objetivo
 
@@ -12,7 +12,7 @@ de publicación cuando el owner así lo configure.
       pública rota: `/` responde 308 hacia la landing canónica y todas las URLs del sitemap responden 200.
 - [x] Retirar la exclusión artificial entre formatos de feed tanto de la UI/API como del cron.
 - [x] Agregar regresiones y actualizar la documentación operativa.
-- [ ] Ejecutar lint, tests, build y validación de preview; abrir y mergear el PR.
+- [x] Ejecutar lint, tests, build y validación de preview; abrir y mergear el PR #270.
 
 ## Alcance
 
@@ -32,6 +32,8 @@ de publicación cuando el owner así lo configure.
 - `npm run lint`: sin errores ni warnings.
 - `npm test -- --runInBand`: 138 suites y 1.189 pruebas aprobadas.
 - `npm run build`: compilación, TypeScript y 90 rutas generadas correctamente.
+- PR #270: build, E2E público y Vercel Preview aprobados; `/login` responde 200,
+  `/contenido/instagram` conserva el gate de sesión y el cron sin secreto responde 401.
 
 ---
 
