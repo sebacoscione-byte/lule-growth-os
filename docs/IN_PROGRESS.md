@@ -9,7 +9,7 @@ de deployments que agotó los 10 GB de Function Storage del plan Hobby.
 
 - [x] Reconstruir la ejecución fallida del 2026-09-05 y medir los bundles/deployments retenidos.
 - [x] Persistir errores sanitizados por canal y propagar el fallo al ledger/reintento del cron.
-- [x] Reducir la retención y limpiar previews antiguos sin borrar producción.
+- [x] Reducir la retención y limpiar deployments antiguos, preservando las 10 producciones recientes.
 - [x] Evitar nuevos bundles para cambios exclusivos de documentación.
 - [x] Validar lint, tests, build, preview y producción; abrir y mergear el PR #268.
 
@@ -20,8 +20,8 @@ de deployments que agotó los 10 GB de Function Storage del plan Hobby.
   como `published:0/1` y el ledger la marcó exitosa. La publicación manual funcionó 36 minutos después.
 - El motivo exacto ya no es recuperable: en Hobby los Runtime Logs sólo se conservan una hora. La
   corrección guarda una versión sanitizada junto a la pieza y en el resultado del cron.
-- Había 107 deployments retenidos en 30 días. Se eliminaron 37 previews de más de 7 días, sin tocar
-  producción, y se acortó la retención automática manteniendo al menos 10 deployments.
+- Había 107 deployments retenidos en 30 días. La limpieza dejó 17: 10 producciones recientes y 7
+  previews/cancelados. El deployment activo y nueve rollbacks de producción quedaron preservados.
 - Se probó reemplazar ffmpeg por Sharp para imágenes estáticas, pero el preview demostró que el total
   real de bundles subía de ~216,8 a ~243,2 MB. Ese cambio se descartó antes del merge.
 
@@ -34,7 +34,8 @@ de deployments que agotó los 10 GB de Function Storage del plan Hobby.
 - Inspección del preview final: 8 bundles únicos, ~216,76 MB. El preview experimental de Sharp
   (~243,2 MB) fue eliminado después de comprobar la regresión.
 - Retención de previews/producción/cancelados/fallidos configurada en 1 día, conservando al menos 10
-  deployments. Se eliminaron 37 previews antiguos; ninguna versión de producción fue borrada a mano.
+  deployments. Se eliminaron 59 previews y 35 producciones antiguas; el deployment activo siguió
+  `READY` y el dominio principal respondió 200 después de la limpieza.
 
 ---
 
