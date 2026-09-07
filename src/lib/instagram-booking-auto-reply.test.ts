@@ -8,6 +8,8 @@ import { getConnectionInfo, getProfile, getValidToken } from "@/lib/instagram-bu
 import type { InstagramInboxItemInput } from "@/lib/instagram-webhook-normalizer"
 import {
   INSTAGRAM_BOOKING_REPLY,
+  INSTAGRAM_COVERAGE_REPLY,
+  getInstagramAutoReplyText,
   isEligibleInstagramBookingInquiry,
   processInstagramBookingAutoReplies,
 } from "./instagram-booking-auto-reply"
@@ -78,6 +80,13 @@ describe("isEligibleInstagramBookingInquiry", () => {
     "¿Cómo hago para sacar turno?",
     "Necesito una cita",
     "¿Hay turnos disponibles?",
+    "Turno",
+    "¿Turno?",
+    "Hola, turno",
+    "¿Tenés turno el martes?",
+    "¿Tienen citas para esta semana?",
+    "¿Qué obras sociales atendés en Lanús?",
+    "¿Atienden por OSDE y cómo saco turno?",
   ])("acepta intención inequívoca: %s", content => {
     expect(isEligibleInstagramBookingInquiry(item({ content }))).toBe(true)
   })
@@ -85,7 +94,6 @@ describe("isEligibleInstagramBookingInquiry", () => {
   it.each([
     "Hola",
     "¿Cuánto sale un turno?",
-    "¿Atienden por OSDE y cómo saco turno?",
     "Quiero cancelar mi turno",
     "Ya tengo turno",
     "Necesito turno por dolor de pecho",
@@ -99,6 +107,12 @@ describe("isEligibleInstagramBookingInquiry", () => {
     expect(isEligibleInstagramBookingInquiry(item({ attachment_type: "image" }))).toBe(false)
     expect(isEligibleInstagramBookingInquiry(item({ content: "[Mensaje eliminado]" }))).toBe(false)
     expect(isEligibleInstagramBookingInquiry(item({ participant_id: null }))).toBe(false)
+  })
+
+  it("elige una respuesta administrativa específica para coberturas", () => {
+    expect(getInstagramAutoReplyText(item({ content: "¿Qué obras sociales atendés en Lanús?" })))
+      .toBe(INSTAGRAM_COVERAGE_REPLY)
+    expect(getInstagramAutoReplyText(item({ content: "Turno" }))).toBe(INSTAGRAM_BOOKING_REPLY)
   })
 })
 
@@ -148,6 +162,28 @@ describe("processInstagramBookingAutoReplies", () => {
         }),
       })
     )
+  })
+
+  it("responde consultas de obras sociales sin prometer una cobertura", async () => {
+    const store = db()
+    const result = await processInstagramBookingAutoReplies(store.client, [item({
+      content: "¿Qué obras sociales atendés en Lanús?",
+    })])
+
+    expect(result.sent).toBe(1)
+    expect(store.rpc).toHaveBeenCalledWith("claim_instagram_booking_auto_reply", expect.objectContaining({
+      p_reply_text: INSTAGRAM_COVERAGE_REPLY,
+    }))
+    expect(global.fetch).toHaveBeenCalledWith(
+      "https://graph.instagram.com/v26.0/ig-business/messages",
+      expect.objectContaining({
+        body: JSON.stringify({
+          recipient: { id: "person-1" },
+          message: { text: INSTAGRAM_COVERAGE_REPLY },
+        }),
+      })
+    )
+    expect(INSTAGRAM_COVERAGE_REPLY).toContain("debe confirmarse directamente con la institución")
   })
 
   it("acepta el user_id público del webhook y envía desde el id scoped de /me", async () => {

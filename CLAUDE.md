@@ -2372,14 +2372,18 @@ plano, sin cookies, que siempre autentica como `service_role` real.
   en absoluto — no hay sesión de usuario que verificar — así que usan `getServiceDb()` directamente.
 
 ## Doctora y configuración
+- 2026-09-07: la respuesta automática administrativa de Instagram reconoce también mensajes breves
+  (`Turno`), preguntas de disponibilidad (`¿Tenés turno el martes?`) y consultas de obras sociales o
+  prepagas. Turnos y coberturas usan textos distintos, sin reservar, confirmar disponibilidad ni
+  garantizar una cobertura. La deduplicación por evento continúa y el cooldown pasó a 15 minutos
+  para el mismo texto; temas distintos pueden responderse dentro de una misma conversación.
 - 2026-09-06: Instagram Inbox recibe DMs y comentarios mediante un webhook firmado. La única
-  respuesta automática habilitada es una plantilla administrativa fija para pedidos inequívocos
+  respuesta automática habilitada era una plantilla administrativa fija para pedidos inequívocos
   de turno: indica entrar al link de la bio, elegir sede y usar el WhatsApp o teléfono oficial;
   aclara que cada institución confirma turnos y disponibilidad. Los comentarios reciben esa
-  orientación por privado. Síntomas, urgencias, estudios, adjuntos, precios, coberturas, cambios o
-  cancelaciones quedan para atención humana. El ledger `instagram_auto_replies` deduplica reintentos
-  y limita una respuesta por persona cada 24 horas; `instagram_auto_reply_settings.enabled` es el
-  corte operativo. No usa IA ni guarda payloads crudos, adjuntos o tokens.
+  orientación por privado. Síntomas, urgencias, estudios, adjuntos, precios, cambios o cancelaciones
+  quedan para atención humana. `instagram_auto_reply_settings.enabled` es el corte operativo. No usa
+  IA ni guarda payloads crudos, adjuntos o tokens.
 - 2026-09-06: por decisión de Seba, de los valores de atención sólo puede comunicarse públicamente
   el de la consulta particular. Los importes de consulta con cobertura y ecocardiograma son internos
   y no deben aparecer en respuestas de Instagram. La automatización de turnos no informa precios.

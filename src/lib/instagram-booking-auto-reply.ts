@@ -10,12 +10,19 @@ const MAX_REPLIES_PER_WEBHOOK = 20
 export const INSTAGRAM_BOOKING_REPLY =
   "¡Hola! Para pedir turno, ingresá al link de la bio y elegí la sede que te quede más cómoda. Allí vas a encontrar los enlaces para comunicarte por WhatsApp o por teléfono. Los turnos y la disponibilidad los confirma cada institución."
 
+export const INSTAGRAM_COVERAGE_REPLY =
+  "¡Hola! Las obras sociales y prepagas dependen de la sede y del plan. En el link de la bio podés elegir la sede, consultar la información vigente y encontrar sus canales oficiales. La cobertura debe confirmarse directamente con la institución al pedir el turno."
+
 const BOOKING_INTENT_PATTERN =
-  /\b(?:pedir|sacar|solicitar|reservar|agendar|conseguir|necesito|quiero|quisiera|busco|como (?:puedo|hago para))\b.{0,45}\b(?:un )?(?:turnos?|citas?)\b|\b(?:turnos?|citas?)\b.{0,45}\b(?:pedir|sacar|solicitar|reservar|agendar|conseguir|necesito|quiero|quisiera|disponibles?|disponibilidad)\b/
+  /\b(?:pedir|sacar|solicitar|reservar|agendar|conseguir|necesito|quiero|quisiera|busco|como (?:puedo|hago para)|hay|tenes|tienen|dan)\b.{0,45}\b(?:un )?(?:turnos?|citas?)\b|\b(?:turnos?|citas?)\b.{0,45}\b(?:pedir|sacar|solicitar|reservar|agendar|conseguir|necesito|quiero|quisiera|disponibles?|disponibilidad|hay|tenes|tienen)\b/
+const SHORT_BOOKING_INTENT_PATTERN =
+  /^[¿?¡! ]*(?:hola[,.! ]*)?(?:turnos?|citas?)[¿?.! ]*$/
 const WRONG_FLOW_PATTERN =
   /\b(?:cancelar|cambiar|reprogramar|confirmar|anular|perdi|perder|ya (?:saque|tengo)|no (?:quiero|necesito))\b.{0,35}\b(?:turno|cita)\b|\b(?:turno|cita)\b.{0,35}\b(?:cancelar|cambiar|reprogramar|confirmar|anular|perdi|perder)\b/
-const OTHER_ADMIN_INTENT_PATTERN =
-  /\b(?:precio|valor|costo|cuanto (?:sale|cuesta|cobra)|obra social|prepaga|cobertura|atiende por|acepta)\b/
+const COVERAGE_INTENT_PATTERN =
+  /\b(?:obras? sociales?|prepagas?|coberturas?|pami|atienden? por|trabajan? con)\b/
+const PRICE_INTENT_PATTERN =
+  /\b(?:precio|valor|costo|cuanto (?:sale|cuesta|cobra))\b/
 const URGENCY_PATTERN = /\b(?:urgente|urgencia|emergencia|guardia)\b/
 
 function normalizeText(value: string): string {
@@ -27,21 +34,29 @@ function normalizeText(value: string): string {
     .trim()
 }
 
-export function isEligibleInstagramBookingInquiry(item: InstagramInboxItemInput): boolean {
+export function getInstagramAutoReplyText(item: InstagramInboxItemInput): string | null {
   if (
     item.direction !== "inbound" ||
     !item.participant_id ||
     !item.content ||
     item.attachment_type
-  ) return false
+  ) return null
 
   const text = normalizeText(item.content)
-  if (!text || text === "[mensaje eliminado]") return false
-  if (containsSensitiveMedicalContent(item.content)) return false
-  if (URGENCY_PATTERN.test(text) || WRONG_FLOW_PATTERN.test(text) || OTHER_ADMIN_INTENT_PATTERN.test(text)) {
-    return false
+  if (!text || text === "[mensaje eliminado]") return null
+  if (containsSensitiveMedicalContent(item.content)) return null
+  if (URGENCY_PATTERN.test(text) || WRONG_FLOW_PATTERN.test(text) || PRICE_INTENT_PATTERN.test(text)) {
+    return null
   }
-  return BOOKING_INTENT_PATTERN.test(text)
+  if (COVERAGE_INTENT_PATTERN.test(text)) return INSTAGRAM_COVERAGE_REPLY
+  if (BOOKING_INTENT_PATTERN.test(text) || SHORT_BOOKING_INTENT_PATTERN.test(text)) {
+    return INSTAGRAM_BOOKING_REPLY
+  }
+  return null
+}
+
+export function isEligibleInstagramBookingInquiry(item: InstagramInboxItemInput): boolean {
+  return getInstagramAutoReplyText(item) !== null
 }
 
 interface SendResult {
@@ -66,12 +81,13 @@ function sourceTargetId(item: InstagramInboxItemInput): string {
 async function sendInstagramBookingReply(
   token: string,
   senderAccountId: string,
-  item: InstagramInboxItemInput
+  item: InstagramInboxItemInput,
+  replyText: string
 ): Promise<SendResult> {
   const recipient = item.item_type === "comment"
     ? { comment_id: sourceTargetId(item) }
     : { id: item.participant_id! }
-  const body = { recipient, message: { text: INSTAGRAM_BOOKING_REPLY } }
+  const body = { recipient, message: { text: replyText } }
 
   let response: Response
   try {
@@ -132,14 +148,17 @@ async function markReply(
 }
 
 /**
- * Envía únicamente la plantilla administrativa aprobada. Un claim transaccional en PostgreSQL
- * deduplica reintentos de Meta y aplica el límite de una respuesta por persona cada 24 horas.
+ * Envía únicamente una de las plantillas administrativas aprobadas. Un claim transaccional en
+ * PostgreSQL deduplica reintentos de Meta y evita repetir el mismo texto durante 15 minutos.
  */
 export async function processInstagramBookingAutoReplies(
   supabase: SupabaseClient,
   items: InstagramInboxItemInput[]
 ): Promise<InstagramAutoReplyResult> {
-  const eligibleItems = items.filter(isEligibleInstagramBookingInquiry)
+  const eligibleItems = items.flatMap(item => {
+    const replyText = getInstagramAutoReplyText(item)
+    return replyText ? [{ item, replyText }] : []
+  })
   const candidates = eligibleItems.slice(0, MAX_REPLIES_PER_WEBHOOK)
   const result: InstagramAutoReplyResult = {
     eligible: candidates.length,
@@ -189,7 +208,8 @@ export async function processInstagramBookingAutoReplies(
   }
   const acceptedWebhookAccountIds = new Set([profile.id, profile.user_id].filter(Boolean))
 
-  await Promise.all(candidates.map(async item => {
+  await Promise.all(candidates.map(async candidate => {
+    const { item, replyText } = candidate
     // Meta usa `user_id` (ID público) en el webhook y `id` (ID scoped de la app) en /me y Send API.
     if (!acceptedWebhookAccountIds.has(item.instagram_account_id)) {
       result.skipped += 1
@@ -203,7 +223,7 @@ export async function processInstagramBookingAutoReplies(
         p_participant_id: item.participant_id,
         p_source_type: item.item_type,
         p_target_id: sourceTargetId(item),
-        p_reply_text: INSTAGRAM_BOOKING_REPLY,
+        p_reply_text: replyText,
       }
     )
     if (claimError) {
@@ -216,7 +236,7 @@ export async function processInstagramBookingAutoReplies(
     }
 
     try {
-      const sent = await sendInstagramBookingReply(token, profile.id, item)
+      const sent = await sendInstagramBookingReply(token, profile.id, item, replyText)
       await markReply(supabase, claimId, {
         status: "sent",
         meta_message_id: sent.messageId,
