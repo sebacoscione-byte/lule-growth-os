@@ -36,7 +36,7 @@ import {
   toLocalInputValue,
 } from "@/lib/content-schedule-display"
 import { buildFallbackVideoPrompt, getVeoPromptQualityIssues } from "@/lib/video-prompt"
-import type { AutoPublishSettings, AutoPublishTrackSettings, ContentChannel, ContentInstagramInsights, ContentItem, ContentObjective, ContentSlide, ContentSource, ContentStatus, ContentVideoBrandScores, ContentVideoScores, InstagramInsightWindow, InstagramMediaInsightSnapshot, VideoGenerationVersion } from "@/types"
+import type { AutoPublishSettings, AutoPublishTrackSettings, ContentInstagramInsights, ContentItem, ContentObjective, ContentSlide, ContentSource, ContentStatus, ContentVideoBrandScores, ContentVideoScores, InstagramInsightWindow, InstagramMediaInsightSnapshot, VideoGenerationVersion } from "@/types"
 import { CONTENT_OBJECTIVE_GOALS, CONTENT_OBJECTIVE_LABELS, WEEKDAY_OPTIONS } from "@/types"
 
 const IS_MANUAL_MODE = process.env.NEXT_PUBLIC_AI_MODE !== "gemini_api"
@@ -2002,14 +2002,9 @@ export default function ContentStudioPage() {
                       </div>
                     </div>
                     {item.auto_publish_result && Object.values(item.auto_publish_result).includes("error") && (
-                      <div className="space-y-0.5 text-xs font-medium text-red-600">
-                        <p>
-                          No se pudo publicar en {Object.entries(item.auto_publish_result).filter(([, v]) => v === "error").map(([k]) => k === "instagram" ? "Instagram" : "Google Business").join(" ni ")}. Reintentá con los botones de abajo.
-                        </p>
-                        {Object.entries(item.auto_publish_errors ?? {}).filter(([channel]) => item.auto_publish_result?.[channel as ContentChannel] === "error").map(([channel, reason]) => (
-                          <p key={channel} className="font-normal">Motivo: {reason}</p>
-                        ))}
-                      </div>
+                      <p className="text-xs font-medium text-red-600">
+                        No se pudo publicar en {Object.entries(item.auto_publish_result).filter(([, v]) => v === "error").map(([k]) => k === "instagram" ? "Instagram" : "Google Business").join(" ni ")}. Reintentá con los botones de abajo.
+                      </p>
                     )}
                     {item.manual_publish_note && (
                       <p

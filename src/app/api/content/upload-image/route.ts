@@ -3,7 +3,7 @@ import { createClient } from "@/lib/supabase/server"
 import { getServiceDb } from "@/lib/supabase/service"
 import { parseJsonBody } from "@/lib/api-validation"
 import { authorizeStaff } from "@/lib/staff-authz"
-import { convertImageToJpeg } from "@/lib/image-processing"
+import { convertImageToJpeg } from "@/lib/video-caption"
 
 const MAX_BYTES = 8 * 1024 * 1024
 const EXTENSION_BY_MIME: Record<string, string> = {

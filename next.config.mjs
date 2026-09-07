@@ -78,24 +78,30 @@ const nextConfig = {
       "node_modules/@ffmpeg-installer/**",
       "node_modules/@ffprobe-installer/**",
     ],
-    // generateContentVisual (ai.ts) compone la placa con Sharp + Fraunces/Inter. Sharp se traza por
-    // su import normal; las fuentes se referencian por ruta y por eso deben declararse explícitamente.
+    // generateContentVisual (ai.ts) ahora compone la placa con composeContentPlate() (content-plate.ts,
+    // 2026-07-30: el modelo de imagen solo genera la foto, el titular/subtitulo/marca se queman por
+    // edicion real con ffmpeg + Fraunces/Inter) ademas de convertImageToJpeg() para portadas de reel --
+    // mismo motivo que arriba, sin esto el deploy de Vercel puede arrancar sin el binario/las fuentes.
     "/api/content/visual": [
       "src/lib/fonts/Fraunces-Bold.ttf",
       "src/lib/fonts/Inter-Regular.ttf",
       "src/lib/fonts/Inter-Bold.ttf",
+      "node_modules/@ffmpeg-installer/**",
     ],
+    "/api/content/upload-image": ["node_modules/@ffmpeg-installer/**"],
     // Los crons editoriales pueden llamar a generateContentVisual() como red de seguridad si a una
     // pieza aprobada le falta la placa -- necesitan los mismos assets que /api/content/visual.
     "/api/cron/publish-stories": [
       "src/lib/fonts/Fraunces-Bold.ttf",
       "src/lib/fonts/Inter-Regular.ttf",
       "src/lib/fonts/Inter-Bold.ttf",
+      "node_modules/@ffmpeg-installer/**",
     ],
     "/api/cron/publish-feed": [
       "src/lib/fonts/Fraunces-Bold.ttf",
       "src/lib/fonts/Inter-Regular.ttf",
       "src/lib/fonts/Inter-Bold.ttf",
+      "node_modules/@ffmpeg-installer/**",
     ],
   },
   // TECH-01 (docs/BACKLOG.md): headers de seguridad generales. El CSP de arriba se sumó después

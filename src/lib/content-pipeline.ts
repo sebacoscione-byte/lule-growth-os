@@ -341,7 +341,6 @@ export function mergeContentPublicationResult(
     ...latest,
     status: result.status,
     auto_publish_result: result.auto_publish_result,
-    auto_publish_errors: result.auto_publish_errors,
     updated_at: result.updated_at,
     ...(result.instagram_media_id ? { instagram_media_id: result.instagram_media_id } : {}),
     ...(result.published_at ? { published_at: result.published_at } : {}),

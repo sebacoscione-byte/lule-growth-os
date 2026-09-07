@@ -71,10 +71,7 @@ export async function runAutoPublishTrack(
     if (!current) continue
     const dueRepeat = current.status !== "approved" && isRepeatDue(current, now)
     if (current.status !== "approved" && !dueRepeat) continue
-    if (dueRepeat) {
-      current.auto_publish_result = {}
-      current.auto_publish_errors = {}
-    }
+    if (dueRepeat) current.auto_publish_result = {}
 
     const readinessIssue = getPublishReadinessIssue(current, format)
     if (readinessIssue) {
@@ -107,18 +104,12 @@ export async function runAutoPublishTrack(
     }
 
     const channelsToPublish = resolveChannelsToPublish(current, channels)
-    const { item: nextItem, allPublished, errors } = await publishApprovedItem(
+    const { item: nextItem, allPublished } = await publishApprovedItem(
       supabase,
       current,
       channelsToPublish,
       { instagramImageDataUrl: imageDataUrl }
     )
-    if (!allPublished) {
-      const channelIssues = channelsToPublish
-        .filter(channel => nextItem.auto_publish_result?.[channel] === "error")
-        .map(channel => `${channel}: ${errors[channel] ?? "external_publish_failed"}`)
-      lastIssue = `error: item ${current.id}: ${channelIssues.join("; ") || "publicación externa incompleta"}`
-    }
     const persistItem = dueRepeat && allPublished
       ? { ...nextItem, repeat_count: (current.repeat_count ?? 0) + 1 }
       : nextItem
