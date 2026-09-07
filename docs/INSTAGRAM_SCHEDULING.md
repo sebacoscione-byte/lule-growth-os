@@ -33,8 +33,9 @@ no un minuto exacto.
 ```
 
 La frecuencia semanal es la cantidad de slots; no existe un segundo contador que pueda quedar
-inconsistente. La API valida duplicados, zona horaria, horarios soportados y superposiciones entre
-posts, carruseles y reels. Las historias sí pueden anticipar una pieza principal la misma noche.
+inconsistente. La API valida duplicados, zona horaria y horarios soportados. Posts, carruseles y reels
+pueden compartir noche: el cron los publica en secuencia dentro de la misma corrida y cada formato
+conserva su propia idempotencia. Las historias corren en la ventana anterior.
 
 La forma legacy con `times_per_week` y `days_of_week` se convierte al leerla. Se preservan activación,
 días, fecha de inicio, tamaño de tanda y últimos resultados; las colas y `queue_rank` viven en las
@@ -57,8 +58,7 @@ el owner puede aplicar la estrategia desde `Estudio de contenido → Biblioteca`
   ráfagas de copias exactas separadas por segundos sin borrar las piezas omitidas.
 - Antes de cada pieza se relee la cola; una pieza que ya dejó de estar aprobada no se publica.
 - Los canales ya exitosos se excluyen de un reintento parcial.
-- Un feed legacy con noches superpuestas publica como máximo un formato esa noche y registra
-  `skipped_feed_conflict` en los restantes.
+- Si coinciden varios formatos de feed la misma noche, se procesan en orden post → carrusel → reel.
 - Carruseles incompletos y reels sin video se omiten con un error visible; no se publica material roto.
 - Un fallo de una métrica o integración de mantenimiento no cancela las publicaciones editoriales.
 

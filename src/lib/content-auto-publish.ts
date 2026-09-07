@@ -12,7 +12,6 @@ import {
   readAutoPublishSettings,
   readContentItems,
   resolveChannelsToPublish,
-  shouldRunAutoPublish,
   writeAutoPublishSettings,
 } from "@/lib/content-pipeline"
 import { publishApprovedItem } from "@/lib/content-publish"
@@ -137,8 +136,8 @@ export async function runAutoPublishTrack(
   }
 }
 
-/** Ejecuta y persiste solo los formatos pedidos. En feed, una publicación exitosa bloquea las
- * siguientes del mismo día aun si una configuración legacy superponía tracks. */
+/** Ejecuta y persiste solo los formatos pedidos. Cada formato conserva su propia idempotencia;
+ * si dos formatos comparten día, se publican en secuencia dentro de la misma corrida. */
 export async function runAutoPublishFormats(
   supabase: SupabaseClient,
   formats: AutoPublishFormat[],
@@ -147,19 +146,10 @@ export async function runAutoPublishFormats(
   const settings = await readAutoPublishSettings(supabase)
   const next: AutoPublishSettings = { ...settings }
   const results: AutoPublishRunResults = {}
-  let feedAlreadyPublished = false
 
   for (const format of formats) {
     const track = settings[format]
-    let result: AutoPublishTrackSettings
-    if (format !== "historia" && feedAlreadyPublished && shouldRunAutoPublish(track, now)) {
-      result = { ...track, last_run_at: now.toISOString(), last_run_result: "skipped_feed_conflict" }
-    } else {
-      result = await runAutoPublishTrack(supabase, format, track, settings.channels, now)
-    }
-    if (format !== "historia" && result.last_published_at !== track.last_published_at) {
-      feedAlreadyPublished = true
-    }
+    const result = await runAutoPublishTrack(supabase, format, track, settings.channels, now)
     next[format] = result
     results[format] = result
   }

@@ -1,3 +1,40 @@
+# EN CURSO (2026-09-07) — indexación y formatos de feed en la misma noche
+
+## Objetivo
+
+Verificar el nuevo aviso de Search Console y permitir que posts, carruseles y reels compartan día
+de publicación cuando el owner así lo configure.
+
+## Plan
+
+- [x] Auditar redirects, sitemap, robots, canonical e indexación visible en producción.
+- [x] Confirmar que "Página con redirección" corresponde a una exclusión esperable y no a una URL
+      pública rota: `/` responde 308 hacia la landing canónica y todas las URLs del sitemap responden 200.
+- [x] Retirar la exclusión artificial entre formatos de feed tanto de la UI/API como del cron.
+- [x] Agregar regresiones y actualizar la documentación operativa.
+- [ ] Ejecutar lint, tests, build y validación de preview; abrir y mergear el PR.
+
+## Alcance
+
+- No se cambia el cron ni su ventana: el job de feed sigue siendo uno y procesa post, carrusel y reel
+  secuencialmente entre 19:00 y 20:00 ART.
+- No se modifica lógica médica, webhooks de WhatsApp, RLS, autenticación ni datos de pacientes.
+
+## Validación local
+
+- Auditoría HTTP de producción: las 13 URLs del sitemap responden 200, declaran su propia canonical
+  absoluta y permiten indexación; `/` responde 308 directo a `/dra-lucia-chahin`.
+- La búsqueda pública de Google devuelve la landing principal y landings secundarias; la principal
+  fue rastreada nuevamente el 2026-09-07.
+- Meta admite varias publicaciones por API en un período de 24 horas; el volumen de esta configuración
+  está muy por debajo de ese límite.
+- Regresión específica: post y reel configurados el mismo jueves se publican ambos, en ese orden.
+- `npm run lint`: sin errores ni warnings.
+- `npm test -- --runInBand`: 138 suites y 1.189 pruebas aprobadas.
+- `npm run build`: compilación, TypeScript y 90 rutas generadas correctamente.
+
+---
+
 # CERRADO (2026-09-07) — cron editorial y Function Storage de Vercel
 
 ## Objetivo
