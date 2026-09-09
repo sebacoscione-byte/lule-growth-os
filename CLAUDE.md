@@ -1904,9 +1904,9 @@ V2 sigue generando la escena sin texto y componiendo la tipografía real con FFm
   separado del límite general de texto y del límite de video. Incluye placas y fotogramas de referencia.
 - **Privacidad**: el tráfico compartido con OpenAI debe permanecer desactivado. Los prompts de este
   flujo son briefs editoriales sin datos de pacientes.
-- **Verificación real del 2026-09-09**: la llamada mínima con `quality: "low"` llegó correctamente al
-  modelo, pero OpenAI la rechazó antes de generar y cobrar porque la organización aún no está
-  verificada. La verificación de organización es independiente del saldo de USD 25.
+- **Verificación real del 2026-09-09**: después de verificar la organización, una única llamada con
+  `quality: "low"` respondió 200 y devolvió una imagen PNG válida de 832x1040. No se usaron datos
+  personales ni clínicos; la verificación de organización sigue siendo independiente del saldo.
 - Las llamadas quedan auditadas en `ai_requests` con `purpose: "content_visual"` y su proveedor real.
 
 ### Histórico: respaldo opcional con OpenAI (`gpt-image-2`) si Gemini falla (2026-07-30)
