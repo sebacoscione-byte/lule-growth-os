@@ -17,8 +17,8 @@ Gemini como respaldo y limitar el gasto diario sin compartir tráfico de la API 
 
 - Las imágenes usan solamente briefs editoriales y no incluyen datos ni fotografías de pacientes.
 - El intercambio voluntario de inputs/outputs con OpenAI permanece desactivado.
-- Una prueba `low` fue rechazada antes de generarse y no consumió crédito: la organización debe
-  completar la verificación de OpenAI; el fallback a Gemini mantiene operativo el sistema.
+- La organización quedó verificada y una única prueba real con `quality: "low"` respondió 200,
+  devolvió una imagen PNG válida de 832x1040 y no incluyó datos personales ni clínicos.
 - No se modifica lógica médica, webhooks, cron jobs, RLS, autenticación ni datos de pacientes.
 
 ## Validación
@@ -30,7 +30,8 @@ Gemini como respaldo y limitar el gasto diario sin compartir tráfico de la API 
   `/api/content/visual` sin sesión rechazado con 401.
 - Variables de OpenAI cargadas como sensibles/configuradas en Preview y Production; no se modificó
   `.env.local` ni se expuso la clave.
-- Activación efectiva pendiente de un único paso externo: verificar la organización de OpenAI.
+- Activación efectiva confirmada contra OpenAI; la prueba mínima se hizo una sola vez para limitar
+  el gasto y Gemini permanece como respaldo automático.
 
 ---
 
