@@ -309,7 +309,7 @@ export async function sendList(
   to: string,
   body: string,
   buttonLabel: string,
-  rows: Array<{ id: string; title: string }>,
+  rows: Array<{ id: string; title: string; description?: string }>,
   ctx: SendContext
 ) {
   assertWindowOpen(to, ctx.windowState)
@@ -322,7 +322,14 @@ export async function sendList(
       body: { text: body },
       action: {
         button: buttonLabel,
-        sections: [{ title: "Opciones", rows }],
+        sections: [{
+          title: "Opciones",
+          rows: rows.map(row => ({
+            id: row.id,
+            title: row.title,
+            ...(row.description ? { description: row.description } : {}),
+          })),
+        }],
       },
     },
   }, to, "interactive_list", ctx)

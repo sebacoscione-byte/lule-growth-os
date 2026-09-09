@@ -24,6 +24,7 @@ jest.mock("@/lib/whatsapp-erasure-suppression", () => ({
 import {
   checkWhatsAppCloudApiConfiguration,
   getWhatsAppGraphApiVersion,
+  sendList,
   sendText,
   sendTemplate,
   WhatsAppApiError,
@@ -235,6 +236,52 @@ describe("sendText — gate de ventana de 24h", () => {
     await expect(sendText("5491100000000", "hola", { ...baseCtx, windowState: "closed" }))
       .rejects.toThrow(WindowClosedError)
     expect(global.fetch).not.toHaveBeenCalled()
+  })
+})
+
+describe("sendList — opciones enriquecidas", () => {
+  beforeEach(() => {
+    jest.clearAllMocks()
+    process.env.WHATSAPP_PHONE_NUMBER_ID = "123"
+    process.env.WHATSAPP_ACCESS_TOKEN = "token"
+    process.env.META_GRAPH_API_VERSION = "v25.0"
+    global.fetch = jest.fn().mockResolvedValue({ ok: true, json: async () => ({}) }) as unknown as typeof fetch
+  })
+
+  it("envía la descripción de cada sede dentro de la fila interactiva", async () => {
+    await sendList(
+      "5491100000000",
+      "Elegí dónde querés atenderte",
+      "Elegir lugar",
+      [{ id: "practice_site:cimel_lanus", title: "CIMEL Lanús", description: "Martes · Tucumán 1314" }],
+      baseCtx
+    )
+
+    expect(global.fetch).toHaveBeenCalledWith(
+      "https://graph.facebook.com/v25.0/123/messages",
+      expect.objectContaining({
+        body: JSON.stringify({
+          messaging_product: "whatsapp",
+          to: "5491100000000",
+          type: "interactive",
+          interactive: {
+            type: "list",
+            body: { text: "Elegí dónde querés atenderte" },
+            action: {
+              button: "Elegir lugar",
+              sections: [{
+                title: "Opciones",
+                rows: [{
+                  id: "practice_site:cimel_lanus",
+                  title: "CIMEL Lanús",
+                  description: "Martes · Tucumán 1314",
+                }],
+              }],
+            },
+          },
+        }),
+      })
+    )
   })
 })
 
