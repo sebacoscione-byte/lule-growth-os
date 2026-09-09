@@ -25,8 +25,8 @@ function sampleRgb(path: string, x: number, y: number): [number, number, number]
   return [pixel[0], pixel[1], pixel[2]]
 }
 
-describe("composeContentPlate V2.1", () => {
-  it("integra foto full-bleed con cobertura marfil gradual, sin un corte vertical", async () => {
+describe("composeContentPlate V2.2", () => {
+  it("integra foto full-bleed con cobertura inferior gradual, sin un corte vertical", async () => {
     const output = await composeContentPlate({
       photoBuffer: solidPhotoPpm(),
       headline: "TU CONTROL CARDIOVASCULAR EN LANÚS",
@@ -37,19 +37,23 @@ describe("composeContentPlate V2.1", () => {
     const outputPath = join(workDir, "plate.png")
     try {
       writeFileSync(outputPath, output)
-      const paperZone = sampleRgb(outputPath, 40, 40)
-      const transitionZone = sampleRgb(outputPath, 670, 40)
-      const photoZone = sampleRgb(outputPath, 900, 40)
+      const photoZone = sampleRgb(outputPath, 40, 120)
+      const transitionLeft = sampleRgb(outputPath, 90, 650)
+      const transitionRight = sampleRgb(outputPath, 900, 650)
+      const paperZone = sampleRgb(outputPath, 900, 1250)
 
+      photoZone.forEach((channel, index) => {
+        expect(Math.abs(channel - PHOTO_RGB[index])).toBeLessThanOrEqual(2)
+      })
       expect(paperZone[0]).toBeGreaterThan(235)
       expect(paperZone[1]).toBeGreaterThan(235)
       expect(paperZone[2]).toBeGreaterThan(225)
-      expect(transitionZone).not.toEqual(paperZone)
-      expect(transitionZone).not.toEqual(photoZone)
-      expect(transitionZone[0]).toBeGreaterThan(PHOTO_RGB[0] + 30)
-      expect(transitionZone[0]).toBeLessThan(paperZone[0] - 20)
-      photoZone.forEach((channel, index) => {
-        expect(Math.abs(channel - PHOTO_RGB[index])).toBeLessThanOrEqual(2)
+      expect(transitionLeft).not.toEqual(paperZone)
+      expect(transitionLeft).not.toEqual(photoZone)
+      expect(transitionLeft[0]).toBeGreaterThan(PHOTO_RGB[0] + 30)
+      expect(transitionLeft[0]).toBeLessThan(paperZone[0] - 20)
+      transitionLeft.forEach((channel, index) => {
+        expect(Math.abs(channel - transitionRight[index])).toBeLessThanOrEqual(2)
       })
     } finally {
       rmSync(workDir, { recursive: true, force: true })

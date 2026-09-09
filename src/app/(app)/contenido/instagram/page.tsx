@@ -3261,7 +3261,7 @@ function Editor({
                 ? "La miniatura que se ve en tu perfil de Instagram (pestaña Reels) y en la Biblioteca de acá — no es el contenido del reel en sí, eso lo define el video de arriba. Si no generás ni subís una, Instagram usa el primer frame del video como portada."
                 : (item.visual_generation_version ?? "v1") === "v1"
                   ? "GPT Image resuelve la placa completa, incluida la tipografía, en una sola generación."
-                  : "GPT Image genera la escena; la app integra foto full-bleed, cobertura de lectura y tipografía real según el formato."}
+                  : "GPT Image genera la escena; la app integra una cobertura editorial inferior y tipografía real sobre la misma foto."}
             </p>
           </CardHeader>
           <CardContent className="space-y-3">
@@ -3284,13 +3284,13 @@ function Editor({
                   disabled={busy}
                   onClick={() => onSave({ visual_generation_version: "v2" })}
                 >
-                  Alternativo (V2.1)
+                  Alternativo (V2.2)
                 </Button>
               </div>
               <p className="w-full text-[11px] text-gray-500">
                 {(item.visual_generation_version ?? "v1") === "v1"
                   ? "GPT Image dibuja la placa entera (foto + texto) en una sola pasada — una sola imagen fotográfica, sin corte al medio."
-                  : "GPT Image genera la foto full-bleed aparte; la cobertura degradada, el titular, subtítulo y marca se agregan por edición real en un panel al costado — ortografía perfecta, pero se ve como dos partes separadas en vez de una sola imagen."}
+                  : "GPT Image genera una foto full-bleed; la app suma desde abajo un degradado editorial, titular, subtítulo y firma con tipografía real — una sola composición, sin corte lateral y con ortografía confiable."}
               </p>
             </div>
             {displayedVisualUrl ? (

@@ -259,13 +259,14 @@ const IMAGE_PROMPT_RULES = `DIRECCION VISUAL PARA GPT IMAGE 2.5:
 - Usa este orden dentro del prompt: objetivo y tema; escena principal; composicion; luz y color; acabado editorial; espacio negativo; restricciones.
 - Indica proporcion vertical 4:5 para feed; usa 9:16 solo si el formato es historia.
 - IMPORTANTE (2026-07-30): esta escena es SOLO la foto/ilustracion de fondo -- el titular, subtitulo,
-  nombre y especialidad se agregan despues por edicion real sobre un panel de texto propio (ver
+  nombre y especialidad se agregan despues por edicion real sobre la misma foto (ver
   composeContentPlate en content-plate.ts), nunca los dibuja el modelo de imagen. Por eso "image_prompt"
   nunca debe mencionar texto, letras, titulares ni tipografia -- describi unicamente la escena
-  fotografica/ilustrada. Pedi que el punto focal y todos los objetos significativos queden contenidos
-  en el 40% derecho, con el 55% izquierdo simple, parejo y de bajo detalle. La foto se usa full-bleed y
-  una cobertura marfil degradada se superpone desde la izquierda: no debe haber objetos importantes ni
-  primeros planos borrosos cruzando esa zona o dominando el tercio inferior.
+  fotografica/ilustrada. Pedi una composicion full-bleed genuina, nunca dividida: el punto focal y los
+  objetos significativos deben concentrarse principalmente en el 60% superior; el 45% inferior debe
+  conservar el mismo ambiente fotografico pero ser mas sereno, parejo y de bajo detalle. Ahi se suma
+  desde abajo una cobertura marfil gradual con texto real. No debe haber rostros, manos, instrumentos
+  ni primeros planos borrosos detras de esa zona de lectura.
 - Para historia, manten el sujeto y los elementos importantes dentro de la zona segura central, lejos de los bordes superior e inferior.
 - Para carrusel, crea una portada que abra una brecha de curiosidad y se entienda en menos de tres segundos.
 - Pedi iluminacion natural o cinematografica suave, profundidad, textura y una paleta sobria con acentos bordo, azul profundo o verde azulado.
@@ -1482,7 +1483,7 @@ FINAL ART DIRECTION:
 FINAL CHECK before rendering: the finished image must contain ONLY the two quoted Spanish strings above (the headline and the subtitle text — never the words "headline" or "subtitle" themselves), each COMPLETE and uncropped from first to last character, each spelled perfectly with correct accents and ñ, every word present and in order, with NO word broken or hyphenated across a line break, entirely inside the frame with margin on all sides, and ZERO other text characters of any kind.`
 }
 
-/** Prompt V2.1 (valor persistido "v2", ya NO es el default desde 2026-08-06 -- ver generateContentVisual):
+/** Prompt V2.2 (valor persistido "v2", ya NO es el default desde 2026-08-06 -- ver generateContentVisual):
  * SOLO la foto/escena full-bleed, sin texto de ningun
  * tipo -- composeContentPlate() integra cobertura/titular/subtitulo/marca aparte, por edicion real. */
 function buildVisualPromptV2(input: {
@@ -1502,7 +1503,7 @@ ${input.image_prompt}
 
 FINAL ART DIRECTION:
 - Produce one polished ${aspectRatio} photographic/illustrative composition, not a mockup or template preview.
-- Compose for a full-bleed image with the main subject and all meaningful objects contained in the RIGHT 40% of the frame. Keep the LEFT 55% quiet, low-detail and tonally even because a soft opaque-to-transparent text scrim will blend over it afterward. Do not place a foreground object across the lower edge or let blurred objects dominate the bottom third.
+- Compose a genuine full-bleed editorial image, never a split layout. Place the strongest focal point mainly in the UPPER 60% of the frame and let the photographic environment continue naturally to every edge. Keep the LOWER 45% quieter, lower-detail and tonally even because a soft bottom-up reading gradient and real typography will be added there afterward. The lower area must still look like part of the same photograph, never an empty panel or a second background. Do not place faces, hands, instruments or other meaningful objects behind that lower text area.
 - The image must feel warm, professional and trustworthy to an adult patient in Argentina, with a clear focal point and generous breathing room.
 - ABSOLUTELY NO text, letters, numbers, words, logos, watermarks, UI elements, phone/app mockups, captions or invented/decorative lettering anywhere in the image, in any language.
 - No diagnosis, treatment claim, urgency marketing, fear, or extra text of any kind.
@@ -1520,11 +1521,10 @@ export async function generateContentVisual(input: {
   image_prompt: string
   /** "v1" (default desde 2026-08-06, tambien si se omite): el modelo dibuja la placa entera (foto +
    * texto) en una sola pasada -- una sola imagen fotografica, sin corte al medio. "v2": motor
-   * anterior (default hasta el 2026-08-06), foto sola + texto compuesto aparte en un panel al
-   * costado (composeContentPlate) -- Seba lo marco como "muy mala, genera todo imagenes con un
-   * corte a la mitad con un texto a la izquierda y la imagen a la derecha" y pidio volver a V1 por
-   * default. Ver buildVisualPromptV1/buildVisualPromptV2 y el selector "Motor de generacion" del
-   * editor. */
+   * anterior (default hasta el 2026-08-06), foto sola + texto compuesto aparte con
+   * composeContentPlate. V2.2 reemplaza el panel al costado por una cobertura editorial inferior
+   * continua, manteniendo ortografia determinista sin dividir la imagen en dos. Ver
+   * buildVisualPromptV1/buildVisualPromptV2 y el selector "Motor de generacion" del editor. */
   version?: "v1" | "v2"
 }): Promise<{ mime_type: string; image_data: string }> {
   const version = input.version === "v2" ? "v2" : "v1"
@@ -1543,7 +1543,7 @@ export async function generateContentVisual(input: {
     return { mime_type: photo.mimeType, image_data: photo.buffer.toString("base64") }
   }
 
-  // V2 (default): la foto todavia no tiene titular/subtitulo/marca -- se componen aparte por edicion
+  // V2: la foto todavia no tiene titular/subtitulo/marca -- se componen aparte por edicion
   // real, garantizando ortografia perfecta siempre (no depende de que el modelo de imagen "acierte").
   const plateBuffer = await composeContentPlate({
     photoBuffer: photo.buffer,
