@@ -59,22 +59,50 @@ El prompt visual define una sola direccion creativa, proporcion vertical, punto 
 titular + subtitulo en una sola pasada, lo cual llego a inventar lineas deformes o comerse letras --
 ver `docs/BACKLOG.md`). Ahora Gemini genera SOLO la foto/escena (con espacio negativo pedido en el
 zona izquierda simple y de bajo detalle) y `composeContentPlate()` (`src/lib/content-plate.ts`) arma
-la placa final por edicion real con ffmpeg. Desde V2.1 la foto ocupa todo el lienzo y una cobertura
-marfil casi opaca detrás del texto se desvanece suavemente hacia el centro; ya no hay dos columnas ni
-un corte vertical. Sobre esa composición se queman titular/subtitulo/nombre/especialidad con texto
+la placa final por edicion real con ffmpeg. Desde V2.2 la foto ocupa todo el lienzo y una cobertura
+marfil aparece gradualmente desde abajo a lo ancho de la misma escena; no hay dos columnas, panel
+lateral ni corte vertical. Sobre esa composición se queman titular/subtitulo/nombre/especialidad con texto
 real y la paleta/tipografia de la landing publica (`ink`/`paper`/`cardiac`, Fraunces+Inter), nunca
 dibujados por el modelo de imagen. Garantiza ortografia
 perfecta siempre. El editor llama a `generateContentVisual` (que hace ambos pasos internamente) para
 generar una placa final 4:5 para feed/carrusel o 9:16 para historia. La persona revisa el resultado y
 lo descarga; no tiene que armar la composicion visual.
 
-La cobertura izquierda es deliberadamente constante: es el sistema de marca de V2.1, no una imagen
-reutilizada. Al tener transición y fotografía full-bleed, funciona como una capa editorial integrada
-en vez de una mitad pegada. La escena sí tiene que cambiar. Antes de gastar un intento, la ruta de
+El sistema de marca constante es la combinacion de paleta, Fraunces+Inter, jerarquia, regla bordo y
+firma profesional; no una geometria lateral que obligue a repetir la misma placa. La escena sí tiene
+que cambiar y conserva su entorno fotografico detras del degradado inferior. Antes de gastar un intento, la ruta de
 generación compara los motivos del `image_prompt` con las piezas recientes y detecta también el cliché
 de consultorio armado con médica parcial + escritorio + utilería clínica. Si aparece cualquiera de
 esos problemas, pide automáticamente otra dirección visual y persiste el prompt realmente usado. No
 hay caché de fotografías entre piezas.
+
+### Criterio visual de V2.2
+
+El rediseño no parte de que exista una plantilla universalmente superior. Mantiene constantes las
+señales que permiten reconocer a la Dra. Lucía y deja variar la escena y el contenido:
+
+- Un experimento sobre identidad visual en redes encontró mejores evaluaciones, credibilidad y
+  reputacion bajo condiciones visualmente consistentes que bajo condiciones inconsistentes
+  ([Journal of Indian Business Research](https://doi.org/10.1108/JIBR-06-2020-0174)).
+- Un estudio de 707 publicaciones y 1.105 historias encontró que la consistencia visual importa, pero
+  que la estrategia más efectiva combina consistencia y variación según formato; demasiada
+  repetición también elimina sorpresa y atención
+  ([Journal of the Academy of Marketing Science](https://doi.org/10.1007/s11747-026-01188-8)).
+- La revisión sistemática de 51 estudios sobre profesionales de salud en Instagram advierte sobre
+  calidad visual, credenciales, ediciones engañosas y confidencialidad; V2 mantiene firma profesional,
+  revisión humana y escenas sin pacientes identificables
+  ([PubMed](https://pubmed.ncbi.nlm.nih.gov/38359390/)).
+- Meta prioriza contenido original y sin marcas de agua en sus recomendaciones; las escenas propias y
+  variables de cada pieza son preferibles a reutilizar material idéntico
+  ([Meta](https://about.fb.com/ltam/news/2024/05/ayudando-a-los-creadores-a-encontrar-nuevas-audiencias/)).
+
+Las experiencias públicas de creadores se usaron sólo como señal cualitativa: coinciden en que una
+marca debe conservar tipografías, colores y espaciado, pero que un carrusel demasiado uniforme puede
+sentirse como una plantilla genérica
+([discusión de diseño](https://www.reddit.com/r/graphic_design/comments/1hecjz0/),
+[discusión sobre carruseles con IA](https://www.reddit.com/r/InstagramMarketing/comments/1v6zrsx/how_are_people_making_instagram_carousel_posts/)).
+Las métricas propias de alcance, guardados, compartidos, visitas
+al perfil y consultas siguen siendo la evidencia decisiva para comparar V1 y V2.2.
 
 Los contenidos de sede, cercanía o cómo pedir turno no se resuelven por defecto con una médica en un
 consultorio. Priorizan un recorrido local/calendario en ilustración editorial táctil, un momento

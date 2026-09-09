@@ -337,6 +337,14 @@
   razonablemente bien — no determinístico, reduce el riesgo pero no lo elimina. Archivos:
   `src/lib/ai.ts` (+tests), `src/app/api/content/visual/route.ts` (+tests),
   `src/app/(app)/contenido/instagram/page.tsx`, `src/types/index.ts`.
+- 2026-09-09 (V2.2, reemplaza la geometría criticada de V2.1): una revisión de evidencia pública
+  sobre identidad visual, Instagram y comunicación de salud confirmó que conviene sostener señales
+  de marca reconocibles sin imponer la misma plantilla lateral a todas las piezas. V2 mantiene el
+  texto determinista de FFmpeg, pero `composeContentPlate` ahora integra una cobertura marfil desde
+  abajo sobre todo el ancho de la foto full-bleed; ya no existe el corte 55% texto/40% foto. El prompt
+  concentra el punto focal en el 60% superior y deja el 45% inferior más sereno, sin convertirlo en
+  un panel vacío. Fraunces+Inter, `paper`/`ink`/`cardiac`, jerarquía y firma siguen constantes. V1
+  permanece predeterminado y V2.2 alternativo hasta poder comparar métricas propias.
 - 2026-08-06 (mismo día, cierre real del punto 3 de arriba): Seba pidió borrar las 5 historias en
   borrador que había generado el cron con el patrón viejo y volver a correr el cron. Confirmado por
   datos reales (consulta de solo lectura a `app_config.content_pipeline`, sin PII) que las 5 eran

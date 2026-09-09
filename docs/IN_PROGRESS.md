@@ -1,3 +1,40 @@
+# EN CURSO (2026-09-09) — V2 visual coherente para Instagram
+
+## Objetivo
+
+Rediseñar la generación de imágenes V2 a partir de evidencia pública sobre comunicación visual,
+Instagram y salud: conservar una identidad reconocible sin repetir una plantilla rígida ni separar
+la fotografía y el texto en dos mitades. Mantener la ortografía determinista de V2 y la seguridad
+médica existente.
+
+## Plan
+
+- [x] Auditar V1/V2.1 y contrastar la decisión con fuentes públicas y experiencias de creadores.
+- [x] Reemplazar el panel lateral de V2.1 por una composición editorial integrada y actualizar el prompt fotográfico.
+- [x] Agregar regresiones visuales del degradado, zonas seguras y ausencia de corte vertical.
+- [x] Actualizar selector, tipos y documentación operativa con el contrato V2.2.
+- [x] Ejecutar lint, tests y build; revisar una placa renderizada.
+- [x] Abrir PR, verificar CI/preview y mergear a `main`.
+
+## Alcance y seguridad
+
+- No se modifica lógica médica, síntomas de alarma, diagnósticos, tratamientos ni guardrails.
+- No se modifican webhooks de WhatsApp, cron jobs, RLS, autenticación ni datos de pacientes.
+- No se generan ni envían fotografías reales de pacientes; el cambio afecta composición y prompts editoriales.
+
+## Validación local
+
+- `npm run lint`: sin errores ni warnings.
+- `npm test -- --runInBand`: 140 suites y 1.224 pruebas aprobadas.
+- `npm run build`: compilación, TypeScript y 90 rutas generadas correctamente.
+- Revisión visual 4:5 sobre una fotografía pública temporal: tipografía legible, degradado inferior
+  continuo y ausencia del corte vertical de V2.1. El archivo de QA no se incorporó al repositorio.
+- PR #277: build, E2E público y Vercel Preview aprobados; E2E autenticado omitido por diseño.
+- Preview `Ready`: `/login` respondió 200 y `/api/content/visual` rechazó correctamente una llamada
+  sin sesión con 401. La composición V2.2 se verificó localmente para no consumir una generación paga.
+
+---
+
 # IMPLEMENTADO (2026-09-09) — migración de imágenes a GPT Image 2.5 Flare
 
 ## Objetivo

@@ -872,6 +872,10 @@ describe("generatePhotoWithGemini reintenta ante una falla transitoria (bug real
       const sentPrompt = body.input as string
       expect(sentPrompt).not.toContain(visualInput.visual_headline)
       expect(sentPrompt).not.toContain(visualInput.visual_subtitle)
+      expect(sentPrompt).toContain("never a split layout")
+      expect(sentPrompt).toContain("UPPER 60%")
+      expect(sentPrompt).toContain("LOWER 45%")
+      expect(sentPrompt).not.toContain("RIGHT 40%")
       expect(_url).toBe("https://generativelanguage.googleapis.com/v1beta/interactions")
       expect(body).toMatchObject({
         model: "gemini-3.1-flash-image",

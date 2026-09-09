@@ -1,5 +1,23 @@
 # Backlog — Lule Growth OS
-**Actualizado:** 2026-09-03 | **Basado en:** PRD Estrategia de Captación v2.1
+**Actualizado:** 2026-09-09 | **Basado en:** PRD Estrategia de Captación v2.1
+
+---
+
+## [RESUELTO] ✅ V2.2 integra foto y texto sin partir la placa (2026-09-09)
+
+- Se contrastaron estudios de identidad visual, comunicación de salud e Instagram con experiencias
+  públicas de creadores. No existe una plantilla universal ganadora: la señal más sólida es sostener
+  códigos reconocibles y permitir variación de escena y ritmo.
+- V2 conserva sus ventajas frente a V1: GPT Image genera sólo la escena y FFmpeg agrega titular,
+  subtítulo y firma con ortografía determinista.
+- Se eliminó el panel fijo izquierdo/derecho de V2.1. V2.2 usa una foto full-bleed y un degradado
+  marfil que aparece desde abajo sobre el ancho completo, por lo que se percibe una sola composición.
+- El prompt concentra el punto focal en la zona superior y reserva una zona inferior tranquila sin
+  convertirla en un fondo vacío. Fraunces, Inter, `paper`/`ink`/`cardiac`, la jerarquía y la firma
+  siguen siendo los códigos constantes de la marca.
+- V1 permanece como predeterminado y V2.2 como alternativa por pieza hasta que las métricas propias
+  de alcance, guardados, compartidos, visitas al perfil y consultas permitan compararlas.
+- No se modificaron lógica médica, webhooks, cron jobs, autenticación, RLS ni datos de pacientes.
 
 ---
 
@@ -179,7 +197,8 @@ sucesores (`gpt-image-1.5`/`gpt-image-2`) tienen pricing similar (~USD 0.009-0.2
 refuerza la Opción A: agnóstica del proveedor de imagen, no se rompe si OpenAI/Google cambian de
 modelo.
 
-**Qué se implementó (Opción A, `src/lib/content-plate.ts`, nuevo)**:
+**Qué se implementó originalmente (Opción A, `src/lib/content-plate.ts`, nuevo; el layout lateral
+descripto abajo fue reemplazado por V2.2 el 2026-09-09)**:
 - `generateContentVisual()` (`ai.ts`) ya NO le pide a Gemini que dibuje el titular/subtítulo — el
   prompt se reescribió para pedir **solo la foto/escena**, con una prohibición explícita y reforzada
   de cualquier texto/letra/número/logo, y la instrucción de dejar espacio negativo en el tercio
