@@ -2,8 +2,8 @@ import type { VideoGenerationVersion } from "@/types"
 
 const V1_REQUIRED_STYLE_PATTERN = /(?:motion graphic|illustration|flat|semi-flat)/i
 const V2_CAMERA_PATTERN = /(?:locked camera|locked tripod|slow controlled push-in|slow lateral slider|gentle handheld drift)/i
-const V2_REQUIRED_SECTIONS = ["Human action:", "Camera motion:", "Environment motion:", "Continuity:", "Audio:"]
-const V2_DIRECT_REQUIRED_SECTIONS = ["Subject and setting:", "Human action:", "Camera and composition:", "Light and palette:", "Continuity:", "Audio:"]
+const V2_REQUIRED_SECTIONS = ["Shot:", "Human action:", "Camera motion:", "Environment motion:", "Continuity:", "Audio:", "Constraints:"]
+const V2_DIRECT_REQUIRED_SECTIONS = ["Shot:", "Subject and setting:", "Human action:", "Camera and composition:", "Light and palette:", "Continuity:", "Audio:", "Constraints:"]
 
 const COMMON_VEO_PARAMETERS = {
   aspectRatio: "9:16",
@@ -11,30 +11,8 @@ const COMMON_VEO_PARAMETERS = {
   durationSeconds: 8,
 } as const
 
-/** Lista de elementos no deseados. Google recomienda describirlos sin instrucciones negativas. */
-export const VEO_V2_NEGATIVE_PROMPT = [
-  "on-screen text", "letters", "numbers", "captions", "logos", "watermarks", "phone interface",
-  "incorrect stethoscope placement on abdomen", "stethoscope on belly", "stethoscope on stomach",
-  "upper-arm blood pressure cuff placed on wrist", "medical instrument placed on the wrong body area",
-  "distorted anatomy", "extra fingers", "missing fingers", "fused hands", "duplicated limbs", "asymmetric eyes",
-  "plastic skin", "beauty retouching", "glamorous makeup", "fashion advertising", "posed stock photography",
-  "fictional doctor addressing camera", "luxury clinic", "American hospital aesthetic", "cold fluorescent light",
-  "invented medical interface", "fake ECG", "invented medical device", "anatomical errors",
-  "paper-cut art", "layered paper", "flat vector", "illustration", "3D render", "CGI", "hologram", "neon",
-  "warped geometry", "duplicated objects", "morphing objects", "floating objects", "unnatural motion",
-  "fast camera", "dramatic zoom", "multiple scenes", "montage", "scene transition", "over-saturated colors",
-].join(", ")
-
-export function getVeoRequestParameters(version: VideoGenerationVersion) {
-  if (version === "v2") {
-    // Veo 3.1 image-to-video solo admite allow_adult. El fotograma aprobado ya fija una persona adulta.
-    return { ...COMMON_VEO_PARAMETERS, personGeneration: "allow_adult", negativePrompt: VEO_V2_NEGATIVE_PROMPT }
-  }
-  if (version === "v2_direct") {
-    // Veo 3.1 text-to-video rechaza allow_adult y exige allow_all. El prompt positivo sigue limitando
-    // la escena a una persona adulta; este valor solo adapta el request al contrato actual de Google.
-    return { ...COMMON_VEO_PARAMETERS, personGeneration: "allow_all", negativePrompt: VEO_V2_NEGATIVE_PROMPT }
-  }
+/** Veo se conserva solamente para V1, con el contrato historico de 8 segundos. */
+export function getVeoRequestParameters() {
   return COMMON_VEO_PARAMETERS
 }
 
@@ -48,6 +26,48 @@ export function getVeoRequestInstance(
       image: { inlineData: { mimeType: referenceImage.mime_type, data: referenceImage.image_data } },
     } : {}),
   }
+}
+
+/**
+ * Gemini Omni usa Interactions API: las restricciones van dentro del prompt regular porque el modelo
+ * no admite `negativePrompt`. V2 Controlada suma la imagen aprobada y fija la tarea image-to-video.
+ */
+export function getOmniVideoRequestBody(
+  model: string,
+  prompt: string,
+  referenceImage?: { mime_type: string; image_data: string },
+) {
+  return {
+    model,
+    input: referenceImage
+      ? [
+          { type: "image", data: referenceImage.image_data, mime_type: referenceImage.mime_type },
+          { type: "text", text: prompt },
+        ]
+      : prompt,
+    response_format: { type: "video", aspect_ratio: "9:16", resolution: "720p" },
+    ...(referenceImage ? { generation_config: { video_config: { task: "image_to_video" } } } : {}),
+    background: false,
+    store: false,
+    stream: false,
+  }
+}
+
+type OmniVideoContent = { type?: string; mime_type?: string; data?: string; uri?: string }
+type OmniVideoResponse = {
+  output_video?: OmniVideoContent
+  steps?: Array<{ type?: string; content?: OmniVideoContent[] }>
+}
+
+/** Extrae tanto el esquema REST documentado (`steps`) como el alias que pueden devolver los SDK. */
+export function getOmniVideoOutput(response: OmniVideoResponse): OmniVideoContent | undefined {
+  if (response.output_video?.data || response.output_video?.uri) return response.output_video
+  for (const step of [...(response.steps ?? [])].reverse()) {
+    if (step.type !== "model_output") continue
+    const video = step.content?.find(content => content.type === "video" && (content.data || content.uri))
+    if (video) return video
+  }
+  return undefined
 }
 
 /** V1 se conserva deliberadamente igual al motor historico ilustrado. */
@@ -86,35 +106,38 @@ FOTOGRAMA INICIAL V2:
 - No pedir movimiento: este prompt define un fotograma fijo. La animacion se especifica aparte.
 - Cero texto, letras, numeros, logos, marcas de agua o interfaces legibles.`
 
-/** V2 anima un fotograma ya aprobado: no debe volver a inventar la escena. */
+/** V2 anima un fotograma ya aprobado con Omni: una instruccion breve preserva mejor la escena. */
 export const VIDEO_PROMPT_RULES_V2 = `${VIDEO_VISUAL_IDENTITY_RULES}
 
-DIRECCION V2 IMAGE-TO-VIDEO PARA VEO:
-- Inclui "video_prompt" en ingles y empieza exactamente con "Animate the approved 9:16 first frame for 8 seconds."
-- El fotograma inicial ya define persona, escena, encuadre, luz y estilo. No los redisenes ni agregues sujetos u objetos.
-- Usa exactamente estas secciones: "Human action:", "Camera motion:", "Environment motion:", "Continuity:", "Audio:".
+DIRECCION V2 IMAGE-TO-VIDEO PARA GEMINI OMNI:
+- Inclui "video_prompt" en ingles y empieza exactamente con "Animate the approved 9:16 first frame into an 8-second video."
+- El fotograma inicial ya define persona, escena, encuadre, luz y estilo. Usa una instruccion precisa y no vuelvas a describir ni redisenar la escena.
+- Usa exactamente estas secciones: "Shot:", "Human action:", "Camera motion:", "Environment motion:", "Continuity:", "Audio:", "Constraints:".
+- Shot: debe decir explicitamente "single unbroken scene", "single continuous shot" y "no scene cuts". Omni tiende a crear varias tomas si no se le indica lo contrario.
 - Human action: una sola accion adulta, pequena, natural y semanticamente relevante (respirar, pausar, acomodar correctamente un manguito, anotar un resultado sin mostrar numeros, escuchar o conversar sin dialogo audible).
 - Camera motion: un solo movimiento como maximo: locked camera, slow controlled push-in, slow lateral slider o gentle handheld drift. Sin montaje ni cambio de angulo.
 - Environment motion: minimo y fisicamente creible; no usar cortina, vapor o luz como accion principal.
-- Continuity: preservar exactamente anatomia, identidad, ropa, ubicacion, utileria medica, composicion, luz y paleta del primer fotograma. Ningun objeto aparece, desaparece, se duplica o se transforma.
-- Audio: ambiente real suave, sin dialogo, narracion ni palabras.
-- El prompt positivo describe lo que sucede; las exclusiones se envian aparte como negativePrompt.
-- Nunca pedir texto, logos, interfaces, multiples escenas, transiciones, gestos teatrales ni una persona mirando a camara.`
+- Continuity: terminar con "Keep everything else exactly the same" y preservar anatomia, identidad, ropa, utileria medica, composicion, luz y paleta del primer fotograma.
+- Audio: pedir solo ambiente real suave, sin dialogo, voz en off, palabras ni musica; la pista final se agrega en postproduccion.
+- Constraints: incluir de forma breve las exclusiones esenciales dentro del prompt regular, porque Omni no admite un negativePrompt separado: sin texto visible, letras, numeros, logos, marcas de agua, pantallas o interfaces; sin sujetos u objetos nuevos; sin anatomia deformada, duplicaciones, transformaciones, CGI ni estetica de publicidad stock.
+- Nunca pedir multiples escenas, transiciones, gestos teatrales ni una persona mirando a camara.`
 
-/** V2 Directa conserva la identidad, pero Veo inventa la escena completa desde texto. */
+/** V2 Directa conserva la identidad, pero Omni inventa la escena completa desde texto. */
 export const VIDEO_PROMPT_RULES_V2_DIRECT = `${VIDEO_VISUAL_IDENTITY_RULES}
 
-DIRECCION V2 DIRECTA TEXT-TO-VIDEO PARA VEO:
+DIRECCION V2 DIRECTA TEXT-TO-VIDEO PARA GEMINI OMNI:
 - Inclui "video_prompt" en ingles y empezá exactamente con "An 8-second vertical 9:16 editorial documentary healthcare video."
-- Veo debe resolver UNA sola toma continua. No uses montaje, secuencia, transiciones ni cambio de lugar.
-- Usa exactamente estas secciones: "Subject and setting:", "Human action:", "Camera and composition:", "Light and palette:", "Continuity:", "Audio:".
+- Omni debe resolver UNA sola toma continua. No uses montaje, secuencia, transiciones ni cambio de lugar.
+- Usa exactamente estas secciones: "Shot:", "Subject and setting:", "Human action:", "Camera and composition:", "Light and palette:", "Continuity:", "Audio:", "Constraints:".
+- Shot: debe decir explicitamente "single unbroken scene", "single continuous shot" y "no scene cuts".
 - Subject and setting: una persona adulta argentina/latina realista o una gráfica editorial de marca cuando el tema sea turnos/sedes. Define edad aproximada, ropa cotidiana, ubicación concreta y un único elemento médico correcto si aporta significado.
 - Human action: una sola acción pequeña, natural y directamente conectada con el tema. La acción humana debe ser el movimiento principal; nunca cortinas, vapor, hojas o luz como recurso central.
 - Camera and composition: un único encuadre a altura humana y un solo movimiento como máximo: locked camera, locked tripod, slow controlled push-in, slow lateral slider o gentle handheld drift. Reserva 25-35% lateral para texto real agregado después.
 - Light and palette: luz natural lateral cálida, contraste suave, saturación moderada/baja, crema cálido, petróleo oscuro, marino, turquesa apagado y un acento terracota mínimo.
-- Continuity: anatomía, rostro, manos, ropa y objetos permanecen consistentes; nada aparece, desaparece, se duplica, flota o se transforma.
-- Audio: ambiente real suave, sin diálogo, narración ni palabras.
-- Nunca inventar el rostro de la Dra. Lucía. Nunca una médica ficticia mirando o hablando a cámara. Cero texto, letras, números, logos, marcas de agua o interfaces legibles.
+- Continuity: anatomía, rostro, manos, ropa y objetos permanecen consistentes; nada aparece, desaparece, se duplica, flota o se transforma. Termina con "Keep everything else exactly the same".
+- Audio: ambiente real suave, sin diálogo, voz en off, palabras ni música; la pista final se agrega en postproducción.
+- Constraints: incluir dentro del prompt regular las exclusiones esenciales: no texto visible, letras, números, logos, marcas de agua, pantallas o interfaces; no anatomía deformada, miembros duplicados, objetos transformados, CGI ni estética de publicidad stock.
+- Nunca inventar el rostro de la Dra. Lucía. Nunca una médica ficticia mirando o hablando a cámara.
 - FALLA CRÍTICA PREVENTIVA: si aparece estetoscopio en auscultación cardíaca, describí explícitamente el cabezal sobre pecho/tórax; nunca abdomen, panza o estómago.
 - Evita estética stock, publicidad prepaga, clínica estadounidense de lujo, pose perfecta, piel plástica, CGI, Canva, anatomía estilizada y utilería médica decorativa.`
 
@@ -144,17 +167,17 @@ export function buildFallbackVideoPrompt(topic: string, version: VideoGeneration
   }
   if (version === "v2_direct") {
     if (/(?:turno|lanus|lanús|lomas|britanico|británico|cimel|sede|ubicacion|ubicación)/i.test(safeTopic)) {
-      return `An 8-second vertical 9:16 editorial documentary healthcare video. Subject and setting: a tactile warm-cream editorial brand graphic about ${safeTopic}, with one restrained dark-petrol route, a muted turquoise appointment marker and a tiny soft-terracotta accent; no invented clinic, doctor, patient or building. Human action: no human is introduced; the existing route marker completes one subtle purposeful movement along its path. Camera and composition: locked camera, graphic grouped across two thirds of the frame with a quiet 25-35 percent lateral safe area. Light and palette: soft natural lateral light over real paper texture, warm cream, dark petrol, muted turquoise and minimal terracotta, moderate-low saturation. Continuity: every shape keeps its exact form, count and position except for the single route-marker movement; nothing appears, disappears or transforms. Audio: very soft paper movement and room tone only, without dialogue, narration or spoken words.`
+      return `An 8-second vertical 9:16 editorial documentary healthcare video. Shot: a single unbroken scene, one continuous shot, no scene cuts. Subject and setting: a tactile warm-cream editorial brand graphic about ${safeTopic}, with one restrained dark-petrol route, a muted turquoise appointment marker and a tiny soft-terracotta accent; no invented clinic, doctor, patient or building. Human action: no human is introduced; the existing route marker completes one subtle purposeful movement along its path. Camera and composition: locked camera, graphic grouped across two thirds of the frame with a quiet 25-35 percent lateral safe area. Light and palette: soft natural lateral light over real paper texture, warm cream, dark petrol, muted turquoise and minimal terracotta, moderate-low saturation. Continuity: every shape keeps its exact form, count and position except for the single route-marker movement. Keep everything else exactly the same. Audio: very soft paper movement and room tone only, no dialogue, voiceover, spoken words or music. Constraints: no visible text, letters, numbers, logos, watermarks, screens or interfaces; no new elements, morphing, CGI or stock-advertising finish.`
     }
-    return `An 8-second vertical 9:16 editorial documentary healthcare video. Subject and setting: a realistic adult Latina patient in everyday clothing performs one concrete preventive action directly connected to ${safeTopic}, in a warm inhabited Argentine home or credible consultation setting, identity partial and never addressing camera. Human action: she completes one small natural movement central to the topic, with realistic breathing, hands and restrained expression. Camera and composition: slow controlled push-in at human eye level with a normal 50 mm perspective, one continuous shot, subject across two thirds and a quiet 25-35 percent lateral safe area. Light and palette: warm lateral window light, soft contrast, moderate-low saturation, warm cream, dark petrol, navy, muted turquoise and a tiny terracotta accent, natural skin and material texture. Continuity: preserve exact anatomy, face, hands, clothing and object placement throughout; everything remains grounded, singular and unchanged. Audio: faint authentic room tone only, without dialogue, narration or spoken words.`
+    return `An 8-second vertical 9:16 editorial documentary healthcare video. Shot: a single unbroken scene, one continuous shot, no scene cuts. Subject and setting: a realistic adult Latina patient in everyday clothing performs one concrete preventive action directly connected to ${safeTopic}, in a warm inhabited Argentine home or credible consultation setting, identity partial and never addressing camera. Human action: she completes one small natural movement central to the topic, with realistic breathing, hands and restrained expression. Camera and composition: slow controlled push-in at human eye level with a normal 50 mm perspective, subject across two thirds and a quiet 25-35 percent lateral safe area. Light and palette: warm lateral window light, soft contrast, moderate-low saturation, warm cream, dark petrol, navy, muted turquoise and a tiny terracotta accent, natural skin and material texture. Continuity: preserve exact anatomy, face, hands, clothing and object placement throughout. Keep everything else exactly the same. Audio: faint authentic room tone only, no dialogue, voiceover, spoken words or music. Constraints: no visible text, letters, numbers, logos, watermarks, screens or interfaces; no extra people, distorted anatomy, duplicated limbs, morphing objects, CGI or stock-advertising finish.`
   }
   if (/(?:turno|lanus|lanús|lomas|britanico|británico|cimel|sede|ubicacion|ubicación)/i.test(safeTopic)) {
-    return "Animate the approved 9:16 first frame for 8 seconds. Human action: no human figure is introduced; the approved branded route marker completes one subtle, purposeful movement along its existing path. Camera motion: locked camera. Environment motion: a barely perceptible natural paper shadow shift adds depth without becoming the main action. Continuity: preserve the exact tactile graphic, shapes, composition, warm cream, dark petrol, muted turquoise and soft terracotta palette of the first frame; no new symbol appears and every element keeps its form. Audio: very soft natural paper movement and room tone only, without dialogue, narration or spoken words."
+    return "Animate the approved 9:16 first frame into an 8-second video. Shot: a single unbroken scene, one continuous shot, no scene cuts. Human action: no human figure is introduced; the approved route marker completes one subtle movement along its existing path. Camera motion: locked camera. Environment motion: one barely perceptible natural paper-shadow shift. Continuity: preserve the exact tactile graphic, shapes, composition and palette; keep everything else exactly the same. Audio: very soft room tone only, no dialogue, voiceover, spoken words or music. Constraints: no visible text, letters, numbers, logos, watermarks, screens or interfaces; no new elements, duplication, morphing, CGI or stock-advertising finish."
   }
-  return "Animate the approved 9:16 first frame for 8 seconds. Human action: the adult subject completes one small, calm and natural movement already implied by the approved scene, with realistic breathing and hands. Camera motion: slow controlled push-in, subtle and steady. Environment motion: only minimal natural room movement secondary to the human action. Continuity: preserve the exact person, anatomy, clothing, objects, medical placement, composition, warm lateral light, moderate-low saturation and editorial documentary healthcare finish of the first frame; all objects remain grounded and unchanged. Audio: faint authentic room tone only, without dialogue, narration or spoken words."
+  return "Animate the approved 9:16 first frame into an 8-second video. Shot: a single unbroken scene, one continuous shot, no scene cuts. Human action: the adult subject completes one small, calm movement already implied by the approved scene, with realistic breathing and hands. Camera motion: slow controlled push-in, subtle and steady. Environment motion: minimal natural room movement secondary to the human action. Continuity: preserve the exact person, anatomy, clothing, objects, medical placement, composition, light and palette; keep everything else exactly the same. Audio: faint authentic room tone only, no dialogue, voiceover, spoken words or music. Constraints: no visible text, letters, numbers, logos, watermarks, screens or interfaces; no new people or objects, distorted anatomy, duplicated limbs, morphing, CGI or stock-advertising finish."
 }
 
-export function getVeoPromptQualityIssues(prompt: string, version: VideoGenerationVersion = "v2"): string[] {
+export function getVideoPromptQualityIssues(prompt: string, version: VideoGenerationVersion = "v2"): string[] {
   const value = prompt.trim()
   const issues: string[] = []
   if (version === "v1") {
@@ -164,25 +187,31 @@ export function getVeoPromptQualityIssues(prompt: string, version: VideoGenerati
     return issues
   }
   if (version === "v2_direct") {
-    if (value.length < 520) issues.push("la dirección V2 Directa es demasiado breve para controlar una escena inventada por Veo")
+    if (value.length < 520) issues.push("la dirección V2 Directa es demasiado breve para controlar una escena inventada por Omni")
     if (!/^An 8-second vertical 9:16 editorial documentary healthcare video\./i.test(value)) issues.push("no usa el contrato documental de V2 Directa")
     for (const section of V2_DIRECT_REQUIRED_SECTIONS) if (!value.includes(section)) issues.push(`falta la sección V2 Directa ${section.replace(":", "")}`)
     if (!V2_CAMERA_PATTERN.test(value)) issues.push("no limita la cámara a un único movimiento fiable")
     if (!/(?:25-35|25 to 35) percent/i.test(value)) issues.push("no reserva el área editorial de texto")
     if (!/(?:continuity|preserve|keeps? (?:its|their) exact)/i.test(value)) issues.push("no controla la continuidad de anatomía y objetos")
-    if (/(?:multiple scenes|montage|cut to|transition to|3d render|cgi|hologram)/i.test(value)) issues.push("pide montaje o una estética sintética incompatible con V2 Directa")
+    if (!/single unbroken scene/i.test(value) || !/(?:single|one) continuous shot/i.test(value) || !/no scene cuts/i.test(value)) issues.push("no exige una única toma continua para Omni")
+    if (!/keep everything else exactly the same/i.test(value)) issues.push("no incluye la instrucción de preservación recomendada para Omni")
+    if (!/no visible text/i.test(value)) issues.push("no incluye las exclusiones dentro del prompt regular de Omni")
+    if (/(?:create|show|use|with) (?:multiple scenes|a montage)|(?:cut to|transition to)|(?:use|using|rendered as|in the style of) (?:a )?(?:3d render|cgi|hologram)/i.test(value)) issues.push("pide montaje o una estética sintética incompatible con V2 Directa")
     return issues
   }
   if (value.length < 360) issues.push("la animacion V2 es demasiado breve para preservar el fotograma")
-  if (!/^Animate the approved 9:16 first frame for 8 seconds\./i.test(value)) issues.push("no usa el flujo V2 de fotograma aprobado")
+  if (!/^Animate the approved 9:16 first frame into an 8-second video\./i.test(value)) issues.push("no usa el flujo V2 de fotograma aprobado")
   for (const section of V2_REQUIRED_SECTIONS) if (!value.includes(section)) issues.push(`falta la seccion V2 ${section.replace(":", "")}`)
   if (!V2_CAMERA_PATTERN.test(value)) issues.push("no limita la camara a un unico movimiento fiable")
   if (!/preserve/i.test(value)) issues.push("no exige preservar la composicion e identidad del fotograma")
-  if (/(?:multiple scenes|montage|cut to|transition to|paper[- ]cut|motion graphic|3d render|cgi)/i.test(value)) issues.push("pide montaje o una estetica sintetica incompatible con V2")
-  if (/(?:on-screen text|caption|logo|interface)/i.test(value)) issues.push("pide elementos graficos que deben agregarse solo en postproduccion")
+  if (!/single unbroken scene/i.test(value) || !/(?:single|one) continuous shot/i.test(value) || !/no scene cuts/i.test(value)) issues.push("no exige una unica toma continua para Omni")
+  if (!/keep everything else exactly the same/i.test(value)) issues.push("no incluye la instruccion de preservacion recomendada para Omni")
+  if (!/no visible text/i.test(value)) issues.push("no incluye las exclusiones dentro del prompt regular de Omni")
+  if (/(?:create|show|use|with) (?:multiple scenes|a montage)|(?:cut to|transition to)|(?:use|using|rendered as|in the style of) (?:a )?(?:paper[- ]cut|motion graphic|3d render|cgi)/i.test(value)) issues.push("pide montaje o una estetica sintetica incompatible con V2")
+  if (/(?:show|include|add|render) (?:on-screen )?(?:text|captions?|logos?|interfaces?)/i.test(value)) issues.push("pide elementos graficos que deben agregarse solo en postproduccion")
   return issues
 }
 
-export function isPublishableVeoPrompt(prompt: string, version: VideoGenerationVersion = "v2"): boolean {
-  return getVeoPromptQualityIssues(prompt, version).length === 0
+export function isPublishableVideoPrompt(prompt: string, version: VideoGenerationVersion = "v2"): boolean {
+  return getVideoPromptQualityIssues(prompt, version).length === 0
 }

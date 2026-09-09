@@ -8,10 +8,12 @@ import { MAX_VISUAL_SUBTITLE_LENGTH, truncateForImagePlate } from "@/lib/content
 import {
   buildFallbackVideoPrompt,
   buildFallbackVideoReferencePrompt,
+  getOmniVideoOutput,
+  getOmniVideoRequestBody,
   getVideoPromptRules,
   getVeoRequestInstance,
   getVeoRequestParameters,
-  isPublishableVeoPrompt,
+  isPublishableVideoPrompt,
   VIDEO_REFERENCE_FRAME_RULES,
 } from "@/lib/video-prompt"
 import { z } from "zod"
@@ -399,7 +401,7 @@ const OBJECTIVE_GUIDANCE: Record<ContentObjective, string> = {
 // 2026-07-23: estructura y criterio de contenido para la "microinfografia medica animada" -- reglas
 // de Seba, transcriptas casi literal porque son muy especificas (ejemplos exactos de ganchos buenos y
 // frases vacias a evitar). Alimenta generateVideoBrief(), que genera TODO el contenido de texto de la
-// pieza (gancho, mensajes, CTA) en espanol -- Veo nunca ve ni genera este texto, ver VIDEO_PROMPT_RULES.
+// pieza (gancho, mensajes, CTA) en espanol -- el motor nunca ve ni genera este texto, ver VIDEO_PROMPT_RULES.
 const VIDEO_BRIEF_RULES = `MICROINFOGRAFIA MEDICA ANIMADA -- estructura obligatoria de un reel de 8 segundos:
 El objetivo NO es una escena cinematografica. Es una pieza que detiene el scroll, ensena algo util y
 termina con una llamada a la accion -- como una infografia que se mueve, no un video publicitario.
@@ -1258,7 +1260,7 @@ function normalizeVideoBrandScores(raw: unknown): ContentVideoBrandScores {
   return Object.fromEntries(REQUIRED_VIDEO_BRAND_SCORE_KEYS.map(key => [key, clampBrandScore(values[key])])) as unknown as ContentVideoBrandScores
 }
 
-/** Genera solo el fotograma base de V2; el texto se agrega despues y Veo unicamente lo anima. */
+/** Genera solo el fotograma base de V2; el texto se agrega despues y Gemini Omni unicamente lo anima. */
 export async function generateVideoReferenceFrame(input: {
   topic: string
   reference_image_prompt: string
@@ -1545,7 +1547,7 @@ export async function generateContentVisual(input: {
 /**
  * Genera la propuesta completa de un reel tipo "microinfografia medica animada" (2026-07-23,
  * reemplaza generateVideoDirection): el gancho (para item.hook), el video_prompt (fondo/animacion
- * para Veo, sin texto -- ver VIDEO_PROMPT_RULES), y el resto del brief estructurado (mensajes, CTA,
+ * para el motor elegido, sin texto -- ver VIDEO_PROMPT_RULES), y el resto del brief estructurado (mensajes, CTA,
  * notas de postproduccion/validacion, autoevaluacion 1-5) segun VIDEO_BRIEF_RULES. La UI bloquea
  * generar el video real si alguna dimension del puntaje da menos de 4.
  */
@@ -1583,7 +1585,7 @@ categoría, el tema y el objetivo editorial que te paso.
 Devolvé SOLO un JSON PLANO con esta forma exacta, sin ningún otro campo ni anidamiento distinto:
 {
   "hook": "texto del gancho en español, tal como debe verse en pantalla en el primer segundo (0,0-1,2s)",
-  "video_prompt": "el prompt en inglés para Veo, siguiendo las reglas de dirección de video de arriba",
+  "video_prompt": "el prompt en inglés para el motor de video de la versión elegida, siguiendo las reglas de arriba",
   "objective": "una sola oración en español: el objetivo educativo específico de esta pieza puntual",
   "messages": ["mensaje secundario 1", "mensaje secundario 2 (opcional)", "mensaje secundario 3 (opcional)"],
   "cta": "texto del cierre/CTA en español (6,2-8,0s)",
@@ -1617,7 +1619,7 @@ Devolvé SOLO un JSON PLANO con esta forma exacta, sin ningún otro campo ni ani
   const candidateVideoPrompt = parsed.video_prompt.trim().slice(0, 2400)
   // El modelo de texto tambien puede desviarse. Nunca trasladar esa desviacion a un intento pago:
   // si la direccion no pasa el contrato editorial, usar un fallback seguro y determinista.
-  const videoPrompt = isPublishableVeoPrompt(candidateVideoPrompt, version)
+  const videoPrompt = isPublishableVideoPrompt(candidateVideoPrompt, version)
     ? candidateVideoPrompt
     : buildFallbackVideoPrompt(input.topic, version)
 
@@ -1670,21 +1672,25 @@ const VEO_POLL_INTERVAL_MS = 10_000
 const VEO_POLL_TIMEOUT_MS = 260_000
 export const DEFAULT_DAILY_VIDEO_GENERATION_LIMIT = 10
 
-/** V1 conserva Veo Fast; ambas variantes V2 usan Veo Standard. Los overrides son
- * separados para que una variable histórica de V1 no degrade silenciosamente la calidad de V2. */
+/** V1 conserva Veo Fast; ambas variantes V2 usan Gemini Omni estable. Los overrides son
+ * separados para que una variable histórica de V1 no cambie silenciosamente el motor de V2. */
 export function getContentVideoModel(version: VideoGenerationVersion): string {
   if (version === "v1") {
     return process.env.GEMINI_VIDEO_MODEL_V1 || process.env.GEMINI_VIDEO_MODEL || "veo-3.1-fast-generate-preview"
   }
-  return process.env.GEMINI_VIDEO_MODEL_V2 || "veo-3.1-generate-preview"
+  const configured = process.env.GEMINI_OMNI_VIDEO_MODEL || process.env.GEMINI_VIDEO_MODEL_V2
+  // Un override viejo de V2 puede seguir apuntando a Veo. No se lo envia por error a Interactions API.
+  return configured?.startsWith("gemini-omni-") ? configured : "gemini-omni-1.1-flash"
+}
+
+export function getContentVideoEngine(version: VideoGenerationVersion): "veo" | "omni" {
+  return version === "v1" ? "veo" : "omni"
 }
 
 /**
- * Genera el UNICO plano de video de un reel con Veo (Gemini API). A diferencia de generateContentVisual
- * (respuesta sincronica en segundos), Veo es un proceso asincronico de "operacion de larga duracion":
- * se pide, se consulta el progreso cada VEO_POLL_INTERVAL_MS hasta que termina (puede tardar 1-3 min),
- * y recien ahi se descarga el archivo final (el video de Google solo esta disponible 48hs, por eso se
- * descarga y persiste en Storage de una via la ruta que llama a esta funcion, nunca se linkea directo).
+ * Genera el UNICO plano de video de un reel con Gemini API. V2 usa Gemini Omni mediante Interactions
+ * API y V1 conserva el proceso asincronico legado de Veo. El resultado se devuelve siempre como MP4
+ * inline para que la ruta aplique tipografia/musica y lo persista inmediatamente en Storage.
  * No tiene tier gratuito (a diferencia de las placas) -- cada llamada exitosa tiene costo real, por eso
  * usa su propio limite diario mas estricto (DAILY_VIDEO_GENERATION_LIMIT), separado de
  * DAILY_AI_REQUEST_LIMIT.
@@ -1707,6 +1713,7 @@ export async function generateContentVideo(input: {
 
   const version = input.version ?? "v2"
   const model = getContentVideoModel(version)
+  const engine = getContentVideoEngine(version)
   if (version === "v2" && !input.reference_image) {
     throw new Error("V2 requiere un fotograma inicial aprobado.")
   }
@@ -1714,12 +1721,41 @@ export async function generateContentVideo(input: {
   const base = "https://generativelanguage.googleapis.com/v1beta"
 
   try {
+    if (engine === "omni") {
+      const response = await fetch(`${base}/interactions`, {
+        method: "POST",
+        headers: { "x-goog-api-key": apiKey, "Content-Type": "application/json" },
+        body: JSON.stringify(getOmniVideoRequestBody(model, input.video_prompt, input.reference_image)),
+      })
+      const data = await response.json() as {
+        error?: { message?: string }
+        output_video?: { type?: string; mime_type?: string; data?: string; uri?: string }
+        steps?: Array<{ type?: string; content?: Array<{ type?: string; mime_type?: string; data?: string; uri?: string }> }>
+      }
+      if (!response.ok) {
+        throw new Error(data.error?.message || `Gemini Omni respondió con estado ${response.status}.`)
+      }
+
+      const video = getOmniVideoOutput(data)
+      if (!video) throw new Error("Gemini Omni no devolvió ningún video.")
+      let videoData = video.data
+      if (!videoData && video.uri) {
+        const videoRes = await fetch(video.uri, { headers: { "x-goog-api-key": apiKey } })
+        if (!videoRes.ok) throw new Error(`No se pudo descargar el video de Gemini Omni (estado ${videoRes.status}).`)
+        videoData = Buffer.from(await videoRes.arrayBuffer()).toString("base64")
+      }
+      if (!videoData) throw new Error("Gemini Omni devolvió un video sin datos descargables.")
+
+      await logRequest("gemini", model, promptHash, "content_video", true)
+      return { mime_type: video.mime_type || "video/mp4", video_data: videoData }
+    }
+
     const startRes = await fetch(`${base}/models/${encodeURIComponent(model)}:predictLongRunning`, {
       method: "POST",
       headers: { "x-goog-api-key": apiKey, "Content-Type": "application/json" },
       body: JSON.stringify({
         instances: [getVeoRequestInstance(input.video_prompt, input.reference_image)],
-        parameters: getVeoRequestParameters(version),
+        parameters: getVeoRequestParameters(),
       }),
     })
     const startData = await startRes.json() as { name?: string; error?: { message?: string } }

@@ -35,7 +35,7 @@ import {
   isTodayAvailableForQueueEstimate,
   toLocalInputValue,
 } from "@/lib/content-schedule-display"
-import { buildFallbackVideoPrompt, getVeoPromptQualityIssues } from "@/lib/video-prompt"
+import { buildFallbackVideoPrompt, getVideoPromptQualityIssues } from "@/lib/video-prompt"
 import type { AutoPublishSettings, AutoPublishTrackSettings, ContentChannel, ContentInstagramInsights, ContentItem, ContentObjective, ContentSlide, ContentSource, ContentStatus, ContentVideoBrandScores, ContentVideoScores, InstagramInsightWindow, InstagramMediaInsightSnapshot, VideoGenerationVersion } from "@/types"
 import { CONTENT_OBJECTIVE_GOALS, CONTENT_OBJECTIVE_LABELS, WEEKDAY_OPTIONS } from "@/types"
 
@@ -2278,7 +2278,7 @@ function Editor({
   const imagePrompt = item.image_prompt?.trim() || fallbackImagePrompt(item)
   const videoGenerationVersion: VideoGenerationVersion = item.video_generation_version ?? "v2"
   const videoPrompt = item.video_prompt?.trim() || fallbackVideoPrompt(item, videoGenerationVersion)
-  const videoPromptIssues = getVeoPromptQualityIssues(videoPrompt, videoGenerationVersion)
+  const videoPromptIssues = getVideoPromptQualityIssues(videoPrompt, videoGenerationVersion)
   const videoNeedsProposal = !item.video_brief ||
     item.video_brief.generation_version !== videoGenerationVersion || videoPromptIssues.length > 0 ||
     (videoGenerationVersion === "v2" && !item.video_brief.reference_image_prompt) ||
@@ -2633,7 +2633,7 @@ function Editor({
   }
 
   /**
-   * Genera la propuesta completa de la microinfografía (gancho, video_prompt para Veo, mensajes, CTA,
+   * Genera la propuesta completa de la microinfografía (gancho, video_prompt para el motor, mensajes, CTA,
    * notas de postproducción/validación y la autoevaluación 1-5) -- /api/content/video-brief, ver
    * generateVideoBrief() en ai.ts. No genera ningún video todavía, solo texto (rápido, sin costo real).
    */
@@ -2734,11 +2734,11 @@ function Editor({
   }
 
   /**
-   * A diferencia de generateVisual (responde en segundos), Veo tarda 1-3 minutos -- esta llamada queda
-   * esperando esa respuesta sincrónica larga (ver maxDuration en /api/content/video). Tiene costo real
+   * A diferencia de generateVisual, el motor de video puede tardar varios minutos -- esta llamada queda
+   * esperando la respuesta (ver maxDuration en /api/content/video). Tiene costo real
    * por generación (a diferencia de las placas, sin tier gratuito) y un límite diario propio, mucho más
    * estricto, del lado del servidor. Si hay una propuesta (video_brief) cargada, la misma llamada
-   * también compone el gancho/mensajes/CTA sobre el video que genera Veo -- un solo click, un solo
+   * también compone el gancho/mensajes/CTA sobre el video generado -- un solo click, un solo
    * video final (ver /api/content/video).
    */
   async function generateAiVideo() {
@@ -2784,7 +2784,7 @@ function Editor({
         video_generation_version: videoGenerationVersion,
       })
     } catch {
-      setAiVideoError("No se pudo conectar con Veo para generar el video.")
+      setAiVideoError("No se pudo conectar con Gemini para generar el video.")
     } finally {
       setAiVideoGenerating(false)
     }
@@ -2943,7 +2943,7 @@ function Editor({
                         className="h-auto min-h-10 flex-col gap-0.5 py-1.5"
                       >
                         <span>Directa (V2)</span>
-                        <span className="text-[9px] font-normal opacity-80">Veo Standard · sin fotograma</span>
+                        <span className="text-[9px] font-normal opacity-80">Omni 1.1 Flash · sin fotograma</span>
                       </Button>
                       <Button
                         type="button"
@@ -2954,7 +2954,7 @@ function Editor({
                         className="h-auto min-h-10 flex-col gap-0.5 py-1.5"
                       >
                         <span>Controlada (V2)</span>
-                        <span className="text-[9px] font-normal opacity-80">Veo Standard · con fotograma</span>
+                        <span className="text-[9px] font-normal opacity-80">Omni 1.1 Flash · con fotograma</span>
                       </Button>
                       <Button
                         type="button"
@@ -2972,16 +2972,16 @@ function Editor({
                       {videoGenerationVersion === "v2"
                         ? "V2 Controlada crea y revisa un fotograma antes de animarlo; ofrece la mayor consistencia, pero suma el costo de imagen."
                         : videoGenerationVersion === "v2_direct"
-                          ? "V2 Directa genera toda la escena y el movimiento con Veo desde texto. No paga fotograma, aunque tiene menos control visual previo."
+                          ? "V2 Directa genera toda la escena y el movimiento con Gemini Omni desde texto. No paga fotograma, aunque tiene menos control visual previo."
                           : "V1 conserva la microinfografía ilustrada que usaba el sistema antes del motor documental."}
                     </p>
                   </div>
                   <p className="text-[11px] font-semibold uppercase tracking-wide text-violet-700">
                     {videoGenerationVersion === "v1" ? "Microinfografía animada original (Veo + texto real)" :
-                      videoGenerationVersion === "v2_direct" ? "Video documental directo (texto → Veo)" : "Video documental controlado (fotograma → Veo)"}
+                      videoGenerationVersion === "v2_direct" ? "Video documental directo (texto → Omni)" : "Video documental controlado (fotograma → Omni)"}
                   </p>
                   <p className="text-[11px] text-violet-700/80">
-                    Veo anima la escena (sin texto); el gancho, los mensajes y el CTA se
+                    {videoGenerationVersion === "v1" ? "Veo" : "Gemini Omni"} genera la escena (sin texto); el gancho, los mensajes y el CTA se
                     escriben aparte y se queman encima por edición real, para que salgan siempre bien
                     escritos.
                   </p>
@@ -3034,7 +3034,7 @@ function Editor({
 
                         <div className="space-y-2 border-t border-gray-100 pt-2">
                           <div className="space-y-1">
-                            <Label className="text-[11px] text-gray-600">Prompt en inglés que se le manda a Veo (fondo/animación del video)</Label>
+                            <Label className="text-[11px] text-gray-600">Prompt en inglés que se le manda al motor (fondo/animación del video)</Label>
                             <Textarea
                               rows={3}
                               value={videoPrompt}
@@ -3164,13 +3164,13 @@ function Editor({
                     {aiVideoGenerating ? "Generando... puede tardar unos minutos" : item.video_url ? "Regenerar video con IA" : "Generar video con IA"}
                   </Button>
                   <p className="text-[11px] text-violet-700/80">
-                    Tiene costo real por intento ({videoGenerationVersion === "v1" ? "aprox. USD 0,80" : "aprox. USD 3,20"}), sin límite gratuito.
+                    Tiene costo real por intento (aprox. USD 0,80 para 8 segundos a 720p), sin límite gratuito.
                   </p>
                   {videoGenerationVersion === "v2_direct" && (
                     <p className="rounded bg-blue-50 p-2 text-[11px] text-blue-800">No genera ni cobra un fotograma inicial: toda la escena viene directamente de la IA de video.</p>
                   )}
                   {videoGenerationVersion === "v2" && !frameReady && !videoNeedsProposal && (
-                    <p className="rounded bg-amber-50 p-2 text-[11px] font-medium text-amber-800">Generá, revisá y aprobá el fotograma inicial para habilitar Veo.</p>
+                    <p className="rounded bg-amber-50 p-2 text-[11px] font-medium text-amber-800">Generá, revisá y aprobá el fotograma inicial para habilitar Gemini Omni.</p>
                   )}
                   {videoNeedsProposal && (
                     <div className="rounded-md border border-amber-200 bg-amber-50 p-2 text-[11px] text-amber-800">
