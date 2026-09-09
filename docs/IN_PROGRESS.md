@@ -35,7 +35,7 @@ Gemini como respaldo y limitar el gasto diario sin compartir tráfico de la API 
 
 ---
 
-# EN CURSO (2026-09-09) — acciones interactivas del bot de WhatsApp
+# CERRADO (2026-09-09) — acciones interactivas del bot de WhatsApp
 
 ## Objetivo
 
@@ -50,7 +50,14 @@ la derivación institucional existente, sin reservar turnos ni confirmar disponi
 - [x] Conservar la sede física elegida durante la respuesta y evitar ambigüedad entre Británico
   Lanús y Central.
 - [x] Agregar mapas y un menú de acciones posteriores a la derivación.
-- [ ] Ejecutar lint, tests, build, preview y merge por PR.
+- [x] Ejecutar lint, tests, build y verificar el preview del PR #276.
+
+## Validación final
+
+- `npm run lint`: sin errores.
+- `npm test -- --runInBand`: 140 suites y 1.224 pruebas aprobadas.
+- `npm run build`: compilación, TypeScript y 90 rutas generadas correctamente.
+- PR #276: build, E2E público y Vercel Preview aprobados; E2E autenticado omitido por diseño.
 
 ## Alcance y seguridad
 
