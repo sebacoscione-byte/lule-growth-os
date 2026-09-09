@@ -38,7 +38,9 @@ import {
   findPracticeSiteInText,
   getPracticeSitesForInstitution,
   PRACTICE_INSTITUTION_NAMES,
+  PRACTICE_SITE_BY_ID,
   type PracticeSite,
+  type PracticeSiteId,
 } from "@/lib/practice-directory"
 import type { HandoffReason, Lead, WhatsAppEntryPoint } from "@/types"
 
@@ -275,10 +277,15 @@ const DECLARES_NO_COVERAGE_PATTERN =
 // chequeo determinístico, gratis, sin gastar una clasificación con IA.
 const BARE_GREETING_PATTERN = /^\s*(hola+|holis+|buenas|buen[oa]s?\s+(d[ií]as?|tardes?|noches?)|hey|ey)\W*$/i
 
-function formatPracticeSite(site: PracticeSite, includeAddress = true): string {
+function formatPracticeSite(
+  site: PracticeSite,
+  includeAddress = true,
+  includeMap = false
+): string {
   const service = site.serviceNote ? ` · ${site.serviceNote}` : ""
   const lines = [`🏥 *${site.name}*`, `🗓️ ${site.hours}${service}`]
   if (includeAddress) lines.push(`📍 ${site.address}`)
+  if (includeMap) lines.push(`🗺️ Cómo llegar: ${site.mapsUrl}`)
   return lines.join("\n")
 }
 
@@ -293,12 +300,13 @@ function institutionDisplayName(location: Pick<WhatsAppLocationConfig, "id" | "n
 function buildPracticeSchedule(
   location: WhatsAppLocationConfig,
   selectedSite?: PracticeSite | null,
-  includeAddress = true
+  includeAddress = true,
+  includeMap = false
 ): string {
   const sites = practiceSitesFor(location)
   const visibleSites = selectedSite?.institutionId === location.id ? [selectedSite] : sites
   if (visibleSites.length > 0) {
-    return visibleSites.map(site => formatPracticeSite(site, includeAddress)).join("\n\n")
+    return visibleSites.map(site => formatPracticeSite(site, includeAddress, includeMap)).join("\n\n")
   }
 
   const legacyLines = [`🏥 *${location.name}*`]
@@ -320,7 +328,7 @@ async function buildSedeInstructions(
   const lines = [
     intro,
     `Para pedir turno con la *Dra. Lucía Chahin* en *${institutionDisplayName(loc)}*:`,
-    buildPracticeSchedule(loc, selectedSite),
+    buildPracticeSchedule(loc, selectedSite, true, true),
   ]
 
   const channels: string[] = []
@@ -450,19 +458,45 @@ function normalizeLocationText(value: string): string {
   return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim()
 }
 
-function parseSede(
+interface SedeSelection {
+  sede: Sede
+  site: PracticeSite | null
+}
+
+const PRACTICE_SITE_BUTTON_PREFIX = "practice_site:"
+
+function parseSedeSelection(
   text: string,
   locations: WhatsAppLocationConfig[],
   buttonId?: string
-): Sede | null {
+): SedeSelection | null {
+  if (buttonId?.startsWith(PRACTICE_SITE_BUTTON_PREFIX)) {
+    const siteId = buttonId.slice(PRACTICE_SITE_BUTTON_PREFIX.length) as PracticeSiteId
+    const site = PRACTICE_SITE_BY_ID[siteId]
+    if (site && locations.some(location => location.id === site.institutionId)) {
+      return { sede: site.institutionId, site }
+    }
+  }
+
   const buttonLocation = locations.find(location => location.id === buttonId)
-  if (buttonLocation) return buttonLocation.id
+  if (buttonLocation) {
+    const sites = practiceSitesFor(buttonLocation)
+    return { sede: buttonLocation.id, site: sites.length === 1 ? sites[0] : null }
+  }
 
   const normalizedText = normalizeLocationText(text)
   if (!normalizedText) return null
 
+  const exactSite = findPracticeSiteInText(text)
+  if (exactSite && locations.some(location => location.id === exactSite.institutionId)) {
+    return { sede: exactSite.institutionId, site: exactSite }
+  }
+
   const directoryMatch = findPracticeInstitutionInText(text, locations.map(location => location.id))
-  if (directoryMatch) return directoryMatch
+  if (directoryMatch) {
+    const sites = getPracticeSitesForInstitution(directoryMatch)
+    return { sede: directoryMatch, site: sites.length === 1 ? sites[0] : null }
+  }
 
   const matched = locations.find(location => {
     const normalizedName = normalizeLocationText(location.name)
@@ -479,7 +513,9 @@ function parseSede(
       || tokens.some(token => normalizedText.includes(token))
   })
 
-  return matched?.id ?? null
+  if (!matched) return null
+  const sites = practiceSitesFor(matched)
+  return { sede: matched.id, site: sites.length === 1 ? sites[0] : null }
 }
 
 async function escalateEmergency(
@@ -546,19 +582,39 @@ async function forceHandoff(session: WhatsAppSession, phone: string, lead: Lead 
   })
 }
 
-function buildLocationButtons(locations: WhatsAppLocationConfig[]) {
-  return locations.map(location => ({
-    id: location.id,
-    title: PRACTICE_INSTITUTION_NAMES[location.id].slice(0, 20),
-  }))
+const PRACTICE_SITE_ROW_TITLES: Readonly<Record<PracticeSiteId, string>> = Object.freeze({
+  cimel_lanus: "CIMEL Lanús",
+  hospital_britanico_lanus: "H. Británico Lanús",
+  hospital_britanico_central: "H. Británico Central",
+  swiss_lomas: "Swiss Medical Lomas",
+})
+
+// WhatsApp admite hasta tres reply buttons, pero la agenda tiene cuatro lugares físicos. La lista
+// interactiva evita agrupar Lanús/Central y permite mostrar horario + dirección antes del toque.
+function buildPracticeSiteRows(locations: WhatsAppLocationConfig[]) {
+  const allowed = new Set(locations.map(location => location.id))
+  return Object.values(PRACTICE_SITE_BY_ID)
+    .filter(site => allowed.has(site.institutionId))
+    .map(site => {
+      const service = site.serviceNote ? ` · ${site.serviceNote}` : ""
+      return {
+        id: `${PRACTICE_SITE_BUTTON_PREFIX}${site.id}`,
+        title: PRACTICE_SITE_ROW_TITLES[site.id],
+        description: `${site.hours}${service} · ${site.address}`.slice(0, 72),
+      }
+    })
 }
 
 async function sendSedeOptions(
   phone: string,
   ctx: SendContext,
-  intro?: string
+  intro?: string,
+  institutionFilter?: Sede | null
 ): Promise<boolean> {
-  const locations = await getLocations()
+  const operationalLocations = await getLocations()
+  const locations = institutionFilter
+    ? operationalLocations.filter(location => location.id === institutionFilter)
+    : operationalLocations
   if (locations.length === 0) {
     await sendButtons(
       phone,
@@ -569,12 +625,8 @@ async function sendSedeOptions(
     return false
   }
 
-  const rows = locations.flatMap(location => practiceSitesFor(location).map(site => {
-    const service = site.serviceNote ? ` · ${site.serviceNote}` : ""
-    return `🏥 *${site.name}* — ${site.hours}${service}`
-  }))
-  const question = `${intro ? `${intro}\n\n` : ""}Lugares y horarios habituales:\n\n${rows.join("\n")}\n\nElegí la institución con la que querés pedir turno. La disponibilidad se confirma directamente allí.`
-  await sendButtons(phone, question, buildLocationButtons(locations), {
+  const question = `${intro ? `${intro}\n\n` : ""}${institutionFilter ? "Elegí el lugar exacto" : "Elegí dónde querés atenderte"}. Vas a ver el horario y la dirección de cada opción. La disponibilidad se confirma directamente con la institución.`
+  await sendList(phone, question, "Elegir lugar", buildPracticeSiteRows(locations), {
     ...ctx,
     flowIntent: ctx.flowIntent ?? "pedir_turno",
   })
@@ -609,19 +661,45 @@ const FOLLOWUP_CONSENT_BUTTONS = [
   { id: FOLLOWUP_DECLINE_BUTTON_ID, title: "No, gracias" },
 ]
 
+const DERIVED_ACTION_BUTTONS = [
+  { id: "ver_sedes", title: "Sedes y horarios" },
+  { id: "cambiar_obra_social", title: "Cambiar cobertura" },
+  { id: "hablar_humano", title: "Hablar con humano" },
+]
+
+async function sendDerivedActions(phone: string, body: string, ctx: SendContext): Promise<void> {
+  await sendButtons(phone, body, DERIVED_ACTION_BUTTONS, {
+    ...ctx,
+    flowIntent: ctx.flowIntent ?? "pedir_turno",
+  })
+}
+
 async function sendInstructionsAndOfferFollowup(
   phone: string,
   sede: Sede,
   intro: string,
   ctx: SendContext,
-  insurance?: string | null
+  insurance?: string | null,
+  selectedSite?: PracticeSite | null
 ): Promise<void> {
   const locations = await getLocations()
   const location = locations.find(item => item.id === sede)
   const coverageNotice = location ? buildCoverageNotice(location, insurance) : null
+  const institutionSites = location ? practiceSitesFor(location) : []
+  if (!selectedSite && institutionSites.length > 1) {
+    await sendSedeOptions(
+      phone,
+      { ...ctx, flowIntent: "pedir_turno" },
+      coverageNotice ? `${intro}\n\n${coverageNotice}` : intro,
+      sede
+    )
+    await updateSession(phone, { state: "esperando_sede" })
+    return
+  }
   const instructions = await buildSedeInstructions(
     sede,
-    coverageNotice ? `${intro}\n\n${coverageNotice}` : intro
+    coverageNotice ? `${intro}\n\n${coverageNotice}` : intro,
+    selectedSite ?? institutionSites[0] ?? null
   )
   if (!instructions) {
     await sendButtons(
@@ -773,7 +851,7 @@ async function answerFaq(text: string, sede: Sede | null): Promise<string | null
   const asksAddress = ["direccion", "dirección", "donde queda", "dónde queda", "como llego", "cómo llego", "ubicacion", "ubicación"].some(k => lower.includes(k))
   if (asksAddress && sede) {
     if (!loc) return unverifiedLocationReply
-    return buildPracticeSchedule(loc, selectedSite)
+    return buildPracticeSchedule(loc, selectedSite, true, true)
   }
 
   return null
@@ -1156,7 +1234,15 @@ export async function handleIncomingMessage(params: {
         await updateLeadLocation(leadId, verifiedSede)
         if (extraction.obraSocial) {
           await updateSession(phone, { obra_social: extraction.obraSocial })
-          await sendInstructionsAndOfferFollowup(phone, verifiedSede, "Perfecto.", ctx, extraction.obraSocial)
+          const selectedSite = findPracticeSiteInText(text)
+          await sendInstructionsAndOfferFollowup(
+            phone,
+            verifiedSede,
+            "Perfecto.",
+            ctx,
+            extraction.obraSocial,
+            selectedSite?.institutionId === verifiedSede ? selectedSite : null
+          )
         } else {
           const options = await getObraSocialOptions(verifiedSede)
           await sendList(phone, "Para terminar, elegí tu obra social o prepaga (o \"Particular\" si no tenés cobertura):", "Elegir", options, { ...ctx, flowIntent: "consultar_cobertura" })
@@ -1208,16 +1294,17 @@ export async function handleIncomingMessage(params: {
 
     case "esperando_sede": {
       const locations = await getLocations()
-      const sede = parseSede(text, locations, buttonId)
-      if (!sede) {
+      const selection = parseSedeSelection(text, locations, buttonId)
+      if (!selection) {
         await sendSedeOptions(phone, ctx, "No entendí bien la opción.")
         return
       }
 
+      const { sede, site } = selection
       if (session.lead_id) await updateLeadLocation(session.lead_id, sede)
 
       if (session.obra_social) {
-        await sendInstructionsAndOfferFollowup(phone, sede, "Perfecto.", ctx, session.obra_social)
+        await sendInstructionsAndOfferFollowup(phone, sede, "Perfecto.", ctx, session.obra_social, site)
       } else {
         const options = await getObraSocialOptions(sede)
         await sendList(phone, "Para terminar, elegí tu obra social o prepaga (o \"Particular\" si no tenés cobertura):", "Elegir", options, { ...ctx, flowIntent: "consultar_cobertura" })
@@ -1262,11 +1349,11 @@ export async function handleIncomingMessage(params: {
         whatsapp_followup_status: consented ? "pending" : "declined",
       }).eq("id", session.lead_id)
       if (followupUpdateError) throw new Error("whatsapp_followup_preference_update_failed")
-      await sendText(
+      await sendDerivedActions(
         phone,
         consented
-          ? "Listo. Te vamos a escribir una sola vez para saber si pudiste pedir el turno."
-          : "Listo. No vamos a iniciar un seguimiento; podés escribirnos cuando quieras.",
+          ? "Listo. Te vamos a escribir una sola vez para saber si pudiste pedir el turno. Mientras tanto, también podés usar estas opciones:"
+          : "Listo. No vamos a iniciar un seguimiento; podés escribirnos cuando quieras o usar estas opciones:",
         { ...ctx, flowIntent: "appointment_followup_consent" }
       )
       await updateSession(phone, { state: "derivado" })
@@ -1274,6 +1361,11 @@ export async function handleIncomingMessage(params: {
     }
 
     case "derivado": {
+      if (buttonId === "ver_sedes") {
+        await sendSedeOptions(phone, { ...ctx, flowIntent: "pedir_turno" })
+        return
+      }
+
       if (messageType === "text") {
         const coverageLocationsReply = buildCoverageLocationsReply(text, await getLocations())
         if (coverageLocationsReply) {
@@ -1299,8 +1391,9 @@ export async function handleIncomingMessage(params: {
       }
 
       const locations = await getLocations()
-      const sede = parseSede(text, locations, buttonId)
-      if (sede) {
+      const selection = parseSedeSelection(text, locations, buttonId)
+      if (selection) {
+        const { sede, site } = selection
         const location = locations.find(item => item.id === sede)
         if (location && session.obra_social
           && isCoverageListedAtLocation(location, session.obra_social) === false
@@ -1313,8 +1406,7 @@ export async function handleIncomingMessage(params: {
         const intro = coverageNotice
           ? `Listo, actualicé tu sede preferida.\n\n${coverageNotice}`
           : "Listo, actualicé tu sede preferida."
-        const explicitSite = messageType === "text" ? findPracticeSiteInText(text) : null
-        const body = await buildSedeInstructions(sede, intro, explicitSite)
+        const body = await buildSedeInstructions(sede, intro, site)
         if (body) {
           await sendText(phone, body, { ...ctx, flowIntent: "pedir_turno" })
         } else {
@@ -1406,9 +1498,12 @@ export async function handleIncomingMessage(params: {
         ? `\n\nTenés cargada la obra social *${session.obra_social}*. Si cambió, escribinos "cambiar obra social".`
         : ""
       const repeatMessage = settings.cost_saving_mode
-        ? "¡Hola! Ya tenés las instrucciones para sacar turno. Elegí una sede o contanos qué necesitás:"
-        : `${isBareGreeting ? "¡Hola!" : "Hola de nuevo"} 👋 Ya tenés las instrucciones para sacar turno con la Dra. Lucía Chahin. Si querés volver a ver los datos de una sede, elegí una opción (o escribinos si necesitás otra cosa):${obraSocialLine}`
-      await sendSedeOptions(phone, { ...ctx, flowIntent: isBareGreeting ? "otro_no_entendido" : intent }, repeatMessage)
+        ? "¡Hola! Ya tenés las instrucciones para sacar turno. ¿Qué necesitás hacer?"
+        : `${isBareGreeting ? "¡Hola!" : "Hola de nuevo"} 👋 Ya tenés las instrucciones para sacar turno con la Dra. Lucía Chahin. ¿Qué necesitás hacer?${obraSocialLine}`
+      await sendDerivedActions(phone, repeatMessage, {
+        ...ctx,
+        flowIntent: isBareGreeting ? "otro_no_entendido" : intent,
+      })
       return
     }
   }

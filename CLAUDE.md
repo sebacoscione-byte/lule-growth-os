@@ -1,6 +1,12 @@
 ﻿# Lule Growth OS — Contexto para Claude
 
 ## Estado actual
+- 2026-09-09 (acciones interactivas de WhatsApp): el selector de atención usa una lista nativa con
+  los cuatro lugares físicos —incluidos Británico Lanús y Central por separado—, cada uno con
+  horario y dirección. La elección exacta se usa en las instrucciones y agrega un enlace de Maps.
+  Tras decidir el seguimiento, y también al volver a saludar, aparecen tres accesos rápidos:
+  “Sedes y horarios”, “Cambiar cobertura” y “Hablar con humano”. Se mantiene la lista institucional
+  verificada, la ventana de 24 horas y la advertencia de que el bot no reserva ni confirma turnos.
 - 2026-09-09 (WhatsApp sincronizado con el cronograma vigente): el bot y las landings comparten un
   directorio de cuatro lugares físicos: CIMEL Lanús martes/jueves/viernes, Hospital Británico Lanús
   los martes para ecocardiogramas, Hospital Británico Central los miércoles y Swiss Medical Lomas

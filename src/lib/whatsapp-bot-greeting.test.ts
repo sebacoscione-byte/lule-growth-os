@@ -133,7 +133,11 @@ describe("saludo simple en estado derivado", () => {
     expect(sendButtons).toHaveBeenCalledWith(
       PHONE,
       expect.stringContaining("¡Hola!"),
-      expect.arrayContaining([expect.objectContaining({ id: "cimel_lanus" })]),
+      [
+        { id: "ver_sedes", title: "Sedes y horarios" },
+        { id: "cambiar_obra_social", title: "Cambiar cobertura" },
+        { id: "hablar_humano", title: "Hablar con humano" },
+      ],
       expect.anything()
     )
     const [, message] = (sendButtons as jest.Mock).mock.calls[0]

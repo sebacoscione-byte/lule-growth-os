@@ -150,19 +150,41 @@ describe("fuente única de sedes en el bot", () => {
       active: true,
     }])
 
-    await handleIncomingMessage({ phone: PHONE, text: "Hola" })
+    await handleIncomingMessage({
+      phone: PHONE,
+      text: "Sedes y horarios",
+      messageType: "button_reply",
+      buttonId: "ver_sedes",
+    })
 
-    const [, message, buttons] = (sendButtons as jest.Mock).mock.calls.at(-1)
-    expect(message).toContain("CIMEL Lanús* — Martes 13:00–15:00 · Jueves y viernes 13:00–16:00")
-    expect(message).toContain("Hospital Británico Lanús* — Martes 16:00–19:30 · Ecocardiogramas")
-    expect(message).toContain("Hospital Británico Central* — Miércoles 17:00–19:45")
-    expect(message).toContain("Swiss Medical Lomas* — Viernes 17:00–20:00")
-    expect(message).not.toContain("Hospital Británico (Central)* (miércoles)")
-    expect(buttons).toEqual([
-      { id: "cimel_lanus", title: "CIMEL Lanús" },
-      { id: "hospital_britanico", title: "Hospital Británico" },
-      { id: "swiss_lomas", title: "Swiss Medical Lomas" },
-    ])
+    expect(sendList).toHaveBeenCalledWith(
+      PHONE,
+      expect.stringContaining("Elegí dónde querés atenderte"),
+      "Elegir lugar",
+      [
+        expect.objectContaining({
+          id: "practice_site:cimel_lanus",
+          title: "CIMEL Lanús",
+          description: expect.stringContaining("Martes 13:00–15:00"),
+        }),
+        expect.objectContaining({
+          id: "practice_site:hospital_britanico_lanus",
+          title: "H. Británico Lanús",
+          description: expect.stringContaining("Martes 16:00–19:30"),
+        }),
+        expect.objectContaining({
+          id: "practice_site:hospital_britanico_central",
+          title: "H. Británico Central",
+          description: expect.stringContaining("Miércoles 17:00–19:45"),
+        }),
+        expect.objectContaining({
+          id: "practice_site:swiss_lomas",
+          title: "Swiss Medical Lomas",
+          description: expect.stringContaining("Viernes 17:00–20:00"),
+        }),
+      ],
+      expect.objectContaining({ flowIntent: "pedir_turno" })
+    )
   })
 
   it("responde una consulta explícita por Hospital Británico Lanús sin mezclar la sede Central", async () => {
@@ -213,12 +235,45 @@ describe("fuente única de sedes en el bot", () => {
     await handleIncomingMessage({ phone: PHONE, text: "El martes" })
 
     expect(leadsBuilder.update).not.toHaveBeenCalled()
-    expect(sendButtons).toHaveBeenCalledWith(
+    expect(sendList).toHaveBeenCalledWith(
       PHONE,
       expect.stringContaining("No entendí bien la opción"),
+      "Elegir lugar",
       expect.anything(),
       expect.anything()
     )
+  })
+
+  it("usa la sede física elegida en la lista y entrega su mapa sin mezclar el otro Británico", async () => {
+    const { leadsBuilder } = mockDb([{
+      id: "hospital_britanico",
+      name: "Hospital Británico",
+      phone: "0810-222-2748 / 4309-6400",
+      obras_sociales: ["OSDE"],
+      accepts_particular: true,
+      services: [],
+      verified_at: "2026-07-15T12:00:00.000Z",
+      verified_by: "test-user",
+      valid_from: "2026-07-01T00:00:00.000Z",
+      active: true,
+    }], { obra_social: "OSDE" })
+
+    await handleIncomingMessage({
+      phone: PHONE,
+      text: "H. Británico Lanús",
+      messageType: "list_reply",
+      buttonId: "practice_site:hospital_britanico_lanus",
+    })
+
+    expect(leadsBuilder.update).toHaveBeenCalledWith(expect.objectContaining({
+      preferred_location: "hospital_britanico",
+      status: "derivado_britanico",
+    }))
+    const [, message] = (sendText as jest.Mock).mock.calls.at(-1)
+    expect(message).toContain("Hospital Británico Lanús")
+    expect(message).toContain("Hipólito Yrigoyen 4429")
+    expect(message).toContain("Cómo llegar: https://www.google.com/maps/")
+    expect(message).not.toContain("Perdriel 74")
   })
 
   it("responde una pregunta general con todos los lugares, no sólo con la sede guardada", async () => {

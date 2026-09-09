@@ -415,9 +415,14 @@ describe("handleIncomingMessage — controles operativos de Fase 0B", () => {
       followup_due_at: expect.any(String),
     }))
     expect(sessionsBuilder.update).toHaveBeenCalledWith(expect.objectContaining({ state: "derivado" }))
-    expect(sendText).toHaveBeenCalledWith(
+    expect(sendButtons).toHaveBeenCalledWith(
       PHONE,
       expect.stringMatching(/una sola vez/i),
+      expect.arrayContaining([
+        expect.objectContaining({ id: "ver_sedes" }),
+        expect.objectContaining({ id: "cambiar_obra_social" }),
+        expect.objectContaining({ id: "hablar_humano" }),
+      ]),
       expect.objectContaining({ flowIntent: "appointment_followup_consent" })
     )
   })

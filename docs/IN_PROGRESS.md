@@ -35,6 +35,32 @@ Gemini como respaldo y limitar el gasto diario sin compartir tráfico de la API 
 
 ---
 
+# EN CURSO (2026-09-09) — acciones interactivas del bot de WhatsApp
+
+## Objetivo
+
+Facilitar las gestiones administrativas desde WhatsApp con una selección inequívoca de los cuatro
+lugares físicos y accesos rápidos a sedes/horarios, cambio de cobertura y atención humana. Mantener
+la derivación institucional existente, sin reservar turnos ni confirmar disponibilidad.
+
+## Plan
+
+- [x] Revisar el transporte, el normalizador y las pruebas existentes de botones/listas.
+- [x] Reemplazar el selector institucional de tres botones por una lista de cuatro lugares físicos.
+- [x] Conservar la sede física elegida durante la respuesta y evitar ambigüedad entre Británico
+  Lanús y Central.
+- [x] Agregar mapas y un menú de acciones posteriores a la derivación.
+- [ ] Ejecutar lint, tests, build, preview y merge por PR.
+
+## Alcance y seguridad
+
+- No se modifica lógica médica, síntomas de alarma, diagnósticos, tratamientos ni guardrails.
+- El bot continúa sin reservar turnos ni confirmar disponibilidad.
+- Se modifica la lógica conversacional que consume el webhook, pero no el endpoint, la cola
+  durable, RLS, autenticación ni cron jobs.
+
+---
+
 # CERRADO (2026-09-09) — migración de video V2 a Gemini Omni 1.1 Flash
 
 ## Objetivo
