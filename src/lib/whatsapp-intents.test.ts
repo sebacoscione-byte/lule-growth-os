@@ -40,6 +40,26 @@ describe("extractIntake", () => {
     expect(extractIntake("¿atiende los miércoles?", [], verifiedLocations).sede).toBe("hospital_britanico")
   })
 
+  it("no confunde martes o viernes con una sede cuando el cronograma tiene más de una", () => {
+    const allLocations = [
+      ...verifiedLocations,
+      {
+        id: "swiss_lomas" as const,
+        name: "Swiss Medical Lomas",
+        day: "viernes",
+        obras_sociales: [],
+        accepts_particular: false,
+        services: [],
+        active: true,
+      },
+    ]
+    expect(extractIntake("prefiero el martes", [], allLocations).sede).toBeNull()
+    expect(extractIntake("prefiero el viernes", [], allLocations).sede).toBeNull()
+    expect(extractIntake("prefiero Lanús", [], allLocations).sede).toBeNull()
+    expect(extractIntake("prefiero Hospital Británico Lanús", [], allLocations).sede)
+      .toBe("hospital_britanico")
+  })
+
   it("no infiere una sede por días hardcodeados fuera de la configuración vigente", () => {
     const locationsWithoutTuesday = verifiedLocations.map(location => ({
       ...location,

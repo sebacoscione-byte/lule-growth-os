@@ -1,6 +1,15 @@
 ﻿# Lule Growth OS — Contexto para Claude
 
 ## Estado actual
+- 2026-09-09 (WhatsApp sincronizado con el cronograma vigente): el bot y las landings comparten un
+  directorio de cuatro lugares físicos: CIMEL Lanús martes/jueves/viernes, Hospital Británico Lanús
+  los martes para ecocardiogramas, Hospital Británico Central los miércoles y Swiss Medical Lomas
+  los viernes. WhatsApp sigue habilitando instituciones sólo desde `app_config.locations` activo y
+  verificado, pero ya no publica sus campos legacy de día/dirección por encima del cronograma actual.
+  Las menciones ambiguas “martes”, “viernes” o “Lanús” vuelven a pedir elección; “Lomas” y cada sede
+  explícita se resuelven correctamente. Las instrucciones incluyen dirección, horario, canales y el
+  recordatorio de confirmar disponibilidad, prestación y cobertura con la institución. No cambió la
+  lógica médica, el webhook, la cola, los crons ni RLS.
 - 2026-09-09 (motor de video V2): V2 Controlada y V2 Directa usan el modelo estable
   `gemini-omni-1.1-flash` mediante Interactions API; V1 conserva Veo 3.1 Fast como compatibilidad.
   Los prompts V2 exigen una sola toma sin cortes, incluyen las exclusiones dentro de la instrucción

@@ -1,6 +1,7 @@
 import { classifyWhatsAppIntent } from "@/lib/ai"
 import { isEmergencyMessage } from "@/lib/medical-safety"
 import type { WhatsAppLocationConfig } from "@/lib/whatsapp-location-config"
+import { findPracticeInstitutionInText } from "@/lib/practice-directory"
 import type { WhatsAppAiProvider, WhatsAppIntent } from "@/types"
 
 export interface IntakeExtraction {
@@ -40,20 +41,25 @@ export function extractIntake(
     .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase()
   const normalizedText = normalize(text)
-  const genericTokens = new Set(["centro", "clinica", "hospital", "medical", "medico", "salud"])
+  const genericTokens = new Set([
+    "centro", "clinica", "hospital", "medical", "medico", "salud",
+    "lanus", "lomas", "zamora", "central", "caba",
+  ])
+  const directoryLocation = findPracticeInstitutionInText(
+    text,
+    knownLocations.map(location => location.id)
+  )
   const matchedLocation = knownLocations.find(location => {
     const normalizedName = normalize(location.name)
     const normalizedId = normalize(location.id.replaceAll("_", " "))
     const tokens = normalizedName
       .split(/\s+/)
       .filter(token => token.length >= 5 && !genericTokens.has(token))
-    const day = location.day ? normalize(location.day) : null
     return normalizedText.includes(normalizedName)
       || normalizedText.includes(normalizedId)
       || tokens.some(token => normalizedText.includes(token))
-      || Boolean(day && normalizedText.includes(day))
   })
-  const sede: IntakeExtraction["sede"] = matchedLocation?.id ?? null
+  const sede: IntakeExtraction["sede"] = directoryLocation ?? matchedLocation?.id ?? null
 
   return { motivo, obraSocial, sede }
 }

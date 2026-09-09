@@ -1,5 +1,6 @@
 import { z } from "zod"
 import { assessEmergencyMessage } from "@/lib/medical-safety"
+import { findPracticeInstitutionInText } from "@/lib/practice-directory"
 import {
   BotNluSchema,
   WHATSAPP_NLU_SCHEMA_VERSION,
@@ -221,10 +222,7 @@ function makeDecision(
 }
 
 function locationFromText(normalized: string): BotNlu["entities"]["preferred_location"] {
-  if (/\b(?:cimel|lanus|martes)\b/.test(normalized)) return "cimel_lanus"
-  if (/\b(?:britanico|miercoles)\b/.test(normalized)) return "hospital_britanico"
-  if (/\b(?:swiss|lomas|viernes)\b/.test(normalized)) return "swiss_lomas"
-  return "unknown"
+  return findPracticeInstitutionInText(normalized) ?? "unknown"
 }
 
 function coverageName(normalized: string): string | null {
@@ -356,18 +354,21 @@ export function evaluateWhatsAppPolicy(rawContext: WhatsAppPolicyContext): Whats
     )
   }
 
-  const explicitLocation =
-    /^(?:cimel|swiss lomas)$|\b(?:quiero lanus|prefiero el britanico|donde queda cimel|atienden los viernes|a que hora esta en el britanico|cambiar de sede a lomas)\b/
-  if (explicitLocation.test(normalized)) {
-    const intent: WhatsAppIntentV2 = /\b(?:viernes|a que hora)\b/.test(normalized)
+  const resolvedLocation = locationFromText(normalized)
+  const asksAboutLocation = /\b(?:cimel|britanico|swiss|swity|perdriel|tucuman|oliden|lomas)\b/.test(normalized)
+  const coverageReplyOwnsSwiss = context.state === "awaiting_coverage" && coverageName(normalized) !== null
+  if (resolvedLocation !== "unknown" && asksAboutLocation && !coverageReplyOwnsSwiss) {
+    const intent: WhatsAppIntentV2 = /\b(?:horario|que dia|que dias|a que hora)\b/.test(normalized)
       ? "opening_days_hours"
       : "location"
     return makeDecision(context, normalized, intent, "show_booking_instructions", "continue", false, {
-      preferred_location: locationFromText(normalized),
+      preferred_location: resolvedLocation,
     })
   }
-  if (/^(?:donde atiende|que dias atiende)$/.test(normalized)) {
-    const intent: WhatsAppIntentV2 = normalized.includes("dias") ? "opening_days_hours" : "location"
+  if (/\b(?:donde atiende|que dias atiende|atiend(?:e|en) (?:el|los) (?:martes|jueves|viernes)|quiero (?:atenderme en )?lanus|prefiero (?:el )?(?:martes|viernes))\b/.test(normalized)) {
+    const intent: WhatsAppIntentV2 = /\b(?:dias?|martes|jueves|viernes|horario|hora)\b/.test(normalized)
+      ? "opening_days_hours"
+      : "location"
     return makeDecision(context, normalized, intent, "ask_location")
   }
 

@@ -33,6 +33,13 @@ import {
   type WhatsAppLocationConfig,
   type WhatsAppLocationId,
 } from "@/lib/whatsapp-location-config"
+import {
+  findPracticeInstitutionInText,
+  findPracticeSiteInText,
+  getPracticeSitesForInstitution,
+  PRACTICE_INSTITUTION_NAMES,
+  type PracticeSite,
+} from "@/lib/practice-directory"
 import type { HandoffReason, Lead, WhatsAppEntryPoint } from "@/types"
 
 export type BotState =
@@ -268,24 +275,66 @@ const DECLARES_NO_COVERAGE_PATTERN =
 // chequeo determinístico, gratis, sin gastar una clasificación con IA.
 const BARE_GREETING_PATTERN = /^\s*(hola+|holis+|buenas|buen[oa]s?\s+(d[ií]as?|tardes?|noches?)|hey|ey)\W*$/i
 
-async function buildSedeInstructions(sede: Sede, intro: string): Promise<string | null> {
+function formatPracticeSite(site: PracticeSite, includeAddress = true): string {
+  const service = site.serviceNote ? ` · ${site.serviceNote}` : ""
+  const lines = [`🏥 *${site.name}*`, `🗓️ ${site.hours}${service}`]
+  if (includeAddress) lines.push(`📍 ${site.address}`)
+  return lines.join("\n")
+}
+
+function practiceSitesFor(location: WhatsAppLocationConfig): PracticeSite[] {
+  return getPracticeSitesForInstitution(location.id)
+}
+
+function institutionDisplayName(location: Pick<WhatsAppLocationConfig, "id" | "name">): string {
+  return PRACTICE_INSTITUTION_NAMES[location.id] ?? location.name
+}
+
+function buildPracticeSchedule(
+  location: WhatsAppLocationConfig,
+  selectedSite?: PracticeSite | null,
+  includeAddress = true
+): string {
+  const sites = practiceSitesFor(location)
+  const visibleSites = selectedSite?.institutionId === location.id ? [selectedSite] : sites
+  if (visibleSites.length > 0) {
+    return visibleSites.map(site => formatPracticeSite(site, includeAddress)).join("\n\n")
+  }
+
+  const legacyLines = [`🏥 *${location.name}*`]
+  if (location.hours) legacyLines.push(`🗓️ ${location.hours}`)
+  else if (location.day) legacyLines.push(`🗓️ ${location.day}`)
+  if (includeAddress && location.address) legacyLines.push(`📍 ${location.address}`)
+  return legacyLines.join("\n")
+}
+
+async function buildSedeInstructions(
+  sede: Sede,
+  intro: string,
+  selectedSite?: PracticeSite | null
+): Promise<string | null> {
   const locations = await getLocations()
   const loc = locations.find(l => l.id === sede)
   if (!loc) return null
 
-  const lines = [`${intro} Para sacar turno con la *Dra. Lucía Chahin* en *${loc.name}*:`]
+  const lines = [
+    intro,
+    `Para pedir turno con la *Dra. Lucía Chahin* en *${institutionDisplayName(loc)}*:`,
+    buildPracticeSchedule(loc, selectedSite),
+  ]
 
-  if (loc.address) lines.push(`🏥 Dirección: ${loc.address}`)
-  if (loc.day) lines.push(`📅 Ella atiende los *${loc.day}*`)
-  if (loc.hours) lines.push(`🕐 Horarios: ${loc.hours}`)
-  if (loc.phone) lines.push(`📞 Turnos telefónicos: *${loc.phone}*`)
-
-  if (loc.booking_url) lines.push(`🔗 Canal oficial para pedir turno: ${loc.booking_url}`)
+  const channels: string[] = []
+  if (loc.phone) channels.push(`📞 Teléfono: *${loc.phone}*`)
+  if (loc.whatsapp) channels.push(`💬 WhatsApp oficial: *${loc.whatsapp}*`)
+  if (loc.booking_url) channels.push(`🔗 Turnos online/app: ${loc.booking_url}`)
+  if (channels.length > 0) lines.push(`*Canales oficiales*\n${channels.join("\n")}`)
 
   if (loc.booking_instruction) lines.push(loc.booking_instruction)
-  lines.push("\n¡Ante cualquier duda, acá estamos! 😊")
+  lines.push(
+    "Este asistente no reserva turnos ni confirma disponibilidad. Al comunicarte, confirmá el lugar, el día, la prestación y la cobertura."
+  )
 
-  return lines.join("\n")
+  return lines.filter(Boolean).join("\n\n")
 }
 
 function normalizeCoverageName(value: string): string {
@@ -299,11 +348,13 @@ function normalizeCoverageName(value: string): string {
 }
 
 export function buildCoverageNotice(
-  location: Pick<WhatsAppLocationConfig, "name" | "obras_sociales" | "accepts_particular">,
+  location: Pick<WhatsAppLocationConfig, "name" | "obras_sociales" | "accepts_particular"> &
+    Partial<Pick<WhatsAppLocationConfig, "id">>,
   insurance: string | null | undefined
 ): string | null {
   const declared = insurance?.trim()
   if (!declared) return null
+  const displayName = location.id ? institutionDisplayName(location as Pick<WhatsAppLocationConfig, "id" | "name">) : location.name
 
   const normalizedDeclared = normalizeCoverageName(declared)
   const isParticular = normalizedDeclared === "particular"
@@ -316,15 +367,15 @@ export function buildCoverageNotice(
   })
 
   if (isParticular && location.accepts_particular) {
-    return `*${location.name}* acepta atención particular, sin obra social ni prepaga.`
+    return `*${displayName}* acepta atención particular, sin obra social ni prepaga.`
   }
   if (listed) {
-    return `La cobertura *${declared}* figura en la lista verificada de *${location.name}*.`
+    return `La cobertura *${declared}* figura en la lista verificada de *${displayName}*.`
   }
   if (!isParticular && location.accepts_particular) {
-    return `Podés atenderte en *${location.name}* de forma particular, pero tu cobertura *${declared}* no figura entre las aceptadas allí.`
+    return `Podés atenderte en *${displayName}* de forma particular, pero tu cobertura *${declared}* no figura entre las aceptadas allí.`
   }
-  return `La cobertura *${declared}* no figura en la lista verificada de *${location.name}*. Confirmala directamente con la sede antes de pedir el turno o consultá por atención particular.`
+  return `La cobertura *${declared}* no figura en la lista verificada de *${displayName}*. Confirmala directamente con la institución antes de pedir el turno o consultá por atención particular.`
 }
 
 export function isCoverageListedAtLocation(
@@ -360,11 +411,11 @@ async function sendCoverageMismatchOptions(
     title: location.name.slice(0, 20),
   }))
   const compatibleLine = compatible.length > 0
-    ? ` Sí figura en *${compatible.map(location => location.name).join(", ")}*.`
+    ? ` Sí figura en *${compatible.map(institutionDisplayName).join(", ")}*.`
     : ""
   await sendButtons(
     phone,
-    `La cobertura *${insurance}* no figura en la lista verificada de *${selectedLocation.name}*.${compatibleLine}\n\n¿Preferís una sede compatible, cambiar la cobertura/atenderte particular, o hablar con una persona?`,
+    `La cobertura *${insurance}* no figura en la lista verificada de *${institutionDisplayName(selectedLocation)}*.${compatibleLine}\n\n¿Preferís una institución compatible, cambiar la cobertura/atenderte particular, o hablar con una persona?`,
     [
       ...compatibleButtons,
       { id: "cambiar_obra_social", title: "Cambiar cobertura" },
@@ -379,10 +430,10 @@ async function sendCoverageMismatchOptions(
 // derivación no tenía ningún dato de contacto propio.
 function buildHumanFallbackLine(loc: WhatsAppLocationConfig | undefined): string {
   if (loc?.booking_url) {
-    return `\n\nMientras tanto, podés usar el canal oficial de *${loc.name}*: ${loc.booking_url}`
+    return `\n\nMientras tanto, podés usar el canal oficial de *${institutionDisplayName(loc)}*: ${loc.booking_url}`
   }
   return loc?.phone
-    ? `\n\nMientras tanto, podés llamar directo a *${loc.name}*: ${loc.phone}`
+    ? `\n\nMientras tanto, podés llamar directo a *${institutionDisplayName(loc)}*: ${loc.phone}`
     : ""
 }
 
@@ -410,18 +461,22 @@ function parseSede(
   const normalizedText = normalizeLocationText(text)
   if (!normalizedText) return null
 
+  const directoryMatch = findPracticeInstitutionInText(text, locations.map(location => location.id))
+  if (directoryMatch) return directoryMatch
+
   const matched = locations.find(location => {
     const normalizedName = normalizeLocationText(location.name)
     const normalizedId = normalizeLocationText(location.id.replaceAll("_", " "))
-    const genericTokens = new Set(["centro", "clinica", "hospital", "medical", "medico", "salud"])
+    const genericTokens = new Set([
+      "centro", "clinica", "hospital", "medical", "medico", "salud",
+      "lanus", "lomas", "zamora", "central", "caba",
+    ])
     const tokens = normalizedName
       .split(/\s+/)
       .filter(token => token.length >= 5 && !genericTokens.has(token))
-    const day = location.day ? normalizeLocationText(location.day) : null
     return normalizedText.includes(normalizedName)
       || normalizedText.includes(normalizedId)
       || tokens.some(token => normalizedText.includes(token))
-      || Boolean(day && normalizedText.includes(day))
   })
 
   return matched?.id ?? null
@@ -494,7 +549,7 @@ async function forceHandoff(session: WhatsAppSession, phone: string, lead: Lead 
 function buildLocationButtons(locations: WhatsAppLocationConfig[]) {
   return locations.map(location => ({
     id: location.id,
-    title: location.name.slice(0, 20),
+    title: PRACTICE_INSTITUTION_NAMES[location.id].slice(0, 20),
   }))
 }
 
@@ -514,11 +569,11 @@ async function sendSedeOptions(
     return false
   }
 
-  const rows = locations.map(location => {
-    const day = location.day ? ` (${location.day})` : ""
-    return `🏥 *${location.name}*${day}`
-  })
-  const question = `${intro ? `${intro}\n\n` : ""}Sedes con datos verificados:\n\n${rows.join("\n")}\n\n¿En cuál preferís atenderte?`
+  const rows = locations.flatMap(location => practiceSitesFor(location).map(site => {
+    const service = site.serviceNote ? ` · ${site.serviceNote}` : ""
+    return `🏥 *${site.name}* — ${site.hours}${service}`
+  }))
+  const question = `${intro ? `${intro}\n\n` : ""}Lugares y horarios habituales:\n\n${rows.join("\n")}\n\nElegí la institución con la que querés pedir turno. La disponibilidad se confirma directamente allí.`
   await sendButtons(phone, question, buildLocationButtons(locations), {
     ...ctx,
     flowIntent: ctx.flowIntent ?? "pedir_turno",
@@ -589,14 +644,17 @@ async function sendInstructionsAndOfferFollowup(
 async function buildIntakeQuestions(costSavingMode: boolean): Promise<string> {
   const locations = await getLocations()
   const services = [...new Set(locations.flatMap(location => location.services))]
-  const locationNames = locations.map(location => {
-    return location.day ? `${location.name} (${location.day})` : location.name
-  })
+  const locationNames = locations.flatMap(location =>
+    practiceSitesFor(location).map(site => {
+      const service = site.serviceNote ? `, ${site.serviceNote.toLowerCase()}` : ""
+      return `${site.name} (${site.day}${service})`
+    })
+  )
   const serviceQuestion = services.length > 0
     ? `1) servicio: ${services.join(", ")} o información administrativa sobre un protocolo`
     : "1) qué gestión administrativa necesitás; una persona puede confirmar los servicios disponibles"
   const locationQuestion = locationNames.length > 0
-    ? `3) sede: ${locationNames.join(", ")}.`
+    ? `3) lugar preferido: ${locationNames.join("; ")}.`
     : "No tengo una lista de sedes vigente para ofrecerte automáticamente; podés pedir hablar con una persona."
 
   return costSavingMode
@@ -656,11 +714,13 @@ export function buildCoverageLocationsReply(
     return `La cobertura *${coverage}* no figura en ninguna de las sedes con datos verificados. Podés pedir hablar con una persona del equipo para confirmarlo.`
   }
 
-  const rows = matchingLocations.map(location => {
-    const day = location.day ? ` (${location.day})` : ""
-    return `🏥 *${location.name}*${day}`
-  })
-  return `La Dra. Lucía Chahin atiende con *${coverage}* en:\n\n${rows.join("\n")}\n\nLa cobertura de cada plan debe confirmarse directamente con la sede al pedir el turno.`
+  const rows = matchingLocations.flatMap(location =>
+    practiceSitesFor(location).map(site => {
+      const service = site.serviceNote ? ` · ${site.serviceNote}` : ""
+      return `🏥 *${site.name}* — ${site.hours}${service}`
+    })
+  )
+  return `La Dra. Lucía Chahin atiende con *${coverage}* en estas instituciones/lugares:\n\n${rows.join("\n")}\n\nLa aceptación depende del plan y debe confirmarse directamente con la institución al pedir el turno.`
 }
 
 // ── Preguntas frecuentes fuera del guion ────────────────────
@@ -669,15 +729,30 @@ async function answerFaq(text: string, sede: Sede | null): Promise<string | null
   const locations = await getLocations()
   const coverageLocationsReply = buildCoverageLocationsReply(text, locations)
   if (coverageLocationsReply) return coverageLocationsReply
+  const normalizedQuestion = normalizeLocationText(text).replace(/[^a-z0-9\s]/g, " ").replace(/\s+/g, " ").trim()
+  const asksAllLocations = /^(?:donde atiende|en donde atiende|que dias atiende|cuales son (?:las )?sedes|donde puedo atenderme)$/.test(normalizedQuestion)
+  if (asksAllLocations) {
+    const schedule = locations
+      .flatMap(location => practiceSitesFor(location).map(site => formatPracticeSite(site)))
+      .join("\n\n")
+    return schedule
+      ? `Estos son los lugares y horarios habituales de la Dra. Lucía Chahin:\n\n${schedule}\n\nLos turnos y la disponibilidad se confirman directamente con cada institución.`
+      : "No tengo una lista de lugares vigente y verificada para informarte por este medio. Podés pedir hablar con una persona del equipo."
+  }
   const loc = sede ? locations.find(l => l.id === sede) : undefined
-  const sedeName = loc?.name ?? null
+  const explicitSite = findPracticeSiteInText(text)
+  const selectedSite = explicitSite && explicitSite.institutionId === loc?.id ? explicitSite : null
+  const sedeName = loc ? institutionDisplayName(loc) : null
   const unverifiedLocationReply =
     "No tengo ese dato vigente y verificado para informarlo por este medio. Podés pedir hablar con una persona del equipo para confirmarlo."
 
   const asksCoverage = ["obra social", "obras sociales", "cobertura", "prepaga", "pami", "aceptan"].some(k => lower.includes(k))
   if (asksCoverage) {
     if (loc?.obras_sociales?.length) {
-      return `En *${sedeName}* la Dra. Lucía Chahin atiende: ${loc.obras_sociales.join(", ")}.\n\nSi la tuya no está en la lista, escribinos y lo confirmamos.`
+      if (loc.obras_sociales.length > 12) {
+        return `En *${sedeName}* hay ${loc.obras_sociales.length} coberturas cargadas. Decime el nombre exacto de tu obra social o prepaga y te indico si figura en la lista verificada. La aceptación depende del plan y debe confirmarse con la institución.`
+      }
+      return `En *${sedeName}* figuran estas coberturas:\n• ${loc.obras_sociales.join("\n• ")}\n\nLa aceptación depende del plan y debe confirmarse directamente con la institución.`
     }
     return unverifiedLocationReply
   }
@@ -691,15 +766,14 @@ async function answerFaq(text: string, sede: Sede | null): Promise<string | null
 
   const asksHours = ["horario", "horarios", "que dia", "qué día", "que dias", "qué días", "a que hora", "a qué hora"].some(k => lower.includes(k))
   if (asksHours && sede) {
-    if (!loc || (!loc.hours && !loc.day)) return unverifiedLocationReply
-    const schedule = loc.hours ? `atiende: ${loc.hours}` : `atiende los ${loc.day}`
-    return `En *${loc.name}*, la Dra. Lucía Chahin ${schedule}.`
+    if (!loc) return unverifiedLocationReply
+    return `${buildPracticeSchedule(loc, selectedSite, false)}\n\nSon horarios habituales; la disponibilidad se confirma al pedir el turno.`
   }
 
   const asksAddress = ["direccion", "dirección", "donde queda", "dónde queda", "como llego", "cómo llego", "ubicacion", "ubicación"].some(k => lower.includes(k))
   if (asksAddress && sede) {
-    if (!loc?.address) return unverifiedLocationReply
-    return `*${loc.name}* está en: ${loc.address}`
+    if (!loc) return unverifiedLocationReply
+    return buildPracticeSchedule(loc, selectedSite)
   }
 
   return null
@@ -1239,7 +1313,8 @@ export async function handleIncomingMessage(params: {
         const intro = coverageNotice
           ? `Listo, actualicé tu sede preferida.\n\n${coverageNotice}`
           : "Listo, actualicé tu sede preferida."
-        const body = await buildSedeInstructions(sede, intro)
+        const explicitSite = messageType === "text" ? findPracticeSiteInText(text) : null
+        const body = await buildSedeInstructions(sede, intro, explicitSite)
         if (body) {
           await sendText(phone, body, { ...ctx, flowIntent: "pedir_turno" })
         } else {

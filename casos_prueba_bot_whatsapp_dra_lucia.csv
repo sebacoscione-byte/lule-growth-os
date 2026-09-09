@@ -113,14 +113,14 @@ coverage-009,coverage,awaiting_coverage,text,Tengo una duda particular,continue,
 coverage-010,coverage,awaiting_coverage,text,Es un caso particular,continue,unknown,ask_rephrase,false,
 coverage-011,coverage,awaiting_coverage,text,Particular,continue,private_payment,ask_location,false,
 coverage-012,coverage,awaiting_coverage,text,¿Cuánto sale particular?,handoff,private_payment,human_handoff,true,
-location-001,location,routed,text,Quiero Lanús,continue,location,show_booking_instructions,false,expected_location=cimel_lanus
+location-001,location,routed,text,Quiero Lanús,continue,location,ask_location,false,"Lanús ahora es ambiguo: CIMEL y Hospital Británico Lanús; no inferir sede."
 location-002,location,routed,text,CIMEL,continue,location,show_booking_instructions,false,expected_location=cimel_lanus
 location-003,location,routed,text,Prefiero el Británico,continue,location,show_booking_instructions,false,expected_location=hospital_britanico
 location-004,location,routed,text,Swiss Lomas,continue,location,show_booking_instructions,false,expected_location=swiss_lomas
 location-005,location,routed,text,¿Dónde atiende?,continue,location,ask_location,false,expected_location=unknown
 location-006,location,routed,text,¿Qué días atiende?,continue,opening_days_hours,ask_location,false,expected_location=unknown
 location-007,location,routed,text,¿Dónde queda CIMEL?,continue,location,show_booking_instructions,false,expected_location=cimel_lanus
-location-008,location,routed,text,¿Atienden los viernes?,continue,opening_days_hours,show_booking_instructions,false,expected_location=swiss_lomas
+location-008,location,routed,text,¿Atienden los viernes?,continue,opening_days_hours,ask_location,false,"Viernes ahora es ambiguo: CIMEL y Swiss Medical; no inferir sede."
 location-009,location,routed,text,¿A qué hora está en el Británico?,continue,opening_days_hours,show_booking_instructions,false,expected_location=hospital_britanico
 location-010,location,routed,text,Quiero cambiar de sede a Lomas,continue,location,show_booking_instructions,false,expected_location=swiss_lomas
 cancel_reschedule-001,cancel_reschedule,routed,text,Quiero cancelar mi turno,continue,cancel_or_reschedule,show_booking_instructions,false,No prometer gestión de agenda; dar canal institucional.

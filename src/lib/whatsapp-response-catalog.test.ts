@@ -19,6 +19,12 @@ describe("catálogo aprobado de WhatsApp", () => {
     expect(getApprovedWhatsAppResponse("medical_boundary").body).toBe(MEDICAL_BOUNDARY_REPLY)
   })
 
+  it("publica el cronograma vigente en las respuestas de derivación", () => {
+    expect(getApprovedWhatsAppResponse("ask_location").body).toContain("martes, jueves o viernes")
+    expect(getApprovedWhatsAppResponse("ask_location").body).toContain("Hospital Británico Lanús")
+    expect(getApprovedWhatsAppResponse("route_britanico").body).toContain("Central los miércoles")
+  })
+
   it("renderiza solo variables declaradas", () => {
     expect(renderApprovedWhatsAppResponse("show_booking_instructions", {
       location_name: "CIMEL Lanús",

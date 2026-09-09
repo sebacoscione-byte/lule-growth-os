@@ -2014,3 +2014,32 @@ externo de una institución.
 - El cambio corrige semántica y períodos históricos del dashboard; no altera los canales públicos.
 
 ---
+# CERRADO (2026-09-09) — respuestas actuales y completas del bot de WhatsApp
+
+## Objetivo
+
+Corregir el incidente real en el que el bot informó el cronograma antiguo de tres sedes, aunque la
+agenda vigente tiene cuatro lugares físicos: CIMEL martes/jueves/viernes, Hospital Británico Lanús
+los martes para ecocardiogramas, Hospital Británico Central los miércoles y Swiss Medical Lomas los
+viernes. Mejorar todas las respuestas administrativas relacionadas con lugares, horarios,
+coberturas e instrucciones sin modificar guardrails ni lógica médica.
+
+## Plan
+
+- [x] Auditar el flujo completo y revisar los tests existentes de WhatsApp antes de modificarlo.
+- [x] Compartir un único directorio vigente entre las landings y el bot.
+- [x] Evitar inferencias ambiguas por día/ciudad y mejorar opciones, FAQ e instrucciones.
+- [x] Agregar regresiones del incidente y actualizar documentación operativa.
+- [x] Ejecutar lint, 140 suites/1.222 tests y build de producción.
+- [ ] Abrir PR, verificar preview de Vercel y mergear.
+
+## Alcance y seguridad
+
+- No se modifican síntomas de alarma, guardrails, diagnósticos, tratamientos ni interpretación de
+  estudios. La IA sigue limitada a devolver una categoría cerrada y no redacta respuestas.
+- El bot continúa sin confirmar disponibilidad ni reservar turnos; todos los canales son oficiales
+  de las instituciones y el paciente debe confirmar horario, prestación y cobertura al pedir turno.
+- Se toca la lógica de respuesta de WhatsApp, pero no el webhook, la cola durable, RLS ni los cron
+  jobs de Vercel.
+
+---
