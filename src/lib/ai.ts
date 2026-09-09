@@ -194,8 +194,8 @@ export async function getDailyRequestCount(purpose?: string): Promise<number> {
 // Prompt builders — pure functions, no API calls
 // ---------------------------------------------------------------------------
 
-const IMAGE_PROMPT_RULES = `DIRECCION VISUAL PARA GEMINI:
-- Inclui "image_prompt": un prompt autocontenido y detallado para que Gemini genere la placa visual final.
+const IMAGE_PROMPT_RULES = `DIRECCION VISUAL PARA GPT IMAGE 2.5:
+- Inclui "image_prompt": un prompt autocontenido y detallado para que GPT Image genere la placa visual final.
 - Redacta "image_prompt" en ingles para maximizar la precision visual; no incluyas instrucciones conversacionales ni explicaciones.
 - El prompt debe pedir una pieza editorial premium que detenga el scroll, conectada de forma concreta con el tema y adaptada al formato.
 - Define un unico punto focal claro y una escena que se entienda en menos de un segundo.
@@ -532,7 +532,7 @@ Devolvé ÚNICAMENTE el JSON válido, sin markdown, sin bloques de código, sin 
 Si un texto necesita comillas, escapalas como \\\" o usa comillas simples para no romper el JSON.
 ${input.format === "carrusel" ? `Formato CARRUSEL: incluí un array "slides" con 4-5 slides de contenido (además de la portada).
 Cada slide tiene "headline" (máx. 40 caracteres), "text" (1-2 oraciones del contenido de esa slide) e
-"image_prompt" (prompt visual en inglés para esa slide puntual, siguiendo la DIRECCION VISUAL PARA GEMINI
+"image_prompt" (prompt visual en inglés para esa slide puntual, siguiendo la DIRECCION VISUAL PARA GPT IMAGE 2.5
 de arriba — una escena distinta a la portada y al resto de las slides, que corresponda a lo que dice esa
 slide, pero con la misma paleta y tratamiento editorial que la portada).
 Usá exactamente estas claves:
@@ -545,7 +545,7 @@ Usá exactamente estas claves:
   "visual_headline": "título de la portada, máximo 40 caracteres",
   "visual_subtitle": "subtítulo de la portada, máximo 60 caracteres",
   "visual_style": "rose",
-  "image_prompt": "prompt visual detallado listo para que Gemini genere la portada final",
+  "image_prompt": "prompt visual detallado listo para que GPT Image genere la portada final",
   "image_alt_text": "descripcion accesible breve en espanol",
   "slides": [
     {"headline": "Slide 1 — título", "text": "Contenido de esta slide en 1-2 oraciones.", "image_prompt": "escena distinta para esta slide"},
@@ -563,7 +563,7 @@ Usá exactamente estas claves:
   "visual_headline": "titular para la placa visual, máximo 60 caracteres",
   "visual_subtitle": "subtítulo para la placa visual, máximo 120 caracteres (para 'historia', dejale lugar real al dato concreto que pide HISTORIAS DE INSTAGRAM de arriba, no lo escribas tan largo que se corte)",
   "visual_style": "rose",
-  "image_prompt": "prompt visual detallado listo para que Gemini genere la placa final",
+  "image_prompt": "prompt visual detallado listo para que GPT Image genere la placa final",
   "image_alt_text": "descripcion accesible breve en espanol"
 }`}`
 }
@@ -721,6 +721,13 @@ export function getPublicAiError(error: unknown): string {
   if (normalized.startsWith("daily_video_limit_exceeded:")) {
     const limit = message.split(":")[1]
     return `Se alcanzó el límite diario de ${limit} videos generados con IA (tiene costo real por generación). Esperá hasta mañana o subí un video propio.`
+  }
+  if (normalized.startsWith("daily_image_limit_exceeded:")) {
+    const limit = message.split(":")[1]
+    return `Se alcanzó el límite diario de ${limit} imágenes generadas con IA (tienen costo real). Esperá hasta mañana o subí una imagen propia.`
+  }
+  if (normalized.includes("organization must be verified")) {
+    return "OpenAI requiere verificar la organización antes de habilitar GPT Image. Completá la verificación en la configuración de la organización e intentá nuevamente."
   }
   if (normalized.includes("credit balance") || normalized.includes("billing") || normalized.includes("insufficient")) {
     return "El proveedor de IA no tiene saldo disponible. Activá billing en Google Cloud o usá el modo manual."
@@ -1084,7 +1091,7 @@ Reglas:
 - El objetivo es educar e invitar puntualmente a pedir turno con vos, nunca con un "medico de confianza" generico ni derivando a otro profesional.
 - Atendés en CIMEL Lanús martes, jueves y viernes; realizás ecocardiogramas en Hospital Británico Lanús los martes; atendés en Hospital Británico Central los miércoles y en Swiss Medical Lomas los viernes.
 - NUNCA inventes telefonos, direcciones web, nombres de apps ni otros canales de contacto que no te hayan sido provistos explicitamente en el pedido. Si no tenes un link de turnos, usa "link en la bio" nada mas.
-- Gemini resolvera despues la placa final e integrara el titular y subtitulo.
+- GPT Image resolvera despues la placa final e integrara el titular y subtitulo.
 ${PLAIN_TEXT_RULES}
 ${IMAGE_PROMPT_RULES}
 ${PATIENT_ACQUISITION_RULES}
@@ -1130,7 +1137,9 @@ ${HASHTAG_RULES}
 
 type ContentVisualFormat = "reel" | "historia" | "carrusel" | "post"
 
-// Tamaños que le pedimos a OpenAI para el respaldo (ver generatePhotoWithOpenAI) -- gpt-image-2 acepta
+export const DEFAULT_DAILY_IMAGE_GENERATION_LIMIT = 10
+
+// Tamaños que le pedimos a OpenAI (ver generatePhotoWithOpenAI) -- GPT Image 2.5 acepta
 // cualquier WIDTHxHEIGHT divisible por 16; estos valores son la relacion 4:5/9:16 exacta más cercana,
 // para que composeContentPlate() reciba una foto con una relación de aspecto similar a la que le pide
 // a Gemini (igual la recorta/escala al slot final, así que no necesita ser pixel-perfecto).
@@ -1149,11 +1158,6 @@ async function generatePhotoWithGemini(
   const apiKey = process.env.GEMINI_API_KEY
   if (!apiKey) throw new Error("GEMINI_API_KEY no esta configurada.")
 
-  const dailyLimit = Number(process.env.DAILY_AI_REQUEST_LIMIT ?? 20)
-  if (await getDailyRequestCount() >= dailyLimit) {
-    throw new Error(`DAILY_LIMIT_EXCEEDED:${dailyLimit}`)
-  }
-
   const model = process.env.GEMINI_IMAGE_MODEL || "gemini-3.1-flash-image"
   // La llamada a la API de imagenes de Gemini a veces falla de forma puntual/transitoria (network
   // blip, 5xx momentaneo, o un 200 OK sin datos de imagen en la respuesta) -- mismo patron que el
@@ -1161,7 +1165,7 @@ async function generatePhotoWithGemini(
   // generacion de imagen NUNCA tenia ningun reintento propio (confirmado 2026-08-02: "Generar placa
   // final" seguia fallando pese a tener credito disponible en la cuenta de Gemini -- reproducido en
   // vivo que un segundo intento manual identico sale bien). Antes de rendirse (o de recurrir al
-  // respaldo de OpenAI en generateContentVisual), reintenta una vez mas -- salvo que el error sea de
+  // respaldo de Gemini en generatePhotoWithFallback), reintenta una vez mas -- salvo que el error sea de
   // cuota/rate-limit, que no se soluciona reintentando de inmediato (ver el 429 dedicado que arma
   // route.ts para ese caso).
   const MAX_RETRIES = 1
@@ -1273,7 +1277,7 @@ APPROVED CREATIVE DIRECTION:
 ${input.reference_image_prompt}
 
 FINAL CHECK: vertical 9:16 editorial documentary healthcare photograph; one meaningful action; 25-35% quiet lateral safe area; zero visible text, letters, numbers, logos, watermarks or readable interfaces. If a stethoscope appears, its chestpiece must be on the chest/thorax for cardiac auscultation, never on abdomen, belly or stomach.`
-  const photo = await generatePhotoWithGemini(prompt, hashPrompt(prompt), "9:16")
+  const photo = await generatePhotoWithFallback(prompt, hashPrompt(prompt), "reel", "9:16")
   return { mime_type: photo.mimeType, image_data: photo.buffer.toString("base64") }
 }
 
@@ -1358,23 +1362,19 @@ Devolve SOLO JSON: {"approved":boolean,"critical_failures":["codigo"],"notes":"e
 }
 
 /**
- * Respaldo opcional si Gemini falla (cupo diario agotado, error transitorio, etc.) -- mismo patron
- * que el fallback Gemini->Anthropic de generateText, aplicado ahora a la generacion de fotos (2026-07-30,
- * a pedido explicito de Seba: "que tambien ChatGPT genere imagenes si lo necesitara"). Solo se activa
- * si OPENAI_API_KEY esta configurada; si no, el error original de Gemini se propaga sin cambios (ver
- * generateContentVisual). Usa gpt-image-2 por default (verificado 2026-07-30 contra la documentacion
- * oficial de OpenAI -- gpt-image-1 se discontinua el 23/9/2026, no usar ese nombre). Requiere que la
- * organizacion de OpenAI este verificada en developer console para poder usar modelos GPT Image; sin
- * eso, esta llamada falla con un error de verificacion (no bloquea nada, cae al error original de
- * Gemini si tambien falla). Request verificado en vivo el 2026-07-30 (pasa la validacion de la API
- * real, error real de "billing_hard_limit_reached" -- falta credito cargado en la cuenta de OpenAI
- * para confirmar la respuesta exitosa de punta a punta).
+ * Motor principal de imagenes desde 2026-09-09. GPT Image 2.5 Flare es el default para generacion
+ * cotidiana rapida; el override queda disponible para una migracion controlada. La calidad media se
+ * fija como parametro de API (no dentro del prompt) y puede ajustarse con OPENAI_IMAGE_QUALITY.
  */
 async function generatePhotoWithOpenAI(prompt: string, promptHash: string, format: ContentVisualFormat): Promise<{ buffer: Buffer; mimeType: string }> {
   const apiKey = process.env.OPENAI_API_KEY
   if (!apiKey) throw new Error("OPENAI_API_KEY no esta configurada.")
 
-  const model = process.env.OPENAI_IMAGE_MODEL || "gpt-image-2"
+  const model = process.env.OPENAI_IMAGE_MODEL || "gpt-image-2.5-flare"
+  const configuredQuality = process.env.OPENAI_IMAGE_QUALITY
+  const quality = configuredQuality && ["low", "medium", "high", "xhigh", "max", "auto"].includes(configuredQuality)
+    ? configuredQuality
+    : "medium"
   try {
     const response = await fetch("https://api.openai.com/v1/images/generations", {
       method: "POST",
@@ -1383,10 +1383,8 @@ async function generatePhotoWithOpenAI(prompt: string, promptHash: string, forma
         model,
         prompt,
         size: OPENAI_IMAGE_SIZE[format],
-        quality: "medium",
-        // NO mandar "response_format" -- verificado en vivo el 2026-07-30 que gpt-image-2 lo rechaza
-        // con 400 "Unknown parameter: response_format" (a diferencia de gpt-image-1/DALL-E, que si lo
-        // aceptaban). La API mas nueva ya no deja elegir formato de respuesta; devuelve b64_json fijo.
+        quality,
+        // GPT Image devuelve b64_json sin necesitar response_format.
       }),
     })
     const data = await response.json() as {
@@ -1399,13 +1397,41 @@ async function generatePhotoWithOpenAI(prompt: string, promptHash: string, forma
     if (!photoData) throw new Error("OpenAI no devolvio una imagen.")
 
     await logRequest("openai", model, promptHash, "content_visual", true)
-    // gpt-image-2 siempre devuelve PNG (no hay parametro para elegir otro formato, ver nota arriba).
+    // Sin output_format explicito, GPT Image devuelve PNG.
     return { buffer: Buffer.from(photoData, "base64"), mimeType: "image/png" }
   } catch (error) {
     await logRequest("openai", model, promptHash, "content_visual", false,
       error instanceof Error ? error.message : String(error))
     throw error
   }
+}
+
+async function assertImageGenerationWithinDailyLimit(): Promise<void> {
+  const dailyLimit = Number(process.env.DAILY_IMAGE_GENERATION_LIMIT ?? DEFAULT_DAILY_IMAGE_GENERATION_LIMIT)
+  if (await getDailyRequestCount("content_visual") >= dailyLimit) {
+    throw new Error(`DAILY_IMAGE_LIMIT_EXCEEDED:${dailyLimit}`)
+  }
+}
+
+/** OpenAI es el motor principal; Gemini conserva continuidad operativa mientras la cuenta se verifica
+ * y como respaldo ante una falla puntual. Se propaga siempre el error del ultimo proveedor intentado. */
+async function generatePhotoWithFallback(
+  prompt: string,
+  promptHash: string,
+  format: ContentVisualFormat,
+  aspectRatio: "4:5" | "9:16"
+): Promise<{ buffer: Buffer; mimeType: string }> {
+  await assertImageGenerationWithinDailyLimit()
+
+  if (process.env.OPENAI_API_KEY) {
+    try {
+      return await generatePhotoWithOpenAI(prompt, promptHash, format)
+    } catch (openaiError) {
+      if (!process.env.GEMINI_API_KEY) throw openaiError
+    }
+  }
+
+  return generatePhotoWithGemini(prompt, promptHash, aspectRatio)
 }
 
 /**
@@ -1492,7 +1518,7 @@ export async function generateContentVisual(input: {
   visual_headline: string
   visual_subtitle: string
   image_prompt: string
-  /** "v1" (default desde 2026-08-06, tambien si se omite): Gemini dibuja la placa entera (foto +
+  /** "v1" (default desde 2026-08-06, tambien si se omite): el modelo dibuja la placa entera (foto +
    * texto) en una sola pasada -- una sola imagen fotografica, sin corte al medio. "v2": motor
    * anterior (default hasta el 2026-08-06), foto sola + texto compuesto aparte en un panel al
    * costado (composeContentPlate) -- Seba lo marco como "muy mala, genera todo imagenes con un
@@ -1510,24 +1536,9 @@ export async function generateContentVisual(input: {
   const prompt = version === "v1" ? buildVisualPromptV1(input, aspectRatio) : buildVisualPromptV2(input, aspectRatio)
   const promptHash = hashPrompt(prompt)
 
-  let photo: { buffer: Buffer; mimeType: string }
-  try {
-    photo = await generatePhotoWithGemini(prompt, promptHash, aspectRatio)
-  } catch (geminiError) {
-    if (!process.env.OPENAI_API_KEY) throw geminiError
-    try {
-      photo = await generatePhotoWithOpenAI(prompt, promptHash, input.format)
-    } catch (openaiError) {
-      // Los dos proveedores fallaron -- se propaga el error de OpenAI (el ULTIMO intentado), no el de
-      // Gemini (bug real 2026-08-01, mismo patron que el fallback de texto en generateText: propagar
-      // siempre el error del primer proveedor esconde la razon real cuando el respaldo tambien falla
-      // -- ej. OpenAI sin saldo, "billing_hard_limit_reached" -- y getPublicAiError() nunca llega a
-      // mostrar el aviso claro de billing que ya tiene previsto para ese caso).
-      throw openaiError
-    }
-  }
+  const photo = await generatePhotoWithFallback(prompt, promptHash, input.format, aspectRatio)
 
-  // V1: Gemini/OpenAI ya devolvieron la placa entera (foto + texto) -- no hay nada que componer.
+  // V1: el proveedor ya devolvio la placa entera (foto + texto) -- no hay nada que componer.
   if (version === "v1") {
     return { mime_type: photo.mimeType, image_data: photo.buffer.toString("base64") }
   }

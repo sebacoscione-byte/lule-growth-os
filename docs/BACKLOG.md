@@ -239,6 +239,21 @@ copia ese estilo puntual.
 
 ---
 
+## [FEATURE] ⏳ GPT Image 2.5 Flare como motor principal (2026-09-09)
+
+OpenAI pasa a ser el proveedor principal de placas y fotogramas de referencia con
+`gpt-image-2.5-flare`, calidad media y un tope independiente de 10 imágenes exitosas por día.
+Gemini queda como respaldo para no interrumpir el editor ni el pipeline de video controlado.
+
+- Prompts y textos de interfaz adaptados a GPT Image 2.5; V1/V2 conservan su contrato visual.
+- `OPENAI_API_KEY`, modelo, calidad y límite preparados para Preview y Production en Vercel.
+- Prueba real `low` rechazada antes de generar/cobrar: falta verificar la organización de OpenAI.
+  Cuando Seba complete ese paso externo, repetir una única prueba y marcar este punto como cerrado.
+- El intercambio voluntario de inputs/outputs con OpenAI permanece desactivado; no se envían datos
+  de pacientes en este flujo editorial.
+
+---
+
 ## [FEATURE] ✅ Respaldo con OpenAI (`gpt-image-2`) si Gemini falla + corrección de costo real (2026-07-30)
 
 A pedido explícito de Seba ("avancemos para que también ChatGPT genere imágenes si lo necesitara"),

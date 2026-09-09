@@ -1,3 +1,28 @@
+# EN CURSO (2026-09-09) — migración de imágenes a GPT Image 2.5 Flare
+
+## Objetivo
+
+Usar GPT Image 2.5 Flare como motor principal para placas y fotogramas de referencia, mantener
+Gemini como respaldo y limitar el gasto diario sin compartir tráfico de la API con OpenAI.
+
+## Plan
+
+- [x] Confirmar modelo, endpoint, parámetros y recomendaciones de prompting en OpenAI Docs.
+- [x] Probar una llamada mínima en calidad baja sin datos personales.
+- [x] Migrar el proveedor principal y adaptar prompts, UI, errores y límite de gasto.
+- [x] Configurar las variables en Vercel sin modificar ni exponer archivos de secretos.
+- [ ] Ejecutar lint, tests y build; validar el preview y mergear el PR.
+
+## Alcance y privacidad
+
+- Las imágenes usan solamente briefs editoriales y no incluyen datos ni fotografías de pacientes.
+- El intercambio voluntario de inputs/outputs con OpenAI permanece desactivado.
+- Una prueba `low` fue rechazada antes de generarse y no consumió crédito: la organización debe
+  completar la verificación de OpenAI; el fallback a Gemini mantiene operativo el sistema.
+- No se modifica lógica médica, webhooks, cron jobs, RLS, autenticación ni datos de pacientes.
+
+---
+
 # CERRADO (2026-09-09) — migración de video V2 a Gemini Omni 1.1 Flash
 
 ## Objetivo

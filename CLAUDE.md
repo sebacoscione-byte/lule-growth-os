@@ -1788,16 +1788,17 @@ SUPABASE_DB_PASSWORD=   # Para migraciones: npm run migrate. Ver: Supabase → P
 AI_PROVIDER=auto
 GEMINI_API_KEY=
 GEMINI_MODEL=gemini-3.5-flash
-GEMINI_IMAGE_MODEL=gemini-3.1-flash-image  # Placas de Instagram (foto) — tiene costo real, ver "Generación de imágenes" abajo
+GEMINI_IMAGE_MODEL=gemini-3.1-flash-image  # Respaldo de imágenes si OpenAI falla
 GEMINI_VIDEO_MODEL=veo-3.1-fast-generate-preview  # Solo V1 legado
 GEMINI_OMNI_VIDEO_MODEL=gemini-omni-1.1-flash  # Override opcional de V2; sin definir usa este mismo modelo estable
 DAILY_VIDEO_GENERATION_LIMIT=3  # Tope diario, propio y mas estricto que DAILY_AI_REQUEST_LIMIT: tiene costo real por generación
 ANTHROPIC_API_KEY=
 ANTHROPIC_MODEL=claude-sonnet-4-6
-# Respaldo opcional de generación de fotos si Gemini falla (cupo agotado, error transitorio) — ver
-# "Respaldo opcional con OpenAI" abajo. Sin esto, el comportamiento es igual que antes (solo Gemini).
+# Motor principal de imágenes. Requiere organización verificada y saldo en OpenAI.
 OPENAI_API_KEY=
-OPENAI_IMAGE_MODEL=gpt-image-2  # Vigente al 2026-07-30 — NO usar "gpt-image-1" (se discontinúa 23/9/2026)
+OPENAI_IMAGE_MODEL=gpt-image-2.5-flare
+OPENAI_IMAGE_QUALITY=medium
+DAILY_IMAGE_GENERATION_LIMIT=10  # Tope propio; incluye placas y fotogramas de referencia exitosos
 # Google Business Profile API (OAuth 2.0)
 GOOGLE_CLIENT_ID=
 GOOGLE_CLIENT_SECRET=
@@ -1889,7 +1890,26 @@ no usar ese nombre de modelo) y sus sucesores `gpt-image-1.5`/`gpt-image-2` (USD
 solapan con el rango de Gemini. La decisión de sumar OpenAI (ver abajo) es por resiliencia/calidad de
 foto, no por ahorro.
 
-### Respaldo opcional con OpenAI (`gpt-image-2`) si Gemini falla (2026-07-30)
+### Motor principal GPT Image 2.5 Flare + respaldo Gemini (2026-09-09)
+
+`generateContentVisual()` y `generateVideoReferenceFrame()` intentan primero OpenAI con
+`gpt-image-2.5-flare`, el modelo rápido recomendado para flujos cotidianos. Si OpenAI no está
+configurado o falla, Gemini conserva la continuidad operativa. V1 sigue generando la placa completa;
+V2 sigue generando la escena sin texto y componiendo la tipografía real con FFmpeg.
+
+- **Parámetros**: `OPENAI_IMAGE_MODEL` default `gpt-image-2.5-flare`, calidad `medium` mediante
+  `OPENAI_IMAGE_QUALITY` y tamaños 4:5/9:16 divisibles por 16. No se envía `response_format`; la
+  respuesta se decodifica desde `b64_json` como PNG.
+- **Control de gasto**: `DAILY_IMAGE_GENERATION_LIMIT` limita a 10 generaciones exitosas por día,
+  separado del límite general de texto y del límite de video. Incluye placas y fotogramas de referencia.
+- **Privacidad**: el tráfico compartido con OpenAI debe permanecer desactivado. Los prompts de este
+  flujo son briefs editoriales sin datos de pacientes.
+- **Verificación real del 2026-09-09**: la llamada mínima con `quality: "low"` llegó correctamente al
+  modelo, pero OpenAI la rechazó antes de generar y cobrar porque la organización aún no está
+  verificada. La verificación de organización es independiente del saldo de USD 25.
+- Las llamadas quedan auditadas en `ai_requests` con `purpose: "content_visual"` y su proveedor real.
+
+### Histórico: respaldo opcional con OpenAI (`gpt-image-2`) si Gemini falla (2026-07-30)
 
 A pedido explícito de Seba ("avancemos para que también ChatGPT genere imágenes si lo necesitara"),
 `generateContentVisual()` ahora intenta generar la foto con Gemini primero (comportamiento de
