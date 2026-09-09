@@ -14,7 +14,7 @@ médica existente.
 - [x] Agregar regresiones visuales del degradado, zonas seguras y ausencia de corte vertical.
 - [x] Actualizar selector, tipos y documentación operativa con el contrato V2.2.
 - [x] Ejecutar lint, tests y build; revisar una placa renderizada.
-- [ ] Abrir PR, verificar CI/preview y mergear a `main`.
+- [x] Abrir PR, verificar CI/preview y mergear a `main`.
 
 ## Alcance y seguridad
 
@@ -29,6 +29,9 @@ médica existente.
 - `npm run build`: compilación, TypeScript y 90 rutas generadas correctamente.
 - Revisión visual 4:5 sobre una fotografía pública temporal: tipografía legible, degradado inferior
   continuo y ausencia del corte vertical de V2.1. El archivo de QA no se incorporó al repositorio.
+- PR #277: build, E2E público y Vercel Preview aprobados; E2E autenticado omitido por diseño.
+- Preview `Ready`: `/login` respondió 200 y `/api/content/visual` rechazó correctamente una llamada
+  sin sesión con 401. La composición V2.2 se verificó localmente para no consumir una generación paga.
 
 ---
 
