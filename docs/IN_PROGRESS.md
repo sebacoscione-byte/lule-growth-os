@@ -2031,7 +2031,18 @@ coberturas e instrucciones sin modificar guardrails ni lógica médica.
 - [x] Evitar inferencias ambiguas por día/ciudad y mejorar opciones, FAQ e instrucciones.
 - [x] Agregar regresiones del incidente y actualizar documentación operativa.
 - [x] Ejecutar lint, 140 suites/1.222 tests y build de producción.
-- [ ] Abrir PR, verificar preview de Vercel y mergear.
+- [x] Abrir PR #275 y verificar CI, E2E público y preview de Vercel.
+
+## Validación final
+
+- `npm run lint`: sin errores.
+- `npm test -- --runInBand`: 140 suites y 1.222 tests aprobados, incluidos los 180 casos del dataset
+  dorado de WhatsApp.
+- `npm run build`: compilación, TypeScript y 90 páginas generadas correctamente.
+- CI y E2E público del PR #275: aprobados; E2E autenticado omitido por diseño en este contexto.
+- Preview de Vercel: `Ready`; lectura autenticada confirmó los cuatro lugares y horarios vigentes.
+  Playwright sobre el mismo build verificó la landing principal, sus cuatro tarjetas, direcciones y
+  horarios sin errores de navegación.
 
 ## Alcance y seguridad
 
