@@ -1,9 +1,11 @@
 import {
+  DEFAULT_DAILY_IMAGE_GENERATION_LIMIT,
   DEFAULT_DAILY_VIDEO_GENERATION_LIMIT,
   buildContentPlanPrompt,
   classifyMessage,
   generateContentPlan,
   generateContentVisual,
+  generateVideoReferenceFrame,
   generateFollowupSuggestion,
   generateReply,
   getContentVideoEngine,
@@ -69,6 +71,22 @@ describe("selección de modelo de video", () => {
 describe("límite diario de generación de video", () => {
   it("permite hasta 10 videos exitosos por día cuando no hay override", () => {
     expect(DEFAULT_DAILY_VIDEO_GENERATION_LIMIT).toBe(10)
+  })
+})
+
+describe("configuración de generación de imágenes", () => {
+  it("limita por defecto a 10 imágenes pagas por día", () => {
+    expect(DEFAULT_DAILY_IMAGE_GENERATION_LIMIT).toBe(10)
+  })
+
+  it("explica el requisito de verificación de OpenAI sin mostrar el error técnico", () => {
+    expect(getPublicAiError(new Error("Your organization must be verified to use the model")))
+      .toMatch(/requiere verificar la organización/i)
+  })
+
+  it("explica el límite diario propio de imágenes", () => {
+    expect(getPublicAiError(new Error("DAILY_IMAGE_LIMIT_EXCEEDED:10")))
+      .toMatch(/límite diario de 10 imágenes/i)
   })
 })
 
@@ -732,16 +750,21 @@ describe("generatePhotoWithGemini reintenta ante una falla transitoria (bug real
 
   let fetchSpy: jest.SpiedFunction<typeof fetch>
   let previousGeminiKey: string | undefined
+  let previousOpenAIKey: string | undefined
 
   beforeEach(() => {
     previousGeminiKey = process.env.GEMINI_API_KEY
+    previousOpenAIKey = process.env.OPENAI_API_KEY
     process.env.GEMINI_API_KEY = "test-key" // el fetch va mockeado, el valor real no importa
+    delete process.env.OPENAI_API_KEY // fuerza el respaldo Gemini que cubre este bloque
   })
 
   afterEach(() => {
     fetchSpy.mockRestore()
     if (previousGeminiKey === undefined) delete process.env.GEMINI_API_KEY
     else process.env.GEMINI_API_KEY = previousGeminiKey
+    if (previousOpenAIKey === undefined) delete process.env.OPENAI_API_KEY
+    else process.env.OPENAI_API_KEY = previousOpenAIKey
   })
 
   it("si el primer intento no trae imagen, reintenta y arma la placa igual", async () => {
@@ -875,5 +898,102 @@ describe("generatePhotoWithGemini reintenta ante una falla transitoria (bug real
 
     await generateContentVisual({ ...visualInput, format: "reel" })
     expect(fetchSpy).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe("GPT Image 2.5 Flare como motor principal", () => {
+  const MINIMAL_PNG_BASE64 =
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII="
+  const originalOpenAIKey = process.env.OPENAI_API_KEY
+  const originalOpenAIModel = process.env.OPENAI_IMAGE_MODEL
+  const originalOpenAIQuality = process.env.OPENAI_IMAGE_QUALITY
+  const originalGeminiKey = process.env.GEMINI_API_KEY
+  let fetchSpy: jest.SpiedFunction<typeof fetch>
+
+  const visualInput = {
+    category: "Chequeo cardiovascular",
+    topic: "Prevención",
+    format: "post" as const,
+    visual_headline: "Cuidá tu corazón",
+    visual_subtitle: "Un control a tiempo suma tranquilidad",
+    image_prompt: "A candid Argentine adult preparing for a morning walk, no text.",
+  }
+
+  beforeEach(() => {
+    process.env.OPENAI_API_KEY = "test-openai-key"
+    process.env.GEMINI_API_KEY = "test-gemini-key"
+    delete process.env.OPENAI_IMAGE_MODEL
+    delete process.env.OPENAI_IMAGE_QUALITY
+  })
+
+  afterEach(() => {
+    fetchSpy.mockRestore()
+    if (originalOpenAIKey === undefined) delete process.env.OPENAI_API_KEY
+    else process.env.OPENAI_API_KEY = originalOpenAIKey
+    if (originalOpenAIModel === undefined) delete process.env.OPENAI_IMAGE_MODEL
+    else process.env.OPENAI_IMAGE_MODEL = originalOpenAIModel
+    if (originalOpenAIQuality === undefined) delete process.env.OPENAI_IMAGE_QUALITY
+    else process.env.OPENAI_IMAGE_QUALITY = originalOpenAIQuality
+    if (originalGeminiKey === undefined) delete process.env.GEMINI_API_KEY
+    else process.env.GEMINI_API_KEY = originalGeminiKey
+  })
+
+  it("usa Flare, calidad media y tamaño 4:5 sin llamar a Gemini", async () => {
+    fetchSpy = jest.spyOn(global, "fetch").mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ data: [{ b64_json: MINIMAL_PNG_BASE64 }] }),
+    } as unknown as Response)
+
+    const result = await generateContentVisual({ ...visualInput, version: "v1" })
+
+    expect(result.image_data).toBe(MINIMAL_PNG_BASE64)
+    expect(fetchSpy).toHaveBeenCalledTimes(1)
+    expect(fetchSpy.mock.calls[0][0]).toBe("https://api.openai.com/v1/images/generations")
+    const body = JSON.parse(String(fetchSpy.mock.calls[0][1]?.body))
+    expect(body).toMatchObject({
+      model: "gpt-image-2.5-flare",
+      quality: "medium",
+      size: "832x1040",
+    })
+    expect(body.response_format).toBeUndefined()
+  })
+
+  it("usa el tamaño vertical 9:16 para el fotograma controlado de video", async () => {
+    fetchSpy = jest.spyOn(global, "fetch").mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ data: [{ b64_json: MINIMAL_PNG_BASE64 }] }),
+    } as unknown as Response)
+
+    await generateVideoReferenceFrame({
+      topic: "Control cardiovascular",
+      reference_image_prompt: "Natural adult tying walking shoes near a window, no text.",
+    })
+
+    const body = JSON.parse(String(fetchSpy.mock.calls[0][1]?.body))
+    expect(body).toMatchObject({ model: "gpt-image-2.5-flare", quality: "medium", size: "1008x1792" })
+  })
+
+  it("conserva Gemini como respaldo si OpenAI falla", async () => {
+    fetchSpy = jest.spyOn(global, "fetch")
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 403,
+        json: async () => ({ error: { message: "organization must be verified" } }),
+      } as unknown as Response)
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          steps: [{ type: "model_output", content: [{ type: "image", mime_type: "image/png", data: MINIMAL_PNG_BASE64 }] }],
+        }),
+      } as unknown as Response)
+
+    const result = await generateContentVisual({ ...visualInput, version: "v1" })
+
+    expect(result.image_data).toBe(MINIMAL_PNG_BASE64)
+    expect(fetchSpy).toHaveBeenCalledTimes(2)
+    expect(fetchSpy.mock.calls[1][0]).toBe("https://generativelanguage.googleapis.com/v1beta/interactions")
   })
 })

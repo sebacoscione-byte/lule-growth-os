@@ -1735,7 +1735,7 @@ export default function ContentStudioPage() {
                 <p className="text-xs text-gray-500">
                   {IS_MANUAL_MODE
                     ? "Se genera el prompt listo para pegar en ChatGPT, Gemini o Claude. Vos pegás la respuesta y la app la guarda."
-                    : "La IA crea los textos y decide la dirección visual. Después, Gemini genera la placa final lista para descargar."}
+                    : "La IA crea los textos y decide la dirección visual. Después, GPT Image genera la placa final lista para descargar."}
                 </p>
 
                 {/* Direct entry */}
@@ -1771,7 +1771,7 @@ export default function ContentStudioPage() {
                       <p className="text-xs text-gray-400">
                         {format === "historia"
                           ? "Se abre en el editor. En historias, Instagram no muestra caption ni hashtags: solo subí una imagen propia y aprobala, no hace falta escribir nada."
-                          : "Se abre en el editor con todos los campos vacíos. Completalos, subí ahí mismo una imagen propia ya lista (sin pasar por Gemini) y aprobala cuando quieras para que entre a la cola de publicación."}
+                          : "Se abre en el editor con todos los campos vacíos. Completalos, subí ahí mismo una imagen propia ya lista (sin pasar por la IA de imágenes) y aprobala cuando quieras para que entre a la cola de publicación."}
                       </p>
                       <div className="border-t pt-3 space-y-2">
                         <p className="text-xs text-gray-500">O pegá la respuesta JSON de una IA (ChatGPT, Gemini, Claude):</p>
@@ -1779,7 +1779,7 @@ export default function ContentStudioPage() {
                           rows={8}
                           value={directPaste}
                           onChange={e => { setDirectPaste(e.target.value); setDirectError(null) }}
-                          placeholder={`Pegá acá la respuesta JSON completa. Debe incluir los textos, image_prompt listo para Gemini e image_alt_text.`}
+                          placeholder={`Pegá acá la respuesta JSON completa. Debe incluir los textos, image_prompt listo para GPT Image e image_alt_text.`}
                           className="font-mono text-xs text-gray-900 placeholder:text-gray-400 resize-none"
                         />
                         {directError && (
@@ -2399,7 +2399,7 @@ function Editor({
         )
       }
     } catch {
-      setVisualError("No se pudo conectar con Gemini para generar la placa.")
+      setVisualError("No se pudo conectar con GPT Image para generar la placa.")
     } finally {
       setVisualGenerating(false)
     }
@@ -2437,7 +2437,7 @@ function Editor({
         image_prompt: typeof data.image_prompt === "string" ? data.image_prompt : promptOverride ?? imagePrompt,
       }
     } catch {
-      return { error: "No se pudo conectar con Gemini para generar esta imagen." }
+      return { error: "No se pudo conectar con GPT Image para generar esta imagen." }
     }
   }
 
@@ -2713,7 +2713,7 @@ function Editor({
         video_reference_frame_approved: false,
       })
     } catch {
-      setVideoFrameError("No se pudo conectar con Gemini para generar y revisar el fotograma.")
+      setVideoFrameError("No se pudo conectar con la IA para generar y revisar el fotograma.")
     } finally {
       setVideoFrameGenerating(false)
     }
@@ -3254,14 +3254,14 @@ function Editor({
           <CardHeader className="pb-3">
             <CardTitle className="flex items-center gap-2 text-base text-gray-900">
               <WandSparkles className="h-4 w-4 text-violet-600" />
-              {isReel ? "Portada del reel (opcional)" : "Placa final con Gemini"}
+              {isReel ? "Portada del reel (opcional)" : "Placa final con GPT Image"}
             </CardTitle>
             <p className="text-xs text-gray-600">
               {isReel
                 ? "La miniatura que se ve en tu perfil de Instagram (pestaña Reels) y en la Biblioteca de acá — no es el contenido del reel en sí, eso lo define el video de arriba. Si no generás ni subís una, Instagram usa el primer frame del video como portada."
                 : (item.visual_generation_version ?? "v1") === "v1"
-                  ? "Gemini resuelve la placa completa, incluida la tipografía, en una sola generación."
-                  : "Gemini genera la escena; la app integra foto full-bleed, cobertura de lectura y tipografía real según el formato."}
+                  ? "GPT Image resuelve la placa completa, incluida la tipografía, en una sola generación."
+                  : "GPT Image genera la escena; la app integra foto full-bleed, cobertura de lectura y tipografía real según el formato."}
             </p>
           </CardHeader>
           <CardContent className="space-y-3">
@@ -3289,8 +3289,8 @@ function Editor({
               </div>
               <p className="w-full text-[11px] text-gray-500">
                 {(item.visual_generation_version ?? "v1") === "v1"
-                  ? "Gemini dibuja la placa entera (foto + texto) en una sola pasada — una sola imagen fotográfica, sin corte al medio."
-                  : "Gemini genera la foto full-bleed en 2K aparte; la cobertura degradada, el titular, subtítulo y marca se agregan por edición real en un panel al costado — ortografía perfecta, pero se ve como dos partes separadas en vez de una sola imagen."}
+                  ? "GPT Image dibuja la placa entera (foto + texto) en una sola pasada — una sola imagen fotográfica, sin corte al medio."
+                  : "GPT Image genera la foto full-bleed aparte; la cobertura degradada, el titular, subtítulo y marca se agregan por edición real en un panel al costado — ortografía perfecta, pero se ve como dos partes separadas en vez de una sola imagen."}
               </p>
             </div>
             {displayedVisualUrl ? (
@@ -3318,7 +3318,7 @@ function Editor({
                     className="gap-2 border-red-200 bg-white text-red-700 hover:bg-red-100"
                   >
                     <ExternalLink className="h-3.5 w-3.5" />
-                    Revisar cuota de Gemini
+                    Revisar saldo de OpenAI
                   </Button>
                 )}
               </div>
@@ -3375,7 +3375,7 @@ function Editor({
                 className="bg-white text-gray-900"
               />
               <p className="text-xs text-gray-400">
-                Esto es el texto exacto que Gemini dibuja arriba de la escena — si no coincide con el
+                Esto es el texto exacto que GPT Image dibuja arriba de la escena — si no coincide con el
                 hook o el caption, corregilo acá y volvé a generar la placa.
               </p>
             </div>
@@ -3438,7 +3438,7 @@ function Editor({
               )}
               {bulkError && <p className="text-xs text-red-600 bg-red-50 rounded p-2">{bulkError}</p>}
               <p className="text-xs text-gray-400">
-                Usa 1 llamada a Gemini por imagen, más 1 llamada de texto adicional por cada slide que
+                Usa 1 llamada a GPT Image por imagen, más 1 llamada de texto adicional por cada slide que
                 todavía no tenga su propia escena (para proponerle una distinta a la portada). Mientras
                 se generan, no se puede editar el texto ni agregar/quitar slides.
               </p>

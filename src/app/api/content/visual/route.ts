@@ -84,7 +84,7 @@ export async function POST(request: Request) {
       topic: (body.topic as string).slice(0, 200),
       format: body.format as typeof FORMATS[number],
       visual_headline: (body.visual_headline as string).slice(0, 90),
-      // V1: Gemini dibuja el texto -- pasarle el subtitulo COMPLETO (ya acotado a 90/300 caracteres
+      // V1: GPT Image dibuja el texto -- pasarle el subtitulo COMPLETO (ya acotado a 90/300 caracteres
       // aguas arriba segun sea portada o slide de carrusel) y dejar que el prompt reforzado de
       // buildVisualPromptV1 lo ajuste con salto de linea/tamaño de fuente. Truncarlo aca a 120
       // caracteres (como necesita V2, ver composeContentPlate) cortaba una slide larga a mitad de
@@ -110,7 +110,7 @@ export async function POST(request: Request) {
       let mimeType = visual.mime_type
       let buffer: Buffer = Buffer.from(visual.image_data, "base64")
       // Portada de reel: Meta exige JPEG para cover_url (ver createVideoContainer) -- el resto de
-      // los formatos no se usan como cover_url, así que se dejan tal cual genera Gemini.
+      // los formatos no se usan como cover_url, así que se dejan tal cual genera el proveedor.
       if (body.format === "reel" && mimeType !== "image/jpeg") {
         try {
           buffer = await convertImageToJpeg(buffer)
@@ -154,11 +154,14 @@ export async function POST(request: Request) {
     // real (bug real 2026-08-03: la placa seguia fallando en produccion sin ninguna pista en los logs).
     console.error("No se pudo generar la placa visual:", message)
     const normalized = message.toLowerCase()
+    if (normalized.startsWith("daily_image_limit_exceeded:")) {
+      return NextResponse.json({ error: getPublicAiError(error) }, { status: 429 })
+    }
     if (normalized.includes("quota") || normalized.includes("resource_exhausted") || normalized.includes("rate limit")) {
       return NextResponse.json({
         code: "IMAGE_QUOTA_UNAVAILABLE",
-        error: "La clave de Gemini no tiene cuota disponible para generar imágenes. Activá billing o una cuota de imágenes en Google AI Studio y volvé a intentar.",
-        help_url: "https://ai.dev/rate-limit",
+        error: "El proveedor de imágenes no tiene cuota disponible. Revisá el saldo y los límites del proyecto e intentá nuevamente.",
+        help_url: "https://platform.openai.com/settings/organization/billing/overview",
       }, { status: 429 })
     }
     return NextResponse.json({ error: getPublicAiError(error) }, { status: 500 })

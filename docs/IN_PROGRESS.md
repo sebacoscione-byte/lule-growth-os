@@ -1,3 +1,39 @@
+# IMPLEMENTADO (2026-09-09) — migración de imágenes a GPT Image 2.5 Flare
+
+## Objetivo
+
+Usar GPT Image 2.5 Flare como motor principal para placas y fotogramas de referencia, mantener
+Gemini como respaldo y limitar el gasto diario sin compartir tráfico de la API con OpenAI.
+
+## Plan
+
+- [x] Confirmar modelo, endpoint, parámetros y recomendaciones de prompting en OpenAI Docs.
+- [x] Probar una llamada mínima en calidad baja sin datos personales.
+- [x] Migrar el proveedor principal y adaptar prompts, UI, errores y límite de gasto.
+- [x] Configurar las variables en Vercel sin modificar ni exponer archivos de secretos.
+- [x] Ejecutar lint, tests y build; validar el preview y mergear el PR.
+
+## Alcance y privacidad
+
+- Las imágenes usan solamente briefs editoriales y no incluyen datos ni fotografías de pacientes.
+- El intercambio voluntario de inputs/outputs con OpenAI permanece desactivado.
+- Una prueba `low` fue rechazada antes de generarse y no consumió crédito: la organización debe
+  completar la verificación de OpenAI; el fallback a Gemini mantiene operativo el sistema.
+- No se modifica lógica médica, webhooks, cron jobs, RLS, autenticación ni datos de pacientes.
+
+## Validación
+
+- `npm run lint`: sin errores ni warnings.
+- `npm test -- --runInBand`: 139 suites y 1.210 pruebas aprobadas.
+- `npm run build`: compilación, TypeScript y 90 rutas generadas correctamente.
+- PR #273: build, E2E público y Vercel Preview aprobados; deployment `Ready` y
+  `/api/content/visual` sin sesión rechazado con 401.
+- Variables de OpenAI cargadas como sensibles/configuradas en Preview y Production; no se modificó
+  `.env.local` ni se expuso la clave.
+- Activación efectiva pendiente de un único paso externo: verificar la organización de OpenAI.
+
+---
+
 # CERRADO (2026-09-09) — migración de video V2 a Gemini Omni 1.1 Flash
 
 ## Objetivo
