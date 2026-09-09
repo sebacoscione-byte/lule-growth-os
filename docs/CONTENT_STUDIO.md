@@ -107,7 +107,7 @@ La captacion no puede usar miedo, culpa, escasez, promesas ni asumir que el lect
 
 Los reels de IA se construyen como una pieza de 8 segundos en dos capas:
 
-- Veo genera solamente la escena visual sin tipografia.
+- El motor de video genera solamente la escena visual sin tipografia.
 - FFmpeg agrega el gancho, los mensajes, el CTA, la identificacion profesional y la musica con assets
   reales. El texto nunca queda a cargo del modelo de video.
 
@@ -115,24 +115,28 @@ El editor permite elegir el motor por pieza:
 
 - **V1 Original**: conserva la microinfografia ilustrada anterior y usa Veo 3.1 Fast. Es mas economica
   (8 segundos a USD 0,10/s segun la tarifa vigente de Google), pero deliberadamente se ve ilustrada.
-- **V2 Calidad** (default): usa Veo 3.1 Standard y una toma documental de un unico momento. El prompt
-  se estructura como sujeto/escena, movimiento fisico, camara/composicion, luz/acabado y ambiente. Solo
-  permite un movimiento de camara fiable y evita transformaciones, personas, manos, anatomia y utileria
-  clinica generica. Cuesta aproximadamente USD 3,20 por clip de 8 segundos a la tarifa vigente.
+- **V2 Calidad** (default): usa el modelo estable `gemini-omni-1.1-flash` mediante Interactions API y
+  una toma documental de un unico momento. Google recomienda Omni como motor general por su coherencia,
+  razonamiento multimodal, consistencia de personajes y precision factual. A 720p cuesta aproximadamente
+  USD 0,80 por un clip de 8 segundos a la tarifa vigente.
 
-V2 envia las exclusiones en el parametro `negativePrompt` separado, como recomienda Google, en vez de
-mezclar una lista de prohibiciones dentro de la descripcion positiva. Entre las exclusiones estan texto,
-interfaces, personas, recortes de papel, vectores, CGI, objetos duplicados/deformados y movimiento
-antinatural. La UI y `/api/content/video` validan cada prompt contra el contrato de la version elegida
-antes de consumir un intento pago. V2 además usa un flujo image-to-video: genera primero un fotograma
+Omni no admite system instructions ni un parametro separado de negative prompt. Por eso V2 incluye las
+exclusiones esenciales dentro del prompt regular: nada de texto, interfaces, anatomia deformada, elementos
+duplicados, CGI o estetica de publicidad stock. Tambien exige literalmente una escena ininterrumpida, una
+toma continua y cero cortes, porque Omni intenta construir varias tomas cuando esa restriccion no esta
+explicita. La instruccion image-to-video es deliberadamente concisa, describe movimiento humano, camara y
+ambiente, y cierra con `Keep everything else exactly the same` para preservar el fotograma aprobado.
+La UI y `/api/content/video` validan el contrato antes de consumir un intento pago. V2 usa un flujo
+image-to-video: genera primero un fotograma
 9:16 con identidad `editorial documentary healthcare photography`, lo compara con las últimas seis
-piezas, lo revisa con los ocho puntajes de marca y exige aprobación humana antes de enviarlo a Veo.
+piezas, lo revisa con los ocho puntajes de marca y exige aprobación humana antes de enviarlo a Omni.
 El revisor rechaza y regenera automáticamente errores críticos; en particular, cualquier estetoscopio
-apoyado sobre abdomen/panza invalida el fotograma. V1 conserva el flujo ilustrado histórico sin este paso.
+apoyado sobre abdomen/panza invalida el fotograma. V1 conserva el flujo ilustrado histórico con Veo Fast
+sin este paso.
 
-El editor ofrece además **V2 Directa**: Veo Standard inventa la escena completa desde el prompt y no
+El editor ofrece además **V2 Directa**: Gemini Omni inventa la escena completa desde el prompt y no
 se genera ni cobra un fotograma inicial. Conserva la identidad documental, el control contra repetición,
-los puntajes de marca y el negative prompt, pero no puede verificar visualmente la escena antes de
+los puntajes de marca y las restricciones en el prompt regular, pero no puede verificar visualmente la escena antes de
 consumir el intento de video; por eso la UI la presenta como una opción de menor control previo.
 Si V2 Controlada rechaza sus tres fotogramas, la UI muestra el motivo concreto de la última revisión
 (notas, fallas críticas y puntajes bloqueantes) y ofrece cambiar en un clic a V2 Directa. Ese cambio
@@ -141,17 +145,18 @@ La revisión solicita JSON estructurado a Gemini y reintenta sobre el mismo arch
 temporalmente indisponible, el servidor detiene el flujo después de la primera imagen y no genera otras
 dos variantes innecesarias. Cambiar de versión obliga a regenerar la propuesta antes de consumir video.
 
-Ambos requests fijan `9:16`, `720p` y 8 segundos para coincidir con los tiempos del texto compuesto.
-Por contrato de Veo 3.1, V2 Controlada (image-to-video) envía `personGeneration: allow_adult`; V2 Directa
-(text-to-video) envía `personGeneration: allow_all`, aunque el prompt positivo mantiene siempre sujetos
-adultos. Enviar `allow_adult` a text-to-video provoca un rechazo inmediato del proveedor.
+Los requests V2 fijan `9:16` y `720p` en `response_format`; los prompts solicitan 8 segundos para coincidir
+con los tiempos del texto compuesto. V2 Controlada envia el fotograma como contenido multimodal y fija
+`generation_config.video_config.task: image_to_video`; V2 Directa envia solo texto. Ambos usan respuesta
+sincronica (`background: false`, `store: false`, `stream: false`), de modo que no conservan una conversacion
+editable en Google y el MP4 pasa directamente a la composicion y Storage propios.
 El límite operativo predeterminado es de 10 videos exitosos por día, compartido entre V1 y V2; puede
 ajustarse mediante `DAILY_VIDEO_GENERATION_LIMIT` sin cambiar código. Los intentos fallidos no consumen
 ese cupo interno, aunque el proveedor puede aplicar sus propios límites.
 
 ## Canales
 
-- Instagram: generacion y descarga de placas con Gemini y reels con Veo + composicion FFmpeg. La
+- Instagram: generacion y descarga de placas con Gemini y reels V2 con Gemini Omni (V1 con Veo) + composicion FFmpeg. La
   publicacion directa por API (manual o automatica) soporta `post`, `historia`, `carrusel` y `reel`;
   un reel no puede aprobarse hasta tener un archivo de video real generado o subido.
 - Google Business: publicacion desde la app solo para contenido aprobado y cuando Google habilita la API para la cuenta. Solo texto (`google_text`), sin imagen.

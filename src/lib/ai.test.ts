@@ -6,6 +6,7 @@ import {
   generateContentVisual,
   generateFollowupSuggestion,
   generateReply,
+  getContentVideoEngine,
   getContentVideoModel,
   getPublicAiError,
   proposeAutoDraftCategories,
@@ -18,6 +19,7 @@ describe("selección de modelo de video", () => {
   const originalGeneric = process.env.GEMINI_VIDEO_MODEL
   const originalV1 = process.env.GEMINI_VIDEO_MODEL_V1
   const originalV2 = process.env.GEMINI_VIDEO_MODEL_V2
+  const originalOmni = process.env.GEMINI_OMNI_VIDEO_MODEL
 
   afterEach(() => {
     if (originalGeneric === undefined) delete process.env.GEMINI_VIDEO_MODEL
@@ -26,24 +28,41 @@ describe("selección de modelo de video", () => {
     else process.env.GEMINI_VIDEO_MODEL_V1 = originalV1
     if (originalV2 === undefined) delete process.env.GEMINI_VIDEO_MODEL_V2
     else process.env.GEMINI_VIDEO_MODEL_V2 = originalV2
+    if (originalOmni === undefined) delete process.env.GEMINI_OMNI_VIDEO_MODEL
+    else process.env.GEMINI_OMNI_VIDEO_MODEL = originalOmni
   })
 
-  it("mantiene V1 en Fast y V2 en Standard por defecto", () => {
+  it("mantiene V1 en Veo Fast y migra V2 al Omni estable por defecto", () => {
     delete process.env.GEMINI_VIDEO_MODEL
     delete process.env.GEMINI_VIDEO_MODEL_V1
     delete process.env.GEMINI_VIDEO_MODEL_V2
+    delete process.env.GEMINI_OMNI_VIDEO_MODEL
 
     expect(getContentVideoModel("v1")).toBe("veo-3.1-fast-generate-preview")
-    expect(getContentVideoModel("v2")).toBe("veo-3.1-generate-preview")
+    expect(getContentVideoModel("v2")).toBe("gemini-omni-1.1-flash")
+    expect(getContentVideoModel("v2_direct")).toBe("gemini-omni-1.1-flash")
+    expect(getContentVideoEngine("v1")).toBe("veo")
+    expect(getContentVideoEngine("v2")).toBe("omni")
+    expect(getContentVideoEngine("v2_direct")).toBe("omni")
   })
 
   it("no deja que el override histórico de V1 degrade silenciosamente V2", () => {
     process.env.GEMINI_VIDEO_MODEL = "veo-legacy-fast"
     delete process.env.GEMINI_VIDEO_MODEL_V1
     delete process.env.GEMINI_VIDEO_MODEL_V2
+    delete process.env.GEMINI_OMNI_VIDEO_MODEL
 
     expect(getContentVideoModel("v1")).toBe("veo-legacy-fast")
-    expect(getContentVideoModel("v2")).toBe("veo-3.1-generate-preview")
+    expect(getContentVideoModel("v2")).toBe("gemini-omni-1.1-flash")
+  })
+
+  it("acepta solamente overrides compatibles con Interactions API para V2", () => {
+    process.env.GEMINI_VIDEO_MODEL_V2 = "veo-3.1-generate-preview"
+    delete process.env.GEMINI_OMNI_VIDEO_MODEL
+    expect(getContentVideoModel("v2")).toBe("gemini-omni-1.1-flash")
+
+    process.env.GEMINI_OMNI_VIDEO_MODEL = "gemini-omni-future"
+    expect(getContentVideoModel("v2_direct")).toBe("gemini-omni-future")
   })
 })
 

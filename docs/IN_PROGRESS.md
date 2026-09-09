@@ -1,3 +1,35 @@
+# EN CURSO (2026-09-09) — migración de video V2 a Gemini Omni 1.1 Flash
+
+## Objetivo
+
+Migrar V2 Controlada y V2 Directa desde Veo 3.1 Standard al motor recomendado por Google para
+generación general de video, manteniendo V1 como compatibilidad, y adaptar los prompts al contrato
+multimodal de Gemini Omni sin alterar la composición final con FFmpeg.
+
+## Plan
+
+- [x] Revisar el flujo actual, los contratos de prompts y los tests existentes.
+- [x] Confirmar en la documentación oficial el modelo estable, la API y las reglas de prompting.
+- [x] Implementar Gemini Omni 1.1 Flash para V2 y conservar Veo Fast en V1.
+- [x] Adaptar validación, fallbacks, textos de interfaz y documentación operativa.
+- [ ] Ejecutar lint, tests y build; validar el preview y mergear el PR.
+
+## Alcance
+
+- V2 Controlada seguirá exigiendo un fotograma 9:16 aprobado antes de generar el video.
+- V2 Directa seguirá siendo text-to-video y sin costo de fotograma previo.
+- Los prompts V2 usarán una toma continua explícita, preservación de identidad y restricciones dentro
+  del prompt regular, porque Omni no admite un parámetro separado de negative prompt.
+- No se modifica lógica médica, webhooks, cron jobs, RLS, autenticación ni datos de pacientes.
+
+## Validación local
+
+- `npm run lint`: sin errores ni warnings.
+- `npm test -- --runInBand`: 139 suites y 1.204 pruebas aprobadas.
+- `npm run build`: compilación, TypeScript y 90 rutas generadas correctamente.
+
+---
+
 # CERRADO (2026-09-07) — respuestas administrativas de Instagram más útiles
 
 ## Objetivo

@@ -1,6 +1,10 @@
 ﻿# Lule Growth OS — Contexto para Claude
 
 ## Estado actual
+- 2026-09-09 (motor de video V2): V2 Controlada y V2 Directa usan el modelo estable
+  `gemini-omni-1.1-flash` mediante Interactions API; V1 conserva Veo 3.1 Fast como compatibilidad.
+  Los prompts V2 exigen una sola toma sin cortes, incluyen las exclusiones dentro de la instrucción
+  regular y usan `Keep everything else exactly the same` para preservar el fotograma aprobado.
 - 2026-09-06 (Instagram Inbox en vivo): la app de Meta quedó publicada y el callback productivo
   `/api/webhooks/instagram` fue verificado desde el panel. La cuenta `@draluciachahin` permanece
   suscrita por API a `messages` y `comments`; una prueba real desde otra cuenta confirmó la llegada
@@ -1785,7 +1789,8 @@ AI_PROVIDER=auto
 GEMINI_API_KEY=
 GEMINI_MODEL=gemini-3.5-flash
 GEMINI_IMAGE_MODEL=gemini-3.1-flash-image  # Placas de Instagram (foto) — tiene costo real, ver "Generación de imágenes" abajo
-GEMINI_VIDEO_MODEL=veo-3.1-fast-generate-preview  # Video de reels con IA — ver "Video de reels con IA (Veo)" abajo
+GEMINI_VIDEO_MODEL=veo-3.1-fast-generate-preview  # Solo V1 legado
+GEMINI_OMNI_VIDEO_MODEL=gemini-omni-1.1-flash  # Override opcional de V2; sin definir usa este mismo modelo estable
 DAILY_VIDEO_GENERATION_LIMIT=3  # Tope diario, propio y mas estricto que DAILY_AI_REQUEST_LIMIT: tiene costo real por generación
 ANTHROPIC_API_KEY=
 ANTHROPIC_MODEL=claude-sonnet-4-6
@@ -1916,21 +1921,18 @@ original de Gemini se propaga sin cambios.
   la organización verificada) para confirmar que el fallback funciona de punta a punta. Mientras no
   esté configurada, el comportamiento de la app no cambia en nada respecto a antes.
 
-### Video de reels con IA (Veo) — costo real, sin tier gratuito (2026-07-23)
+### Video de reels con IA (Gemini Omni + Veo legado) — costo real, sin tier gratuito (actualizado 2026-09-09)
 
 En el editor de una pieza formato reel, además de subir un video propio, se puede generar el video con
-IA (Veo 3.1, vía la misma `GEMINI_API_KEY`) — botones "Proponer dirección con IA" (propone
+IA mediante la misma `GEMINI_API_KEY` — botones "Proponer dirección con IA" (propone
 `video_prompt`, un plano único en inglés) y "Generar video con IA" (`generateContentVideo()` en
-`src/lib/ai.ts` → `/api/content/video`). A pedido explícito de Seba, comparado en vivo contra Sora
-(OpenAI) antes de elegir: Sora tenía mejor fama de calidad pero **su API se apaga el 24/9/2026 sin
-sucesor anunciado** — se descartó por ahora, queda como una eventual "segunda etapa" si hace falta
-mejorar calidad más adelante. Veo quedó verificado en vivo con una generación real (clip de 8s
-vertical, tier Fast, ~$0.88, 67s de principio a fin) antes de integrarlo al código.
+`src/lib/ai.ts` → `/api/content/video`). V2 Controlada y V2 Directa usan
+`gemini-omni-1.1-flash`, el modelo general recomendado por Google para video; V1 conserva Veo 3.1 Fast
+para poder reproducir el flujo ilustrado histórico.
 
 - **Sin tier gratuito** (igual que las placas, ver arriba — la diferencia real es de escala de
-  costo, no de "gratis vs. pago"): cada generación exitosa tiene costo real
-  (`GEMINI_VIDEO_MODEL=veo-3.1-fast-generate-preview` por default — Fast 720p, ~$0.10-0.12/seg, un
-  clip de hasta 8s sale ~$0.80-1, un orden de magnitud más caro que una placa individual). Necesita que el proyecto de Google Cloud detrás de `GEMINI_API_KEY`
+  costo, no de "gratis vs. pago"): Gemini Omni cuesta aproximadamente USD 0,10/segundo a 720p, por
+  lo que un clip de 8 segundos ronda USD 0,80. Necesita que el proyecto de Google Cloud detrás de `GEMINI_API_KEY`
   tenga facturación paga activa (a diferencia del resto de la IA de este proyecto) — confirmalo en
   aistudio.google.com → Proyectos → tu proyecto → columna "Nivel de facturación" (tiene que decir un
   nivel pago, no "Nivel gratuito").
@@ -1942,15 +1944,12 @@ vertical, tier Fast, ~$0.88, 67s de principio a fin) antes de integrarlo al cód
   cámara — se nota demasiado que es IA generativa y rompe la confianza que la pieza necesita generar.
   Todo el contenido es B-roll silencioso (manos, objetos, ambientes, equipamiento), mismo criterio que
   ya regía el guion manual de reels (`REEL_SCENE_RULES`) — ver `VIDEO_PROMPT_RULES` en `src/lib/ai.ts`,
-  incluye instrucción explícita de audio ("ambient sound only, no dialogue") porque Veo genera audio
+  incluye instrucción explícita de audio ("room tone only, no dialogue or music") porque el motor genera audio
   nativo y sin esa aclaración puede inventar voces.
-- Es un proceso asíncrono de 1-3 minutos (Veo devuelve una operación de larga duración, se consulta el
-  progreso hasta que termina) — la ruta `/api/content/video` queda esperando esa respuesta larga
-  (`maxDuration = 280`, la más alta de todo el proyecto) y el botón del editor muestra "Generando...
-  puede tardar unos minutos" en vez del spinner casi instantáneo de las placas.
-- El video que devuelve Google solo está disponible 48hs en su propia URL — la ruta lo descarga y
-  persiste en Storage (`content-media`, mismo bucket que las placas y la subida manual) de una, nunca
-  se linkea directo a la URL de Google.
+- V2 usa Interactions API en modo síncrono (`background/store/stream: false`); V1 mantiene el polling de
+  la operación larga de Veo. La ruta conserva `maxDuration = 280` para cubrir ambos caminos y FFmpeg.
+- El MP4 se compone y persiste inmediatamente en Storage (`content-media`, mismo bucket que las placas
+  y la subida manual); el navegador nunca recibe el archivo base64 del proveedor.
 
 ## Instagram Business — cómo configurar OAuth (publicar posts/historias)
 La app usa "Instagram API with Instagram Login" (graph.instagram.com) — NO requiere una Facebook Page vinculada,
