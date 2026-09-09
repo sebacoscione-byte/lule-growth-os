@@ -1,4 +1,4 @@
-# EN CURSO (2026-09-09) — migración de video V2 a Gemini Omni 1.1 Flash
+# CERRADO (2026-09-09) — migración de video V2 a Gemini Omni 1.1 Flash
 
 ## Objetivo
 
@@ -12,7 +12,7 @@ multimodal de Gemini Omni sin alterar la composición final con FFmpeg.
 - [x] Confirmar en la documentación oficial el modelo estable, la API y las reglas de prompting.
 - [x] Implementar Gemini Omni 1.1 Flash para V2 y conservar Veo Fast en V1.
 - [x] Adaptar validación, fallbacks, textos de interfaz y documentación operativa.
-- [ ] Ejecutar lint, tests y build; validar el preview y mergear el PR.
+- [x] Ejecutar lint, tests y build; validar el preview y mergear el PR.
 
 ## Alcance
 
@@ -27,6 +27,8 @@ multimodal de Gemini Omni sin alterar la composición final con FFmpeg.
 - `npm run lint`: sin errores ni warnings.
 - `npm test -- --runInBand`: 139 suites y 1.204 pruebas aprobadas.
 - `npm run build`: compilación, TypeScript y 90 rutas generadas correctamente.
+- PR #272: build, E2E público y Vercel Preview aprobados; `/login` respondió 200, el editor conservó
+  el redirect autenticado y `/api/content/video` rechazó el request sin sesión con 401.
 
 ---
 
