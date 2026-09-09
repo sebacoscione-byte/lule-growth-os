@@ -2014,3 +2014,43 @@ externo de una institución.
 - El cambio corrige semántica y períodos históricos del dashboard; no altera los canales públicos.
 
 ---
+# CERRADO (2026-09-09) — respuestas actuales y completas del bot de WhatsApp
+
+## Objetivo
+
+Corregir el incidente real en el que el bot informó el cronograma antiguo de tres sedes, aunque la
+agenda vigente tiene cuatro lugares físicos: CIMEL martes/jueves/viernes, Hospital Británico Lanús
+los martes para ecocardiogramas, Hospital Británico Central los miércoles y Swiss Medical Lomas los
+viernes. Mejorar todas las respuestas administrativas relacionadas con lugares, horarios,
+coberturas e instrucciones sin modificar guardrails ni lógica médica.
+
+## Plan
+
+- [x] Auditar el flujo completo y revisar los tests existentes de WhatsApp antes de modificarlo.
+- [x] Compartir un único directorio vigente entre las landings y el bot.
+- [x] Evitar inferencias ambiguas por día/ciudad y mejorar opciones, FAQ e instrucciones.
+- [x] Agregar regresiones del incidente y actualizar documentación operativa.
+- [x] Ejecutar lint, 140 suites/1.222 tests y build de producción.
+- [x] Abrir PR #275 y verificar CI, E2E público y preview de Vercel.
+
+## Validación final
+
+- `npm run lint`: sin errores.
+- `npm test -- --runInBand`: 140 suites y 1.222 tests aprobados, incluidos los 180 casos del dataset
+  dorado de WhatsApp.
+- `npm run build`: compilación, TypeScript y 90 páginas generadas correctamente.
+- CI y E2E público del PR #275: aprobados; E2E autenticado omitido por diseño en este contexto.
+- Preview de Vercel: `Ready`; lectura autenticada confirmó los cuatro lugares y horarios vigentes.
+  Playwright sobre el mismo build verificó la landing principal, sus cuatro tarjetas, direcciones y
+  horarios sin errores de navegación.
+
+## Alcance y seguridad
+
+- No se modifican síntomas de alarma, guardrails, diagnósticos, tratamientos ni interpretación de
+  estudios. La IA sigue limitada a devolver una categoría cerrada y no redacta respuestas.
+- El bot continúa sin confirmar disponibilidad ni reservar turnos; todos los canales son oficiales
+  de las instituciones y el paciente debe confirmar horario, prestación y cobertura al pedir turno.
+- Se toca la lógica de respuesta de WhatsApp, pero no el webhook, la cola durable, RLS ni los cron
+  jobs de Vercel.
+
+---

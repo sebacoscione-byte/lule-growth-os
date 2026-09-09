@@ -1,3 +1,5 @@
+import { PRACTICE_SITE_BY_ID } from "@/lib/practice-directory"
+
 export const PUBLIC_ANALYTICS_LOCATION_KEYS = [
   "cimel", "swiss", "britanico_lanus", "britanico_central",
 ] as const
@@ -82,28 +84,33 @@ export function resolvePublicLocationWhatsApp(
   )?.whatsapp?.trim()
 }
 
+const CIMEL_SITE = PRACTICE_SITE_BY_ID.cimel_lanus
+const SWISS_SITE = PRACTICE_SITE_BY_ID.swiss_lomas
+const BRITANICO_CENTRAL_SITE = PRACTICE_SITE_BY_ID.hospital_britanico_central
+const BRITANICO_LANUS_SITE = PRACTICE_SITE_BY_ID.hospital_britanico_lanus
+
 const CIMEL = {
   key: "cimel",
   trackingKey: "cimel" as const,
   analyticsKey: "cimel" as const,
-  name: "CIMEL Lanús",
-  address: "Tucumán 1314, Lanús",
-  day: "martes, jueves y viernes",
-  hours: "Martes 13:00–15:00\nJueves y viernes 13:00–16:00",
-  phone: "011 4249-3412",
-  mapsUrl: "https://share.google/rsph8WtMpJAiRkeki",
+  name: CIMEL_SITE.name,
+  address: CIMEL_SITE.address,
+  day: CIMEL_SITE.day,
+  hours: CIMEL_SITE.hours.replace(" · ", "\n"),
+  phone: CIMEL_SITE.phone,
+  mapsUrl: CIMEL_SITE.mapsUrl,
 }
 
 const SWISS = {
   key: "swiss",
   trackingKey: "swiss" as const,
   analyticsKey: "swiss" as const,
-  name: "Swiss Medical Lomas",
-  address: "Oliden 141, Lomas de Zamora",
-  day: "viernes",
-  hours: "Viernes 17:00–20:00",
-  phone: "0810-333-8876",
-  mapsUrl: "https://maps.app.goo.gl/tzSVjSYm47UfNkLJ8",
+  name: SWISS_SITE.name,
+  address: SWISS_SITE.address,
+  day: SWISS_SITE.day,
+  hours: SWISS_SITE.hours,
+  phone: SWISS_SITE.phone,
+  mapsUrl: SWISS_SITE.mapsUrl,
 }
 
 const BRITANICO_CENTRAL = {
@@ -111,23 +118,23 @@ const BRITANICO_CENTRAL = {
   trackingKey: "britanico" as const,
   analyticsKey: "britanico_central" as const,
   name: "Hospital Británico (Central)",
-  address: "Perdriel 74, CABA",
-  day: "miércoles",
-  hours: "Miércoles 17:00–19:45",
-  phone: "4309-6400",
-  mapsUrl: "https://maps.app.goo.gl/ZPbUhv7PAtUnS6D79",
+  address: BRITANICO_CENTRAL_SITE.address,
+  day: BRITANICO_CENTRAL_SITE.day,
+  hours: BRITANICO_CENTRAL_SITE.hours,
+  phone: BRITANICO_CENTRAL_SITE.phone,
+  mapsUrl: BRITANICO_CENTRAL_SITE.mapsUrl,
 }
 
 const BRITANICO_LANUS = {
   key: "britanico-lanus",
   trackingKey: "britanico" as const,
   analyticsKey: "britanico_lanus" as const,
-  name: "Hospital Británico Lanús",
-  address: "Av. Hipólito Yrigoyen 4429, Lanús",
-  day: "martes",
-  hours: "Martes 16:00–19:30 · Ecocardiogramas",
-  phone: "0810-222-2748",
-  mapsUrl: "https://www.google.com/maps/search/?api=1&query=Hospital%20Brit%C3%A1nico%20Lan%C3%BAs%20Av.%20Hip%C3%B3lito%20Yrigoyen%204429",
+  name: BRITANICO_LANUS_SITE.name,
+  address: BRITANICO_LANUS_SITE.address,
+  day: BRITANICO_LANUS_SITE.day,
+  hours: `${BRITANICO_LANUS_SITE.hours} · ${BRITANICO_LANUS_SITE.serviceNote}`,
+  phone: BRITANICO_LANUS_SITE.phone,
+  mapsUrl: BRITANICO_LANUS_SITE.mapsUrl,
 }
 
 const BRITANICO_INSTRUCTION = "Llamá a la Central de Turnos 0810-222-2748 o al 4309-6400, o pedí turno desde la app del Hospital Británico, y solicitá turno con la Dra. Lucía Chahin indicando la sede."

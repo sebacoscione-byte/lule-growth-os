@@ -5,7 +5,7 @@ import {
   type WhatsAppResponseKey,
 } from "@/lib/whatsapp-policy"
 
-export const WHATSAPP_RESPONSE_CATALOG_VERSION = "2026-07-16" as const
+export const WHATSAPP_RESPONSE_CATALOG_VERSION = "2026-09-09" as const
 
 const ResponseVariableSchema = z.enum([
   "booking_channel",
@@ -72,7 +72,7 @@ export const WHATSAPP_RESPONSE_CATALOG: Readonly<Record<WhatsAppResponseKey, Wha
   ),
   ask_location: template(
     "ask_location",
-    "¿En qué sede preferís atenderte: CIMEL Lanús, Hospital Británico o Swiss Medical Lomas?",
+    "¿Qué lugar preferís? CIMEL Lanús (martes, jueves o viernes), Hospital Británico Lanús (ecocardiogramas los martes), Hospital Británico Central (miércoles) o Swiss Medical Lomas (viernes). La disponibilidad se confirma con la institución.",
   ),
   show_booking_instructions: template(
     "show_booking_instructions",
@@ -81,17 +81,17 @@ export const WHATSAPP_RESPONSE_CATALOG: Readonly<Record<WhatsAppResponseKey, Wha
   ),
   route_cimel: template(
     "route_cimel",
-    "Para CIMEL Lanús, solicitá el turno directamente por {{booking_channel}}. Este asistente no confirma disponibilidad ni reserva turnos.",
+    "La Dra. Lucía Chahin atiende habitualmente en CIMEL Lanús los martes, jueves y viernes. Solicitá el turno directamente por {{booking_channel}} y confirmá día, prestación y cobertura. Este asistente no confirma disponibilidad ni reserva turnos.",
     ["booking_channel"],
   ),
   route_britanico: template(
     "route_britanico",
-    "Para Hospital Británico, solicitá el turno directamente por {{booking_channel}}. Este asistente no confirma disponibilidad ni reserva turnos.",
+    "En Hospital Británico, la Dra. Lucía Chahin realiza ecocardiogramas en Lanús los martes y atiende en Central los miércoles. Solicitá el turno directamente por {{booking_channel}}, indicando la sede, y confirmá día, prestación y cobertura. Este asistente no confirma disponibilidad ni reserva turnos.",
     ["booking_channel"],
   ),
   route_swiss: template(
     "route_swiss",
-    "Para Swiss Medical Lomas, solicitá el turno directamente por {{booking_channel}}. Este asistente no confirma disponibilidad ni reserva turnos.",
+    "La Dra. Lucía Chahin atiende habitualmente en Swiss Medical Lomas los viernes. Solicitá el turno directamente por {{booking_channel}} y confirmá día, prestación y cobertura. Este asistente no confirma disponibilidad ni reserva turnos.",
     ["booking_channel"],
   ),
   greeting_existing: template(

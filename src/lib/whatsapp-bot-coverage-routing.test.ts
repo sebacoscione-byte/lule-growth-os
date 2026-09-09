@@ -52,7 +52,8 @@ describe("cobertura por sede del bot de WhatsApp", () => {
     ])
     expect(reply).toContain("*Particular*")
     expect(reply).toContain("*CIMEL Lanús*")
-    expect(reply).toContain("*Hospital Británico*")
+    expect(reply).toContain("*Hospital Británico Lanús*")
+    expect(reply).toContain("*Hospital Británico Central*")
     expect(reply).not.toContain("Swiss Medical Lomas")
   })
 

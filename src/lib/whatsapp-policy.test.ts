@@ -22,4 +22,11 @@ describe("separación NLU / policy", () => {
       patient_reply: "texto no aprobado",
     })).toThrow()
   })
+
+  it("no deriva por días ambiguos del cronograma vigente", () => {
+    expect(evaluateWhatsAppPolicy({ state: "awaiting_location", input_type: "text", text: "Prefiero el martes" }))
+      .toMatchObject({ response_key: "ask_location", nlu: { entities: { preferred_location: "unknown" } } })
+    expect(evaluateWhatsAppPolicy({ state: "awaiting_location", input_type: "text", text: "Quiero Hospital Británico Lanús" }))
+      .toMatchObject({ response_key: "show_booking_instructions", nlu: { entities: { preferred_location: "hospital_britanico" } } })
+  })
 })

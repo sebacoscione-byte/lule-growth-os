@@ -117,6 +117,147 @@ function mockDb(locations: unknown, sessionOverrides: Record<string, unknown> = 
 beforeEach(() => jest.clearAllMocks())
 
 describe("fuente única de sedes en el bot", () => {
+  it("muestra los cuatro lugares físicos y el cronograma vigente aunque la configuración conserve días legacy", async () => {
+    mockDb([{
+      id: "cimel_lanus",
+      name: "CIMEL Lanús",
+      day: "martes",
+      hours: "Martes",
+      services: ["Consulta cardiológica", "Ecocardiograma"],
+      verified_at: "2026-07-15T12:00:00.000Z",
+      verified_by: "test-user",
+      valid_from: "2026-07-01T00:00:00.000Z",
+      active: true,
+    }, {
+      id: "hospital_britanico",
+      name: "Hospital Británico (Central)",
+      day: "miércoles",
+      hours: "Miércoles",
+      services: ["Consulta cardiológica", "Ecocardiograma"],
+      verified_at: "2026-07-15T12:00:00.000Z",
+      verified_by: "test-user",
+      valid_from: "2026-07-01T00:00:00.000Z",
+      active: true,
+    }, {
+      id: "swiss_lomas",
+      name: "Swiss Medical Lomas",
+      day: "viernes",
+      hours: "Viernes",
+      services: ["Consulta cardiológica", "Ecocardiograma"],
+      verified_at: "2026-07-15T12:00:00.000Z",
+      verified_by: "test-user",
+      valid_from: "2026-07-01T00:00:00.000Z",
+      active: true,
+    }])
+
+    await handleIncomingMessage({ phone: PHONE, text: "Hola" })
+
+    const [, message, buttons] = (sendButtons as jest.Mock).mock.calls.at(-1)
+    expect(message).toContain("CIMEL Lanús* — Martes 13:00–15:00 · Jueves y viernes 13:00–16:00")
+    expect(message).toContain("Hospital Británico Lanús* — Martes 16:00–19:30 · Ecocardiogramas")
+    expect(message).toContain("Hospital Británico Central* — Miércoles 17:00–19:45")
+    expect(message).toContain("Swiss Medical Lomas* — Viernes 17:00–20:00")
+    expect(message).not.toContain("Hospital Británico (Central)* (miércoles)")
+    expect(buttons).toEqual([
+      { id: "cimel_lanus", title: "CIMEL Lanús" },
+      { id: "hospital_britanico", title: "Hospital Británico" },
+      { id: "swiss_lomas", title: "Swiss Medical Lomas" },
+    ])
+  })
+
+  it("responde una consulta explícita por Hospital Británico Lanús sin mezclar la sede Central", async () => {
+    mockDb([{
+      id: "hospital_britanico",
+      name: "Hospital Británico (Central)",
+      phone: "0810-222-2748 / 4309-6400",
+      booking_instruction: "Pedí turno por los canales oficiales del Hospital Británico.",
+      obras_sociales: ["OSDE"],
+      accepts_particular: true,
+      services: ["Consulta cardiológica", "Ecocardiograma"],
+      verified_at: "2026-07-15T12:00:00.000Z",
+      verified_by: "test-user",
+      valid_from: "2026-07-01T00:00:00.000Z",
+      active: true,
+    }])
+
+    await handleIncomingMessage({ phone: PHONE, text: "¿Dónde queda Hospital Británico Lanús?" })
+
+    const [, message] = (sendText as jest.Mock).mock.calls.at(-1)
+    expect(message).toContain("Hospital Británico Lanús")
+    expect(message).toContain("Av. Hipólito Yrigoyen 4429, Lanús")
+    expect(message).toContain("Martes 16:00–19:30 · Ecocardiogramas")
+    expect(message).not.toContain("Perdriel 74")
+    expect(message).not.toContain("en *Hospital Británico (Central)*")
+    expect(message).toContain("no reserva turnos ni confirma disponibilidad")
+  })
+
+  it("no elige una sede por un martes ambiguo", async () => {
+    const { leadsBuilder } = mockDb([{
+      id: "cimel_lanus",
+      name: "CIMEL Lanús",
+      services: [],
+      verified_at: "2026-07-15T12:00:00.000Z",
+      verified_by: "test-user",
+      valid_from: "2026-07-01T00:00:00.000Z",
+      active: true,
+    }, {
+      id: "hospital_britanico",
+      name: "Hospital Británico",
+      services: [],
+      verified_at: "2026-07-15T12:00:00.000Z",
+      verified_by: "test-user",
+      valid_from: "2026-07-01T00:00:00.000Z",
+      active: true,
+    }], { state: "esperando_sede", obra_social: "Particular / sin cobertura" })
+
+    await handleIncomingMessage({ phone: PHONE, text: "El martes" })
+
+    expect(leadsBuilder.update).not.toHaveBeenCalled()
+    expect(sendButtons).toHaveBeenCalledWith(
+      PHONE,
+      expect.stringContaining("No entendí bien la opción"),
+      expect.anything(),
+      expect.anything()
+    )
+  })
+
+  it("responde una pregunta general con todos los lugares, no sólo con la sede guardada", async () => {
+    mockDb([{
+      id: "cimel_lanus",
+      name: "CIMEL Lanús",
+      services: [],
+      verified_at: "2026-07-15T12:00:00.000Z",
+      verified_by: "test-user",
+      valid_from: "2026-07-01T00:00:00.000Z",
+      active: true,
+    }, {
+      id: "hospital_britanico",
+      name: "Hospital Británico (Central)",
+      services: [],
+      verified_at: "2026-07-15T12:00:00.000Z",
+      verified_by: "test-user",
+      valid_from: "2026-07-01T00:00:00.000Z",
+      active: true,
+    }, {
+      id: "swiss_lomas",
+      name: "Swiss Medical Lomas",
+      services: [],
+      verified_at: "2026-07-15T12:00:00.000Z",
+      verified_by: "test-user",
+      valid_from: "2026-07-01T00:00:00.000Z",
+      active: true,
+    }])
+
+    await handleIncomingMessage({ phone: PHONE, text: "¿Dónde atiende?" })
+
+    const [, message] = (sendText as jest.Mock).mock.calls.at(-1)
+    expect(message).toContain("CIMEL Lanús")
+    expect(message).toContain("Hospital Británico Lanús")
+    expect(message).toContain("Hospital Británico Central")
+    expect(message).toContain("Swiss Medical Lomas")
+    expect(message).toContain("disponibilidad se confirman directamente")
+  })
+
   it("responde por otra cobertura sin cambiar la guardada ni la sede del paciente", async () => {
     const locations = [{
       id: "cimel_lanus",
@@ -262,6 +403,30 @@ describe("fuente única de sedes en el bot", () => {
       expect.stringContaining("Servicio administrativo verificado"),
       expect.anything()
     )
+  })
+
+  it("no vuelca una cartilla institucional extensa en un solo mensaje", async () => {
+    mockDb([{
+      id: "cimel_lanus",
+      name: "CIMEL Lanús",
+      obras_sociales: Array.from({ length: 72 }, (_, index) => `Cobertura ${index + 1}`),
+      services: [],
+      verified_at: "2026-07-15T12:00:00.000Z",
+      verified_by: "test-user",
+      valid_from: "2026-07-01T00:00:00.000Z",
+      active: true,
+    }])
+
+    await handleIncomingMessage({ phone: PHONE, text: "¿Qué obras sociales aceptan?" })
+
+    expect(sendText).toHaveBeenCalledWith(
+      PHONE,
+      expect.stringContaining("hay 72 coberturas cargadas"),
+      expect.anything()
+    )
+    const [, message] = (sendText as jest.Mock).mock.calls.at(-1)
+    expect(message).not.toContain("Cobertura 72")
+    expect(message).toContain("Decime el nombre exacto")
   })
 
   it("no afirma servicios de un seed legacy sin trazabilidad de verificación", async () => {
