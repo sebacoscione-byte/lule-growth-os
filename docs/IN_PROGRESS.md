@@ -1,4 +1,4 @@
-# EN CURSO (2026-09-10) — respuestas automáticas de Instagram más claras
+# CERRADO (2026-09-10) — respuestas automáticas de Instagram más claras
 
 ## Objetivo
 
@@ -12,7 +12,7 @@ clínicas ni prometer disponibilidad.
 - [x] Transparentar que responde un asistente virtual y mejorar las instrucciones de cada respuesta.
 - [x] Cubrir consultas administrativas frecuentes de sedes, días y horarios con datos compartidos.
 - [x] Alinear el texto del Inbox con la automatización real y actualizar la documentación operativa.
-- [ ] Ejecutar lint, tests y build; abrir PR, verificar preview y mergear.
+- [x] Ejecutar lint, tests y build; abrir PR, verificar preview y mergear.
 
 ## Alcance y seguridad
 
@@ -21,6 +21,16 @@ clínicas ni prometer disponibilidad.
   fuera de la automatización y quedan para atención humana.
 - Se modifica la lógica llamada por el webhook de Instagram, pero no su firma, persistencia, RLS ni
   el webhook de WhatsApp. No se agregan cron jobs.
+
+## Validación final
+
+- `npm run lint`: sin errores ni warnings.
+- `npm test -- --runInBand`: 140 suites y 1.241 pruebas aprobadas; 47 casos focalizados cubren el
+  clasificador, los límites administrativos y el webhook de Instagram.
+- `npm run build`: compilación, TypeScript y 90 rutas generadas correctamente.
+- PR #278: build y E2E público aprobados; E2E autenticado omitido por diseño en pull requests.
+- Vercel Preview: deployment `Ready`. El acceso HTTP anónimo redirige al SSO de Vercel, como está
+  configurado para previews protegidos; no se intentó eludir esa protección.
 
 ---
 
