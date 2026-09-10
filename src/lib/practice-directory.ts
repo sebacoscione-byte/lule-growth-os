@@ -36,8 +36,8 @@ export interface PracticeSite {
 
 /**
  * Cronograma asistencial confirmado por la Dra. Lucía Chahin. Es la fuente compartida por las
- * landings y las respuestas administrativas de WhatsApp. La disponibilidad de turnos siempre debe
- * confirmarse con cada institución.
+ * landings y las respuestas administrativas de WhatsApp e Instagram. La disponibilidad de turnos
+ * siempre debe confirmarse con cada institución.
  */
 export const PRACTICE_SITES: readonly PracticeSite[] = Object.freeze([
   {

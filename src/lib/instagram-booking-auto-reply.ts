@@ -2,16 +2,24 @@ import type { SupabaseClient } from "@supabase/supabase-js"
 import { getConnectionInfo, getProfile, getValidToken } from "@/lib/instagram-business"
 import type { InstagramInboxItemInput } from "@/lib/instagram-webhook-normalizer"
 import { containsSensitiveMedicalContent } from "@/lib/medical-safety"
+import { PRACTICE_SITES } from "@/lib/practice-directory"
 
 const GRAPH_BASE = "https://graph.instagram.com/v26.0"
 const FETCH_TIMEOUT_MS = 10_000
 const MAX_REPLIES_PER_WEBHOOK = 20
 
 export const INSTAGRAM_BOOKING_REPLY =
-  "¡Hola! Para pedir turno, ingresá al link de la bio y elegí la sede que te quede más cómoda. Allí vas a encontrar los enlaces para comunicarte por WhatsApp o por teléfono. Los turnos y la disponibilidad los confirma cada institución."
+  "¡Hola! Soy el asistente virtual administrativo de la Dra. Lucía Chahin. Para pedir un turno, entrá al link de la bio y elegí dónde querés atenderte. Ahí vas a encontrar el canal oficial de cada institución. La disponibilidad, la prestación y la cobertura se confirman directamente con la sede al solicitarlo."
 
 export const INSTAGRAM_COVERAGE_REPLY =
-  "¡Hola! Las obras sociales y prepagas dependen de la sede y del plan. En el link de la bio podés elegir la sede, consultar la información vigente y encontrar sus canales oficiales. La cobertura debe confirmarse directamente con la institución al pedir el turno."
+  "¡Hola! Soy el asistente virtual administrativo de la Dra. Lucía Chahin. Las obras sociales y prepagas dependen de la institución y de tu plan. En el link de la bio, elegí la sede y revisá su información vigente. Si querés atenderte de forma particular, seguí el mismo camino para consultar esa modalidad. La cobertura debe confirmarse directamente con la institución al pedir el turno."
+
+const INSTAGRAM_LOCATION_LINES = PRACTICE_SITES.map(site =>
+  `• ${site.name}${site.serviceNote ? ` (${site.serviceNote.toLowerCase()})` : ""}: ${site.hours}.`
+).join("\n")
+
+export const INSTAGRAM_LOCATION_REPLY =
+  `¡Hola! Soy el asistente virtual administrativo de la Dra. Lucía Chahin. Estos son sus lugares y horarios habituales:\n${INSTAGRAM_LOCATION_LINES}\nEn el link de la bio podés ver las direcciones y los canales oficiales para pedir turno. La disponibilidad se confirma con cada institución.`
 
 const BOOKING_INTENT_PATTERN =
   /\b(?:pedir|sacar|solicitar|reservar|agendar|conseguir|necesito|quiero|quisiera|busco|como (?:puedo|hago para)|hay|tenes|tienen|dan)\b.{0,45}\b(?:un )?(?:turnos?|citas?)\b|\b(?:turnos?|citas?)\b.{0,45}\b(?:pedir|sacar|solicitar|reservar|agendar|conseguir|necesito|quiero|quisiera|disponibles?|disponibilidad|hay|tenes|tienen)\b/
@@ -20,7 +28,11 @@ const SHORT_BOOKING_INTENT_PATTERN =
 const WRONG_FLOW_PATTERN =
   /\b(?:cancelar|cambiar|reprogramar|confirmar|anular|perdi|perder|ya (?:saque|tengo)|no (?:quiero|necesito))\b.{0,35}\b(?:turno|cita)\b|\b(?:turno|cita)\b.{0,35}\b(?:cancelar|cambiar|reprogramar|confirmar|anular|perdi|perder)\b/
 const COVERAGE_INTENT_PATTERN =
-  /\b(?:obras? sociales?|prepagas?|coberturas?|pami|atienden? por|trabajan? con)\b/
+  /\b(?:obras? sociales?|prepagas?|coberturas?|pami|sin (?:obra social|prepaga)|no tengo (?:obra social|prepaga)|atienden? por|trabajan? con)\b|\b(?:atenderme|atencion|consulta|turno|atienden?|atendes)\b.{0,30}\bparticular\b|\bparticular\b.{0,30}\b(?:atenderme|atencion|consulta|turno|atienden?|atendes)\b/
+const LOCATION_CONTEXT_PATTERN =
+  /\b(?:atiende|atendes|atencion|consultorio|doctora|dra|cardiologa|cimel|hospital britanico|britanico|swiss medical|swiss|sede)\b/
+const LOCATION_QUESTION_PATTERN =
+  /\b(?:donde|como llegar|en que (?:sede|lugar|zona)|cuales? (?:sedes?|lugares?)|sedes?|lugares?|ubicacion|direccion|horarios?|que dias?|que dia|cuando|(?:atiende(?:s)?|atendes) (?:en|(?:el|los?) (?:lunes|martes|miercoles|jueves|viernes|sabados?|domingos?)))\b/
 const PRICE_INTENT_PATTERN =
   /\b(?:precio|valor|costo|cuanto (?:sale|cuesta|cobra))\b/
 const URGENCY_PATTERN = /\b(?:urgente|urgencia|emergencia|guardia)\b/
@@ -49,6 +61,9 @@ export function getInstagramAutoReplyText(item: InstagramInboxItemInput): string
     return null
   }
   if (COVERAGE_INTENT_PATTERN.test(text)) return INSTAGRAM_COVERAGE_REPLY
+  if (LOCATION_CONTEXT_PATTERN.test(text) && LOCATION_QUESTION_PATTERN.test(text)) {
+    return INSTAGRAM_LOCATION_REPLY
+  }
   if (BOOKING_INTENT_PATTERN.test(text) || SHORT_BOOKING_INTENT_PATTERN.test(text)) {
     return INSTAGRAM_BOOKING_REPLY
   }

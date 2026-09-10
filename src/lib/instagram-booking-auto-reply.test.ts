@@ -9,6 +9,7 @@ import type { InstagramInboxItemInput } from "@/lib/instagram-webhook-normalizer
 import {
   INSTAGRAM_BOOKING_REPLY,
   INSTAGRAM_COVERAGE_REPLY,
+  INSTAGRAM_LOCATION_REPLY,
   getInstagramAutoReplyText,
   isEligibleInstagramBookingInquiry,
   processInstagramBookingAutoReplies,
@@ -87,6 +88,15 @@ describe("isEligibleInstagramBookingInquiry", () => {
     "¿Tienen citas para esta semana?",
     "¿Qué obras sociales atendés en Lanús?",
     "¿Atienden por OSDE y cómo saco turno?",
+    "Quiero atenderme de forma particular",
+    "No tengo obra social",
+    "¿Dónde atiende la doctora?",
+    "¿Qué días atiende en CIMEL?",
+    "¿Cuál es el horario de Swiss Medical Lomas?",
+    "¿Dónde queda Hospital Británico Central?",
+    "¿Atiende en Lanús?",
+    "¿Atendés los viernes?",
+    "¿Cómo llegar a CIMEL?",
   ])("acepta intención inequívoca: %s", content => {
     expect(isEligibleInstagramBookingInquiry(item({ content }))).toBe(true)
   })
@@ -98,6 +108,12 @@ describe("isEligibleInstagramBookingInquiry", () => {
     "Ya tengo turno",
     "Necesito turno por dolor de pecho",
     "Es urgente, quiero un turno",
+    "¿Dónde puedo mandar un estudio para que lo revise?",
+    "¿Qué horario me conviene para tomar la medicación?",
+    "No tengo obra social y necesito turno por dolor de pecho",
+    "¿Cuánto sale atenderme particular?",
+    "Quiero cambiar mi turno en CIMEL",
+    "Es un caso muy particular",
   ])("deja para una persona los casos ambiguos o sensibles: %s", content => {
     expect(isEligibleInstagramBookingInquiry(item({ content }))).toBe(false)
   })
@@ -109,10 +125,34 @@ describe("isEligibleInstagramBookingInquiry", () => {
     expect(isEligibleInstagramBookingInquiry(item({ participant_id: null }))).toBe(false)
   })
 
-  it("elige una respuesta administrativa específica para coberturas", () => {
+  it("elige una respuesta administrativa específica según la gestión", () => {
     expect(getInstagramAutoReplyText(item({ content: "¿Qué obras sociales atendés en Lanús?" })))
       .toBe(INSTAGRAM_COVERAGE_REPLY)
     expect(getInstagramAutoReplyText(item({ content: "Turno" }))).toBe(INSTAGRAM_BOOKING_REPLY)
+    expect(getInstagramAutoReplyText(item({ content: "¿Qué días atiende en CIMEL?" })))
+      .toBe(INSTAGRAM_LOCATION_REPLY)
+    expect(getInstagramAutoReplyText(item({ content: "Quiero atenderme particular" })))
+      .toBe(INSTAGRAM_COVERAGE_REPLY)
+    expect(getInstagramAutoReplyText(item({ content: "¿Qué horarios atiende por OSDE?" })))
+      .toBe(INSTAGRAM_COVERAGE_REPLY)
+  })
+
+  it("explica que responde un asistente y conserva límites administrativos claros", () => {
+    for (const reply of [INSTAGRAM_BOOKING_REPLY, INSTAGRAM_COVERAGE_REPLY, INSTAGRAM_LOCATION_REPLY]) {
+      expect(reply).toContain("asistente virtual administrativo")
+      expect(reply).not.toMatch(/reserv(?:é|amos|ado)|turno confirmado|cobertura confirmada/i)
+      expect(reply.length).toBeLessThanOrEqual(1_000)
+    }
+    expect(INSTAGRAM_BOOKING_REPLY).toContain("link de la bio")
+    expect(INSTAGRAM_BOOKING_REPLY).toContain("disponibilidad")
+    expect(INSTAGRAM_COVERAGE_REPLY).toContain("dependen de la institución y de tu plan")
+  })
+
+  it("mantiene el cronograma vigente en la respuesta de sedes", () => {
+    expect(INSTAGRAM_LOCATION_REPLY).toContain("CIMEL Lanús: Martes 13:00–15:00 · Jueves y viernes 13:00–16:00")
+    expect(INSTAGRAM_LOCATION_REPLY).toContain("Hospital Británico Lanús (ecocardiogramas): Martes 16:00–19:30")
+    expect(INSTAGRAM_LOCATION_REPLY).toContain("Hospital Británico Central: Miércoles 17:00–19:45")
+    expect(INSTAGRAM_LOCATION_REPLY).toContain("Swiss Medical Lomas: Viernes 17:00–20:00")
   })
 })
 
