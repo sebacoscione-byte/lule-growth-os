@@ -2414,6 +2414,13 @@ plano, sin cookies, que siempre autentica como `service_role` real.
   en absoluto — no hay sesión de usuario que verificar — así que usan `getServiceDb()` directamente.
 
 ## Doctora y configuración
+- 2026-09-10: las respuestas automáticas administrativas de Instagram se identifican como
+  “asistente virtual administrativo” y dan instrucciones más directas para pedir turno o consultar
+  cobertura. Se agregó una respuesta específica para consultas inequívocas de sedes, direcciones,
+  días y horarios, generada desde `PRACTICE_SITES` para compartir el cronograma vigente con las
+  landings y WhatsApp. También reconoce atención particular o ausencia de cobertura. Los filtros
+  previos para síntomas, urgencias, medicación, interpretación de estudios, precios, cancelaciones,
+  cambios y adjuntos siguen fallando cerrado; no se modificó `medical-safety.ts`.
 - 2026-09-07: la respuesta automática administrativa de Instagram reconoce también mensajes breves
   (`Turno`), preguntas de disponibilidad (`¿Tenés turno el martes?`) y consultas de obras sociales o
   prepagas. Turnos y coberturas usan textos distintos, sin reservar, confirmar disponibilidad ni

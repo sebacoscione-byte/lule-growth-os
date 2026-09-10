@@ -70,7 +70,9 @@ export default function InstagramInboxPage() {
               <h1 className="flex items-center gap-2 font-semibold text-gray-900">
                 <Camera className="h-5 w-5 text-pink-600" /> Inbox de Instagram
               </h1>
-              <p className="text-xs text-gray-500">Lectura de DMs y comentarios · sin respuestas automáticas</p>
+              <p className="text-xs text-gray-500">
+                DMs y comentarios · respuestas automáticas sólo para turnos, coberturas, sedes y horarios
+              </p>
             </div>
           </div>
           <Button variant="outline" size="sm" onClick={sync} disabled={syncing}>
