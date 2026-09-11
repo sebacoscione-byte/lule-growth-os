@@ -1,4 +1,4 @@
-# EN CURSO (2026-09-11) — PAMI y respuestas públicas de coberturas en Instagram
+# IMPLEMENTADO (2026-09-11) — PAMI y respuestas públicas de coberturas en Instagram
 
 ## Objetivo
 
@@ -12,8 +12,10 @@ de obras sociales recibidas como comentarios. Las consultas por DM conservan la 
 - [x] Enviar públicamente las respuestas de cobertura que nacen en comentarios.
 - [x] Eliminar PAMI de `app_config.locations` mediante una migración preservando el resto de la cartilla.
 - [x] Ejecutar lint, tests, build y validar la migración.
-- [ ] Abrir PR, verificar preview, mergear y comprobar producción.
-- [ ] Responder el comentario real de Instagram con el texto aprobado.
+- [x] Abrir PR, verificar preview, mergear y comprobar producción.
+- [ ] Responder el comentario real de Instagram con el texto aprobado: el comentario de la captura
+  no aparece en el Inbox, en la API de comentarios del post ni en su HTML público. Sin un
+  `comment_id` verificable no se publica una respuesta suelta que podría quedar fuera del hilo.
 
 ## Alcance y seguridad
 
@@ -29,6 +31,11 @@ de obras sociales recibidas como comentarios. Las consultas por DM conservan la 
 - `npm run lint`: sin errores ni warnings.
 - `npm test -- --runInBand`: 141 suites y 1.246 pruebas aprobadas.
 - `npm run build`: compilación, TypeScript y 90 rutas generadas correctamente.
+- PR #279: build, E2E público y Vercel Preview aprobados; `/login` respondió 200 mediante la sesión
+  autenticada de Vercel CLI.
+- PR #279 mergeado y deployment productivo `Ready` con los alias públicos activos.
+- Migración aplicada atómicamente en producción. La lectura posterior confirmó cero etiquetas de
+  PAMI en `app_config.locations` y la landing pública respondió correctamente sin mostrar PAMI.
 
 ---
 
