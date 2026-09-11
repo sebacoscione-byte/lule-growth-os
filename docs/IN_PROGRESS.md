@@ -1,3 +1,37 @@
+# EN CURSO (2026-09-11) — PAMI y respuestas públicas de coberturas en Instagram
+
+## Objetivo
+
+Quitar PAMI de las coberturas vigentes y responder públicamente, en primera persona, las consultas
+de obras sociales recibidas como comentarios. Las consultas por DM conservan la respuesta privada.
+
+## Plan
+
+- [x] Auditar el webhook, el clasificador y la fuente compartida de coberturas.
+- [x] Agregar una respuesta específica para PAMI y una respuesta general para otras coberturas.
+- [x] Enviar públicamente las respuestas de cobertura que nacen en comentarios.
+- [x] Eliminar PAMI de `app_config.locations` mediante una migración preservando el resto de la cartilla.
+- [x] Ejecutar lint, tests, build y validar la migración.
+- [ ] Abrir PR, verificar preview, mergear y comprobar producción.
+- [ ] Responder el comentario real de Instagram con el texto aprobado.
+
+## Alcance y seguridad
+
+- Las respuestas son plantillas administrativas fijas; no usan IA ni interpretan información médica.
+- El cambio toca el procesamiento del webhook de Instagram y una migración de configuración, pero no
+  modifica firmas, RLS, autenticación, cron jobs ni el webhook de WhatsApp.
+- La respuesta pública no confirma planes ni disponibilidad. Para otras coberturas deriva a las
+  historias destacadas y a la web de la bio, y recomienda confirmar con cada institución.
+
+## Validación local
+
+- Migración `20260911_remove_pami_coverage.sql` validada contra Supabase con rollback completo.
+- `npm run lint`: sin errores ni warnings.
+- `npm test -- --runInBand`: 141 suites y 1.246 pruebas aprobadas.
+- `npm run build`: compilación, TypeScript y 90 rutas generadas correctamente.
+
+---
+
 # CERRADO (2026-09-10) — respuestas automáticas de Instagram más claras
 
 ## Objetivo

@@ -67,9 +67,9 @@ describe("cobertura por sede del bot de WhatsApp", () => {
     expect(reply).not.toContain("Hospital Británico")
   })
 
-  it("informa cuando una cobertura consultada no figura", () => {
+  it("informa en primera persona que no atiende PAMI", () => {
     expect(buildCoverageLocationsReply("¿Dónde aceptan PAMI?", [
       { ...cimel, id: "cimel_lanus" } as never,
-    ])).toContain("no figura en ninguna")
+    ])).toContain("no atiendo por *PAMI*")
   })
 })

@@ -785,6 +785,10 @@ export function buildCoverageLocationsReply(
   const coverage = asksParticular ? "Particular" : requested
   if (!coverage) return null
 
+  if (normalizeCoverageName(coverage) === "pami") {
+    return "Por el momento no atiendo por *PAMI*. Podés ver las obras sociales y prepagas con las que atiendo en las historias destacadas de Instagram o en mi página web, desde el link de la bio."
+  }
+
   const matchingLocations = locations.filter(location =>
     isCoverageListedAtLocation(location, coverage) === true
   )

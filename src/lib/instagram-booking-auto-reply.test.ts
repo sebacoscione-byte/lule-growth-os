@@ -10,6 +10,8 @@ import {
   INSTAGRAM_BOOKING_REPLY,
   INSTAGRAM_COVERAGE_REPLY,
   INSTAGRAM_LOCATION_REPLY,
+  INSTAGRAM_PAMI_REPLY,
+  getInstagramAutoReplyPlan,
   getInstagramAutoReplyText,
   isEligibleInstagramBookingInquiry,
   processInstagramBookingAutoReplies,
@@ -135,17 +137,38 @@ describe("isEligibleInstagramBookingInquiry", () => {
       .toBe(INSTAGRAM_COVERAGE_REPLY)
     expect(getInstagramAutoReplyText(item({ content: "¿Qué horarios atiende por OSDE?" })))
       .toBe(INSTAGRAM_COVERAGE_REPLY)
+    expect(getInstagramAutoReplyText(item({ content: "Atienden x PAMI" })))
+      .toBe(INSTAGRAM_PAMI_REPLY)
   })
 
-  it("explica que responde un asistente y conserva límites administrativos claros", () => {
-    for (const reply of [INSTAGRAM_BOOKING_REPLY, INSTAGRAM_COVERAGE_REPLY, INSTAGRAM_LOCATION_REPLY]) {
+  it("mantiene primera persona para coberturas y límites administrativos claros", () => {
+    for (const reply of [INSTAGRAM_BOOKING_REPLY, INSTAGRAM_LOCATION_REPLY]) {
       expect(reply).toContain("asistente virtual administrativo")
       expect(reply).not.toMatch(/reserv(?:é|amos|ado)|turno confirmado|cobertura confirmada/i)
       expect(reply.length).toBeLessThanOrEqual(1_000)
     }
+    for (const reply of [INSTAGRAM_COVERAGE_REPLY, INSTAGRAM_PAMI_REPLY]) {
+      expect(reply).toContain("atiendo")
+      expect(reply).not.toContain("asistente virtual administrativo")
+      expect(reply).toContain("historias destacadas")
+      expect(reply).toContain("página web")
+      expect(reply).toContain("link de la bio")
+      expect(reply.length).toBeLessThanOrEqual(1_000)
+    }
     expect(INSTAGRAM_BOOKING_REPLY).toContain("link de la bio")
     expect(INSTAGRAM_BOOKING_REPLY).toContain("disponibilidad")
-    expect(INSTAGRAM_COVERAGE_REPLY).toContain("dependen de la institución y de tu plan")
+    expect(INSTAGRAM_COVERAGE_REPLY).toContain("dependen de la sede y del plan")
+    expect(INSTAGRAM_PAMI_REPLY).toContain("no atiendo por PAMI")
+  })
+
+  it("publica las coberturas consultadas en comentarios y mantiene privados los DM", () => {
+    expect(getInstagramAutoReplyPlan(item({
+      external_id: "comment:coverage-1",
+      item_type: "comment",
+      content: "¿Atienden con Galeno?",
+    }))).toEqual({ text: INSTAGRAM_COVERAGE_REPLY, delivery: "public_comment" })
+    expect(getInstagramAutoReplyPlan(item({ content: "¿Atienden x PAMI?" })))
+      .toEqual({ text: INSTAGRAM_PAMI_REPLY, delivery: "private_message" })
   })
 
   it("mantiene el cronograma vigente en la respuesta de sedes", () => {
@@ -223,7 +246,52 @@ describe("processInstagramBookingAutoReplies", () => {
         }),
       })
     )
-    expect(INSTAGRAM_COVERAGE_REPLY).toContain("debe confirmarse directamente con la institución")
+    expect(INSTAGRAM_COVERAGE_REPLY).toContain("confirmar la cobertura directamente con la institución")
+  })
+
+  it("responde públicamente un comentario de cobertura", async () => {
+    const store = db()
+    ;(global.fetch as jest.Mock).mockResolvedValue(new Response(JSON.stringify({ id: "reply-comment-1" }), {
+      status: 200,
+      headers: { "content-type": "application/json" },
+    }))
+
+    const result = await processInstagramBookingAutoReplies(store.client, [item({
+      external_id: "comment:comment-coverage-1",
+      item_type: "comment",
+      content: "¿Atienden con OSDE?",
+    })])
+
+    expect(result.sent).toBe(1)
+    expect(global.fetch).toHaveBeenCalledWith(
+      "https://graph.instagram.com/v26.0/comment-coverage-1/replies",
+      expect.objectContaining({
+        body: JSON.stringify({ message: INSTAGRAM_COVERAGE_REPLY }),
+      })
+    )
+    expect(store.update).toHaveBeenCalledWith(expect.objectContaining({
+      status: "sent",
+      meta_message_id: "reply-comment-1",
+    }))
+  })
+
+  it("responde PAMI con el texto específico y público", async () => {
+    const store = db()
+    await processInstagramBookingAutoReplies(store.client, [item({
+      external_id: "comment:comment-pami-1",
+      item_type: "comment",
+      content: "Atienden x PAMI",
+    })])
+
+    expect(store.rpc).toHaveBeenCalledWith("claim_instagram_booking_auto_reply", expect.objectContaining({
+      p_reply_text: INSTAGRAM_PAMI_REPLY,
+    }))
+    expect(global.fetch).toHaveBeenCalledWith(
+      "https://graph.instagram.com/v26.0/comment-pami-1/replies",
+      expect.objectContaining({
+        body: JSON.stringify({ message: INSTAGRAM_PAMI_REPLY }),
+      })
+    )
   })
 
   it("acepta el user_id público del webhook y envía desde el id scoped de /me", async () => {

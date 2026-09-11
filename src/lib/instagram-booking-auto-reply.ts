@@ -12,7 +12,10 @@ export const INSTAGRAM_BOOKING_REPLY =
   "¡Hola! Soy el asistente virtual administrativo de la Dra. Lucía Chahin. Para pedir un turno, entrá al link de la bio y elegí dónde querés atenderte. Ahí vas a encontrar el canal oficial de cada institución. La disponibilidad, la prestación y la cobertura se confirman directamente con la sede al solicitarlo."
 
 export const INSTAGRAM_COVERAGE_REPLY =
-  "¡Hola! Soy el asistente virtual administrativo de la Dra. Lucía Chahin. Las obras sociales y prepagas dependen de la institución y de tu plan. En el link de la bio, elegí la sede y revisá su información vigente. Si querés atenderte de forma particular, seguí el mismo camino para consultar esa modalidad. La cobertura debe confirmarse directamente con la institución al pedir el turno."
+  "¡Hola! Gracias por consultar. Podés ver las obras sociales y prepagas con las que atiendo en las historias destacadas o en mi página web, desde el link de la bio. Como dependen de la sede y del plan, te recomiendo confirmar la cobertura directamente con la institución al pedir el turno. Saludos 😊"
+
+export const INSTAGRAM_PAMI_REPLY =
+  "¡Hola! Gracias por consultar. Por el momento no atiendo por PAMI. Podés ver las obras sociales y prepagas con las que atiendo en las historias destacadas o en mi página web, desde el link de la bio. Saludos 😊"
 
 const INSTAGRAM_LOCATION_LINES = PRACTICE_SITES.map(site =>
   `• ${site.name}${site.serviceNote ? ` (${site.serviceNote.toLowerCase()})` : ""}: ${site.hours}.`
@@ -28,7 +31,7 @@ const SHORT_BOOKING_INTENT_PATTERN =
 const WRONG_FLOW_PATTERN =
   /\b(?:cancelar|cambiar|reprogramar|confirmar|anular|perdi|perder|ya (?:saque|tengo)|no (?:quiero|necesito))\b.{0,35}\b(?:turno|cita)\b|\b(?:turno|cita)\b.{0,35}\b(?:cancelar|cambiar|reprogramar|confirmar|anular|perdi|perder)\b/
 const COVERAGE_INTENT_PATTERN =
-  /\b(?:obras? sociales?|prepagas?|coberturas?|pami|sin (?:obra social|prepaga)|no tengo (?:obra social|prepaga)|atienden? por|trabajan? con)\b|\b(?:atenderme|atencion|consulta|turno|atienden?|atendes)\b.{0,30}\bparticular\b|\bparticular\b.{0,30}\b(?:atenderme|atencion|consulta|turno|atienden?|atendes)\b/
+  /\b(?:obras? sociales?|prepagas?|coberturas?|pami|sin (?:obra social|prepaga)|no tengo (?:obra social|prepaga)|(?:atienden?|atendes) (?:por|con|x)|aceptan? (?:la |el )?(?:obra social|prepaga|plan)|trabajan? con)\b|\b(?:atenderme|atencion|consulta|turno|atienden?|atendes)\b.{0,30}\bparticular\b|\bparticular\b.{0,30}\b(?:atenderme|atencion|consulta|turno|atienden?|atendes)\b/
 const LOCATION_CONTEXT_PATTERN =
   /\b(?:atiende|atendes|atencion|consultorio|doctora|dra|cardiologa|cimel|hospital britanico|britanico|swiss medical|swiss|sede)\b/
 const LOCATION_QUESTION_PATTERN =
@@ -47,6 +50,17 @@ function normalizeText(value: string): string {
 }
 
 export function getInstagramAutoReplyText(item: InstagramInboxItemInput): string | null {
+  return getInstagramAutoReplyPlan(item)?.text ?? null
+}
+
+export type InstagramAutoReplyDelivery = "private_message" | "public_comment"
+
+export interface InstagramAutoReplyPlan {
+  text: string
+  delivery: InstagramAutoReplyDelivery
+}
+
+export function getInstagramAutoReplyPlan(item: InstagramInboxItemInput): InstagramAutoReplyPlan | null {
   if (
     item.direction !== "inbound" ||
     !item.participant_id ||
@@ -60,12 +74,18 @@ export function getInstagramAutoReplyText(item: InstagramInboxItemInput): string
   if (URGENCY_PATTERN.test(text) || WRONG_FLOW_PATTERN.test(text) || PRICE_INTENT_PATTERN.test(text)) {
     return null
   }
-  if (COVERAGE_INTENT_PATTERN.test(text)) return INSTAGRAM_COVERAGE_REPLY
+  const coverageDelivery: InstagramAutoReplyDelivery = item.item_type === "comment"
+    ? "public_comment"
+    : "private_message"
+  if (/\bpami\b/.test(text)) return { text: INSTAGRAM_PAMI_REPLY, delivery: coverageDelivery }
+  if (COVERAGE_INTENT_PATTERN.test(text)) {
+    return { text: INSTAGRAM_COVERAGE_REPLY, delivery: coverageDelivery }
+  }
   if (LOCATION_CONTEXT_PATTERN.test(text) && LOCATION_QUESTION_PATTERN.test(text)) {
-    return INSTAGRAM_LOCATION_REPLY
+    return { text: INSTAGRAM_LOCATION_REPLY, delivery: "private_message" }
   }
   if (BOOKING_INTENT_PATTERN.test(text) || SHORT_BOOKING_INTENT_PATTERN.test(text)) {
-    return INSTAGRAM_BOOKING_REPLY
+    return { text: INSTAGRAM_BOOKING_REPLY, delivery: "private_message" }
   }
   return null
 }
@@ -97,17 +117,24 @@ async function sendInstagramBookingReply(
   token: string,
   senderAccountId: string,
   item: InstagramInboxItemInput,
-  replyText: string
+  reply: InstagramAutoReplyPlan
 ): Promise<SendResult> {
-  const recipient = item.item_type === "comment"
-    ? { comment_id: sourceTargetId(item) }
-    : { id: item.participant_id! }
-  const body = { recipient, message: { text: replyText } }
+  const publicComment = reply.delivery === "public_comment"
+  const targetId = sourceTargetId(item)
+  const url = publicComment
+    ? `${GRAPH_BASE}/${encodeURIComponent(targetId)}/replies`
+    : `${GRAPH_BASE}/${encodeURIComponent(senderAccountId)}/messages`
+  const body = publicComment
+    ? { message: reply.text }
+    : {
+        recipient: item.item_type === "comment" ? { comment_id: targetId } : { id: item.participant_id! },
+        message: { text: reply.text },
+      }
 
   let response: Response
   try {
     response = await fetch(
-      `${GRAPH_BASE}/${encodeURIComponent(senderAccountId)}/messages`,
+      url,
       {
         method: "POST",
         headers: {
@@ -123,7 +150,7 @@ async function sendInstagramBookingReply(
     throw new InstagramSendError("network_indeterminate", "indeterminate")
   }
 
-  let payload: { message_id?: unknown; error?: { code?: unknown; error_subcode?: unknown } } = {}
+  let payload: { id?: unknown; message_id?: unknown; error?: { code?: unknown; error_subcode?: unknown } } = {}
   try {
     payload = await response.json() as typeof payload
   } catch {
@@ -138,7 +165,8 @@ async function sendInstagramBookingReply(
       "definite_failure"
     )
   }
-  return { messageId: typeof payload.message_id === "string" ? payload.message_id : null }
+  const resultId = publicComment ? payload.id : payload.message_id
+  return { messageId: typeof resultId === "string" ? resultId : null }
 }
 
 export interface InstagramAutoReplyResult {
@@ -171,8 +199,8 @@ export async function processInstagramBookingAutoReplies(
   items: InstagramInboxItemInput[]
 ): Promise<InstagramAutoReplyResult> {
   const eligibleItems = items.flatMap(item => {
-    const replyText = getInstagramAutoReplyText(item)
-    return replyText ? [{ item, replyText }] : []
+    const reply = getInstagramAutoReplyPlan(item)
+    return reply ? [{ item, reply }] : []
   })
   const candidates = eligibleItems.slice(0, MAX_REPLIES_PER_WEBHOOK)
   const result: InstagramAutoReplyResult = {
@@ -224,7 +252,7 @@ export async function processInstagramBookingAutoReplies(
   const acceptedWebhookAccountIds = new Set([profile.id, profile.user_id].filter(Boolean))
 
   await Promise.all(candidates.map(async candidate => {
-    const { item, replyText } = candidate
+    const { item, reply } = candidate
     // Meta usa `user_id` (ID público) en el webhook y `id` (ID scoped de la app) en /me y Send API.
     if (!acceptedWebhookAccountIds.has(item.instagram_account_id)) {
       result.skipped += 1
@@ -238,7 +266,7 @@ export async function processInstagramBookingAutoReplies(
         p_participant_id: item.participant_id,
         p_source_type: item.item_type,
         p_target_id: sourceTargetId(item),
-        p_reply_text: replyText,
+        p_reply_text: reply.text,
       }
     )
     if (claimError) {
@@ -251,7 +279,7 @@ export async function processInstagramBookingAutoReplies(
     }
 
     try {
-      const sent = await sendInstagramBookingReply(token, profile.id, item, replyText)
+      const sent = await sendInstagramBookingReply(token, profile.id, item, reply)
       await markReply(supabase, claimId, {
         status: "sent",
         meta_message_id: sent.messageId,
