@@ -56,6 +56,20 @@ Solo capta, clasifica, deriva y hace seguimiento.
 - Al cerrar una tarea, dejar actualizados los documentos afectados (`CLAUDE.md`,
   `docs/BACKLOG.md`, etc. según corresponda).
 
+## Cierre de sesión y aprendizaje
+- Cuando Seba diga **"cerrá sesión"**, **"cerrar sesión"**, **"cerrá la sesión"** o una variante
+  corta equivalente, interpretarlo como un pedido de cierre con aprendizaje; no como una simple
+  despedida ni como logout de una cuenta.
+- Revisar la conversación completa y capturar sólo lo durable y no obvio: correcciones de enfoque,
+  preferencias confirmadas, reglas de negocio, decisiones técnicas y cambios de prioridad.
+- Actualizar el conocimiento compartido que corresponda (`CLAUDE.md` u otro documento operativo)
+  sin duplicar lo ya escrito. Los bugs, limitaciones y tareas no terminadas van a
+  `docs/BACKLOG.md`, no al conocimiento. Mantener también `docs/IN_PROGRESS.md` coherente con el
+  estado final.
+- Si el cierre exige cambios en el repositorio, seguir el flujo normal de rama, validación, PR y
+  merge. Terminar con un reporte compacto de: conocimiento actualizado, backlog actualizado y
+  pendientes importantes para la próxima sesión. Si no hubo novedades en una categoría, decirlo.
+
 ## Stack
 - Next.js 16.2 (App Router) + React 19 + TypeScript
 - Tailwind CSS v4 + shadcn/ui / Radix UI (instalado manualmente, sin CLI)

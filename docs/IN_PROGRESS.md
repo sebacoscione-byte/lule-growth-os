@@ -1,3 +1,30 @@
+# IMPLEMENTADO (2026-09-11) — cierre de sesión con aprendizaje compartido
+
+## Objetivo
+
+Alinear Codex con el cierre de aprendizaje que Claude ejecuta cuando Seba dice "cerrá sesión" y
+dejar el conocimiento y los pendientes de la sesión de PAMI en sus fuentes durables correctas.
+
+## Plan
+
+- [x] Auditar el skill `continuous-learning` y la memoria específica del proyecto usada por Claude.
+- [x] Verificar qué decisiones de esta sesión ya estaban documentadas y detectar huecos.
+- [x] Documentar el disparador de cierre y su clasificación entre conocimiento y backlog para Codex.
+- [x] Registrar el comentario PAMI original como pendiente externo y corregir la referencia histórica.
+- [x] Ejecutar lint, tests y build; abrir PR, verificar preview y mergear.
+
+## Alcance
+
+- Sólo se modifica documentación operativa; no se cambia código, datos, automatizaciones ni lógica médica.
+
+## Validación
+
+- `npm run lint`: sin errores ni warnings.
+- `npm test -- --runInBand`: 141 suites y 1.246 pruebas aprobadas.
+- `npm run build`: compilación, TypeScript y 90 rutas generadas correctamente.
+
+---
+
 # IMPLEMENTADO (2026-09-11) — PAMI y respuestas públicas de coberturas en Instagram
 
 ## Objetivo

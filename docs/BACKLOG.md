@@ -12,6 +12,13 @@
 - Los DMs conservan respuesta privada. No se usa IA, no se confirman planes ni disponibilidad y
   cualquier contenido médico continúa fuera de esta automatización.
 
+### [EXTERNO] Responder el comentario PAMI original si vuelve a estar disponible
+
+- El comentario mostrado en la captura no aparece actualmente en el Inbox, en la API de comentarios
+  del post ni en el HTML público. Si reaparece o se obtiene su `comment_id`, responder dentro de ese
+  hilo con la plantilla aprobada. Los comentarios nuevos equivalentes ya quedan cubiertos por la
+  automatización pública.
+
 ---
 
 ## [RESUELTO] ✅ V2.2 integra foto y texto sin partir la placa (2026-09-09)
@@ -50,8 +57,9 @@
 
 - Se aplicó una sola vez la migración del PR #253 y `app_config.locations` quedó con las 72
   coberturas informadas para Hospital Británico.
-- Se verificó que PAMI conserve la aclaración exclusiva para pacientes trasplantados o en lista de
-  espera de trasplante hepático.
+- En ese momento se verificó la aclaración exclusiva de PAMI para pacientes trasplantados o en lista
+  de espera de trasplante hepático. Esta condición histórica fue reemplazada el 2026-09-11: PAMI ya
+  no figura como cobertura vigente (ver la sección resuelta al inicio del documento).
 - El PR #255 corrigió el último faltante: la landing de Hospital Británico Lanús ahora hereda la
   cartilla institucional sin reutilizar la dirección, los horarios ni los teléfonos de Central.
 - La landing principal y las de CABA/Lanús muestran la cartilla completa. Sólo dentro del bloque de
