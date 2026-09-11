@@ -83,7 +83,7 @@ describe("WhatsApp compartido del Hospital Británico", () => {
 
 describe("configuración institucional compartida del Hospital Británico", () => {
   const locations = [
-    { name: "Hospital Británico", obras_sociales: ["AMFFA", "PAMI (condición restringida)"] },
+    { name: "Hospital Británico", obras_sociales: ["AMFFA", "Galeno"] },
     { name: "Swiss Medical Lomas", obras_sociales: ["Swiss Medical"] },
   ]
 

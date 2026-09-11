@@ -2414,6 +2414,12 @@ plano, sin cookies, que siempre autentica como `service_role` real.
   en absoluto — no hay sesión de usuario que verificar — así que usan `getServiceDb()` directamente.
 
 ## Doctora y configuración
+- 2026-09-11: Lucía confirmó que no atiende por PAMI. La migración
+  `20260911_remove_pami_coverage.sql` elimina cualquier entrada de PAMI de `app_config.locations`,
+  fuente compartida por Configuración, landings y el bot administrativo. En Instagram, las consultas
+  de coberturas recibidas como comentarios se responden públicamente con plantillas fijas en primera
+  persona; PAMI tiene una respuesta específica que aclara que no atiende esa cobertura y deriva a las
+  historias destacadas o a la web desde la bio. Los DMs siguen siendo privados y no se agregó IA.
 - 2026-09-10: las respuestas automáticas administrativas de Instagram se identifican como
   “asistente virtual administrativo” y dan instrucciones más directas para pedir turno o consultar
   cobertura. Se agregó una respuesta específica para consultas inequívocas de sedes, direcciones,

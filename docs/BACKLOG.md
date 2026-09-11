@@ -1,5 +1,16 @@
 # Backlog — Lule Growth OS
-**Actualizado:** 2026-09-09 | **Basado en:** PRD Estrategia de Captación v2.1
+**Actualizado:** 2026-09-11 | **Basado en:** PRD Estrategia de Captación v2.1
+
+---
+
+## [RESUELTO] ✅ PAMI y respuestas públicas de coberturas en Instagram (2026-09-11)
+
+- PAMI dejó de figurar en la fuente compartida de coberturas de Configuración, landings y WhatsApp.
+- Los comentarios que consultan por obras sociales o prepagas reciben una respuesta pública fija,
+  en primera persona, que deriva a las historias destacadas y a la página web del link de la bio.
+- PAMI tiene una respuesta específica: Lucía informa que por el momento no atiende esa cobertura.
+- Los DMs conservan respuesta privada. No se usa IA, no se confirman planes ni disponibilidad y
+  cualquier contenido médico continúa fuera de esta automatización.
 
 ---
 

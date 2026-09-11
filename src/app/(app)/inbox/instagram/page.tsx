@@ -71,7 +71,7 @@ export default function InstagramInboxPage() {
                 <Camera className="h-5 w-5 text-pink-600" /> Inbox de Instagram
               </h1>
               <p className="text-xs text-gray-500">
-                DMs y comentarios · respuestas automáticas sólo para turnos, coberturas, sedes y horarios
+                DMs y comentarios · coberturas públicas; turnos, sedes y horarios por privado
               </p>
             </div>
           </div>
