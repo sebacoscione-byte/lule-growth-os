@@ -1,6 +1,13 @@
 ﻿# Lule Growth OS — Contexto para Claude
 
 ## Estado actual
+- 2026-09-12 (historias nuevas antes que repeticiones): cuando la corrida de historias encuentra
+  contenido nuevo aprobado y evergreen vencido al mismo tiempo, publica primero todas las historias
+  nuevas elegidas por `items_per_run` y después las repeticiones aditivas. Un `queue_rank` manual ya
+  no puede adelantar una repetición sobre una historia nueva; las flechas y las posiciones de la
+  Biblioteca respetan los dos bloques y permiten ordenar dentro de cada uno. Posts, carruseles y
+  reels conservan su orden combinado anterior. No cambian horarios, cupos, cantidad de publicaciones,
+  rutas de cron ni lógica médica.
 - 2026-09-09 (acciones interactivas de WhatsApp): el selector de atención usa una lista nativa con
   los cuatro lugares físicos —incluidos Británico Lanús y Central por separado—, cada uno con
   horario y dirección. La elección exacta se usa en las instrucciones y agrega un enlace de Maps.

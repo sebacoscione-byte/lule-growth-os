@@ -972,10 +972,9 @@ export default function ContentStudioPage() {
       const track = autoPublishSettings[format]
       const todayAvailable = isTodayAvailableForQueueEstimate(track, now)
       const queue = pickNextPublishableItems(items, format, items.length)
-      // Solo cuenta piezas aprobadas: una evergreen intercalada no le quita ni le suma dias de espera
-      // a una pieza nueva (se publica ADEMAS, sin competir por el cupo, ver pickNextPublishableItems),
-      // asi que su posicion para estimar fecha tiene que ignorar donde haya quedado reordenada una
-      // evergreen en el medio.
+      // Solo cuenta piezas aprobadas: una evergreen no le quita ni le suma dias de espera a una pieza
+      // nueva (se publica ADEMAS, sin competir por el cupo, ver pickNextPublishableItems). En historias,
+      // las nuevas forman siempre el primer bloque de la corrida.
       let position = 0
       queue.forEach(queuedItem => {
         if (queuedItem.status !== "approved") return
@@ -994,8 +993,8 @@ export default function ContentStudioPage() {
 
   // Posicion (1-indexada) de cada pieza reordenable -- aprobada o evergreen repitiendose -- dentro de
   // la cola de su propio formato, en el orden en que realmente saldrian publicadas una detras de otra
-  // en la misma corrida (ver reorderableQueuePositions). Se usa solo para mostrarle a una evergreen en
-  // que lugar de la tanda quedaria, ya que "#N en la cola" (arriba) cuenta solo piezas nuevas.
+  // en la misma corrida (ver reorderableQueuePositions). Para historias, siempre ubica primero el
+  // bloque de nuevas y despues el de repeticiones.
   const runOrderByFormat = useMemo(() => {
     const map = new Map<string, Map<string, number>>();
     (["post", "historia", "carrusel", "reel"] as const).forEach(format => {
@@ -2059,11 +2058,9 @@ export default function ContentStudioPage() {
                     {item.status === "approved" && !item.repeat_interval_days && queueInfo.get(item.id) && (
                       <p className="text-xs text-gray-500">
                         {(() => {
-                          // El numero mostrado usa el orden REAL de la corrida (aprobadas + evergreens
-                          // activas intercaladas, ver runOrderByFormat) -- no el conteo de "posicion"
-                          // interno (solo aprobadas) que se usa para estimar la fecha (etaLabel) mas
-                          // abajo. Si una evergreen se reordeno por delante de esta pieza, ya no le
-                          // corresponde decir "Próxima en publicarse".
+                          // El numero mostrado usa el orden real de la corrida (ver runOrderByFormat),
+                          // no solo el conteo interno usado para estimar la fecha. En historias, las
+                          // nuevas siempre ocupan las primeras posiciones.
                           const runPosition = runOrderByFormat.get(item.format)?.get(item.id) ?? queueInfo.get(item.id)!.position
                           return runPosition === 1 ? "Próxima en publicarse" : `#${runPosition} en la cola`
                         })()}

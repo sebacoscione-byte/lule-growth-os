@@ -529,8 +529,8 @@ export function estimateRepeatEndDate(
 
 // Offset usado como fallback de orden para una pieza evergreen (publicada, en repeticion) que nunca
 // se reordeno a mano: muy por encima de cualquier timestamp real, para que por default siga cayendo
-// despues de las piezas aprobadas nuevas (mismo comportamiento de siempre), pero permite que un
-// queue_rank manual la intercale en cualquier lugar de la cola una vez que se la reordena.
+// despues de las piezas aprobadas nuevas. En historias, nuevas y repetidas se ordenan ademas como
+// bloques separados; en los otros formatos un queue_rank manual todavia puede intercalarlas.
 const REPEAT_DEFAULT_RANK_OFFSET = 10_000_000_000_000
 
 /**
@@ -546,6 +546,27 @@ function effectiveQueueRank(item: ContentItem): number {
     return REPEAT_DEFAULT_RANK_OFFSET + new Date(item.updated_at).getTime()
   }
   return new Date(item.approved_at ?? item.created_at).getTime()
+}
+
+/**
+ * Orden visible y reordenable de un formato. En historias, las aprobadas que todavia no salieron
+ * forman siempre el primer bloque y las evergreen ya publicadas el segundo. Asi las flechas pueden
+ * cambiar el orden dentro de cada bloque, pero nunca adelantar una repeticion sobre una historia
+ * nueva. Los demas formatos conservan el orden manual combinado existente.
+ */
+function orderedReorderableItems(items: ContentItem[], format: AutoPublishFormat): ContentItem[] {
+  const reorderable = items.filter(item => isReorderableInQueue(item) && item.format === format)
+  if (format !== "historia") {
+    return reorderable.sort((a, b) => effectiveQueueRank(a) - effectiveQueueRank(b))
+  }
+
+  const fresh = reorderable
+    .filter(item => item.status === "approved")
+    .sort((a, b) => effectiveQueueRank(a) - effectiveQueueRank(b))
+  const repeats = reorderable
+    .filter(item => item.status !== "approved")
+    .sort((a, b) => effectiveQueueRank(a) - effectiveQueueRank(b))
+  return [...fresh, ...repeats]
 }
 
 /**
@@ -570,9 +591,7 @@ export function isReorderableInQueue(item: ContentItem): boolean {
  * las flechas de reordenar tengan un numero visible que confirme que el cambio se aplico.
  */
 export function reorderableQueuePositions(items: ContentItem[], format: AutoPublishFormat): Map<string, number> {
-  const ordered = items
-    .filter(item => isReorderableInQueue(item) && item.format === format)
-    .sort((a, b) => effectiveQueueRank(a) - effectiveQueueRank(b))
+  const ordered = orderedReorderableItems(items, format)
   return new Map(ordered.map((queuedItem, index) => [queuedItem.id, index + 1]))
 }
 
@@ -626,8 +645,8 @@ export function contentPublicationSignature(item: ContentItem): string {
  * uno con su propio cronograma). `count` (items_per_run) limita SOLO las piezas nuevas aprobadas
  * (contenido fresco, ordenadas por `effectiveQueueRank`). Las piezas evergreen que ya cumplieron su
  * intervalo de repeticion (ver `isRepeatDue`) se publican ADEMAS, sin competir por ese cupo: una pieza
- * fija que se repite no le quita el lugar a una nueva -- salen las dos en la misma corrida. Las evergreen
- * van ordenadas por la mas atrasada.
+ * fija que se repite no le quita el lugar a una nueva -- salen las dos en la misma corrida. Para historias,
+ * todas las nuevas salen antes que cualquier repeticion; dentro de cada bloque se respeta `queue_rank`.
  */
 export function pickNextPublishableItems(
   items: ContentItem[],
@@ -638,12 +657,9 @@ export function pickNextPublishableItems(
   const approved = items
     .filter(item => item.status === "approved" && item.format === format)
     .sort((a, b) => effectiveQueueRank(a) - effectiveQueueRank(b))
-  const dueRepeats = items.filter(item => item.format === format && isRepeatDue(item, now))
-  // Orden final por queue_rank efectivo: por default una evergreen sigue cayendo despues de las
-  // piezas nuevas (mismo comportamiento de siempre, ver REPEAT_DEFAULT_RANK_OFFSET), pero si se la
-  // reordeno a mano (mismas flechas que ya existian para la cola aprobada, ver moveItemInQueue) puede
-  // intercalarse en cualquier lugar -- esto determina el orden real de publicacion de la corrida (ej.
-  // el orden en que unas Historias quedan una detras de otra para quien las mira).
+  const dueRepeats = items
+    .filter(item => item.format === format && isRepeatDue(item, now))
+    .sort((a, b) => effectiveQueueRank(a) - effectiveQueueRank(b))
   const seenApproved = new Set<string>()
   const uniqueApproved = approved.filter(item => {
     const signature = contentPublicationSignature(item)
@@ -655,8 +671,10 @@ export function pickNextPublishableItems(
   // Las historias pueden publicar varias piezas por corrida. Si la cola contiene copias exactas,
   // publicar solo la primera evita ráfagas idénticas separadas por segundos; las demás permanecen
   // aprobadas para que el equipo pueda diferenciarlas o archivarlas.
-  const selected = [...uniqueApproved, ...dueRepeats]
-    .sort((a, b) => effectiveQueueRank(a) - effectiveQueueRank(b))
+  const combined = [...uniqueApproved, ...dueRepeats]
+  const selected = format === "historia"
+    ? combined
+    : combined.sort((a, b) => effectiveQueueRank(a) - effectiveQueueRank(b))
   const selectedSignatures = new Set<string>()
   return selected.filter(item => {
     const signature = contentPublicationSignature(item)
@@ -674,19 +692,19 @@ export function pickNextPublishableItem(items: ContentItem[], format: AutoPublis
 /**
  * Pura, sin I/O: mueve una pieza reordenable (aprobada, o evergreen ya publicada y repitiendose, ver
  * `isReorderableInQueue`) un lugar hacia arriba o abajo dentro de la cola de su propio formato. Al
- * mover, normaliza `queue_rank` de TODA esa cola (aprobadas + evergreens activas) a enteros
+ * mover, normaliza `queue_rank` de la cola afectada a enteros
  * secuenciales segun el orden efectivo actual (esto "migra" piezas viejas sin queue_rank al nuevo
- * sistema explicito) y despues intercambia el rank de las dos piezas afectadas -- asi una evergreen
- * puede intercalarse en cualquier lugar entre las piezas nuevas, en vez de salir siempre al final de
- * la corrida. Si la pieza ya esta en la punta de la cola en esa direccion, no hace nada.
+ * sistema explicito) y despues intercambia el rank de las dos piezas afectadas. Para historias, una
+ * pieza solo se mueve dentro de su bloque (nuevas o repetidas), porque las nuevas siempre se publican
+ * primero. En los demas formatos se mantiene una unica cola combinada. Si la pieza ya esta en la punta
+ * de su cola en esa direccion, no hace nada.
  */
 export function moveItemInQueue(items: ContentItem[], id: string, direction: "up" | "down"): ContentItem[] {
   const target = items.find(item => item.id === id)
   if (!target || !isReorderableInQueue(target)) return items
 
-  const queueIds = items
-    .filter(item => isReorderableInQueue(item) && item.format === target.format)
-    .sort((a, b) => effectiveQueueRank(a) - effectiveQueueRank(b))
+  const queueIds = orderedReorderableItems(items, target.format)
+    .filter(item => target.format !== "historia" || item.status === target.status)
     .map(item => item.id)
 
   const index = queueIds.indexOf(id)
