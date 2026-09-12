@@ -1,3 +1,32 @@
+# IMPLEMENTADO (2026-09-12) — historias nuevas antes que repeticiones
+
+## Objetivo
+
+Cuando una corrida automática tenga historias nuevas y también historias evergreen listas para
+repetirse, publicar primero todas las nuevas y después las repetidas.
+
+## Plan
+
+- [x] Auditar la selección, el orden manual y los tests existentes del cron de historias.
+- [x] Separar el orden de historias nuevas y repetidas sin cambiar sus cupos.
+- [x] Alinear la posición mostrada en la Biblioteca y el reordenamiento manual.
+- [x] Agregar regresiones y actualizar la documentación operativa.
+- [ ] Ejecutar lint, tests y build; abrir PR, verificar preview y mergear.
+
+## Alcance
+
+- No cambia el horario ni la cantidad de historias de cada corrida: las repeticiones siguen siendo
+  aditivas y no consumen el cupo de historias nuevas.
+- No se modifica lógica médica, datos de pacientes, webhooks, autenticación ni RLS.
+
+## Validación local
+
+- `npm run lint`: sin errores ni warnings.
+- `TZ=America/Argentina/Buenos_Aires npm test -- --runInBand`: 141 suites y 1.249 pruebas aprobadas.
+- `npm run build`: compilación, TypeScript y 90 rutas generadas correctamente.
+
+---
+
 # IMPLEMENTADO (2026-09-11) — cierre de sesión con aprendizaje compartido
 
 ## Objetivo

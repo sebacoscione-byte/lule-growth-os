@@ -131,6 +131,43 @@ describe("runAutoPublishTrack scheduling guards", () => {
     )
     expect(shouldSkipCompletedTrack(result, new Date("2026-08-06T22:40:00.000Z"))).toBe(false)
   })
+
+  it("publica las historias nuevas antes que las repeticiones en la corrida real", async () => {
+    const fresh = item({
+      id: "fresh-story", format: "historia", visual_url: "https://example.com/fresh.jpg", queue_rank: 2,
+      hook: "Historia nueva", caption: "Contenido nuevo",
+    })
+    const repeat = item({
+      id: "repeat-story", format: "historia", status: "published",
+      visual_url: "https://example.com/repeat.jpg", repeat_interval_days: 1, queue_rank: 1,
+      updated_at: "2026-08-01T21:15:00.000Z", hook: "Historia evergreen", caption: "Contenido repetido",
+    })
+    ;(contentPipeline.readContentItems as jest.Mock).mockResolvedValue([repeat, fresh])
+    ;(contentPipeline.mutateContentItems as jest.Mock).mockResolvedValue([repeat, fresh])
+    ;(contentPublish.publishApprovedItem as jest.Mock).mockImplementation(async (_supabase, candidate) => ({
+      item: { ...candidate, status: "published" },
+      allPublished: true,
+      errors: {},
+    }))
+
+    const track = {
+      ...DEFAULT_AUTO_PUBLISH_SETTINGS.historia,
+      enabled: true,
+      items_per_run: 1,
+      schedule_slots: [{ day_of_week: 4, local_time: "18:00" }],
+    }
+    const result = await runAutoPublishTrack(
+      supabase,
+      "historia",
+      track,
+      ["instagram"],
+      new Date("2026-08-06T21:15:00.000Z")
+    )
+
+    expect((contentPublish.publishApprovedItem as jest.Mock).mock.calls.map(call => call[1].id))
+      .toEqual(["fresh-story", "repeat-story"])
+    expect(result.last_run_result).toBe("published:2/2")
+  })
 })
 
 describe("runAutoPublishFormats", () => {

@@ -289,7 +289,9 @@ track — tener ambas cosas se pisaba). Los campos viven en el JSON de la pieza 
   (off→on, server-side en `/api/content/items`). No es editable por el cliente.
 - Las piezas que se repiten **no compiten por el cupo `items_per_run`** ("Publicar de a N"): ese cupo limita
   solo las piezas nuevas aprobadas, y las evergreen vencidas se publican **además** en la misma corrida
-  (`pickNextPublishableItems` = `[...aprobadas.slice(0, count), ...evergreenVencidas]`). Ej: con "Publicar de a
+  (`pickNextPublishableItems` = `[...aprobadas.slice(0, count), ...evergreenVencidas]`). En historias,
+  las nuevas se publican siempre primero y las repeticiones después, aunque antes se hubiera asignado
+  un `queue_rank` manual que las intercalara. Ej: con "Publicar de a
   1" y una pieza fija marcada para repetirse, cada día programado salen 2 publicaciones — la nueva del cupo y
   la fija aparte. Una pieza fija nunca le quita el lugar a una nueva ni al revés.
   Esta regla aplica una vez que la Biblioteca la registra como `published`; si permanece `approved`, su
@@ -313,7 +315,8 @@ tipo. Es la fecha real en que cada pieza va a salir segun el cronograma de su fo
 su proxima salida). Las piezas sin fecha de publicacion estimada (borradores, archivadas, ya publicadas sin
 repetir) van al final, de la mas nueva a la mas antigua por `created_at`. Las flechas de reordenar cambian el
 `queue_rank` de un formato, que a su vez cambia la fecha estimada de esa pieza y por lo tanto su lugar en esta
-lista.
+lista. Dentro de historias, las flechas reordenan nuevas entre sí o repeticiones entre sí; no pueden adelantar
+una repetición por encima del bloque de historias nuevas.
 
 ## Guardrails
 

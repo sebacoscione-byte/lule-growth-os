@@ -373,6 +373,23 @@ describe("pickNextPublishableItems", () => {
     expect(pickNextPublishableItems([evergreen, fresh], "historia", 1, now).map(i => i.id)).toEqual(["fresh", "evergreen"])
   })
 
+  it("publica todas las historias nuevas antes que las repetidas aunque el orden manual diga lo contrario", () => {
+    const fresh1 = item({ id: "fresh1", format: "historia", status: "approved", queue_rank: 3 })
+    const fresh2 = item({ id: "fresh2", format: "historia", status: "approved", queue_rank: 4 })
+    const repeat1 = item({
+      id: "repeat1", format: "historia", status: "published", queue_rank: 1,
+      repeat_interval_days: 1, updated_at: "2026-07-01T00:00:00.000Z",
+    })
+    const repeat2 = item({
+      id: "repeat2", format: "historia", status: "published", queue_rank: 2,
+      repeat_interval_days: 1, updated_at: "2026-07-01T00:00:00.000Z",
+    })
+    const now = new Date("2026-07-10T00:00:00.000Z")
+
+    expect(pickNextPublishableItems([repeat1, fresh2, repeat2, fresh1], "historia", 2, now).map(i => i.id))
+      .toEqual(["fresh1", "fresh2", "repeat1", "repeat2"])
+  })
+
   it("items_per_run limita solo las frescas; las evergreens se agregan aparte", () => {
     const fresh1 = item({ id: "fresh1", format: "historia", status: "approved", approved_at: "2026-07-01T00:00:00.000Z" })
     const fresh2 = item({ id: "fresh2", format: "historia", status: "approved", approved_at: "2026-07-02T00:00:00.000Z" })
@@ -547,20 +564,23 @@ describe("moveItemInQueue", () => {
     expect(moveItemInQueue([draft], "draft", "up")).toEqual([draft])
   })
 
-  it("una evergreen que sigue repitiendose se puede intercalar entre piezas aprobadas nuevas", () => {
+  it("una evergreen de historias solo se reordena dentro del bloque de repeticiones", () => {
     const a = item({ id: "a", format: "historia", approved_at: "2026-07-01T00:00:00.000Z" })
     const b = item({ id: "b", format: "historia", approved_at: "2026-07-02T00:00:00.000Z" })
-    const evergreen = item({
-      id: "evergreen", format: "historia", status: "published",
-      repeat_interval_days: 1, updated_at: "2026-06-01T00:00:00.000Z",
+    const repeat1 = item({
+      id: "repeat1", format: "historia", status: "published",
+      repeat_interval_days: 1, updated_at: "2026-06-01T00:00:00.000Z", queue_rank: 1,
     })
-    // Orden efectivo de arranque (sin reordenar nunca): a, b, evergreen (la evergreen cae al final por
-    // default, ver REPEAT_DEFAULT_RANK_OFFSET). Subirla dos veces la deja primera.
+    const repeat2 = item({
+      id: "repeat2", format: "historia", status: "published",
+      repeat_interval_days: 1, updated_at: "2026-06-02T00:00:00.000Z", queue_rank: 2,
+    })
     const now = new Date("2026-07-10T00:00:00.000Z")
-    const once = moveItemInQueue([a, b, evergreen], "evergreen", "up")
-    expect(pickNextPublishableItems(once, "historia", 2, now).map(i => i.id)).toEqual(["a", "evergreen", "b"])
-    const twice = moveItemInQueue(once, "evergreen", "up")
-    expect(pickNextPublishableItems(twice, "historia", 2, now).map(i => i.id)).toEqual(["evergreen", "a", "b"])
+    const reordered = moveItemInQueue([a, b, repeat1, repeat2], "repeat2", "up")
+
+    expect(pickNextPublishableItems(reordered, "historia", 2, now).map(i => i.id))
+      .toEqual(["a", "b", "repeat2", "repeat1"])
+    expect(moveItemInQueue(reordered, "repeat2", "up")).toBe(reordered)
   })
 
   it("no reordena una evergreen que ya agoto su limite de repeticiones", () => {
@@ -617,6 +637,18 @@ describe("reorderableQueuePositions", () => {
     expect(positions.get("b")).toBe(2)
     expect(positions.get("evergreen")).toBe(3)
     expect(positions.has("post")).toBe(false)
+  })
+
+  it("muestra primero las historias nuevas aunque una repetida tenga menor queue_rank", () => {
+    const fresh = item({ id: "fresh", format: "historia", status: "approved", queue_rank: 2 })
+    const evergreen = item({
+      id: "evergreen", format: "historia", status: "published", queue_rank: 1,
+      repeat_interval_days: 1, updated_at: "2026-06-01T00:00:00.000Z",
+    })
+
+    const positions = reorderableQueuePositions([evergreen, fresh], "historia")
+    expect(positions.get("fresh")).toBe(1)
+    expect(positions.get("evergreen")).toBe(2)
   })
 })
 
