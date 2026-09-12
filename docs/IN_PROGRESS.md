@@ -11,7 +11,7 @@ repetirse, publicar primero todas las nuevas y después las repetidas.
 - [x] Separar el orden de historias nuevas y repetidas sin cambiar sus cupos.
 - [x] Alinear la posición mostrada en la Biblioteca y el reordenamiento manual.
 - [x] Agregar regresiones y actualizar la documentación operativa.
-- [ ] Ejecutar lint, tests y build; abrir PR, verificar preview y mergear.
+- [x] Ejecutar lint, tests y build; abrir PR, verificar preview y mergear.
 
 ## Alcance
 
@@ -24,6 +24,8 @@ repetirse, publicar primero todas las nuevas y después las repetidas.
 - `npm run lint`: sin errores ni warnings.
 - `TZ=America/Argentina/Buenos_Aires npm test -- --runInBand`: 141 suites y 1.249 pruebas aprobadas.
 - `npm run build`: compilación, TypeScript y 90 rutas generadas correctamente.
+- PR #282: CI, E2E público y Vercel aprobados; el preview quedó `Ready` y `/login` respondió
+  HTTP 200 mediante la sesión autenticada de Vercel CLI.
 
 ---
 
