@@ -56,6 +56,7 @@ const TOKEN_ALIASES: Readonly<Record<string, string>> = Object.freeze({
   lugares: "lugar",
   prestaciones: "prestacion",
   servicios: "servicio",
+  disponibles: "disponible",
   haces: "hacer",
   hace: "hacer",
   hacen: "hacer",
@@ -66,6 +67,7 @@ const TOKEN_ALIASES: Readonly<Record<string, string>> = Object.freeze({
   atiendes: "atender",
   atiende: "atender",
   atienden: "atender",
+  atenderme: "atender",
   aceptan: "aceptar",
   aceptas: "aceptar",
   necesito: "necesitar",
@@ -75,7 +77,6 @@ const TOKEN_ALIASES: Readonly<Record<string, string>> = Object.freeze({
   quisiera: "querer",
   piden: "pedir",
   pedis: "pedir",
-  pedís: "pedir",
   llevo: "llevar",
   llevaria: "llevar",
   comunico: "comunicar",
@@ -86,7 +87,7 @@ const TOKEN_ALIASES: Readonly<Record<string, string>> = Object.freeze({
   quedan: "quedar",
   tenes: "tener",
   tienes: "tener",
-  tengo: "tener",
+  tienen: "tener",
 })
 
 // Sólo se corrigen términos administrativos largos y conocidos. El umbral es deliberadamente
@@ -111,6 +112,7 @@ const FUZZY_ADMIN_VOCABULARY = Object.freeze([
   "confirmar",
   "especialidad",
   "prestacion",
+  "disponible",
 ])
 
 const COVERAGE_BRANDS = Object.freeze([
@@ -138,6 +140,7 @@ const QUESTION_WORDS = Object.freeze(["que", "cual", "cuales", "como", "cuando",
 const WEEKDAYS = Object.freeze([
   "lunes", "martes", "miercoles", "jueves", "viernes", "sabado", "domingo",
 ])
+const PRACTICE_AREAS = Object.freeze(["lanus", "lomas", "caba"])
 
 function levenshtein(a: string, b: string): number {
   if (a === b) return 0
@@ -233,8 +236,7 @@ export function getInstagramAutoReplyBlockReason(value: string): InstagramAutoRe
 
   if (
     hasAppointment && hasAny(text, [
-      "ya tener turno", "ya saque turno", "ya pedi turno", "ya consegui turno", "ya reserve turno",
-      "ya tengo turno", "ya tenia turno",
+      "ya tengo turno", "ya tenia turno", "ya saque turno", "ya pedi turno", "ya consegui turno", "ya reserve turno",
     ])
   ) return "already_resolved"
 
@@ -277,7 +279,7 @@ function requirementsIntent(text: string): boolean {
     "orden", "autorizacion", "documentacion", "credencial", "dni", "requisito",
   ])
   const adminAction = hasAny(text, [
-    "necesitar", "pedir", "hacer falta", "llevar", "presentar", "requisito", "que llevo", "que presentar",
+    "necesitar", "pedir", "hacer falta", "llevar", "presentar", "requisito", "que llevar", "que presentar",
   ])
   if (adminDocument && (adminAction || hasAny(text, QUESTION_WORDS))) return true
   return hasAny(text, ["llevar", "presentar"]) && hasAny(text, ["consulta", "estudio", "turno", "cita"])
@@ -304,19 +306,21 @@ function serviceIntent(value: string, text: string, services: PracticeServiceId[
 
 function locationIntent(value: string, text: string): boolean {
   const siteMentioned = Boolean(findPracticeSiteInText(value))
-  if (hasAny(text, ["direccion", "ubicacion", "como llegar", "donde queda", "donde atiende", "donde atender"])) return true
+  if (hasAny(text, ["direccion", "ubicacion", "como llegar", "donde quedar", "donde atender"])) return true
   if (hasPhrase(text, "donde") && hasAny(text, ["atender", "consultorio", "sede", "lugar", "doctora"])) return true
+  if (hasPhrase(text, "atender") && hasAny(text, PRACTICE_AREAS)) return true
 
   const schedule = hasAny(text, ["horario", "que dia", "cuando", ...WEEKDAYS])
   if (schedule && (siteMentioned || hasAny(text, ["atender", "sede", "consultorio", "doctora"]))) return true
-  return siteMentioned && hasAny(text, ["direccion", "horario", "dia", "queda", "quedar"])
+  return siteMentioned && hasAny(text, ["direccion", "horario", "dia", "quedar"])
 }
 
 function bookingIntent(text: string): boolean {
   const appointment = hasAny(text, ["turno", "cita"])
   const consultation = hasPhrase(text, "consulta")
   const availability = hasAny(text, ["disponible", "disponibilidad", "hay turno", "hay cita"])
-  if (appointment && (hasAny(text, BOOKING_ACTIONS) || availability || tokenCount(text) <= 3)) return true
+  const asksIfAvailable = appointment && hasAny(text, ["hay", "tener"])
+  if (appointment && (hasAny(text, BOOKING_ACTIONS) || availability || asksIfAvailable || tokenCount(text) <= 3)) return true
   if (consultation && hasAny(text, BOOKING_ACTIONS)) return true
   return false
 }
