@@ -77,7 +77,7 @@ describe("Instagram administrative intents", () => {
 
   it.each([
     "¿Necesito orden para el estudio?",
-    "¿Piden autorización de la obra social?",
+    "¿Piden autorización para el estudio?",
     "¿Qué documentación tengo que llevar?",
   ])("deriva requisitos administrativos variables: %s", content => {
     expect(getInstagramAutoReplyText(item(content))).toBe(INSTAGRAM_REQUIREMENTS_REPLY)
