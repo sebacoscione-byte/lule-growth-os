@@ -13,6 +13,7 @@ export type InstagramAdministrativeIntent =
   | "specialty"
 
 export type InstagramAutoReplyBlockReason =
+  | "urgency"
   | "price"
   | "already_resolved"
   | "explicit_rejection"
@@ -227,6 +228,8 @@ export function detectInstagramPracticeServices(value: string): PracticeServiceI
 export function getInstagramAutoReplyBlockReason(value: string): InstagramAutoReplyBlockReason | null {
   const text = normalizeInstagramAdministrativeText(value)
   const hasAppointment = hasAny(text, ["turno", "cita"])
+
+  if (hasAny(text, ["urgente", "urgencia", "emergencia", "guardia"])) return "urgency"
 
   if (
     hasAny(text, ["precio", "costo", "arancel"]) ||
