@@ -14,6 +14,7 @@ export type InstagramAdministrativeIntent =
 
 export type InstagramAutoReplyBlockReason =
   | "urgency"
+  | "clinical_interpretation"
   | "price"
   | "already_resolved"
   | "explicit_rejection"
@@ -183,6 +184,7 @@ function fuzzyCanonicalToken(token: string): string {
   let bestDistance = Number.POSITIVE_INFINITY
   let tied = false
   for (const candidate of FUZZY_ADMIN_VOCABULARY) {
+    if (candidate.slice(0, 2) !== token.slice(0, 2)) continue
     if (Math.abs(candidate.length - token.length) > maxDistance) continue
     const distance = levenshtein(token, candidate)
     if (distance < bestDistance) {
@@ -240,8 +242,17 @@ export function detectInstagramPracticeServices(value: string): PracticeServiceI
 export function getInstagramAutoReplyBlockReason(value: string): InstagramAutoReplyBlockReason | null {
   const text = normalizeInstagramAdministrativeText(value)
   const hasAppointment = hasAny(text, ["turno", "cita"])
+  const mentionsStudyOrResult = hasAny(text, [
+    "ecocardiograma", "electrocardiograma", "estudio", "resultado", "informe",
+  ])
 
   if (hasAny(text, ["urgente", "urgencia", "emergencia", "guardia"])) return "urgency"
+
+  if (
+    mentionsStudyOrResult && hasAny(text, [
+      "interpretar", "interpretacion", "que significa", "es normal", "esta bien", "esta mal", "revisar", "evaluar",
+    ])
+  ) return "clinical_interpretation"
 
   if (
     hasAny(text, ["precio", "costo", "arancel"]) ||
