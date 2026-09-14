@@ -21,6 +21,18 @@ export const PRACTICE_SITE_IDS = [
 
 export type PracticeSiteId = (typeof PRACTICE_SITE_IDS)[number]
 
+export const PRACTICE_SERVICE_IDS = [
+  "cardiology_consultation",
+  "echocardiogram",
+] as const
+
+export type PracticeServiceId = (typeof PRACTICE_SERVICE_IDS)[number]
+
+export const PRACTICE_SERVICE_NAMES: Readonly<Record<PracticeServiceId, string>> = Object.freeze({
+  cardiology_consultation: "Consulta cardiológica",
+  echocardiogram: "Ecocardiograma",
+})
+
 export interface PracticeSite {
   id: PracticeSiteId
   institutionId: PracticeInstitutionId
@@ -31,6 +43,7 @@ export interface PracticeSite {
   hours: string
   phone: string
   mapsUrl: string
+  services: readonly PracticeServiceId[]
   serviceNote?: string
 }
 
@@ -50,6 +63,7 @@ export const PRACTICE_SITES: readonly PracticeSite[] = Object.freeze([
     hours: "Martes 13:00–15:00 · Jueves y viernes 13:00–16:00",
     phone: "011 4249-3412",
     mapsUrl: "https://share.google/rsph8WtMpJAiRkeki",
+    services: ["cardiology_consultation"],
   },
   {
     id: "hospital_britanico_lanus",
@@ -61,6 +75,7 @@ export const PRACTICE_SITES: readonly PracticeSite[] = Object.freeze([
     hours: "Martes 16:00–19:30",
     phone: "0810-222-2748",
     mapsUrl: "https://www.google.com/maps/search/?api=1&query=Hospital%20Brit%C3%A1nico%20Lan%C3%BAs%20Av.%20Hip%C3%B3lito%20Yrigoyen%204429",
+    services: ["echocardiogram"],
     serviceNote: "Ecocardiogramas",
   },
   {
@@ -73,6 +88,7 @@ export const PRACTICE_SITES: readonly PracticeSite[] = Object.freeze([
     hours: "Miércoles 17:00–19:45",
     phone: "4309-6400",
     mapsUrl: "https://maps.app.goo.gl/ZPbUhv7PAtUnS6D79",
+    services: ["cardiology_consultation"],
   },
   {
     id: "swiss_lomas",
@@ -84,6 +100,7 @@ export const PRACTICE_SITES: readonly PracticeSite[] = Object.freeze([
     hours: "Viernes 17:00–20:00",
     phone: "0810-333-8876",
     mapsUrl: "https://maps.app.goo.gl/tzSVjSYm47UfNkLJ8",
+    services: ["cardiology_consultation"],
   },
 ])
 
@@ -95,6 +112,10 @@ export function getPracticeSitesForInstitution(
   institutionId: PracticeInstitutionId
 ): PracticeSite[] {
   return PRACTICE_SITES.filter(site => site.institutionId === institutionId)
+}
+
+export function getPracticeSitesForService(serviceId: PracticeServiceId): PracticeSite[] {
+  return PRACTICE_SITES.filter(site => site.services.includes(serviceId))
 }
 
 export function normalizePracticeSearch(value: string): string {
