@@ -43,6 +43,8 @@ const TOKEN_ALIASES: Readonly<Record<string, string>> = Object.freeze({
   ecocardios: "ecocardiograma",
   ecocardiogramas: "ecocardiograma",
   ecos: "eco",
+  obras: "obra",
+  sociales: "social",
   prepagas: "prepaga",
   coberturas: "cobertura",
   resultados: "resultado",
@@ -323,7 +325,10 @@ function bookingIntent(text: string): boolean {
   const consultation = hasPhrase(text, "consulta")
   const availability = hasAny(text, ["disponible", "disponibilidad", "hay turno", "hay cita"])
   const asksIfAvailable = appointment && hasAny(text, ["hay", "tener"])
-  if (appointment && (hasAny(text, BOOKING_ACTIONS) || availability || asksIfAvailable || tokenCount(text) <= 3)) return true
+  const shortRequest = appointment && tokenCount(text) <= 3 && !hasAny(text, [
+    "tengo turno", "mi turno", "turno hoy", "turno manana", "turno ayer",
+  ])
+  if (appointment && (hasAny(text, BOOKING_ACTIONS) || availability || asksIfAvailable || shortRequest)) return true
   if (consultation && hasAny(text, BOOKING_ACTIONS)) return true
   return false
 }
