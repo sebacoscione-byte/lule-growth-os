@@ -91,6 +91,16 @@ const TOKEN_ALIASES: Readonly<Record<string, string>> = Object.freeze({
   tenes: "tener",
   tienes: "tener",
   tienen: "tener",
+  confirmo: "confirmar",
+  confirmas: "confirmar",
+  cancelo: "cancelar",
+  cancelas: "cancelar",
+  reprogramo: "reprogramar",
+  reprogramas: "reprogramar",
+  modifico: "modificar",
+  modificas: "modificar",
+  muevo: "mover",
+  moves: "mover",
 })
 
 // Sólo se corrigen términos administrativos largos y conocidos. El umbral es deliberadamente
