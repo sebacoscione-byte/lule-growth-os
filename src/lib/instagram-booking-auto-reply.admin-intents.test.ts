@@ -4,6 +4,7 @@ import {
   INSTAGRAM_CONTACT_REPLY,
   INSTAGRAM_REQUIREMENTS_REPLY,
   INSTAGRAM_RESULTS_REPLY,
+  INSTAGRAM_SPECIALTY_REPLY,
   getInstagramAutoReplyText,
 } from "./instagram-booking-auto-reply"
 
@@ -29,13 +30,27 @@ describe("Instagram administrative intents", () => {
   it.each([
     "En el británico de Lanús haces solo ecocardio o tmb consulta cardiológica?",
     "En Hospital Británico Lanús hacés consulta también o solo eco?",
-    "¿Qué prestaciones hacés en el Británico de Lanús?",
-  ])("responde la prestación exacta por sede: %s", content => {
+  ])("responde la comparación de prestaciones exacta por sede: %s", content => {
     const reply = getInstagramAutoReplyText(item(content))
     expect(reply).toContain("Hospital Británico Lanús")
     expect(reply).toContain("ecocardiograma")
     expect(reply).toContain("consulta cardiológica")
     expect(reply).toContain("CIMEL Lanús")
+  })
+
+  it("responde qué prestación se realiza en una sede sin inventar otras", () => {
+    const reply = getInstagramAutoReplyText(item("¿Qué prestaciones hacés en el Británico de Lanús?"))
+    expect(reply).toContain("Hospital Británico Lanús")
+    expect(reply).toContain("ecocardiograma")
+    expect(reply).not.toContain("consulta cardiológica")
+  })
+
+  it("corrige una consulta de servicio incompatible con la sede usando la fuente estructurada", () => {
+    const reply = getInstagramAutoReplyText(item("¿Hacés ecocardiograma en CIMEL?"))
+    expect(reply).toContain("CIMEL Lanús")
+    expect(reply).toContain("consulta cardiológica")
+    expect(reply).toContain("Hospital Británico Lanús")
+    expect(reply).toContain("ecocardiograma")
   })
 
   it("indica dónde realiza ecocardiogramas", () => {
@@ -83,11 +98,18 @@ describe("Instagram administrative intents", () => {
     expect(getInstagramAutoReplyText(item(content))).toBe(INSTAGRAM_REQUIREMENTS_REPLY)
   })
 
+  it("responde la especialidad con una plantilla cerrada", () => {
+    expect(getInstagramAutoReplyText(item("¿Qué especialidad tiene la doctora?")))
+      .toBe(INSTAGRAM_SPECIALTY_REPLY)
+  })
+
   it.each([
     "¿Cuánto cuesta la consulta cardiológica?",
     "Tengo dolor de pecho y necesito turno",
     "¿Podés interpretar mi ecocardiograma?",
-  ])("mantiene fuera de automatización precio o contenido clínico: %s", content => {
+    "Es urgente, quiero un turno",
+    "Ya tengo turno, gracias",
+  ])("mantiene fuera de automatización precio, contenido clínico, urgencias o flujos ya resueltos: %s", content => {
     expect(getInstagramAutoReplyText(item(content))).toBeNull()
   })
 })
