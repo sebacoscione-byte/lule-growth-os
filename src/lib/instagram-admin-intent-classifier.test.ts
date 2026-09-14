@@ -18,6 +18,7 @@ describe("Instagram administrative intent classifier", () => {
     ["¿Necesito autorisacion para el estudio?", "requirements"],
     ["¿Dónde retiro el informe?", "results"],
     ["Necesito reprogramar el turno", "appointment_management"],
+    ["¿Cómo confirmo mi turno?", "appointment_management"],
     ["¿Dónde atiende?", "location"],
     ["¿Atendés en Lanús?", "location"],
     ["¿Tenés turnos disponibles esta semana?", "booking"],
@@ -52,6 +53,7 @@ describe("Instagram administrative intent classifier", () => {
 
   it.each([
     ["Es urgente, quiero un turno", "urgency"],
+    ["¿Podés interpretar mi ecocardiograma?", "clinical_interpretation"],
     ["¿Cuánto cuesta la consulta?", "price"],
     ["Ya tengo turno, gracias", "already_resolved"],
     ["No quiero turno", "explicit_rejection"],
