@@ -2,7 +2,18 @@ import type { SupabaseClient } from "@supabase/supabase-js"
 import { getConnectionInfo, getProfile, getValidToken } from "@/lib/instagram-business"
 import type { InstagramInboxItemInput } from "@/lib/instagram-webhook-normalizer"
 import { containsSensitiveMedicalContent } from "@/lib/medical-safety"
-import { PRACTICE_SITES } from "@/lib/practice-directory"
+import {
+  classifyInstagramAdministrativeIntent,
+  getInstagramAutoReplyBlockReason,
+  type InstagramAdministrativeClassification,
+} from "@/lib/instagram-admin-intent-classifier"
+import {
+  findPracticeSiteInText,
+  getPracticeSitesForService,
+  PRACTICE_SERVICE_NAMES,
+  PRACTICE_SITES,
+  type PracticeServiceId,
+} from "@/lib/practice-directory"
 
 const GRAPH_BASE = "https://graph.instagram.com/v26.0"
 const FETCH_TIMEOUT_MS = 10_000
@@ -17,6 +28,21 @@ export const INSTAGRAM_COVERAGE_REPLY =
 export const INSTAGRAM_PAMI_REPLY =
   "¡Hola! Gracias por consultar. Por el momento no atiendo por PAMI. Podés ver las obras sociales y prepagas con las que atiendo en las historias destacadas o en mi página web, desde el link de la bio. Saludos 😊"
 
+export const INSTAGRAM_APPOINTMENT_MANAGEMENT_REPLY =
+  "¡Hola! Para cancelar, cambiar o confirmar un turno tenés que comunicarte directamente con la institución donde lo reservaste. En el link de la bio están los canales oficiales de cada sede."
+
+export const INSTAGRAM_CONTACT_REPLY =
+  "¡Hola! En el link de la bio vas a encontrar las direcciones, teléfonos y canales oficiales de cada lugar donde atiende la Dra. Lucía Chahin. Si me indicás la sede, puedo orientarte con el dato correspondiente."
+
+export const INSTAGRAM_RESULTS_REPLY =
+  "¡Hola! La entrega, disponibilidad o retiro de informes y resultados se gestiona directamente con la institución donde te realizaste el estudio. En el link de la bio están los canales oficiales de cada sede."
+
+export const INSTAGRAM_REQUIREMENTS_REPLY =
+  "¡Hola! Los requisitos administrativos para una consulta o estudio (por ejemplo orden, autorización o documentación) pueden variar según la institución y la cobertura. Te recomiendo confirmarlos directamente con la sede al pedir el turno; los canales oficiales están en el link de la bio."
+
+export const INSTAGRAM_SPECIALTY_REPLY =
+  "¡Hola! Sí, la Dra. Lucía Chahin es médica cardióloga. En el link de la bio podés ver los lugares donde atiende, horarios y canales oficiales para pedir turno."
+
 const INSTAGRAM_LOCATION_LINES = PRACTICE_SITES.map(site =>
   `• ${site.name}${site.serviceNote ? ` (${site.serviceNote.toLowerCase()})` : ""}: ${site.hours}.`
 ).join("\n")
@@ -24,29 +50,55 @@ const INSTAGRAM_LOCATION_LINES = PRACTICE_SITES.map(site =>
 export const INSTAGRAM_LOCATION_REPLY =
   `¡Hola! Soy el asistente virtual administrativo de la Dra. Lucía Chahin. Estos son sus lugares y horarios habituales:\n${INSTAGRAM_LOCATION_LINES}\nEn el link de la bio podés ver las direcciones y los canales oficiales para pedir turno. La disponibilidad se confirma con cada institución.`
 
-const BOOKING_INTENT_PATTERN =
-  /\b(?:pedir|sacar|solicitar|reservar|agendar|conseguir|necesito|quiero|quisiera|busco|como (?:puedo|hago para)|hay|tenes|tienen|dan)\b.{0,45}\b(?:un )?(?:turnos?|citas?)\b|\b(?:turnos?|citas?)\b.{0,45}\b(?:pedir|sacar|solicitar|reservar|agendar|conseguir|necesito|quiero|quisiera|disponibles?|disponibilidad|hay|tenes|tienen)\b/
-const SHORT_BOOKING_INTENT_PATTERN =
-  /^[¿?¡! ]*(?:hola[,.! ]*)?(?:turnos?|citas?)[¿?.! ]*$/
-const WRONG_FLOW_PATTERN =
-  /\b(?:cancelar|cambiar|reprogramar|confirmar|anular|perdi|perder|ya (?:saque|tengo)|no (?:quiero|necesito))\b.{0,35}\b(?:turno|cita)\b|\b(?:turno|cita)\b.{0,35}\b(?:cancelar|cambiar|reprogramar|confirmar|anular|perdi|perder)\b/
-const COVERAGE_INTENT_PATTERN =
-  /\b(?:obras? sociales?|prepagas?|coberturas?|pami|sin (?:obra social|prepaga)|no tengo (?:obra social|prepaga)|(?:atienden?|atendes) (?:por|con|x)|aceptan? (?:la |el )?(?:obra social|prepaga|plan)|trabajan? con)\b|\b(?:atenderme|atencion|consulta|turno|atienden?|atendes)\b.{0,30}\bparticular\b|\bparticular\b.{0,30}\b(?:atenderme|atencion|consulta|turno|atienden?|atendes)\b/
-const LOCATION_CONTEXT_PATTERN =
-  /\b(?:atiende|atendes|atencion|consultorio|doctora|dra|cardiologa|cimel|hospital britanico|britanico|swiss medical|swiss|sede)\b/
-const LOCATION_QUESTION_PATTERN =
-  /\b(?:donde|como llegar|en que (?:sede|lugar|zona)|cuales? (?:sedes?|lugares?)|sedes?|lugares?|ubicacion|direccion|horarios?|que dias?|que dia|cuando|(?:atiende(?:s)?|atendes) (?:en|(?:el|los?) (?:lunes|martes|miercoles|jueves|viernes|sabados?|domingos?)))\b/
-const PRICE_INTENT_PATTERN =
-  /\b(?:precio|valor|costo|cuanto (?:sale|cuesta|cobra))\b/
-const URGENCY_PATTERN = /\b(?:urgente|urgencia|emergencia|guardia)\b/
+function serviceLabel(serviceId: PracticeServiceId): string {
+  return PRACTICE_SERVICE_NAMES[serviceId].toLowerCase()
+}
 
-function normalizeText(value: string): string {
-  return value
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
-    .replace(/\s+/g, " ")
-    .trim()
+function sitesForService(serviceId: PracticeServiceId): string {
+  return getPracticeSitesForService(serviceId).map(site => site.name).join(", ")
+}
+
+function serviceReply(text: string, requestedServices: PracticeServiceId[]): string | null {
+  const site = findPracticeSiteInText(text)
+
+  if (site) {
+    const offered = site.services.map(serviceLabel)
+    const offeredSummary = offered.length === 1 ? offered[0] : offered.join(" y ")
+    const unavailableRequested = requestedServices.filter(serviceId => !site.services.includes(serviceId))
+
+    if (unavailableRequested.length > 0) {
+      const alternatives = unavailableRequested.map(serviceId => {
+        const destination = sitesForService(serviceId)
+        return `${serviceLabel(serviceId)}: ${destination}`
+      }).join(" · ")
+      return `¡Hola! En ${site.name} la Dra. Lucía Chahin realiza ${offeredSummary}. Para la otra prestación que consultás: ${alternatives}. En el link de la bio están los canales oficiales para pedir turno.`
+    }
+
+    return `¡Hola! En ${site.name} la Dra. Lucía Chahin realiza ${offeredSummary}. En el link de la bio están los canales oficiales de la sede para pedir turno y confirmar disponibilidad.`
+  }
+
+  if (requestedServices.includes("echocardiogram") && requestedServices.includes("cardiology_consultation")) {
+    return `¡Hola! La Dra. Lucía Chahin realiza ecocardiogramas en ${sitesForService("echocardiogram")}. Para consulta cardiológica atiende en ${sitesForService("cardiology_consultation")}. En el link de la bio están los canales oficiales para pedir turno.`
+  }
+  if (requestedServices.includes("echocardiogram")) {
+    return `¡Hola! La Dra. Lucía Chahin realiza ecocardiogramas en ${sitesForService("echocardiogram")}. En el link de la bio están los canales oficiales para pedir turno y confirmar disponibilidad.`
+  }
+  if (requestedServices.includes("cardiology_consultation")) {
+    return `¡Hola! La Dra. Lucía Chahin realiza consulta cardiológica en ${sitesForService("cardiology_consultation")}. En el link de la bio están los canales oficiales para pedir turno y confirmar disponibilidad.`
+  }
+  return null
+}
+
+function locationReply(text: string): string {
+  const site = findPracticeSiteInText(text)
+  if (!site) return INSTAGRAM_LOCATION_REPLY
+  return `¡Hola! ${site.name}: ${site.hours}. Dirección: ${site.address}. En el link de la bio están los canales oficiales para pedir turno y confirmar disponibilidad.`
+}
+
+function contactReply(text: string): string {
+  const site = findPracticeSiteInText(text)
+  if (!site) return INSTAGRAM_CONTACT_REPLY
+  return `¡Hola! Para ${site.name}, el teléfono informado es ${site.phone}. En el link de la bio también tenés la dirección y los canales oficiales de la sede.`
 }
 
 export function getInstagramAutoReplyText(item: InstagramInboxItemInput): string | null {
@@ -60,6 +112,42 @@ export interface InstagramAutoReplyPlan {
   delivery: InstagramAutoReplyDelivery
 }
 
+function planFromClassification(
+  item: InstagramInboxItemInput,
+  classification: InstagramAdministrativeClassification
+): InstagramAutoReplyPlan | null {
+  const publicIfComment: InstagramAutoReplyDelivery = item.item_type === "comment"
+    ? "public_comment"
+    : "private_message"
+
+  switch (classification.intent) {
+    case "pami":
+      return { text: INSTAGRAM_PAMI_REPLY, delivery: publicIfComment }
+    case "coverage":
+      return { text: INSTAGRAM_COVERAGE_REPLY, delivery: publicIfComment }
+    case "appointment_management":
+      return { text: INSTAGRAM_APPOINTMENT_MANAGEMENT_REPLY, delivery: "private_message" }
+    case "results":
+      return { text: INSTAGRAM_RESULTS_REPLY, delivery: "private_message" }
+    case "requirements":
+      return { text: INSTAGRAM_REQUIREMENTS_REPLY, delivery: "private_message" }
+    case "contact":
+      return { text: contactReply(item.content ?? ""), delivery: "private_message" }
+    case "specialty":
+      return { text: INSTAGRAM_SPECIALTY_REPLY, delivery: publicIfComment }
+    case "service": {
+      const reply = serviceReply(item.content ?? "", classification.services)
+      return reply ? { text: reply, delivery: publicIfComment } : null
+    }
+    case "location":
+      return { text: locationReply(item.content ?? ""), delivery: "private_message" }
+    case "booking":
+      return { text: INSTAGRAM_BOOKING_REPLY, delivery: "private_message" }
+    default:
+      return null
+  }
+}
+
 export function getInstagramAutoReplyPlan(item: InstagramInboxItemInput): InstagramAutoReplyPlan | null {
   if (
     item.direction !== "inbound" ||
@@ -68,26 +156,13 @@ export function getInstagramAutoReplyPlan(item: InstagramInboxItemInput): Instag
     item.attachment_type
   ) return null
 
-  const text = normalizeText(item.content)
-  if (!text || text === "[mensaje eliminado]") return null
+  if (item.content.trim().toLowerCase() === "[mensaje eliminado]") return null
   if (containsSensitiveMedicalContent(item.content)) return null
-  if (URGENCY_PATTERN.test(text) || WRONG_FLOW_PATTERN.test(text) || PRICE_INTENT_PATTERN.test(text)) {
-    return null
-  }
-  const coverageDelivery: InstagramAutoReplyDelivery = item.item_type === "comment"
-    ? "public_comment"
-    : "private_message"
-  if (/\bpami\b/.test(text)) return { text: INSTAGRAM_PAMI_REPLY, delivery: coverageDelivery }
-  if (COVERAGE_INTENT_PATTERN.test(text)) {
-    return { text: INSTAGRAM_COVERAGE_REPLY, delivery: coverageDelivery }
-  }
-  if (LOCATION_CONTEXT_PATTERN.test(text) && LOCATION_QUESTION_PATTERN.test(text)) {
-    return { text: INSTAGRAM_LOCATION_REPLY, delivery: "private_message" }
-  }
-  if (BOOKING_INTENT_PATTERN.test(text) || SHORT_BOOKING_INTENT_PATTERN.test(text)) {
-    return { text: INSTAGRAM_BOOKING_REPLY, delivery: "private_message" }
-  }
-  return null
+  if (getInstagramAutoReplyBlockReason(item.content)) return null
+
+  const classification = classifyInstagramAdministrativeIntent(item.content)
+  if (!classification) return null
+  return planFromClassification(item, classification)
 }
 
 export function isEligibleInstagramBookingInquiry(item: InstagramInboxItemInput): boolean {
@@ -146,7 +221,6 @@ async function sendInstagramBookingReply(
       }
     )
   } catch {
-    // Un timeout o corte puede ocurrir después de que Meta haya aceptado el mensaje. No se reintenta.
     throw new InstagramSendError("network_indeterminate", "indeterminate")
   }
 
@@ -190,10 +264,6 @@ async function markReply(
   if (error) throw new Error("instagram_auto_reply_status_failed")
 }
 
-/**
- * Envía únicamente una de las plantillas administrativas aprobadas. Un claim transaccional en
- * PostgreSQL deduplica reintentos de Meta y evita repetir el mismo texto durante 15 minutos.
- */
 export async function processInstagramBookingAutoReplies(
   supabase: SupabaseClient,
   items: InstagramInboxItemInput[]
@@ -253,7 +323,6 @@ export async function processInstagramBookingAutoReplies(
 
   await Promise.all(candidates.map(async candidate => {
     const { item, reply } = candidate
-    // Meta usa `user_id` (ID público) en el webhook y `id` (ID scoped de la app) en /me y Send API.
     if (!acceptedWebhookAccountIds.has(item.instagram_account_id)) {
       result.skipped += 1
       return

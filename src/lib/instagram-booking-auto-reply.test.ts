@@ -7,6 +7,7 @@ jest.mock("@/lib/instagram-business", () => ({
 import { getConnectionInfo, getProfile, getValidToken } from "@/lib/instagram-business"
 import type { InstagramInboxItemInput } from "@/lib/instagram-webhook-normalizer"
 import {
+  INSTAGRAM_APPOINTMENT_MANAGEMENT_REPLY,
   INSTAGRAM_BOOKING_REPLY,
   INSTAGRAM_COVERAGE_REPLY,
   INSTAGRAM_LOCATION_REPLY,
@@ -99,14 +100,15 @@ describe("isEligibleInstagramBookingInquiry", () => {
     "¿Atiende en Lanús?",
     "¿Atendés los viernes?",
     "¿Cómo llegar a CIMEL?",
-  ])("acepta intención inequívoca: %s", content => {
+    "Quiero cancelar mi turno",
+    "Quiero cambiar mi turno en CIMEL",
+  ])("acepta intención administrativa inequívoca: %s", content => {
     expect(isEligibleInstagramBookingInquiry(item({ content }))).toBe(true)
   })
 
   it.each([
     "Hola",
     "¿Cuánto sale un turno?",
-    "Quiero cancelar mi turno",
     "Ya tengo turno",
     "Necesito turno por dolor de pecho",
     "Es urgente, quiero un turno",
@@ -114,7 +116,6 @@ describe("isEligibleInstagramBookingInquiry", () => {
     "¿Qué horario me conviene para tomar la medicación?",
     "No tengo obra social y necesito turno por dolor de pecho",
     "¿Cuánto sale atenderme particular?",
-    "Quiero cambiar mi turno en CIMEL",
     "Es un caso muy particular",
   ])("deja para una persona los casos ambiguos o sensibles: %s", content => {
     expect(isEligibleInstagramBookingInquiry(item({ content }))).toBe(false)
@@ -131,14 +132,19 @@ describe("isEligibleInstagramBookingInquiry", () => {
     expect(getInstagramAutoReplyText(item({ content: "¿Qué obras sociales atendés en Lanús?" })))
       .toBe(INSTAGRAM_COVERAGE_REPLY)
     expect(getInstagramAutoReplyText(item({ content: "Turno" }))).toBe(INSTAGRAM_BOOKING_REPLY)
-    expect(getInstagramAutoReplyText(item({ content: "¿Qué días atiende en CIMEL?" })))
-      .toBe(INSTAGRAM_LOCATION_REPLY)
+
+    const cimelLocation = getInstagramAutoReplyText(item({ content: "¿Qué días atiende en CIMEL?" }))
+    expect(cimelLocation).toContain("CIMEL Lanús")
+    expect(cimelLocation).toContain("Martes 13:00–15:00")
+
     expect(getInstagramAutoReplyText(item({ content: "Quiero atenderme particular" })))
       .toBe(INSTAGRAM_COVERAGE_REPLY)
     expect(getInstagramAutoReplyText(item({ content: "¿Qué horarios atiende por OSDE?" })))
       .toBe(INSTAGRAM_COVERAGE_REPLY)
     expect(getInstagramAutoReplyText(item({ content: "Atienden x PAMI" })))
       .toBe(INSTAGRAM_PAMI_REPLY)
+    expect(getInstagramAutoReplyText(item({ content: "Necesito reprogramar mi turno" })))
+      .toBe(INSTAGRAM_APPOINTMENT_MANAGEMENT_REPLY)
   })
 
   it("mantiene primera persona para coberturas y límites administrativos claros", () => {
@@ -171,7 +177,7 @@ describe("isEligibleInstagramBookingInquiry", () => {
       .toEqual({ text: INSTAGRAM_PAMI_REPLY, delivery: "private_message" })
   })
 
-  it("mantiene el cronograma vigente en la respuesta de sedes", () => {
+  it("mantiene el cronograma vigente en la respuesta general de sedes", () => {
     expect(INSTAGRAM_LOCATION_REPLY).toContain("CIMEL Lanús: Martes 13:00–15:00 · Jueves y viernes 13:00–16:00")
     expect(INSTAGRAM_LOCATION_REPLY).toContain("Hospital Británico Lanús (ecocardiogramas): Martes 16:00–19:30")
     expect(INSTAGRAM_LOCATION_REPLY).toContain("Hospital Británico Central: Miércoles 17:00–19:45")
